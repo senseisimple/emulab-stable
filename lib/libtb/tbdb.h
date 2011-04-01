@@ -33,6 +33,7 @@ int	mydb_seteventschedulerpid(char *pid, char *eid, int processid);
  */
 MYSQL_RES      *mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
+int		mydb_insertid(void);
 unsigned long  mydb_escape_string(char *to, const char *from,
 				  unsigned long length);
 

@@ -1,22 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<s:BorderContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
-				   xmlns:s="library://ns.adobe.com/flex/spark" 
-				   xmlns:mx="library://ns.adobe.com/flex/mx"
-				   width="100%" height="100%" borderStyle="solid" backgroundColor="#F6F6F6" borderColor="#CDC2C2"
-				   dragEnter="dragEnterHandler(event)"  dragDrop="dragDropHandler(event)"
-				   mouseMove="mouseMoveHandler(event)"
-				   mouseUp="mouseUpHandler(event)">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	<fx:Script>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   width="100%" height="100%" borderStyle="solid" backgroundColor="#F6F6F6" borderColor="#CDC2C2"
+		   dragEnter="dragEnterHandler(event)"  dragDrop="dragDropHandler(event)"
+		   mouseMove="mouseMoveHandler(event)"
+		   mouseUp="mouseUpHandler(event)">
+	
+	<mx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.controls.List;
+			import mx.core.UIComponent;
 			import mx.events.DragEvent;
 			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
 			
-			import protogeni.display.mapping.GeniMapMarker;
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
@@ -33,6 +32,7 @@
 			
 			public var allNodes:SliceNodeCollection = new SliceNodeCollection();
 			public var allLinks:SliceLinkCollection = new SliceLinkCollection();
+			//public var addedRawChildren:ArrayCollection = new ArrayCollection();
 			
 			public function load(newSlice:Slice):void
 			{
@@ -43,17 +43,17 @@
 				for each(var s:Sliver in slice.slivers)
 				{
 					for each(var n:VirtualNode in s.nodes)
-					this.addVirtualNodeToCanvas(n);
+						this.addVirtualNodeToCanvas(n);
 				}
 				
 				// Links
 				for each(s in slice.slivers)
 				{
 					for each(var l:VirtualLink in s.links)
-					this.addVirtualLinkToCanvas(l);
+						this.addVirtualLinkToCanvas(l);
 				}
 			}
-			
+
 			public function refreshSlice():void
 			{
 				if(!slice.hasAllAllocatedResources())
@@ -68,7 +68,7 @@
 					var vn:VirtualNode = slice.getVirtualNodeWithId(sn.lastId);
 					if(vn == null)
 					{
-						this.removeElement(sn);
+						this.removeChild(sn);
 						allNodes.removeItemAt(i);
 						i--;
 					}
@@ -87,13 +87,13 @@
 						sn.resetToStatus();
 					}
 				}
-				
+
 				// Add new nodes
 				for each(var unaddedNode:VirtualNode in unadded)
-				this.addVirtualNodeToCanvas(unaddedNode);
+					this.addVirtualNodeToCanvas(unaddedNode);
 				
 				unadded = slice.GetAllLinks();
-				
+					
 				// Remove/replace old links
 				for(i = 0; i < this.allLinks.length; i++)
 				{
@@ -101,8 +101,8 @@
 					var vl:VirtualLink = slice.getVirtualLinkWithId(sl.lastId);
 					if(vl == null)
 					{
-						this.removeElement(sl.removeButton);
-						this.removeElement(sl);
+						removeChild(sl.removeButton);
+						removeChild(sl);
 						allLinks.removeItemAt(i);
 						i--;
 					}
@@ -123,7 +123,7 @@
 				
 				// Add new
 				for each(var unaddedLink:VirtualLink in unadded)
-				this.addVirtualLinkToCanvas(unaddedLink);
+					this.addVirtualLinkToCanvas(unaddedLink);
 				
 				hostWindow.loadNodes();
 			}
@@ -155,13 +155,13 @@
 			private  function dragEnterHandler(event:DragEvent):void {
 				if (event.dragSource.hasFormat("canvas") ||
 					event.dragSource.hasFormat("marker") ||
-					(event.dragInitiator is List &&
-						(List(event.dragInitiator).selectedItem is VirtualNode ||
+						(event.dragInitiator is List &&
+							(List(event.dragInitiator).selectedItem is VirtualNode ||
 							(List(event.dragInitiator).selectedItem is PhysicalNode &&
-								PhysicalNode(List(event.dragInitiator).selectedItem).available &&
-								!allNodes.containsPhysicalNode(PhysicalNode(List(event.dragInitiator).selectedItem))))))
+							PhysicalNode(List(event.dragInitiator).selectedItem).available &&
+							!allNodes.containsPhysicalNode(PhysicalNode(List(event.dragInitiator).selectedItem))))))
 				{
-					DragManager.acceptDragDrop(BorderContainer(event.currentTarget));
+					DragManager.acceptDragDrop(Canvas(event.currentTarget));
 				}
 			}
 			
@@ -172,8 +172,8 @@
 					if(List(event.dragInitiator).selectedItem is PhysicalNode)
 					{
 						addPhysicalNode(List(event.dragInitiator).selectedItem as PhysicalNode,
-							BorderContainer(event.currentTarget).mouseX,
-							BorderContainer(event.currentTarget).mouseY);
+							Canvas(event.currentTarget).mouseX,
+							Canvas(event.currentTarget).mouseY);
 						
 					} else if(List(event.dragInitiator).selectedItem is VirtualNode) {
 						var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor((List(event.dragInitiator).selectedItem as VirtualNode).manager));
@@ -181,27 +181,26 @@
 						nvn.isShared = (List(event.dragInitiator).selectedItem as VirtualNode).isShared;
 						nvn.id = slice.getUniqueVirtualNodeId(nvn);
 						this.addVirtualNode(nvn,
-							BorderContainer(event.currentTarget).mouseX,
-							BorderContainer(event.currentTarget).mouseY);
+							Canvas(event.currentTarget).mouseX,
+							Canvas(event.currentTarget).mouseY);
 					}
 				}
-					// Handle markers
+				// Handle markers
 				else if(event.dragSource.hasFormat("marker"))
 				{
-					var dragSource:GeniMapMarker = event.dragSource.dataForFormat( 'marker' ) as GeniMapMarker;
+					var dragSource:ProtogeniMapMarker = event.dragSource.dataForFormat( 'marker' ) as ProtogeniMapMarker;
 					var vn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(dragSource.nodeGroups.collection[0].collection[0].manager));
 					vn.isVirtual = true;
 					vn.id = slice.getUniqueVirtualNodeId(vn);
 					this.addVirtualNode(vn,
-						BorderContainer(event.currentTarget).mouseX,
-						BorderContainer(event.currentTarget).mouseY);
+						Canvas(event.currentTarget).mouseX,
+						Canvas(event.currentTarget).mouseY);
 				}
-				
 				// Handle dragging old one
 				else if(this.contains(event.dragInitiator as DisplayObject))
 				{
-					SliceNode(event.dragInitiator).x = BorderContainer(event.currentTarget).mouseX - SliceNode(event.dragInitiator).startX;
-					SliceNode(event.dragInitiator).y = BorderContainer(event.currentTarget).mouseY - SliceNode(event.dragInitiator).startY;
+					SliceNode(event.dragInitiator).x = Canvas(event.currentTarget).mouseX - SliceNode(event.dragInitiator).startX;
+					SliceNode(event.dragInitiator).y = Canvas(event.currentTarget).mouseY - SliceNode(event.dragInitiator).startY;
 					redrawAllLinks();
 				}
 			}
@@ -219,7 +218,7 @@
 			{
 				// Remove subnodes
 				for each(var sub:VirtualNode in sn.node.subNodes)
-				removeVirtualNode(sub);
+					removeVirtualNode(sub);
 				
 				// Remove links
 				while(sn.links.length > 0)
@@ -233,8 +232,8 @@
 					if(s.nodes.length == 0 && slice.slivers.getItemIndex(s) > -1)
 						slice.slivers.removeItemAt(slice.slivers.getItemIndex(s));
 				}
-				
-				this.removeElement(sn);
+
+				this.removeChild(sn);
 				allNodes.removeItemAt(allNodes.getItemIndex(sn));
 				hostWindow.loadNodes();
 			}
@@ -247,7 +246,7 @@
 				var sl:SliceLink = new SliceLink(this);
 				sl.establishFromExisting(vl);
 				sl.drawEstablished();
-				this.addElement(sl);
+				this.addChild(sl);
 				validateNow();
 				redrawAllLinks();
 				return sl;
@@ -335,7 +334,7 @@
 				if(allNodes.contains(sn))
 					return;
 				sn.canvas = this;
-				this.addElement(sn);
+				this.addChild(sn);
 				this.validateNow();
 				sn.setLocation(x, y);
 				sn.adjustWidth();
@@ -350,7 +349,7 @@
 				startNode = node;
 				tempLink = new SliceLink(this);
 			}
-			
+
 			protected function mouseMoveHandler(event:MouseEvent):void
 			{
 				if(startNode != null)
@@ -360,23 +359,24 @@
 					for each(var sn:SliceNode in allNodes)
 					{
 						if(sn != startNode
-							&& sn.getRect(this).contains(mouseX, mouseY)
-							&& !allLinks.hasLinkFor(startNode, sn)) {
+								&& sn.getRect(this).contains(mouseX, mouseY)
+								&& !allLinks.hasLinkFor(startNode, sn)) {
 							currentNode = sn;
 							break;
 						}
 					}
-					
+
 					// Add sprite to Canvas display list
 					tempLink.drawEstablishing(startNode.x + startNode.width/2,
-						startNode.y + startNode.height/2,
-						mouseX,
-						mouseY, currentNode != null);
-					addElement(tempLink);
-				} else if(tempLink != null && this.contains(tempLink))
-					removeElement(tempLink);
+											startNode.y + startNode.height/2,
+											mouseX,
+											mouseY, currentNode != null);
+					addChild(tempLink);
+
+				} else if(tempLink != null && this.getChildren().contains(tempLink))
+					removeChild(tempLink);
 			}
-			
+
 			protected function mouseUpHandler(event:MouseEvent):void
 			{
 				// Add link if needed
@@ -384,9 +384,9 @@
 					if(tempLink.establish(startNode, currentNode)) {
 						tempLink.drawEstablished();
 					} else
-						removeElement(tempLink);
-				} else if(tempLink != null && contains(tempLink))
-					removeElement(tempLink);
+						removeChild(tempLink);
+				} else if(tempLink != null && getChildren().indexOf(tempLink) > -1)
+					removeChild(tempLink);
 				validateNow();
 				
 				// Reset
@@ -402,10 +402,12 @@
 				for each(var sl:SliceLink in allLinks)
 				{
 					sl.drawEstablished();
-					this.setElementIndex(sl, 0);
+					this.setChildIndex(sl, 0);
 				}
-				
+					
 			}
+
 		]]>
-	</fx:Script>
-</s:BorderContainer>
+	</mx:Script>
+
+</mx:Canvas>

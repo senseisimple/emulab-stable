@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+  import flash.events.ErrorEvent;
+  import flash.events.SecurityErrorEvent;
   import protogeni.resources.Slice;
 
   public class RequestUserResolve extends Request
@@ -22,13 +24,13 @@ package protogeni.communication
     {
 		super("UserResolve", "Resolve user", CommunicationUtil.resolve);
 		op.addField("type", "User");
-		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
 	
 	override public function start():Operation
 	{
-		op.addField("credential", Main.geniHandler.CurrentUser.credential);
-		op.addField("hrn", Main.geniHandler.CurrentUser.urn);
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		op.addField("hrn", Main.protogeniHandler.CurrentUser.urn);
 		return op;
 	}
 	
@@ -37,11 +39,11 @@ package protogeni.communication
 		var newCalls:RequestQueue = new RequestQueue();
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			Main.geniHandler.CurrentUser.uid = response.value.uid;
-			Main.geniHandler.CurrentUser.hrn = response.value.hrn;
-			Main.geniHandler.CurrentUser.uuid = response.value.uuid;
-			Main.geniHandler.CurrentUser.email = response.value.email;
-			Main.geniHandler.CurrentUser.name = response.value.name;
+			Main.protogeniHandler.CurrentUser.uid = response.value.uid;
+			Main.protogeniHandler.CurrentUser.hrn = response.value.hrn;
+			Main.protogeniHandler.CurrentUser.uuid = response.value.uuid;
+			Main.protogeniHandler.CurrentUser.email = response.value.email;
+			Main.protogeniHandler.CurrentUser.name = response.value.name;
 			
 			var slices:Array = response.value.slices;
 			if(slices != null && slices.length > 0) {
@@ -49,17 +51,17 @@ package protogeni.communication
 				{
 					var userSlice:Slice = new Slice();
 					userSlice.urn = sliceUrn;
-					Main.geniHandler.CurrentUser.slices.add(userSlice);
+					Main.protogeniHandler.CurrentUser.slices.add(userSlice);
 					newCalls.push(new RequestSliceResolve(userSlice));
 				}
 			}
 			
-			Main.geniDispatcher.dispatchUserChanged();
-			Main.geniDispatcher.dispatchSlicesChanged();
+			Main.protogeniHandler.dispatchUserChanged();
+			Main.protogeniHandler.mapHandler.drawAll();
 		}
 		else
 		{
-			Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
+			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 		
 		return newCalls.head;

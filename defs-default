@@ -41,6 +41,7 @@ MIN_UNIX_GID=6000
 WINSUPPORT=1
 ELVIN_COMPAT=1
 NSVERIFY=1
+TBUSEDBI=1
 
 # Set to one to disable exporting NFS filesystems to nodes
 NOSHAREDFS=0

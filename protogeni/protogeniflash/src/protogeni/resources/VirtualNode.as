@@ -25,7 +25,7 @@
 			if(owner != null)
 			{
 				slivers.addItem(owner);
-				manager = owner.manager;
+				manager = owner.componentManager;
 			}
 				
 			interfaces = new VirtualInterfaceCollection();
@@ -49,7 +49,7 @@
 		public var virtualizationSubtype:String = "emulab-openvz";
 		
 		// Component
-		public var manager:GeniManager;
+		public var manager:ComponentManager;
 		
 		[Bindable]
 		public var urn:String;
@@ -101,7 +101,7 @@
 		}
 		
 		public function setToVirtualNode(virtualName:String,
-										 virtualManager:GeniManager,
+										 virtualManager:ComponentManager,
 										 virtualUrn:String,
 										 newIsShared:Boolean):void
 		{
@@ -116,15 +116,15 @@
 		
 		public function getDiskImageShort():String
 		{
-			if(diskImage.indexOf("urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//") > -1)
-				return diskImage.replace("urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//", "");
+			if(diskImage.indexOf("urn:publicid:IDN+emulab.net+image+emulab-ops//") > -1)
+				return diskImage.replace("urn:publicid:IDN+emulab.net+image+emulab-ops//", "");
 			else
 				return diskImage;
 		}
 		
 		public function setDiskImageFromOSID(osid:String):void
 		{
-			this.diskImage = "urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//" + osid;
+			this.diskImage = "urn:publicid:IDN+emulab.net+image+emulab-ops//" + osid;
 		}
 		
 		public function setDiskImage(img:String):void
@@ -145,7 +145,7 @@
 			if(isVirtual)
 			{
 				var newVirtualInterface:VirtualInterface = new VirtualInterface(this);
-				newVirtualInterface.id = this.id + ":if" + this.interfaces.collection.length;
+				newVirtualInterface.id = "virt-int-" + this.interfaces.collection.length;
 				newVirtualInterface.role = PhysicalNodeInterface.EXPERIMENTAL;
 				newVirtualInterface.bandwidth = 100000;
 				newVirtualInterface.isVirtual = true;
@@ -166,7 +166,7 @@
 						{
 							var newPhysicalInterface:VirtualInterface = new VirtualInterface(this);
 							newPhysicalInterface.isVirtual = false;
-							newPhysicalInterface.id = this.id + ":if" + this.interfaces.collection.length;
+							newPhysicalInterface.id = "phy-int-" + this.interfaces.collection.length;
 							newPhysicalInterface.role = candidate.role;
 							newPhysicalInterface.physicalNodeInterface = candidate;
 							return newPhysicalInterface;
@@ -232,6 +232,57 @@
 				}
 			}
 			return ac;
+		}
+		
+		public function getXml():XML
+		{
+			var result : XML = <node />;
+			if (!isVirtual)
+				result.@component_uuid = physicalNode.urn;
+			result.@component_manager_uuid = manager.Urn;
+			result.@virtual_id = id;
+			result.@virtualization_type = virtualizationType;
+			if (isShared)
+			{
+				result.@virtualization_subtype = virtualizationSubtype;
+				result.@exclusive = 0;
+			}
+			else
+				result.@exclusive = 1;
+
+			// Currently only pcs
+			var nodeType:String = "pc";
+			if (isShared)
+				nodeType = "pcvm";
+			var nodeTypeXml:XML = <node_type />;
+			nodeTypeXml.@type_name = nodeType;
+			nodeTypeXml.@type_slots = 1;
+			result.appendChild(nodeTypeXml);
+			
+			if(startupCommand.length > 0)
+				result.@startup_command = startupCommand;
+			
+			if(tarfiles.length > 0)
+				result.@tarfiles = tarfiles;
+			
+			if(diskImage.length > 0)
+			{
+				var diskImageXml:XML = <disk_image />;
+				diskImageXml.@name = diskImage;
+				result.appendChild(diskImageXml);
+			}
+			
+			if (superNode != null)
+				result.appendChild(XML("<subnode_of>" + superNode.urn + "</subnode_of>"));
+			
+			for each (var current:VirtualInterface in interfaces.collection)
+			{
+				var interfaceXml:XML = <interface />;
+				interfaceXml.@virtual_id = current.id;
+				result.appendChild(interfaceXml);
+			}
+
+			return result;
 		}
 	}
 }

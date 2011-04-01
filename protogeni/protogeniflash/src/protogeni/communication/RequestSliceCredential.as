@@ -14,8 +14,6 @@
 
 package protogeni.communication
 {
-	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
@@ -25,10 +23,10 @@ package protogeni.communication
     {
 		super("SliceCredential", "Getting the slice credential for " + s.hrn, CommunicationUtil.getCredential, true);
 		slice = s;
-		op.addField("credential", Main.geniHandler.CurrentUser.credential);
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
 		op.addField("urn", slice.urn);
 		op.addField("type", "Slice");
-		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
 
 	override public function complete(code : Number, response : Object) : *
@@ -37,13 +35,9 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			slice.credential = String(response.value);
-			Main.geniDispatcher.dispatchSliceChanged(slice);
-			for each(var s:Sliver in slice.slivers) {
-				if(s.manager is AggregateManager)
-					newCalls.push(new RequestSliverListResourcesAm(s));
-				else if(s.manager is ProtogeniComponentManager)
-					newCalls.push(new RequestSliverGet(s));
-			}
+			Main.protogeniHandler.dispatchSliceChanged(slice);
+			for each(var s:Sliver in slice.slivers)
+				newCalls.push(new RequestSliverGet(s));
 		}
 		else
 		{

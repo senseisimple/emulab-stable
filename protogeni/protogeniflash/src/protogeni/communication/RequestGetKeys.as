@@ -14,17 +14,18 @@
 
 package protogeni.communication
 {
+	import flash.events.ErrorEvent;
+	
 	public class RequestGetKeys extends Request
 	{
 		public function RequestGetKeys() : void
 		{
 			super("GetKeys", "Getting the ssh credential", CommunicationUtil.getKeys);
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function start():Operation
 		{
-			op.addField("credential",Main.geniHandler.CurrentUser.credential);
+			op.addField("credential",Main.protogeniHandler.CurrentUser.credential);
 			return op;
 		}
 		
@@ -32,12 +33,12 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				Main.geniHandler.CurrentUser.keys = response.value;
-				Main.geniDispatcher.dispatchUserChanged();
+				Main.protogeniHandler.CurrentUser.keys = response.value;
+				Main.protogeniHandler.dispatchUserChanged();
 			}
 			else
 			{
-				Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
+				Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 			}
 			
 			return null;

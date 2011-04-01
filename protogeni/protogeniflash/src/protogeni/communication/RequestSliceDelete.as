@@ -14,7 +14,10 @@
 
 package protogeni.communication
 {
+	import mx.controls.Alert;
+	
 	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 
   public class RequestSliceDelete extends Request
   {
@@ -23,7 +26,7 @@ package protogeni.communication
 		super("SliceDelete", "Deleting slice named " + s.hrn, CommunicationUtil.deleteSlice);
 		slice = s;
 		op.addField("slice_urn", slice.urn);
-		op.addField("credential", Main.geniHandler.CurrentUser.credential);
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
 		// What CM???
     }
 	

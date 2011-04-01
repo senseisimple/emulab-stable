@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Implements the libvnode API for Xen support in Emulab.
@@ -366,12 +366,14 @@ sub rootPostConfig($)
 
 #
 # Create the basic context for the VM and give it a unique ID for identifying
-# "internal" state.
+# "internal" state.  If $raref is set, then we are in a RELOAD state machine
+# and need to walk the appropriate states.
 #
 sub vnodeCreate($$$)
 {
     my ($vnode_id,$imagename,$raref) = @_;
     my %image = %defaultImage;
+    my $inreload = 0;
 
     my $vmid;
     if ($vnode_id =~ /^\w+\d+\-(\d+)$/) {
@@ -400,11 +402,26 @@ sub vnodeCreate($$$)
 	    createRootDisk($vname);
 	}
 	$raref = { "IMAGETIME" => 0 };
+    } else {
+	$inreload = 1;
     }
 
     print STDERR "xen_vnodeCreate: loading image '$imagename'\n";
     if (!defined($raref)) {
 	fatal("xen_vnodeCreate: cannot load image without loadinfo\n");
+    }
+
+    if ($inreload) {
+	# Tell stated we are getting ready for a reload
+	libvnode::setState("RELOADSETUP");
+
+	#
+	# Immediately drop into RELOADING before calling createImageDisk as
+	# that is the place where any image will be downloaded from the image
+	# server and we want that download to take place in the longer timeout
+	# period afforded by the RELOADING state.
+	#
+	libvnode::setState("RELOADING");
     }
 
     $lvname = createImageDisk($imagename, $raref);
@@ -483,10 +500,9 @@ sub vnodeCreate($$$)
     }
 
     #
-    # Finish off the state transitions started by createImageDisk.
+    # Finish off the state transitions as necessary.
     #
-    if (defined($imagename)) {
-	# Tell stated via tmcd
+    if ($inreload) {
 	libvnode::setState("RELOADDONE");
 	sleep(4);
 	libvnode::setState("SHUTDOWN");
@@ -777,6 +793,9 @@ sub vnodeBoot($)
 	die("libvnode_xen: vnodeBoot $vnode_id: could not create bridges");
     }
 
+    # notify stated that we are about to boot
+    libvnode::setState("BOOTING");
+
     # and finally, create the VM
     mysystem("xm create $config");
     print "Created virtual machine $vnode_id\n";
@@ -968,18 +987,12 @@ sub createImageDisk($$)
 	return $lvname;
     }
 
-    # Tell stated we are getting ready for a reload
-    libvnode::setState("RELOADSETUP");
-
     my $size = $XEN_LDSIZE;
     if (system("/usr/sbin/lvcreate -n $lvname -L ${size}G $VGNAME")) {
 	print STDERR "libvnode_xen: could not create disk for $image\n";
 	TBScriptUnlock();
 	return 0;
     }
-
-    # Tell stated via tmcd
-    libvnode::setState("RELOADING");
 
     # Now we just download the file, then let create do its normal thing
     my $imagepath = lvmVolumePath($lvname);

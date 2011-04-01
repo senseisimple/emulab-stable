@@ -21,9 +21,8 @@ package protogeni.communication
   public class CommunicationUtil
   {
 	  // Namespaces
-	  public static var rspec01Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
-	  public static var rspec02Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
-	  public static var rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/2";
+	  public static var rspec1Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
+	  public static var rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
 	  
 	  // Error codes
 	  public static var GENIRESPONSE_SUCCESS : int = 0;
@@ -69,15 +68,18 @@ package protogeni.communication
 	  }
 	  
     private static var sa : String = "sa";
-    private static var cm : String = "cm";
+    private static var cm : String = null;
     private static var ses : String = "ses";
     private static var ch : String = "ch";
-	private static var am : String = "am";
 
+//    public static var defaultAuthority : String = "myelab.testbed.emulab.net";
+    public static var defaultAuthority : String = "emulab.net";
+
+//    public static var defaultHost : String = "myboss.myelab.testbed.emulab.net:446";
     public static var defaultHost : String = "boss.emulab.net";
 
     public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
-
+//"https://boss.emulab.net:443/protogeni/xmlrpc/";
     public static var chUrl : String = "https://boss.emulab.net/protogeni/xmlrpc/";
 
     public static var getCredential : Array = new Array(sa, "GetCredential");
@@ -85,20 +87,9 @@ package protogeni.communication
     public static var resolve : Array = new Array(sa, "Resolve");
     public static var remove : Array = new Array(sa, "Remove");
     public static var register : Array = new Array(sa, "Register");
-	
-	public static var getVersion : Array = new Array(cm, "GetVersion");
+
     public static var discoverResources : Array = new Array(cm, "DiscoverResources");
 	public static var resolveResource : Array = new Array(cm, "Resolve");
-	// AM
-	public static var getVersionAm : Array = new Array(am, "GetVersion");
-	public static var listResourcesAm : Array = new Array(am, "ListResources");
-	public static var deleteSliverAm : Array = new Array(am, "DeleteSliver");
-	public static var createSliverAm : Array = new Array(am, "CreateSliver");
-	public static var sliverStatusAm : Array = new Array(am, "SliverStatus");
-	public static var renewSliverAm : Array = new Array(am, "RenewSliver");
-	public static var shutdownAm : Array = new Array(am, "Shutdown");
-	// PL
-	public static var resolvePl : Array = new Array(am, "Resolve");
 	// Ticket
     public static var getTicket : Array = new Array(cm, "GetTicket");
     public static var updateTicket : Array = new Array(cm, "UpdateTicket");

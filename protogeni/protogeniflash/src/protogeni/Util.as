@@ -15,10 +15,11 @@
 package protogeni
 {
   import flash.external.ExternalInterface;
-  import flash.net.URLRequest;
-  import flash.net.navigateToURL;
+  import flash.net.*;
   
   import mx.collections.ArrayCollection;
+  import mx.formatters.NumberBaseRoundType;
+  import mx.formatters.NumberFormatter;
 
   public class Util
   {
@@ -36,16 +37,6 @@ package protogeni
 		  navigateToURL(new URLRequest(url), "_blank");
 	  }
 	  
-	  public static function tryGetBaseUrl(url:String):String
-	  {
-		  var hostPattern:RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
-		  var match : Object = hostPattern.exec(url);
-		  if (match != null)
-			  return match[1];
-		  else
-			  return url;
-	  }
-	  
     public static function makeUrn(authority : String,
                                    type : String,
                                    name : String) : String
@@ -53,20 +44,15 @@ package protogeni
       return "urn:publicid:IDN+" + authority + "+" + type + "+" + name;
     }
 	
-	public static function getAuthorityFromUrn(urn:String) : String
-	{
-		return urn.split("+")[1];
-	}
-	
 	// Takes the given bandwidth and creates a human readable string
 	public static function kbsToString(bandwidth:Number):String {
 		var bw:String = "";
 		if(bandwidth < 1000) {
-			return bandwidth + " Kb/s"
+			return bandwidth + " Kb\\s"
 		} else if(bandwidth < 1000000) {
-			return bandwidth / 1000 + " Mb/s"
+			return bandwidth / 1000 + " Mb\\s"
 		} else if(bandwidth < 1000000000) {
-			return bandwidth / 1000000 + " Gb/s"
+			return bandwidth / 1000000 + " Gb\\s"
 		}
 		return bw;
 	}
@@ -137,40 +123,8 @@ package protogeni
 		return false;
 	}
 	
-	public static function areEqual(a:Array,b:Array):Boolean {
-		if(a.length != b.length) {
-			return false;
-		}
-		var len:int = a.length;
-		for(var i:int = 0; i < len; i++) {
-			if(a[i] !== b[i]) {
-				return false;
-			}
-		}
-		return true;
-	}
-	
-	public static function haveSame(a:Array,b:Array):Boolean {
-		if(a.length != b.length)
-			return false;
-		
-		var len:int = a.length;
-		for(var i:int = 0; i < len; i++) {
-			if(b.indexOf(a[i]) == -1)
-				return false;
-		}
-		return true;
-	}
-	
 	// Shortens the given string to a length, taking out from the middle
 	public static function shortenString(phrase : String, size : int) : String {
-		// Remove any un-needed elements
-		var a:Array = phrase.split("https://");
-		if(a.length == 1)
-			a = phrase.split("http://");
-		if(a.length == 2)
-			phrase = a[1];
-		
 		if(phrase.length < size)
 			return phrase;
 		

@@ -1,89 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						title="Slices" show="refreshView()" creationComplete="openFirst()"
-						width="300" height="220" close="closeWindow()">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	<fx:Script>
+<display:DefaultWindow
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	title="Slices" show="refreshView()"
+	width="300" height="220"
+	xmlns:display="protogeni.display.*">
+	
+	<mx:Script>
 		<![CDATA[
 			import mx.controls.Alert;
 			import mx.controls.Button;
-			import mx.events.FlexEvent;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
 			
-			import protogeni.GeniEvent;
-			import protogeni.resources.Slice;
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
+			import protogeni.resources.Slice; 
 			
 			public function openFirst():void {
-				refreshView();
+				show();
 				init();
-				focusManager.setFocus(sliceName.textInput);
+				
+				focusManager.setFocus(sliceName);
 			}
 			
 			public function init():void
 			{
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, refreshView);
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, refreshView);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, refreshView);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refreshView);
 			}
 			
-			public override function closeWindow(event:Event=null):void {
-				Main.geniDispatcher.removeEventListener(GeniEvent.SLICES_CHANGED, refreshView);
-				Main.geniDispatcher.removeEventListener(GeniEvent.SLICE_CHANGED, refreshView);
-				super.closeWindow(event);
-			}
-			
-			public function createSlice(junk:* = null):void
+			public function createSlice():void
 			{
-				if(Main.geniHandler.CurrentUser.credential == null || Main.geniHandler.CurrentUser.credential.length == 0)
+				if(Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0)
 				{
 					Alert.show("User credential needed before trying to create slice.");
 					return;
 				}
-				
-				if(Main.geniHandler.CurrentUser.keys == null || Main.geniHandler.CurrentUser.keys.length == 0)
+					
+				if(Main.protogeniHandler.CurrentUser.keys == null || Main.protogeniHandler.CurrentUser.keys.length == 0)
 				{
 					Alert.show("User keys needed before trying to create slice.");
 					return;
 				}
-				
-				if(sliceName.textInput.text.length == 0)
+
+				if(sliceName.text.length == 0)
 				{
 					Alert.show("Please input a name for the slice");
-					focusManager.setFocus(sliceName.textInput);
+					focusManager.setFocus(sliceName);
 					return;
 				}
-				
-				Main.geniHandler.requestHandler.createSlice(sliceName.textInput.text);
+
+				Main.protogeniHandler.rpcHandler.createSlice(sliceName.text);
 			}
 			
 			public function refreshView(junk:* = null):void
 			{
-				slices.removeAllElements();
-				for each(var s:Slice in Main.geniHandler.CurrentUser.slices)
+				this.removeAllChildren();
+				for each(var s:Slice in Main.protogeniHandler.CurrentUser.slices)
 				{
 					var b:Button = DisplayUtil.getSliceButton(s);
 					b.percentWidth = 100;
-					slices.addElement(b);
+					this.addChild(b);
 				}
 			}
-			
-			public function readyInput():void {
-				sliceName.textInput.restrict = "a-zA-Z0-9\\-";
-				sliceName.setEnter(createSlice);
-			}
+
 		]]>
-	</fx:Script>
-	<s:Scroller width="100%" height="100%">
-		<s:VGroup width="100%" height="100%" id="slices" />
-	</s:Scroller>
-	<display:controlBarLayout>
-		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="10" paddingTop="2" />
-	</display:controlBarLayout>
-	<display:controlBarContent>
-		<s:Label text="Create new" />
-		<display:KeyboardTextInput id="sliceName" width="100%" creationComplete="readyInput()" />
-		<display:ImageButton id="createButton" icon="{DisplayUtil.actionIcon}" click="createSlice();" />
-	</display:controlBarContent>
+	</mx:Script>
+	
+	<mx:ControlBar>
+		<display:PromptingTextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-" prompt="New slice name..." />
+		<display:ImageButton id="createButton" source="{DisplayUtil.actionIcon}" click="createSlice();" />
+	</mx:ControlBar>
+	
 </display:DefaultWindow>

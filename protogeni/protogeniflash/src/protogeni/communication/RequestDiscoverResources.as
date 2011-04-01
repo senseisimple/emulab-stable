@@ -17,26 +17,25 @@ package protogeni.communication
   import com.mattism.http.xmlrpc.MethodFault;
   
   import flash.events.ErrorEvent;
+  import flash.events.SecurityErrorEvent;
   import flash.utils.ByteArray;
   
   import mx.utils.Base64Decoder;
   
   import protogeni.Util;
-  import protogeni.resources.ProtogeniComponentManager;
-  import protogeni.resources.GeniManager;
+  import protogeni.resources.ComponentManager;
 
   public class RequestDiscoverResources extends Request
   {
 	  
-    public function RequestDiscoverResources(newCm:ProtogeniComponentManager) : void
+    public function RequestDiscoverResources(newCm:ComponentManager) : void
     {
 		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true, false);
 		op.timeout = 60;
 		cm = newCm;
-		op.addField("credentials", new Array(Main.geniHandler.CurrentUser.credential));
+		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
 		op.addField("compress", true);
-		op.setUrl(newCm.Url);
-		cm.lastRequest = this;
+		op.setExactUrl(newCm.DiscoverResourcesUrl());
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -50,15 +49,26 @@ package protogeni.communication
 			var decodedRspec:String = bytes.toString();
 			
 			cm.Rspec = new XML(decodedRspec);
-			cm.rspecProcessor.processResourceRspec(cleanup);
+			/*try
+			{
+				cm.Rspec = new XML(decodedRspec);
+			} catch(e:Error)
+			{
+				// Remove prefixes and try again
+				var prefixPattern:RegExp = /(<[\/]*)([\w]*:)/gi;
+				decodedRspec = decodedRspec.replace(prefixPattern, "$1");
+				cm.Rspec = new XML(decodedRspec);
+			}*/
+			
+			cm.processRspec(cleanup);
 		}
 		else
 		{
 			cm.errorMessage = response.output;
 			cm.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + cm.errorMessage;
-			cm.Status = GeniManager.STATUS_FAILED;
+			cm.Status = ComponentManager.FAILED;
 			this.removeImmediately = true;
-			Main.geniDispatcher.dispatchGeniManagerChanged(cm);
+			Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		}
 		
 		return null;
@@ -69,37 +79,36 @@ package protogeni.communication
 		cm.errorMessage = event.toString();
 		cm.errorDescription = "";
 		if(cm.errorMessage.search("#2048") > -1)
-			cm.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + cm.VisitUrl();
+			cm.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + cm.DiscoverResourcesUrl();
 		else if(cm.errorMessage.search("#2032") > -1)
 			cm.errorDescription = "IO error, possibly due to the server being down";
 		else if(cm.errorMessage.search("timed"))
 			cm.errorDescription = event.text;
 		
-		cm.Status = GeniManager.STATUS_FAILED;
-		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
+		cm.Status = ComponentManager.FAILED;
+		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 
       return null;
     }
 	
 	override public function cancel():void
 	{
-		cm.Status = GeniManager.STATUS_UNKOWN;
-		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
+		cm.Status = ComponentManager.UNKOWN;
+		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		op.cleanup();
 	}
 	
 	override public function cleanup():void
 	{
-		if(cm.Status == GeniManager.STATUS_INPROGRESS)
-			cm.Status = GeniManager.STATUS_FAILED;
+		if(cm.Status == ComponentManager.INPROGRESS)
+			cm.Status = ComponentManager.FAILED;
 		running = false;
-		Main.geniHandler.requestHandler.remove(this, false);
-		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
+		Main.protogeniHandler.rpcHandler.remove(this, false);
+		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		op.cleanup();
-		Main.geniHandler.mapHandler.drawMap();
-		Main.geniHandler.requestHandler.tryNext();
+		Main.protogeniHandler.rpcHandler.start();
 	}
 
-    private var cm : ProtogeniComponentManager;
+    private var cm : ComponentManager;
   }
 }

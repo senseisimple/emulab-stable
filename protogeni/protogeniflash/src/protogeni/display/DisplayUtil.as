@@ -19,38 +19,32 @@
  
  package protogeni.display
 {
+	import flash.display.DisplayObject;
 	import flash.events.MouseEvent;
+	import flash.text.StyleSheet;
+	import flash.xml.XMLNode;
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
-	import mx.controls.ButtonLabelPlacement;
+	import mx.controls.Label;
 	import mx.managers.PopUpManager;
 	
 	import protogeni.communication.Request;
-	import protogeni.resources.GeniManager;
+	import protogeni.resources.ComponentManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PhysicalNodeInterface;
-	import protogeni.resources.PlanetlabAggregateManager;
-	import protogeni.resources.ProtogeniComponentManager;
-	import protogeni.resources.Site;
 	import protogeni.resources.Slice;
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
 	
-	import spark.components.Label;
-	
 	public class DisplayUtil
 	{
-		public static var successColorString:String = "#0E8219";
-		public static var failColorString:String = "#FE0000";
-		public static var waitColorString:String = "#FF7F00";
-		
-		public static var successColor:uint = 0x0E8219;
-		public static var failColor:uint = 0xFE0000;
-		public static var waitColor:uint = 0xFF7F00;
+		public static var successColor:String = "#0E8219";
+		public static var failColor:String = "#FE0000";
+		public static var waitColor:String = "#FF7F00";
 		
 		public static var hideColor:Object = 0xCCCCCC;
 		public static var linkColor:Object = 0xFFCFD1;
@@ -62,8 +56,6 @@
 		
 		public static var windowHeight:int = 400;
 		public static var windowWidth:int = 700;
-		public static var minComponentHeight:int = 24;
-		public static var minComponentWidth:int = 24;
 		
 		// Embedded images used around the application
 		[Bindable]
@@ -83,19 +75,11 @@
 		public static var rightIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/arrow_up.png")]
-		public static var upIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_down.png")]
-		public static var downIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/status_online.png")]
+		[Embed(source="../../../images/user.png")]
 		public static var userIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/status_offline.png")]
+		[Embed(source="../../../images/user_gray.png")]
 		public static var noUserIcon:Class;
 		
 		[Bindable]
@@ -107,16 +91,8 @@
         public static var crossIcon:Class;
         
         [Bindable]
-        [Embed(source="../../../images/administrator.png")]
+        [Embed(source="../../../images/drive_network.png")]
         public static var ownedIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/server.png")]
-		public static var exclusiveIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/server_stanchion.png")]
-		public static var sharedIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/drive_network.png")]
@@ -167,24 +143,16 @@
 		public static var cancelIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/stop.png")]
+		[Embed(source="../../../images/control_stop_blue.png")]
 		public static var stopIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/control_stop_blue.png")]
-		public static var stopControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_pause_blue.png")]
-		public static var pauseControlIcon:Class;
-		
-		[Bindable]
 		[Embed(source="../../../images/control_play_blue.png")]
-		public static var playControlIcon:Class;
+		public static var playIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/control_repeat_blue.png")]
-		public static var repeatControlIcon:Class;
+		public static var repeatIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/delete.png")]
@@ -196,10 +164,6 @@
 		
 		[Bindable]
 		[Embed(source="../../../images/find.png")]
-		public static var findIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/magnifier.png")]
 		public static var searchIcon:Class;
 		
 		[Bindable]
@@ -230,18 +194,6 @@
 		[Embed(source="../../../images/wand.png")]
 		public static var actionIcon:Class;
 		
-		[Bindable]
-		[Embed(source="../../../images/ssl_certificates.png")]
-		public static var sslIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/keyboard.png")]
-		public static var keyboardIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/system_monitor.png")]
-		public static var consoleIcon:Class;
-		
 		public static function getLabel(text:String):Label
 		{
 			var l:Label = new Label();
@@ -263,27 +215,23 @@
 				return ownedIcon;
             else
             {
-	            if (val.available) {
-					if(val.exclusive)
-						return exclusiveIcon;
-					else
-						return sharedIcon;
-				}
+	            if (val.available)
+	                return availableIcon;
 	            else
 	                return cancelIcon;
             }
         }
         
         // Get's the CM icon
-        public static function assignIconForGeniManager(val:GeniManager):Class {
-			if(val.Status == GeniManager.STATUS_VALID)
+        public static function assignIconForComponentManager(val:ComponentManager):Class {
+			if(val.Status == ComponentManager.VALID)
 				return availableIcon;
 			else
 				return crossIcon;
         }
 		
 		public static function getLogMessageButton(msg:LogMessage):Button {
-			var logButton:Button = getButton();
+			var logButton:Button = new Button();
 			logButton.label = msg.name;
 			logButton.toolTip = msg.groupId;
 			if(msg.isError)
@@ -293,29 +241,25 @@
 			}
 			else
 			{
-				if(msg.type == LogMessage.TYPE_START) {
+				if(msg.type == LogMessage.TYPE_START)
 					logButton.setStyle("icon",DisplayUtil.rightIcon);
-					logButton.labelPlacement = ButtonLabelPlacement.LEFT;
-				}
-				else if(msg.type == LogMessage.TYPE_END) {
-					logButton.setStyle("icon",DisplayUtil.rightIcon);
-					logButton.labelPlacement = ButtonLabelPlacement.RIGHT;
-				}
-				else {
+				else if(msg.type == LogMessage.TYPE_END)
+					logButton.setStyle("icon",DisplayUtil.leftIcon);
+				else
 					logButton.setStyle("icon",DisplayUtil.availableIcon);
-				}
 			}
 			logButton.addEventListener(MouseEvent.CLICK,
 				function openLog():void {
 					var logw:LogMessageWindow = new LogMessageWindow();
-					logw.showWindow();
+					PopUpManager.addPopUp(logw, Main.Pgmap(), false);
+					PopUpManager.centerPopUp(logw);
 					logw.setMessage(msg);
 				});
 			return logButton;
 		}
 		
 		public static function getRequestButton(r:Request):Button {
-			var requestButton:Button = getButton();
+			var requestButton:Button = new Button();
 			requestButton.label = r.name;
 			requestButton.toolTip = r.details;
 			requestButton.addEventListener(MouseEvent.CLICK,
@@ -328,7 +272,7 @@
 		
 		// Gets a button for the slice
 		public static function getSliceButton(s:Slice):Button {
-			var sButton:Button = getButton();
+			var sButton:Button = new Button();
 			if(s.hrn != null && s.hrn.length > 0)
 				sButton.label = s.hrn;
 			else
@@ -342,25 +286,14 @@
 		}
 		
 		// Gets a button for the component manager
-		public static function getGeniManagerButton(gm:GeniManager):Button {
-			var cmButton:Button = getButton(DisplayUtil.assignIconForGeniManager(gm));
-			cmButton.label = gm.Hrn;
-			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
+		public static function getComponentManagerButton(cm:ComponentManager):Button {
+			var cmButton:Button = new Button();
+			cmButton.label = cm.Hrn;
+			cmButton.toolTip = cm.Hrn + " at " + cm.Url;
+			cmButton.setStyle("icon", DisplayUtil.assignIconForComponentManager(cm));
 			cmButton.addEventListener(MouseEvent.CLICK,
-				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewGeniManager(gm);
-				}
-			);
-			return cmButton;
-		}
-		
-		// Gets a button for the component manager
-		public static function getSiteButton(s:Site):Button {
-			var cmButton:Button = getButton();
-			cmButton.label = s.id + " (" + s.name + ")";
-			cmButton.addEventListener(MouseEvent.CLICK,
-				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewNodeCollection(s.nodes);
+				function openComponentManager(event:MouseEvent):void {
+					viewComponentManager(cm);
 				}
 			);
 			return cmButton;
@@ -368,12 +301,13 @@
 		
 		// Gets a button for the physical node
 		public static function getPhysicalNodeButton(n:PhysicalNode):Button {
-			var nodeButton:Button = getButton(DisplayUtil.assignAvailabilityIcon(n));
+			var nodeButton:Button = new Button();
 			nodeButton.label = n.name;
 			nodeButton.toolTip = n.name + " on " + n.manager.Hrn;
+			nodeButton.setStyle("icon", DisplayUtil.assignAvailabilityIcon(n));
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
-					DisplayUtil.viewPhysicalNode(n);
+					viewPhysicalNode(n);
 				}
 			);
 			return nodeButton;
@@ -381,12 +315,12 @@
 		
 		// Gets a button for the physical node
 		public static function getVirtualNodeButton(n:VirtualNode):Button {
-			var nodeButton:Button = getButton();
+			var nodeButton:Button = new Button();
 			nodeButton.label = n.id;
 			nodeButton.toolTip = n.id + " on " + n.manager.Hrn;
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
-					DisplayUtil.viewVirtualNode(n);
+					viewVirtualNode(n);
 				}
 			);
 			return nodeButton;
@@ -394,11 +328,12 @@
 		
 		// Gets a button for a physical link
 		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
-			var linkButton:Button = getButton(DisplayUtil.linkIcon);
+			var linkButton:Button = new Button();
 			linkButton.label = ni.id;
+			linkButton.setStyle("icon", DisplayUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
-					DisplayUtil.viewPhysicalLink(nl);
+					viewPhysicalLink(nl);
 				}
 			);
 			return linkButton;
@@ -411,7 +346,7 @@
 			linkButton.setStyle("icon", DisplayUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
-					DisplayUtil.viewVirtualLink(pl);
+					viewVirtualLink(pl);
 				}
 			);
 			return linkButton;
@@ -419,15 +354,19 @@
 		
 		// Opens a virtual link window
 		public static function viewVirtualLink(pl:VirtualLink):void {
-	    	var plWindow:VirtualLinkWindow = new VirtualLinkWindow();
-			plWindow.showWindow();
+	    	var plWindow:VirtualLinkAdvancedWindow = new VirtualLinkAdvancedWindow();
+	    	plWindow.main = Main.Pgmap();
+	    	PopUpManager.addPopUp(plWindow, Main.Pgmap(), false);
+       		PopUpManager.centerPopUp(plWindow);
        		plWindow.loadPointLink(pl);
 	    }
 		
 		// Opens a physical link window
 		public static function viewPhysicalLink(l:PhysicalLink):void {
-			var lgWindow:PhysicalLinkWindow = new PhysicalLinkWindow();
-			lgWindow.showWindow();
+			var lgWindow:PhysicalLinkAdvancedWindow = new PhysicalLinkAdvancedWindow();
+	    	lgWindow.main = Main.Pgmap();
+	    	PopUpManager.addPopUp(lgWindow, Main.Pgmap(), false);
+       		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadLink(l);
 		}
 		
@@ -436,49 +375,54 @@
 			if(lc.length == 1)
 				viewPhysicalLink(lc[0]);
 			else {
-				var lgWindow:PhysicalLinkGroupWindow = new PhysicalLinkGroupWindow();
-				lgWindow.showWindow();
+				var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
+		    	lgWindow.main = Main.Pgmap();
+		    	PopUpManager.addPopUp(lgWindow, Main.Pgmap(), false);
+	       		PopUpManager.centerPopUp(lgWindow);
 	       		lgWindow.loadCollection(lc);
 			}
 		}
 		
 		// Opens a group of physical links
 		public static function viewPhysicalLinkGroup(lg:PhysicalLinkGroup):void {
-			var lgWindow:PhysicalLinkGroupWindow = new PhysicalLinkGroupWindow();
-			lgWindow.showWindow();
+			var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
+	    	lgWindow.main = Main.Pgmap();
+	    	PopUpManager.addPopUp(lgWindow, Main.Pgmap(), false);
+       		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadGroup(lg);
 		}
 		
 		// Opens a component manager in a window
-		public static function viewGeniManager(gm:GeniManager):void {
-			if(gm is ProtogeniComponentManager) {
-				var cmWindow:ProtogeniManagerWindow = new ProtogeniManagerWindow();
-				cmWindow.showWindow();
-				cmWindow.load(gm as ProtogeniComponentManager);
-			} else if (gm is PlanetlabAggregateManager) {
-				var plmWindow:PlanetlabManagerWindow = new PlanetlabManagerWindow();
-				plmWindow.showWindow();
-				plmWindow.load(gm as PlanetlabAggregateManager);
-			}
+		public static function viewComponentManager(cm:ComponentManager):void {
+			var cmWindow:ComponentManagerAdvancedWindow = new ComponentManagerAdvancedWindow();
+	    	cmWindow.main = Main.Pgmap();
+	    	PopUpManager.addPopUp(cmWindow, Main.Pgmap(), false);
+       		PopUpManager.centerPopUp(cmWindow);
+       		cmWindow.load(cm);
 		}
 		
 		// Opens a physical node in a window
 		public static function viewPhysicalNode(n:PhysicalNode):void {
-			var ngWindow:PhysicalNodeWindow = new PhysicalNodeWindow();
-			ngWindow.showWindow();
+			var ngWindow:PhysicalNodeAdvancedWindow = new PhysicalNodeAdvancedWindow();
+	    	ngWindow.main = Main.Pgmap();
+	    	PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+       		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadNode(n);
 		}
 		
 		public static function viewVirtualNode(n:VirtualNode):void {
-			var ngWindow:VirtualNodeWindow = new VirtualNodeWindow();
-			ngWindow.showWindow();
+			var ngWindow:VirtualNodeAdvancedWindow = new VirtualNodeAdvancedWindow();
+			PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+			PopUpManager.centerPopUp(ngWindow);
 			ngWindow.loadNode(n);
 		}
 		
 		// Opens a group of physical nodes in a window
 		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
-			var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
-			ngWindow.showWindow();
+			var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
+	    	ngWindow.main = Main.Pgmap();
+	    	PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+       		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadGroup(ng);
 		}
 		
@@ -487,8 +431,10 @@
 			if(nc.length == 1)
 				viewPhysicalNode(nc[0]);
 			else {
-				var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
-				ngWindow.showWindow();
+				var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
+		    	ngWindow.main = Main.Pgmap();
+		    	PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+	       		PopUpManager.centerPopUp(ngWindow);
 	       		ngWindow.loadCollection(nc);
 			}
 		}
@@ -496,57 +442,16 @@
 		// Opens a component manager in a window
 		public static function viewSlice(s:Slice):void {
 			var sWindow:SliceWindow = new SliceWindow();
-			sWindow.showWindow();
+			PopUpManager.addPopUp(sWindow, Main.Pgmap(), false);
+			PopUpManager.centerPopUp(sWindow);
 			sWindow.loadSlice(s);
 		}
 		
 		public static function viewRequest(r:Request):void {
 			var rWindow:RequestWindow = new RequestWindow();
-			rWindow.showWindow();
+			PopUpManager.addPopUp(rWindow, Main.Pgmap(), false);
+			PopUpManager.centerPopUp(rWindow);
 			rWindow.load(r);
-		}
-		
-		public static function viewSearchWindow():void {
-			var searchWindow:SearchWindow = new SearchWindow();
-			searchWindow.showWindow();
-		}
-		
-		public static function viewAboutWindow():void {
-			var aboutWindow:AboutWindow = new AboutWindow();
-			PopUpManager.addPopUp(aboutWindow, Main.Application(), false);
-			PopUpManager.centerPopUp(aboutWindow);
-		}
-		
-		public static function viewSlicesWindow():void {
-			var slicesWindow:SlicesWindow = new SlicesWindow();
-			slicesWindow.showWindow();
-		}
-		
-		public static function viewUserWindow():void {
-			var userWindow:UserWindow = new UserWindow();
-			userWindow.showWindow();
-		}
-		
-		public static function viewManagersWindow():void {
-			var managersWindow:GeniManagersWindow = new GeniManagersWindow();
-			managersWindow.showWindow();
-		}
-		
-		public static function getButton(img:Class = null, imgOnly:Boolean = false):Button {
-			var b:Button = new Button();
-			if(imgOnly)
-				b.width = minComponentWidth;
-			b.height = minComponentHeight;
-			if(img != null)
-				b.setStyle("icon", img);
-			return b;
-		}
-		
-		private static var initialUserWindow:InitialUserWindow = null;
-		public static function viewInitialUserWindow():void {
-			if(initialUserWindow == null)
-				initialUserWindow = new InitialUserWindow();
-			initialUserWindow.showWindow();
 		}
 	}
 }

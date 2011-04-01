@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+  import flash.events.ErrorEvent;
+
   class RequestSliceEmbedding extends Request
   {
     public function RequestSliceEmbedding(newManager : ComponentManager,

@@ -1,432 +1,223 @@
 <?xml version="1.0" encoding="utf-8"?>
-<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
-			   xmlns:s="library://ns.adobe.com/flex/spark" 
-			   xmlns:mx="library://ns.adobe.com/flex/mx"
-			   xmlns:mapping="protogeni.display.mapping.*"
-			   minWidth="700" minHeight="400" xmlns:display="protogeni.display.*"
-			   preinitialize="preinit();"
-			   backgroundColor="#D2E1F0"
-			   applicationComplete="init();">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:maps="com.google.maps.*"
+	xmlns:protogeniflash="protogeniflash.*"
+	layout="vertical" paddingRight="0" paddingLeft="0" paddingTop="0" paddingBottom="0" horizontalAlign="left"
+	backgroundColor="#D2E1F0"
+    preinitialize="preinit();"
+	creationComplete="init();" xmlns:display="protogeni.display.*">
 	
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace display "protogeni.display.*";
-		@namespace mapping "protogeni.display.mapping.*";
+	<mx:Script>
+    <![CDATA[
+		import com.google.maps.LatLng;
+		import com.google.maps.MapOptions;
+		import com.google.maps.MapType;
 		
-		.authenticatedStyle {
-			themeColor: green;
-			chromeColor: green;
-		}
+		import mx.collections.ArrayCollection;
+		import mx.controls.Alert;
+		import mx.controls.Image;
+		import mx.controls.Label;
+		import mx.core.mx_internal;
+		import mx.events.CloseEvent;
+		import mx.events.CollectionEvent;
+		import mx.events.ListEvent;
+		import mx.events.ResizeEvent;
+		import mx.managers.PopUpManager;
 		
-		.unauthenticatedStyle {
-			themeColor: red;
-			chromeColor: red;
+		import protogeni.ProtogeniEvent;
+		import protogeni.ProtogeniHandler;
+		import protogeni.Util;
+		import protogeni.display.ChooseComponentManagerWindow;
+		import protogeni.display.ConsoleWindow;
+		import protogeni.display.DisplayUtil;
+		import protogeni.display.SearchWindow;
+		import protogeni.display.SlicesWindow;
+		import protogeni.display.UserWindow;
+		import protogeni.resources.Slice;
+	    
+	    //------------------------------------------
+	    // Embedded resources
+	    [Embed(source="../images/arrow_out.png")] 
+        private var arrowOut:Class;
+        
+        [Embed(source="../images/arrow_in.png")] 
+        private var arrowIn:Class;
+        
+        public var console:ConsoleWindow;
+		public var cms:ChooseComponentManagerWindow;
+        public var about:AboutWindow = new AboutWindow();
+		public var slices:SlicesWindow;
+		public var user:UserWindow;
+		public var search:SearchWindow;
+		
+		[Bindable]
+		public var slicesMenu : ArrayCollection;
+	    
+	    private function preinit():void {
+	    	Security.allowDomain("*");
+	    	Security.allowInsecureDomain("*");
+	    }
+	    
+	    // Start out by asking the user for the CM URL
+	    private function init():void {
+			Main.protogeniHandler = new ProtogeniHandler();
+			Main.protogeniHandler.mapHandler.map = map;
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
+			
+			console = new ConsoleWindow();
+			PopUpManager.addPopUp(console, this, false);
+			PopUpManager.centerPopUp(console);
+			PopUpManager.removePopUp(console);
+			Main.log = console;
+			
+			cms = new ChooseComponentManagerWindow();
+			cms.openFirst();
+			
+			search = new SearchWindow();
+			search.show();
+			search.close();
+			
+			slices = new SlicesWindow();
+			slices.openFirst();
+			slices.close();
+			
+			user = new UserWindow();
+			user.show();
+			user.load(Main.protogeniHandler.CurrentUser);
+			user.close();
+			
+			Security.allowDomain("localhost");	
+	    }
+		
+		private function reinit():void
+		{
+			Main.protogeniHandler = new ProtogeniHandler();
+			Main.protogeniHandler.mapHandler.map = map;
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
+			
+			cms.init();
+			user.load(Main.protogeniHandler.CurrentUser);
+			slices.init();
 		}
-	</fx:Style>
-	
-	<fx:Script>
-		<![CDATA[
-			import mx.collections.ArrayCollection;
-			import mx.controls.Alert;
-			import mx.core.FlexGlobals;
-			import mx.events.CloseEvent;
-			import mx.events.ListEvent;
-			import mx.rpc.events.ResultEvent;
-			
-			import protogeni.GeniDispatcher;
-			import protogeni.GeniEvent;
-			import protogeni.GeniHandler;
-			import protogeni.Util;
-			import protogeni.communication.RequestGeniBundle;
-			import protogeni.communication.RequestRootBundle;
-			import protogeni.communication.RequestTest;
-			import protogeni.display.DisplayUtil;
-			import protogeni.display.KeyboardWindow;
-			import protogeni.resources.Slice;
-			import protogeni.resources.SliceAuthority;
-			
-			//------------------------------------------
-			// Embedded resources
-			[Bindable]
-			[Embed(source="../images/arrow_out.png")] 
-			private var arrowOut:Class;
-			
-			[Embed(source="../images/arrow_in.png")] 
-			private var arrowIn:Class;
-			
-			[Bindable]
-			public var allowAuthenticate:Boolean;
-			
-			[Bindable]
-			public var slicesMenu : ArrayCollection;
-			
-			public var geniLocalSharedObject:SharedObject;
-			
-			public var forceMapKey:String;
-			
-			private function preinit():void {
-				Security.allowDomain("*");
-				Security.allowInsecureDomain("*");
-				Security.allowDomain("localhost");	
-				
-				// Force a different Google Maps API key if given
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.mapkey != null)
-					{
-						forceMapKey = FlexGlobals.topLevelApplication.parameters.mapkey;
-					}
-				} catch(all:Error) {
-				}
-				
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.debug != null)
-					{
-						Main.debugMode = FlexGlobals.topLevelApplication.parameters.debug == "1";
-					}
-				} catch(all:Error) {
-				}
-				
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.usejs != null)
-					{
-						Main.useJavascript = FlexGlobals.topLevelApplication.parameters.usejs == "1";
-					}
-				} catch(all:Error) {
-				}
-				
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.pgonly != null)
-					{
-						Main.protogeniOnly = FlexGlobals.topLevelApplication.parameters.pgonly == "1";
-					}
-				} catch(all:Error) {
-				}
+        
+        public function showAbout():void {
+	    	PopUpManager.addPopUp(about, this, false);
+       		PopUpManager.centerPopUp(about);
+	    }
+            
+	    //------------------------------------------
+	    // GUI
+	    private function toggleFullScreen():void {
+	      try {
+	        switch (systemManager.stage.displayState) {
+	          case StageDisplayState.FULL_SCREEN:
+	            systemManager.stage.displayState = StageDisplayState.NORMAL;
+	            fullscreenButton.source = new arrowOut();
+	            break;
+	          default:
+	            systemManager.stage.displayState = StageDisplayState.FULL_SCREEN;
+	            fullscreenButton.source = new arrowIn();
+	            break;
+	        }
+	      } catch (err:SecurityError) {
+	      	Alert.show("Fullscreen isn't supported on the current system.  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
+	      }
+	    }
+		
+		public function userChanged(pe:ProtogeniEvent):void {
+			if(Main.protogeniHandler.CurrentUser == null
+				|| Main.protogeniHandler.CurrentUser.credential == null
+				|| Main.protogeniHandler.CurrentUser.credential.length == 0)
+			{
+				this.userButton.source = DisplayUtil.noUserIcon;
+			} else {
+				this.userButton.source = DisplayUtil.userIcon;
 			}
-			
-			private function init():void {
-				Main.geniDispatcher = new GeniDispatcher();
-				Main.geniHandler = new GeniHandler();
-				Main.geniHandler.mapHandler.map = map;
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, fillCombobox);
-				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
-				
-				// Default behavior (public)
-				allowAuthenticate = true;
-				Main.geniHandler.unauthenticatedMode = true;
-				
-				// Flash options
-				loadParams();
-				
-				// Saved variables
-				try {
-					geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
-				} catch(e:Error) {
-					Alert.show("It looks like Flash is unable to save/load local data." +
-						"  Would you like to load directions on how to enable local data?",
-						"Enable Local Data?", Alert.YES|Alert.NO, this,
-						function allowData(e:CloseEvent):void {
-							if(e.detail == Alert.YES) {
-								Util.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
-							}
-						});
-				}
-				
-				loadLocalUserData();
-				
-				if(Main.debugMode) {
-					LogHandler.viewConsole();
-					DisplayUtil.viewManagersWindow();
-				}
+		}
+	    
+	    // ComboBox
+	    public function fillCombobox(junk:* = null):void {
+	    	slicesMenu = Main.protogeniHandler.CurrentUser.slices.displaySlices();
+	    }
+	    
+	    public function getSliceLabel(s:Slice):String {
+	    	return s.DisplayString();
+	    }
+	    
+	    public function sliceSelected(evt:ListEvent):void {
+			Main.protogeniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
+	    	onlyMyResourcesCheckbox.selected = Main.protogeniHandler.mapHandler.selectedSlice.hrn != null &&
+				Main.protogeniHandler.mapHandler.selectedSlice.hrn.length > 0;
+			Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
+	    	Main.protogeniHandler.mapHandler.drawMap();
+	    }
+		
+		public function startover():void
+		{
+			Main.protogeniHandler.rpcHandler.pause();
+			Main.protogeniHandler.rpcHandler.clearAll();
+			reinit();
+			Main.protogeniHandler.rpcHandler.startInitiationSequence();
+		}
+    ]]>
+</mx:Script>
 
-				// Load the certificate bundle
-				if(Main.useJavascript) {
-					loadLocalBundleData();
-					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
-					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
-				}
-
-				if(Main.useJavascript && Main.geniHandler.CurrentUser.hasSetupJavascript) {
-					Main.geniHandler.unauthenticatedMode = false;
-					Main.geniHandler.requestHandler.startInitiationSequence(true);
-				} else {
-					var startOptions:StartOptionsWindow = new StartOptionsWindow();
-					startOptions.showWindow();
-				}
-			}
-			
-			//------------------------------------------
-			// GUI
-			private function toggleFullScreen():void {
-				try {
-					switch (systemManager.stage.displayState) {
-						case StageDisplayState.FULL_SCREEN:
-							systemManager.stage.displayState = StageDisplayState.NORMAL;
-							fullscreenButton.setStyle("icon", arrowOut);
-							break;
-						default:
-							systemManager.stage.displayState = StageDisplayState.FULL_SCREEN;
-							fullscreenButton.setStyle("icon", arrowIn);
-							break;
-					}
-				} catch (err:SecurityError) {
-					Alert.show("Fullscreen isn't supported on the current system." +
-						"  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
-				}
-			}
-			
-			public function userChanged(pe:GeniEvent):void {
-				if(Main.geniHandler.CurrentUser == null
-					|| Main.geniHandler.CurrentUser.credential == null
-					|| Main.geniHandler.CurrentUser.credential.length == 0)
-				{
-					this.userButton.setStyle("icon", DisplayUtil.noUserIcon);
-					this.userButton.toolTip = "Authenticate";
-					this.userButton.label = "Authenticate";
-				} else {
-					this.userButton.setStyle("icon", DisplayUtil.userIcon);
-					this.userButton.toolTip = "View user information"
-					this.userButton.label = Main.geniHandler.CurrentUser.uid;
-				}
-			}
-			
-			public function showAuthenticate():void
-			{
-				if(!allowAuthenticate)
-					return;
-				
-				userButton.styleName = "unauthenticatedStyle";
-			}
-			
-			public function hideAuthenticate():void
-			{
-				if(!allowAuthenticate)
-					return;
-				
-				userButton.styleName = "authenticatedStyle";
-			}
-			
-			protected function loadUser():void
-			{
-				if(Main.geniHandler.unauthenticatedMode) {
-					Main.geniHandler.requestHandler.startInitiationSequence(true);
-				} else {
-					DisplayUtil.viewUserWindow();
-				}
-			}
-			
-			// ComboBox
-			public function fillCombobox(junk:* = null):void {
-				slicesMenu = Main.geniHandler.CurrentUser.slices.displaySlices();
-			}
-			
-			public function getSliceLabel(s:Slice):String {
-				return s.DisplayString();
-			}
-			
-			public function sliceSelected(evt:ListEvent):void {
-				Main.geniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
-				onlyMyResourcesCheckbox.selected = Main.geniHandler.mapHandler.selectedSlice.hrn != null &&
-					Main.geniHandler.mapHandler.selectedSlice.hrn.length > 0;
-				Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
-				Main.geniHandler.mapHandler.drawMap();
-			}
-			
-			public function startover():void {
-				reinit();
-				Main.geniHandler.requestHandler.startInitiationSequence();
-			}
-			
-			public function reinit():void
-			{
-				if(Main.geniHandler != null)
-					Main.geniHandler.destroy();
-				Main.geniHandler = new GeniHandler();
-				Main.geniHandler.mapHandler.map = map;
-				//loadParams();
-				//loadLocalUserData();
-				// Override the params
-				//Main.geniHandler.unauthenticatedMode = !authenticateUser;
-				
-				//Main.geniHandler.requestHandler.startInitiationSequence();
-			}
-			
-			
-			public function loadParams():void
-			{
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.mode != null)
-					{
-						var input:String = FlexGlobals.topLevelApplication.parameters.mode;
-						
-						allowAuthenticate = input != "publiconly";
-						Main.geniHandler.unauthenticatedMode = input != "authenticate";
-					}
-				} catch(all:Error) {
-				}
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.saurl != null)
-					{
-						for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-							if(sa.Url == FlexGlobals.topLevelApplication.parameters.saurl) {
-								Main.geniHandler.forceAuthority = sa;
-								break;
-							}
-						}
-					}
-				} catch(all:Error) {
-				}
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.publicurl != null)
-					{
-						Main.geniHandler.publicUrl = FlexGlobals.topLevelApplication.parameters.publicurl;
-					}
-				} catch(all:Error) {
-				}
-			}
-			
-			public function loadLocalUserData():void
-			{
-				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
-				{
-					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-						if(sa.Url == geniLocalSharedObject.data.authority) {
-							Main.geniHandler.CurrentUser.authority = sa;
-							break;
-						}
-					}
-					
-					Main.geniHandler.CurrentUser.sslPem = geniLocalSharedObject.data.sslPem;
-					if(geniLocalSharedObject.data.password != null && geniLocalSharedObject.data.password.length > 0)
-						Main.geniHandler.CurrentUser.setPassword(geniLocalSharedObject.data.password, true);
-				}
-			}
-			
-			public function saveLocalUserData():void
-			{
-				if(geniLocalSharedObject == null)
-					return;
-
-				geniLocalSharedObject.data.password = Main.geniHandler.CurrentUser.encryptedPassword;
-				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
-				geniLocalSharedObject.data.sslPem = Main.geniHandler.CurrentUser.sslPem;
-				try
-				{
-					geniLocalSharedObject.flush();
-				}
-				catch (e:Error)
-				{
-					trace("Problem saving shared object");
-				}
-			}
-			
-			public function loadLocalBundleData():void
-			{
-				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
-					Main.setCertBundle(geniLocalSharedObject.data.certBundle);
-				if(Main.certBundle == null || Main.certBundle.length == 0)
-					Main.setCertBundle((new FallbackGeniBundle()).toString() + (new FallbackRootBundle()).toString());
-			}
-			
-			public function saveLocalBundleData():void
-			{
-				if(geniLocalSharedObject == null)
-					return;
-				
-				geniLocalSharedObject.data.certBundle = Main.certBundle;
-				try
-				{
-					geniLocalSharedObject.flush();
-				}
-				catch (e:Error)
-				{
-					trace("Problem saving shared object");
-				}
-			}
-			
-			public function setStatus(s:String, isError:Boolean):void
-			{
-				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
-				waitingIcon.visible = isWorking;
-				progressLabel.text = s;
-				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
-					waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
-				else
-					waitingCountLabel.text = "";
-				if(isWorking)
-					progressLabel.styleName = "inprogressStyle";
-				else if(isError)
-					progressLabel.styleName = "failedStyle";
-				else
-					progressLabel.styleName = "validStyle";
-			}
-		]]>
-	</fx:Script>
-	<s:controlBarLayout>
-		<s:HorizontalLayout verticalAlign="middle" gap="4" paddingTop="2" paddingBottom="2" paddingLeft="2" paddingRight="2" />
-	</s:controlBarLayout>
-	<s:controlBarContent>
+	<mx:ApplicationControlBar dock="true">
 		<display:ImageButton id="infoButton"
-							 icon="@Embed('../images/protogeni-logo.png')"
-							 click="DisplayUtil.viewAboutWindow()"
+							 source="@Embed('../images/protogeni-logo.png')"
+							 click="showAbout()"
 							 toolTip="View more information about ProtoGENI" />
-		<display:DefaultLine percentHeight="90" />
+		<mx:VRule height="14"/>
 		<display:ImageButton id="refreshButton"
-							  icon="{DisplayUtil.refreshIcon}"
-							 click="startover()" includeInLayout="false" visible="false"
-							 toolTip="Reload all data" />
+			source="{DisplayUtil.refreshIcon}"
+			click="startover()" includeInLayout="false" visible="false"
+			toolTip="Reload all data" />
 		<display:ImageButton id="cmButton"
-							  icon="@Embed('../images/building.png')"
-							 click="DisplayUtil.viewManagersWindow();"
-							 toolTip="GENI managers"/>
+			source="@Embed('../images/building.png')"
+			click="cms.show()"
+			toolTip="Manage component managers"/>
 		<display:ImageButton id="consoleButton"
-							  icon="{DisplayUtil.consoleIcon}"
-							 click="LogHandler.viewConsole();" 
-							 toolTip="Console"/>
-		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
-							  icon="{DisplayUtil.graphIcon}"
-							 click="DisplayUtil.viewSlicesWindow();"
-							 toolTip="Work with slices"/>
-		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
-							 visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" height="24"
-					 change="sliceSelected(event)"
-					 includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" skinClass="protogeni.display.skins.CheckBoxSkin"
-					click="Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.geniHandler.mapHandler.drawMap()"
-					includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
-					visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<s:Rect percentWidth="100" />
-		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+			source="@Embed('../images/application_xp_terminal.png')"
+			click="Main.log.open()" 
+			toolTip="View the console"/>
+		<mx:VRule height="14" includeInLayout="true" visible="true" />
+		<display:ImageButton id="sliceButton" includeInLayout="true" visible="true"
+						   source="{DisplayUtil.graphIcon}"
+						   click="slices.show()"
+						   toolTip="Work with slices"/>
+		<mx:VRule height="14"/>
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
+		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.protogeniHandler.mapHandler.drawMap()"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
-		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
-		<s:Rect percentWidth="100" />
-		<mx:Button icon="{DisplayUtil.noUserIcon}"
-				   click="loadUser()"
-				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
-				   toolTip="Authenticate" label="Authenticate" styleName="unauthenticatedStyle"
-				   id="userButton" height="24" />
+		<mx:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label  text="{Main.protogeniHandler.CurrentUser.uid}"/>
+		<display:ImageButton id="userButton"
+							 source="{DisplayUtil.noUserIcon}"
+							 click="user.show()"
+							 toolTip="View user information" />
 		<display:ImageButton id="searchButton"
-							  icon="{DisplayUtil.findIcon}"
-							 click="DisplayUtil.viewSearchWindow()"
+							 source="{DisplayUtil.searchIcon}"
+							 click="search.show()"
 							 toolTip="Search" />
 		<display:ImageButton id="resetZoomButton"
-							  icon="@Embed('../images/zoom.png')"
-							 click="map.resetZoom();"
-							 toolTip="Reset zoom" />
+			source="@Embed('../images/zoom.png')"
+			click="map.resetZoom();"
+			toolTip="Reset zoom" />
 		<display:ImageButton id="fullscreenButton"
-							  icon="{arrowOut}"
-							 click="toggleFullScreen()"
-							 toolTip="Toggle fullscreen" />
+			source="@Embed('../images/arrow_out.png')"
+			click="toggleFullScreen()"
+			toolTip="Toggle fullscreen" />
 		<display:ImageButton id="helpButton"
-							  icon="{DisplayUtil.helpIcon}"
+							 source="{DisplayUtil.helpIcon}"
 							 click="Util.showManual()"
 							 toolTip="View more information" />
-	</s:controlBarContent>
-	<mapping:GeniMap id="map" />
-</s:Application>
+	</mx:ApplicationControlBar>
+
+	<display:ProtogeniMap id="map" />
+	
+</mx:Application>

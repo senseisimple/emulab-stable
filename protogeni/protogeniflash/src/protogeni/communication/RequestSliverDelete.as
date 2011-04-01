@@ -21,31 +21,27 @@ package protogeni.communication
 	{
 		public function RequestSliverDelete(s:Sliver) : void
 		{
-			super("SliverDelete", "Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.deleteSlice);
+			super("SliverDelete", "Deleting sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.deleteSlice);
 			sliver = s;
 			op.addField("slice_urn", sliver.slice.urn);
 			op.addField("credentials", new Array(sliver.slice.credential));
-			op.setUrl(sliver.manager.Url);
+			op.setExactUrl(sliver.componentManager.Url);
 		}
 		
 		override public function complete(code : Number, response : Object) : *
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				sliver.removeOutsideReferences();
 				if(sliver.slice.slivers.getItemIndex(sliver) > -1)
 					sliver.slice.slivers.removeItemAt(sliver.slice.slivers.getItemIndex(sliver));
-				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
+				var old:Slice = Main.protogeniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
 				if(old != null)
 				{
-					var oldSliver:Sliver = old.slivers.getByUrn(sliver.urn);
-					if(oldSliver != null) {
-						oldSliver.removeOutsideReferences();
+					if(old.slivers.getByUrn(sliver.urn) != null)
 						old.slivers.removeItemAt(old.slivers.getItemIndex(old.slivers.getByUrn(sliver.urn)));
-					}
-					Main.geniDispatcher.dispatchSliceChanged(old);
+					Main.protogeniHandler.dispatchSliceChanged(old);
 				}
-				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+				Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 			}
 			else
 			{

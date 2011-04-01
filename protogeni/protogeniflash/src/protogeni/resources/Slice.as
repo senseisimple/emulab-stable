@@ -97,7 +97,7 @@
 			{
 				for each(var n:VirtualNode in s.nodes)
 				{
-					if(n.manager == s.manager)
+					if(n.manager == s.componentManager)
 						nodes.addItem(n);
 				}
 					
@@ -146,17 +146,6 @@
 			return null;
 		}
 		
-		public function getVirtualInterfaceWithId(id:String):VirtualInterface
-		{
-			for each(var s:Sliver in slivers)
-			{
-				var vi:VirtualInterface = s.nodes.getByInterfaceId(id);
-				if(vi != null)
-					return vi;
-			}
-			return null;
-		}
-		
 		public function getVirtualLinkWithId(id:String):VirtualLink
 		{
 			for each(var s:Sliver in slivers)
@@ -168,24 +157,24 @@
 			return null;
 		}
 		
-		public function hasSliverFor(gm:GeniManager):Boolean
+		public function hasSliverFor(cm:ComponentManager):Boolean
 		{
 			for each(var s:Sliver in slivers)
 			{
-				if(s.manager == gm)
+				if(s.componentManager == cm)
 					return true;
 			}
 			return false;
 		}
 		
-		public function getOrCreateSliverFor(gm:GeniManager):Sliver
+		public function getOrCreateSliverFor(cm:ComponentManager):Sliver
 		{
 			for each(var s:Sliver in slivers)
 			{
-				if(s.manager == gm)
+				if(s.componentManager == cm)
 					return s;
 			}
-			var newSliver:Sliver = new Sliver(this, gm);
+			var newSliver:Sliver = new Sliver(this, cm);
 			slivers.addItem(newSliver);
 			return newSliver;
 		}
@@ -207,7 +196,7 @@
 				var newSliver:Sliver = new Sliver(newSlice);
 				newSliver.created = sliver.created;
 				newSliver.credential = sliver.credential;
-				newSliver.manager = sliver.manager;
+				newSliver.componentManager = sliver.componentManager;
 				newSliver.rspec = sliver.rspec;
 				newSliver.urn = sliver.urn;
 				newSliver.ticket = sliver.ticket;
@@ -225,13 +214,13 @@
 			// Build up the slivers with nodes
 			for each(sliver in this.slivers)
 			{
-				newSliver = newSlice.slivers.getByGm(sliver.manager);
+				newSliver = newSlice.slivers.getByCm(sliver.componentManager);
 				
 				// Build up nodes
 				var retrace:Array = new Array();
 				for each(var node:VirtualNode in sliver.nodes)
 				{
-					if(node.manager != sliver.manager)
+					if(node.manager != sliver.componentManager)
 						continue;
 					var newNode:VirtualNode = new VirtualNode(newSliver);
 					newNode.id = node.id;
@@ -257,7 +246,7 @@
 					newNode.status = node.status;
 					for each(var nodeSliver:Sliver in node.slivers)
 					{
-						newNode.slivers.addIfNotExisting(newSlice.slivers.getByGm(nodeSliver.manager));
+						newNode.slivers.addIfNotExisting(newSlice.slivers.getByCm(nodeSliver.componentManager));
 						if(nodeSliver != sliver)
 							newSlice.slivers.getByUrn(nodeSliver.urn).nodes.addItem(newNode);
 					}
@@ -299,7 +288,7 @@
 			// Build up the links
 			for each(sliver in this.slivers)
 			{
-				newSliver = newSlice.slivers.getByGm(sliver.manager);
+				newSliver = newSlice.slivers.getByCm(sliver.componentManager);
 				
 				for each(var link:VirtualLink in sliver.links)
 				{
@@ -309,7 +298,7 @@
 					newLink.bandwidth = link.bandwidth;
 					newLink.firstTunnelIp = link.firstTunnelIp;
 					newLink.secondTunnelIp = link.secondTunnelIp;
-					newLink.linkType = link.linkType;
+					newLink._isTunnel = link._isTunnel;
 					newLink.rspec = link.rspec;
 					for each(var linkSliver:Sliver in link.slivers)
 						newLink.slivers.push(newSlice.slivers.getByUrn(linkSliver.urn));
@@ -397,6 +386,17 @@
 				}
 			}
 			return "link-" + highest;
+			/*
+			if(l == null)
+				return "link-" + highest;
+			else
+			{
+				if(l.isTunnel())
+					return "tunnel-" + highest;
+				else
+					return "link-" + highest;
+			}
+			*/
 		}
 		
 		public function getUniqueVirtualNodeId(n:VirtualNode = null):String

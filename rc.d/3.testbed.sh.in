@@ -48,8 +48,10 @@ case "$1" in
 
 		if [ -x @prefix@/sbin/sslxmlrpc_server.py ]; then
 			echo -n " sslxmlrpc_server"
-			@prefix@/sbin/sslxmlrpc_server.py
+			@prefix@/sbin/sslxmlrpc_server.py 2>/dev/null
 		fi
+
+		# mfrisbeed started with its own script
 
 		if [ -x @prefix@/sbin/reload_daemon  ]; then
 			echo -n " reloadd"

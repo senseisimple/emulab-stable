@@ -1,40 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-			   xmlns:s="library://ns.adobe.com/flex/spark" 
-			   xmlns:mx="library://ns.adobe.com/flex/mx" skinClass="protogeni.display.skins.TitleWindowSkin"
-			   title="About"
-			   close="PopUpManager.removePopUp(this)"
-			   xmlns:display="protogeni.display.*">
-	<s:layout>
-		<s:VerticalLayout horizontalAlign="center" paddingBottom="2"/>
-	</s:layout>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
+	title="About" showCloseButton="true" horizontalAlign="center"
+	borderAlpha=".9" borderColor="#D2E1F0"
+	close="PopUpManager.removePopUp(this)" xmlns:display="protogeni.display.*">
 	
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	
-	<fx:Script>
+	<mx:Script>
 		<![CDATA[
 			import mx.managers.PopUpManager;
 			
 			import protogeni.Util;
 		]]>
-	</fx:Script>
-
-	<s:BitmapImage source="@Embed('../images/protogeni.png')" />
-	<s:Label text="Displays resources from ProtoGENI and associated federations." />
-	<mx:LinkButton label="Visit our website" height="24">
-		<mx:click>Util.openWebsite('http://www.protogeni.net');</mx:click>
-	</mx:LinkButton>
-	<display:DefaultLine percentWidth="90" />
-	<s:Label text="Special thanks to" fontWeight="bold" fontStyle="italic"/>
-	<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">
+	</mx:Script>
+	<display:ImageButton source="@Embed('../images/protogeni.png')" click="Util.openWebsite('http://www.protogeni.net')" />
+	<mx:Label text="Displays resources from the ProtoGENI federation." fontSize="12"/>
+	<mx:HRule/>
+	<mx:Label text="Special thanks to" fontWeight="bold" fontStyle="italic"/>
+	<mx:LinkButton label="Fatcow (CCA3 Icons)">
 		<mx:click>navigateToURL(new URLRequest("http://www.fatcow.com/free-icons/index.bml"), "_blank");</mx:click>
 	</mx:LinkButton>
-	<mx:LinkButton label="Mattism (LGPL XML-RPC)" height="24">
+	<mx:LinkButton label="Mattism (LGPL XML-RPC)">
 		<mx:click>navigateToURL(new URLRequest("http://sf.net/projects/xmlrpcflash"), "_blank");</mx:click>
 	</mx:LinkButton>
-	<mx:LinkButton label="Icons Land" height="24">
+	<mx:LinkButton label="Icons Land">
 		<mx:click>navigateToURL(new URLRequest("http://www.icons-land.com/"), "_blank");</mx:click>
 	</mx:LinkButton>
-</s:TitleWindow>
+	
+</mx:TitleWindow>

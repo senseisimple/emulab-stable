@@ -33,7 +33,7 @@
 		public var managerString:String;
 		
 		[Bindable]
-		public var manager:GeniManager;
+		public var manager:ComponentManager;
 		
 		[Bindable]
 		public var urn:String;
@@ -54,14 +54,14 @@
 		public var packetLoss:Number;
 		
 		[Bindable]
-		public var types:Vector.<String> = new Vector.<String>();
+		public var types:ArrayCollection = new ArrayCollection();
 
 		public var rspec:XML;
 		
-		public function GetNodes():Vector.<PhysicalNode> {
-			var ac:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
-			ac.push(interface1.owner);
-			ac.push(interface2.owner);
+		public function GetNodes():ArrayCollection {
+			var ac:ArrayCollection = new ArrayCollection();
+			ac.addItem(interface1.owner);
+			ac.addItem(interface2.owner);
 			return ac;
 		}
 	}

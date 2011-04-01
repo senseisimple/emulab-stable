@@ -1,23 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*">
-	<fx:Declarations>
-	</fx:Declarations>
-	<fx:Script>
+<display:DefaultWindow xmlns="protogeniflash.*" xmlns:mx="http://www.adobe.com/2006/mxml" layout="horizontal"
+	title="RSpec Viewer" xmlns:display="protogeni.display.*">
+	
+	<mx:Script>
 		<![CDATA[
-			[Bindable]
-			public var xmlString:String;
-			
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager; 
+
 			public function loadXml(val:XML):void {
 				if(val != null) {
-					xmlString = val.toXMLString();
+					txt.text = val.toXMLString();
 				} else {
-					xmlString = "No document found";
+					txt.text = "No document found";
 				}
 			}
+			
 		]]>
-	</fx:Script>
-	<s:Button label="Copy to clipboard" click="System.setClipboard(xmlString)" />
-	<s:TextArea id="txt" width="100%" height="100%"  editable="false" text="{xmlString}"/>
+	</mx:Script>
+	<mx:TextArea id="txt" width="100%" height="100%"  editable="false" wordWrap="true"/>
+	
 </display:DefaultWindow>

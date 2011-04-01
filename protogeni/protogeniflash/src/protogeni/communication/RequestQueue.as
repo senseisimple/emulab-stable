@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+	import flash.utils.Dictionary;
+
   public class RequestQueue
   {
     public function RequestQueue(shouldPushEvents:Boolean = false) : void
@@ -71,35 +73,19 @@ package protogeni.communication
 		
 		if (tail != null)
 		{
-			if(newNode.item.forceNext && nextRequest != null)
-			{
-				var parseNode:RequestQueueNode = head;
-				if(parseNode == nextRequest) {
-					head = newNode;
-				} else {
-					while(parseNode.next != nextRequest)
-						parseNode = parseNode.next;
-					parseNode.next = newNode;
-				}
-				
-				newTail.next = nextRequest;
+			tail.next = newNode;
+			if(nextRequest == null)
 				nextRequest = newNode;
-				newTail = tail;
-			} else {
-				tail.next = newNode;
-				if(nextRequest == null)
-					nextRequest = newNode;
-			}
 		}
 		else
 		{
 			head = newNode;
 			nextRequest = newNode;
 		}
-		tail = newTail;
 		
+		tail = newTail;
 		if(pushEvents)
-			Main.geniDispatcher.dispatchQueueChanged();
+			Main.protogeniHandler.dispatchQueueChanged();
     }
 	
 	public function working():Boolean
@@ -124,9 +110,7 @@ package protogeni.communication
 	
 	public function readyToStart():Boolean
 	{
-		return head != null &&
-			nextRequest != null &&
-			(nextRequest == head || nextRequest.item.startImmediately == true);
+		return head != null && nextRequest != null && (nextRequest == head || nextRequest.item.startImmediately == true);
 	}
 
     public function front() : *
@@ -170,7 +154,7 @@ package protogeni.communication
 			nextRequest = head.next;
         head = head.next;
 		if(pushEvents)
-			Main.geniDispatcher.dispatchQueueChanged();
+			Main.protogeniHandler.dispatchQueueChanged();
       }
       if (head == null)
       {
@@ -194,8 +178,6 @@ package protogeni.communication
 	
 	public function remove(removeNode:RequestQueueNode):void
 	{
-		if(removeNode == null)
-			return;
 		if(head == removeNode)
 		{
 			if(nextRequest == head)
@@ -220,7 +202,7 @@ package protogeni.communication
 			}
 		}
 		if(pushEvents)
-			Main.geniDispatcher.dispatchQueueChanged();
+			Main.protogeniHandler.dispatchQueueChanged();
 	}
 
     public var head:RequestQueueNode;

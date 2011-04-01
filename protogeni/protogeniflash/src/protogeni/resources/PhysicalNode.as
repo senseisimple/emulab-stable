@@ -19,10 +19,9 @@
 	// Physical node
 	public class PhysicalNode
 	{
-		public function PhysicalNode(own:PhysicalNodeGroup, ownedBy:GeniManager)
+		public function PhysicalNode(own:PhysicalNodeGroup)
 		{
 			owner = own;
-			manager = ownedBy;
 		}
 		
 		public var owner:PhysicalNodeGroup;
@@ -37,7 +36,7 @@
 		public var managerString:String;
 		
 		[Bindable]
-		public var manager:GeniManager;
+		public var manager:ComponentManager;
 		
 		[Bindable]
 		public var available:Boolean;
@@ -47,25 +46,18 @@
 		
 		[Bindable]
 		public var subNodeOf : PhysicalNode = null;
-		public var subNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
+		public var subNodes : ArrayCollection = new ArrayCollection();
 		public var virtualNodes : ArrayCollection = new ArrayCollection();
 		
-		public var diskImages:Vector.<DiskImage> = new Vector.<DiskImage>();
+		public var diskImages:ArrayCollection = new ArrayCollection();
 		
 		[Bindable]
-		public var types:Vector.<NodeType> = new Vector.<NodeType>();
+		public var types:ArrayCollection = new ArrayCollection();
 		
 		[Bindable]
 		public var interfaces:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();
 		
 		public var rspec:XML;
-		
-		// Use for anything, more inmportantly any additions by non-Protogeni managers
-		public var tag:*;
-		
-		// Planetlab
-		public var hostname:String;
-		public var bw_limitKbps:int;
 		
 		public function IsSwitch():Boolean {
 			for each(var d:NodeType in types) {

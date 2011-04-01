@@ -18,30 +18,17 @@ package protogeni.communication
   
   import flash.events.ErrorEvent;
   import flash.events.Event;
-  import flash.events.HTTPStatusEvent;
-  import flash.events.IOErrorEvent;
-  import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
-  import flash.events.TimerEvent;
-  import flash.net.URLLoader;
-  import flash.net.URLRequest;
-  import flash.net.URLRequestMethod;
   import flash.system.Security;
-  import flash.utils.Timer;
-  
-  import mx.collections.ArrayCollection;
+  import flash.utils.Dictionary;
 
   public class Operation
   {
-	  public static var XMLRPC:int = 0;
-	  public static var HTTP:int = 1;
-	  
-    public function Operation(qualifiedMethod : Array = null, newNode:Request = null, newType:int = 0) : void
+    public function Operation(qualifiedMethod : Array = null, newNode:Request = null) : void
     {
       server = null;
 	  node = newNode;
       reset(qualifiedMethod);
-	  type = newType;
     }
 
     public function reset(qualifiedMethod : Array) : void
@@ -77,10 +64,7 @@ package protogeni.communication
       url = newUrl;
       if (module != null)
       {
-		  if(url.charAt(url.length-1) == "/")
-			url += module;
-		  else
-			url += "/" + module;
+        url += "/" + module;
       }
     }
 
@@ -96,129 +80,48 @@ package protogeni.communication
 
     public function addField(key : String, value : Object) : void
     {
-		if(param == null)
-			setParameterized();
-      	param[key] = value;
+      param[key] = value;
     }
-	
-	public function pushField(value:Object):void
-	{
-		if(!(param is ArrayCollection))
-			setPositioned();
-		param.addItem(value);
-	}
 
-    public function clearFields():void
+    public function clearFields() : void
     {
-      param = null;
+      param = new Object();
     }
-	
-	public function setPositioned():void
-	{
-		param = new ArrayCollection();
-	}
-	
-	public function setParameterized():void
-	{
-		param = new Object();
-	}
-	
-	public var delaySeconds:int = 0;
-	private var delayTimer:Timer;
 
     public function call(newSuccess : Function, newFailure : Function) : void
     {
-		Main.checkLoadCrossDomain(url);
-		success = newSuccess;
-		failure = newFailure;
-		
-		if(delaySeconds == 0)
-			makeCall();
-		else {
-			delayTimer = new Timer(delaySeconds*1000, 1);
-			delayTimer.addEventListener(TimerEvent.TIMER, delayedCall);
-			delayTimer.start();
-		}
-    }
-	
-	public function delayedCall(e:TimerEvent):void {
-		delayTimer.removeEventListener(TimerEvent.TIMER, delayedCall);
-		makeCall();
-	}
-	
-	private function makeCall():void {
-		switch(type)
-		{
-			case XMLRPC:
-				try
-				{
-					server = new ConnectionImpl(url);
-					server.timeout = timeout;
-					server.addEventListener(Event.COMPLETE, callSuccess);
-					server.addEventListener(ErrorEvent.ERROR, callFailure);
-					server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
-					if(param is ArrayCollection)
-					{
-						for each(var o:* in param) {
-							server.addParam(o, null);
-						}
-					}	
-					else if(param != null)
-						server.addParam(param, "struct");
-					server.call(method);
-				}
-				catch (e : Error)
-				{
-					LogHandler.appendMessage(new LogMessage(url, "Error", "\n\nException on XMLRPC Call: "
-						+ e.toString() + "\n\n", true));
-				}
-				break;
-			case HTTP:
-				var request:URLRequest = new URLRequest(url);
-				//				request.method = URLRequestMethod.GET;
-				loader = Main.GetLoader();
-				//				loader.dataFormat = URLLoaderDataFormat.TEXT;
-				loader.addEventListener(Event.COMPLETE, callSuccess);
-				loader.addEventListener(ErrorEvent.ERROR, callFailure);
-				loader.addEventListener(IOErrorEvent.IO_ERROR, callFailure);
-				loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
-				//loader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
-				try
-				{
-					loader.load(request);
-				}
-				catch (e : Error)
-				{
-					LogHandler.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
-						+ e.toString() + "\n\n", true));
-				}
-				break;
-			default:
-				throw Error("Unknown Operation type");
-		}
-	}
-	
-	public function httpStatus(event:HTTPStatusEvent):void
-	{
-		trace(event.toString());
-	}
-	
-	public function getSent() : String
-	{
-		switch(type)
-		{
-			case XMLRPC:
-				return getSendXml();
-				break;
-			case HTTP:
-				return "";
-				break;
-			default:
-				return "";
-		}
-	}
+      try
+      {
+        if (visitedSites[url] != true)
+        {
+          visitedSites[url] = true;
+          var hostPattern : RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
+          var match : Object = hostPattern.exec(url);
+          if (match != null)
+          {
+            var host : String = match[1];
+            Security.loadPolicyFile(host + "/protogeni/crossdomain.xml");
+          }
+        }
+        success = newSuccess;
+        failure = newFailure;
+        server = new ConnectionImpl(url);
+		server.timeout = timeout;
+        server.addEventListener(Event.COMPLETE, callSuccess);
+        server.addEventListener(ErrorEvent.ERROR, callFailure);
+        server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
+        server.addParam(param, "struct");
+        server.call(method);
+      }
+      catch (e : Error)
+      {
 
-    private function getSendXml() : String
+        Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on XMLRPC Call: "
+                                     + e.toString() + "\n\n", true));
+      }
+    }
+
+    public function getSendXml() : String
     {
 		try
 		{
@@ -233,23 +136,8 @@ package protogeni.communication
 		else
       		return x.toString();
     }
-	
-	public function getResponse() : String
-	{
-		switch(type)
-		{
-			case XMLRPC:
-				return getResponseXml();
-				break;
-			case HTTP:
-				return this.loader.data as String;
-				break;
-			default:
-				return "";
-		}
-	}
 
-    private function getResponseXml() : String
+    public function getResponseXml() : String
     {
       return String(server._response.data);
     }
@@ -258,39 +146,16 @@ package protogeni.communication
     {
 //      cleanup();
 
-		switch(type)
-		{
-			case XMLRPC:
-				try{
-					success(node, Number(server.getResponse().code), server.getResponse());
-				} catch(e:Error) {
-					success(node, null, server.getResponse());
-				}
-				break;
-			case HTTP:
-				success(node, CommunicationUtil.GENIRESPONSE_SUCCESS, loader.data);
-				break;
-			default:
-				throw Error("Success function not indicated");
-		}
-      
+      success(node, Number(server.getResponse().code),
+//              server.getResponse().value.toString(),
+//              String(server.getResponse().output),
+              server.getResponse());
     }
 
     private function callFailure(event : ErrorEvent) : void
     {
 //      cleanup();
-		switch(type)
-		{
-			case XMLRPC:
-				failure(node, event, server.getFault());
-				break;
-			case HTTP:
-				failure(node, event, null);
-				break;
-			default:
-				failure(node, event, null);
-		}
-      
+      failure(node, event, server.getFault());
     }
 
     public function cleanup() : void
@@ -303,7 +168,6 @@ package protogeni.communication
                                    callFailure);
         server.cleanup();
         server = null;
-		loader = null;
       }
     }
 
@@ -311,16 +175,15 @@ package protogeni.communication
     private var method : String;
     private var url : String;
     private var param : Object;
+    private var server : ConnectionImpl;
     private var success : Function;
     private var failure : Function;
 	private var node:Request;
-	public var type:int;
-	
-	private var server : ConnectionImpl;
-	private var loader:Object
 	
 	public var timeout:int = 60;
-	
-	private static var SERVER_PATH : String = "/protogeni/xmlrpc/";
+
+    private static var SERVER_PATH : String = "/protogeni/xmlrpc/";
+
+    private static var visitedSites : Dictionary = new Dictionary();
   }
 }

@@ -22,9 +22,8 @@ package
 				"Name: " + name + "\n" +
 				"Group ID: " + groupId + "\n" +
 				"Time: " + timeStamp + "\n" +
-				"Is Error?: " + isError + "\n" +
-				"Details:\n" + details +
-				"\n-----------------END-";
+				"Details: " + details + "\n" +
+				"-----------------END-";
 		}
 		
 		public var groupId : String;	// Identifier to group, like what CM it's associated with 

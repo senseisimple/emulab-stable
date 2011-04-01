@@ -20,12 +20,12 @@ package protogeni.communication
   {
     public function RequestSliverUpdate(s:Sliver) : void
     {
-		super("SliverUpdate", "Updating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.updateSliver);
+		super("SliverUpdate", "Updating sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.updateSliver);
 		sliver = s;
 		op.addField("sliver_urn", sliver.urn);
 		op.addField("rspec", sliver.getRequestRspec().toXMLString());
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setUrl(sliver.manager.Url);
+		op.setExactUrl(sliver.componentManager.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *

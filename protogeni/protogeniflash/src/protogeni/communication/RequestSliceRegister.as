@@ -16,6 +16,7 @@ package protogeni.communication
 {
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 
   public class RequestSliceRegister extends Request
   {
@@ -23,10 +24,9 @@ package protogeni.communication
     {
 		super("SliceRegister", "Register slice named " + s.hrn, CommunicationUtil.register);
 		slice = s;
-		op.addField("credential", Main.geniHandler.CurrentUser.credential);
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
 		op.addField("hrn", slice.urn);
 		op.addField("type", "Slice");
-		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -35,13 +35,12 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			slice.credential = String(response.value);
-			Main.geniHandler.CurrentUser.slices.add(slice);
-			Main.geniDispatcher.dispatchSlicesChanged();
+			Main.protogeniHandler.CurrentUser.slices.add(slice);
 			DisplayUtil.viewSlice(slice);
 		}
 		else
 		{
-			Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
+			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 		
 		return newRequest;

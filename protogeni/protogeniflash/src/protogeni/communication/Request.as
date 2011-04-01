@@ -41,14 +41,14 @@ package protogeni.communication
 		cleanup();
 	}
 
-    public function getSent() : String
+    public function getSendXml() : String
     {
-      return op.getSent();
+      return op.getSendXml();
     }
 
-    public function getResponse() : String
+    public function getResponseXml() : String
     {
-      return op.getResponse();
+      return op.getResponseXml();
     }
 
     public function getUrl() : String
@@ -80,10 +80,6 @@ package protogeni.communication
 	public var removeImmediately:Boolean;
 	public var continueOnError:Boolean;
 	public var running:Boolean = false;
-	public var nonXmlrpc:Boolean = false;
-	public var forceNext:Boolean = false;
-	public var ignoreReturnCode:Boolean = false;
-	public var numTries:int = 0;
 	
 	public var node:RequestQueueNode;
   }

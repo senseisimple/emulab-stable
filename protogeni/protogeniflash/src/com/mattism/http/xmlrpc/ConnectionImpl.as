@@ -20,9 +20,7 @@ package com.mattism.http.xmlrpc
   import flash.events.ErrorEvent;
   import flash.events.Event;
   import flash.events.EventDispatcher;
-  import flash.events.HTTPStatusEvent;
   import flash.events.IOErrorEvent;
-  import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
   import flash.events.TimerEvent;
   import flash.net.URLLoader;
@@ -42,8 +40,8 @@ package com.mattism.http.xmlrpc
     public var _method : MethodCall;
     private var _rpc_response : Object;
     private var _parser : Parser;
-    public var _response:Object;
-	private var _parsed_response : Object;
+    public var _response : URLLoader;
+    private var _parsed_response : Object;
 
     private var _fault : MethodFault;
 	
@@ -61,17 +59,12 @@ package com.mattism.http.xmlrpc
       this._parser = new ParserImpl();
 
       //init response
-	  if(Main.useJavascript)
-        this._response = new JSLoader();
-      else {
-		  this._response = new URLLoader();
-		  //this._response.addEventListener(Event.OPEN, open);
-		  //this._response.addEventListener(ProgressEvent.PROGRESS, progress);
-		  //this._response.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
-	  }
-			
+      this._response = new URLLoader();
       this._response.addEventListener(Event.COMPLETE, this._onLoad);
+//      this._response.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
       this._response.addEventListener(IOErrorEvent.IO_ERROR, ioError);
+//      this._response.addEventListener(Event.OPEN, open);
+//      this._response.addEventListener(ProgressEvent.PROGRESS, progress);
       this._response.addEventListener(SecurityErrorEvent.SECURITY_ERROR,
                                       securityError);
       if (url)

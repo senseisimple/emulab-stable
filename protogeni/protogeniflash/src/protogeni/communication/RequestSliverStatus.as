@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.PhysicalNode;
+	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	
@@ -21,11 +23,11 @@ package protogeni.communication
   {
     public function RequestSliverStatus(s:Sliver) : void
     {
-		super("SliverStatus", "Getting the sliver status on " + s.manager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.sliverStatus, true);
+		super("SliverStatus", "Getting the sliver status on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.sliverStatus, true);
 		sliver = s;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setUrl(sliver.manager.Url);
+		op.setExactUrl(sliver.componentManager.Url);
     }
 
 	override public function complete(code : Number, response : Object) : *
@@ -36,7 +38,7 @@ package protogeni.communication
 			sliver.state = response.value.state;
 			for each(var nodeObject:Object in response.value.details)
 			{
-				var vn:VirtualNode = sliver.getVirtualNodeFor(sliver.manager.Nodes.GetByUrn(nodeObject.component_urn));
+				var vn:VirtualNode = sliver.getVirtualNodeFor(sliver.componentManager.Nodes.GetByUrn(nodeObject.component_urn));
 				if(vn != null)
 				{
 					vn.status = nodeObject.status;
@@ -44,9 +46,7 @@ package protogeni.communication
 					vn.error = nodeObject.error;
 				}
 			}
-			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			Main.geniDispatcher.dispatchSlicesChanged();
+			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 		}
 		else
 		{

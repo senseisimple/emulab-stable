@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.PhysicalNode;
+	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	
@@ -27,7 +29,7 @@ package protogeni.communication
 		op.addField("credentials", new Array(sliver.slice.credential));
 		op.addField("status", Sliver.STATUS_READY);
 		op.addField("timeout", 60000);
-		op.setUrl(sliver.componentManager.Url);
+		op.setExactUrl(sliver.componentManager.Url);
     }
 
 	override public function complete(code : Number, response : Object) : *
@@ -43,7 +45,7 @@ package protogeni.communication
 				vn.state = nodeObject.state;
 				vn.error = nodeObject.error;
 			}
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 		}
 		else
 		{

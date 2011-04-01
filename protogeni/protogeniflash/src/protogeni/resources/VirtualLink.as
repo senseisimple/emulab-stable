@@ -14,15 +14,14 @@
  
  package protogeni.resources
 {
+	import mx.charts.renderers.DiamondItemRenderer;
 	import mx.collections.ArrayCollection;
 	
 	// Link as part of a sliver/slice connecting virtual nodes
 	public class VirtualLink
 	{
-		public static var TYPE_NORMAL:int = 0;
-		public static var TYPE_TUNNEL:int = 1;
-		public static var TYPE_ION:int = 2;
-		public static var TYPE_GPENI:int = 3;
+		// Status values
+		public static var TUNNEL : String = "tunnel";
 		
 		public function VirtualLink(owner:Sliver)
 		{
@@ -42,8 +41,7 @@
 		
 		public var firstTunnelIp:int = 0;
 		public var secondTunnelIp:int = 0;
-
-		public var linkType:int = TYPE_NORMAL;
+		public var _isTunnel:Boolean = false;
 		
 		public var slivers:Array;
 
@@ -53,8 +51,6 @@
 		public var secondNode:VirtualNode;
 		
 		public static var tunnelNext:int = 1;
-		
-		public var urn:String;
 		
 		public static function getNextTunnel():String
 		{
@@ -68,68 +64,40 @@
 		{
 			var firstInterface:VirtualInterface;
 			var secondInterface:VirtualInterface;
-			if(first.manager == second.manager)
+			if(first.manager != second.manager)
 			{
-				linkType = TYPE_NORMAL;
+				firstInterface = first.interfaces.GetByID("control");
+				secondInterface = second.interfaces.GetByID("control");
+				_isTunnel = true;
+				if(firstInterface.ip.length == 0)
+					firstInterface.ip = getNextTunnel();
+				if(secondInterface.ip.length == 0)
+					secondInterface.ip = getNextTunnel();
 				
+				// Make sure nodes are in both
+				if(!(second.slivers[0] as Sliver).nodes.contains(first))
+					(second.slivers[0] as Sliver).nodes.addItem(first);
+				if(!(first.slivers[0] as Sliver).nodes.contains(second))
+					(first.slivers[0] as Sliver).nodes.addItem(second);
+				
+				// Add relative slivers
+				if(slivers[0].componentManager != first.slivers[0].componentManager)
+					slivers.push(first.slivers[0]);
+				else if(slivers[0].componentManager != second.slivers[0].componentManager)
+					slivers.push(second.slivers[0]);
+			} else {
 				firstInterface = first.allocateInterface();
 				secondInterface = second.allocateInterface();
-				if(firstInterface == null || secondInterface == null)
+				if(secondInterface == null || secondInterface == null)
 					return false;
 				first.interfaces.Add(firstInterface);
 				second.interfaces.Add(secondInterface);
 			}
-			 else
-			 {
-				 if((first.manager.supportsIon && second.manager.supportsIon && Main.useIon) ||
-					 (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)) {
-					 
-					 if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
-						 linkType = TYPE_ION;
-					 else if(first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)
-						 linkType = TYPE_GPENI;
-					 
-					 firstInterface = first.allocateInterface();
-					 secondInterface = second.allocateInterface();
-					 if(firstInterface == null || secondInterface == null)
-						 return false;
-					 first.interfaces.Add(firstInterface);
-					 second.interfaces.Add(secondInterface);
-				 } else {
-					 linkType = TYPE_TUNNEL;
-					 
-					 firstInterface = first.interfaces.GetByID("control");
-					 secondInterface = second.interfaces.GetByID("control");
-					 
-					 // THIS WILL PROBABLY BREAK VERSION 1!!!!
-					 /*
-					 firstInterface = first.allocateInterface();
-					 secondInterface = second.allocateInterface();
-					 if(firstInterface == null || secondInterface == null)
-					 return false;
-					 first.interfaces.Add(firstInterface);
-					 second.interfaces.Add(secondInterface);
-					 */
-					 // END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
-
-					 if(firstInterface.ip.length == 0)
-						 firstInterface.ip = getNextTunnel();
-					 if(secondInterface.ip.length == 0)
-						 secondInterface.ip = getNextTunnel();
-				 }
-				 
-				 // Make sure nodes are in both
-				 if(!(second.slivers[0] as Sliver).nodes.contains(first))
-					 (second.slivers[0] as Sliver).nodes.addItem(first);
-				 if(!(first.slivers[0] as Sliver).nodes.contains(second))
-					 (first.slivers[0] as Sliver).nodes.addItem(second);
-				 
-				 // Add relative slivers
-				 if(slivers[0].manager != first.slivers[0].manager)
-					 slivers.push(first.slivers[0]);
-				 else if(slivers[0].manager != second.slivers[0].manager)
-					 slivers.push(second.slivers[0]);
-			 }
+			
+			// Bandwidth
+			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
+			if (first.id.slice(0, 2) == "pg" || second.id.slice(0, 2) == "pg")
+				bandwidth = 1000000;
 			
 			this.interfaces.addItem(firstInterface);
 			this.interfaces.addItem(secondInterface);
@@ -137,8 +105,6 @@
 			secondNode = second;
 			first.links.addItem(this);
 			second.links.addItem(this);
-			firstInterface.virtualLinks.addItem(this);
-			secondInterface.virtualLinks.addItem(this);
 			id = slivers[0].slice.getUniqueVirtualLinkId(this);
 			for each(var s:Sliver in slivers)
 				s.links.addItem(this);
@@ -147,14 +113,6 @@
 				firstInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
 				secondInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
 			}
-			
-			// Bandwidth
-			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
-			if (first.id.slice(0, 2) == "pg" || second.id.slice(0, 2) == "pg")
-				bandwidth = 1000000;
-			if(linkType == TYPE_GPENI || linkType == TYPE_ION)
-				bandwidth = 100000;
-			
 			return true;
 		}
 		
@@ -170,14 +128,14 @@
 			firstNode.links.removeItemAt(firstNode.links.getItemIndex(this));
 			for(var i:int = 1; i < firstNode.slivers.length; i++)
 			{
-				if((firstNode.slivers.getItemAt(i) as Sliver).links.getForNode(firstNode).length == 0)
-					(firstNode.slivers.getItemAt(i) as Sliver).nodes.remove(firstNode);
+				if((firstNode.slivers[i] as Sliver).links.getForNode(firstNode).length == 0)
+					(firstNode.slivers[i] as Sliver).nodes.remove(firstNode);
 			}
 			secondNode.links.removeItemAt(secondNode.links.getItemIndex(this));
 			for(i = 1; i < secondNode.slivers.length; i++)
 			{
-				if((secondNode.slivers.getItemAt(i) as Sliver).links.getForNode(secondNode).length == 0)
-					(secondNode.slivers.getItemAt(i) as Sliver).nodes.remove(secondNode);
+				if((secondNode.slivers[i] as Sliver).links.getForNode(secondNode).length == 0)
+					(secondNode.slivers[i] as Sliver).nodes.remove(secondNode);
 			}
 			for each(var s:Sliver in slivers)
 			{
@@ -185,10 +143,30 @@
 			}
 		}
 		
-		public function isConnectedTo(target:GeniManager) : Boolean
+		public function isTunnel():Boolean
 		{
-			//if(this.firstNode.manager == target || secondNode.manager == target)
-			//	return true;
+			if(interfaces.length > 0)
+			{
+				var basicManager:ComponentManager = (interfaces[0] as VirtualInterface).virtualNode.manager;
+				for each(var i:VirtualInterface in interfaces)
+				{
+					if(i.virtualNode.manager != basicManager)
+						return true;
+				}
+			}
+			return _isTunnel;
+		}
+		
+		public function hasTunnelTo(target : ComponentManager) : Boolean
+		{
+			return isTunnel() && (this.firstNode.manager == target
+				|| secondNode.manager == target);
+		}
+		
+		public function isConnectedTo(target : ComponentManager) : Boolean
+		{
+			if(hasTunnelTo(target))
+				return true;
 			for each(var i:VirtualInterface in interfaces)
 			{
 				if(i.virtualNode.manager == target)
@@ -216,6 +194,57 @@
 					return true;
 			}
 			return false;
+		}
+		
+		public function getXml():XML
+		{
+			var result : XML = <link />;
+			result.@virtual_id = id;
+			
+			if (!isTunnel())
+				result.appendChild(XML("<bandwidth>" + bandwidth + "</bandwidth>"));
+			
+			if (slivers[0].componentManager.Version >= 3)
+			{
+				var link_type:XML = <link_type />;
+				link_type.@name = "GRE";
+				var key:XML = <field />;
+				key.@key = "key";
+				key.@value = "0";
+				var ttl:XML = <field />;
+				ttl.@key = "ttl";
+				ttl.@value = "0";
+				link_type.appendChild(key);
+				link_type.appendChild(ttl);
+				result.appendChild(link_type);
+			}
+			else
+			{
+				if (isTunnel())
+				{
+					result.@link_type = "tunnel";
+				}
+				else
+					result.@link_type = "ethernet";
+			}
+			
+			for each (var current:VirtualInterface in interfaces)
+			{
+				var interfaceRefXml:XML = <interface_ref />;
+				interfaceRefXml.@virtual_node_id = current.virtualNode.id;
+				if (isTunnel())
+				{
+					interfaceRefXml.@tunnel_ip = current.ip;
+					interfaceRefXml.@virtual_interface_id = "control";
+				}
+				else
+				{
+					interfaceRefXml.@virtual_interface_id = current.id;
+				}
+				result.appendChild(interfaceRefXml);
+			}
+
+			return result;
 		}
 	}
 }

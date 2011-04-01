@@ -69,13 +69,13 @@ if (@ARGV != 1) {
 # Lookup user.
 my $this_user = User->ThisUser();
 if (! defined($this_user)) {
-    tbdie("You ($UID) do not exist!");
+    die("You ($UID) do not exist!");
 }
 
 # Lookup experiment.
 my $experiment = Experiment->Lookup($ARGV[0]);
 if (!defined($experiment)) {
-    tbdie("Could not lookup experiment object for $ARGV[0]!")
+    die("Could not lookup experiment object for $ARGV[0]!")
 }
 my $pid       = $experiment->pid();
 my $eid       = $experiment->eid();

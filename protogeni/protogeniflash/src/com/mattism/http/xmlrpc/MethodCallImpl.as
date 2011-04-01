@@ -9,9 +9,9 @@
 
 package com.mattism.http.xmlrpc
 {
-        import com.mattism.http.xmlrpc.MethodCall;
         import com.mattism.http.xmlrpc.util.XMLRPCDataTypes;
         import com.mattism.http.xmlrpc.util.XMLRPCUtils;
+		import com.mattism.http.xmlrpc.MethodCall;
 
         public class MethodCallImpl
         implements MethodCall
@@ -85,20 +85,13 @@ package com.mattism.http.xmlrpc
             this.debug("CreateParameterNode()");
             var Node:XML = <value />;
             var TypeNode:XML;
-			
-			if(parameter == null)
-				return Node;
 
             if (parameter is String)
-				parameter = {value:parameter};
+              parameter = {value:parameter};
             else if(parameter is Boolean)
-				parameter = {value:parameter};
-			else if(parameter is Number)
-				parameter = {value:parameter};
-			else if(parameter is Date)
-				parameter = {value:parameter};
+             parameter = {value:parameter};
             else if (parameter && parameter.value == null)
-				parameter = {value:parameter};
+             parameter = {value:parameter};
 
             if ( typeof parameter == "object")
             {
@@ -111,10 +104,6 @@ package com.mattism.http.xmlrpc
                   parameter.type=XMLRPCDataTypes.STRING;
                 else if ( v is Boolean )
                   parameter.type=XMLRPCDataTypes.BOOLEAN;
-				else if ( v is Number )
-					parameter.type=XMLRPCDataTypes.DOUBLE;
-				else if ( v is Date )
-					parameter.type=XMLRPCDataTypes.DATETIME;
                 else if ( v is Object )
                   parameter.type=XMLRPCDataTypes.STRUCT;
                 else
@@ -127,9 +116,7 @@ package com.mattism.http.xmlrpc
                 parameter = this.fixCDATAParameter(parameter);
 
                 this.debug("CreateParameterNode(): Creating object '"+parameter.value+"' as type "+parameter.type);
-                if(parameter.type == XMLRPCDataTypes.BOOLEAN)
-					parameter.value = parameter.value ? 1 : 0;
-				TypeNode = <{parameter.type}>{parameter.value}</{parameter.type}>;
+                TypeNode = <{parameter.type}>{parameter.value}</{parameter.type}>;
                 Node.appendChild(TypeNode);
                 return Node;
               }

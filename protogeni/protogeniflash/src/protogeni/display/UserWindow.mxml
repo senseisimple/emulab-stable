@@ -1,161 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						width="400" height="300"
-						defaultButton="{okButton}"
-						creationComplete="onCreationComplete()"
-						title="User Information"
-						close="closeWindow()">
-	<display:layout>
-		<s:VerticalLayout/>
-	</display:layout>
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	<fx:Script>
+<display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:display="protogeni.display.*"
+		 title="User Information" icon="{DisplayUtil.userIcon}" width="400" height="300">
+	
+	<mx:Script>
 		<![CDATA[
-			import mx.controls.Alert;
-			import mx.core.FlexGlobals;
-			
-			import protogeni.GeniEvent;
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
 			import protogeni.resources.Slice;
 			import protogeni.resources.User;
 			
 			[Bindable]
 			private var user:User;
 			
-			public function onCreationComplete():void
+			public function load(u:User):void
 			{
-				user = Main.geniHandler.CurrentUser;
+				user = u;
 				refresh();
-				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, refresh);
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, refresh);
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, refresh);
-			}
-			
-			public override function closeWindow(event:Event=null):void {
-				Main.geniDispatcher.removeEventListener(GeniEvent.USER_CHANGED, refresh);
-				Main.geniDispatcher.removeEventListener(GeniEvent.SLICE_CHANGED, refresh);
-				Main.geniDispatcher.removeEventListener(GeniEvent.SLICES_CHANGED, refresh);
-				super.closeWindow(event);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, refresh);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refresh);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, refresh);
 			}
 			
 			public function refresh(junk:* = null):void
 			{
 				credentialBasicImage.source = DisplayUtil.assignIcon(user.credential != null && user.credential.length > 0);
 				credentialKeysImage.source = DisplayUtil.assignIcon(user.keys != null && user.keys.length > 0);
-				slices.removeAllElements()
+				slices.removeAllChildren();
 				for each(var s:Slice in user.slices)
-				slices.addElement(DisplayUtil.getSliceButton(s));
-				if(sslPem != null)
-					this.sslPem.text = user.sslPem;
-			}
-			
-			public function save():void
-			{
-				user.sslPem = this.sslPem.text;
-				(Main.Application() as protogeniflash).saveLocalUserData();
+					slices.addChild(DisplayUtil.getSliceButton(s));
 			}
 		]]>
-	</fx:Script>
-	<mx:TabNavigator width="100%" height="100%" paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5">
-		<mx:Grid label="Basic" width="100%" height="100%" id="infoGrid" horizontalScrollPolicy="off" verticalScrollPolicy="off">
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Name" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.name}" />
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Authority" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.authority.Name}" />
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Credentials" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="Basic"/>
-					<mx:Image width="16" height="16" id="credentialBasicImage"/>
-					<s:Group>
-						<display:DefaultLine percentHeight="90" />
-					</s:Group>
-					<s:Label text="Keys"/>
-					<mx:Image width="16" height="16" id="credentialKeysImage"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Password" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Button label="Force delete cache" click="user.encryptedPassword = ''; FlexGlobals.topLevelApplication.saveLocalUserData(); Alert.show('Password removed');" />
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Uid" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.uid}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Uuid" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.uuid}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Hrn" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.hrn}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Email" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.email}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Urn" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.urn}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Slices" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Scroller width="100%" height="100%">
-						<s:VGroup width="100%" height="100%" id="slices" />
-					</s:Scroller>
-				</mx:GridItem>
-			</mx:GridRow>
-		</mx:Grid>
-		<s:NavigatorContent height="100%" width="100%" label="SSL Certificate">
-			<mx:TextArea id="sslPem" text="{user.sslPem}" width="100%" height="100%" />
-		</s:NavigatorContent>
-	</mx:TabNavigator>
-	<display:controlBarContent>
-		<s:Button id="okButton" label="OK" click="save(); closeWindow();" height="24" />
-		<s:Button label="Cancel" click="refresh(); closeWindow();" height="24" />
-	</display:controlBarContent>
+	</mx:Script>
+	
+	<mx:Grid width="100%" height="100%">
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Name" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{user.name}" selectable="true"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Credentials" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="Basic"/>
+				<mx:Image width="16" height="16" id="credentialBasicImage"/>
+				<mx:VRule height="16"/>
+				<mx:Label text="Keys"/>
+				<mx:Image width="16" height="16" id="credentialKeysImage"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Uid" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{user.uid}" selectable="true"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Uuid" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{user.uuid}" selectable="true"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Hrn" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{user.hrn}" selectable="true"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Email" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{user.email}" selectable="true"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Urn" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{user.urn}" selectable="true"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Slices" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:VBox width="100%" height="82" id="slices">
+				</mx:VBox>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+	
 </display:DefaultWindow>

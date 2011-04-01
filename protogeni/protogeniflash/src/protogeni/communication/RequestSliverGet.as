@@ -14,17 +14,18 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
   public class RequestSliverGet extends Request
   {
     public function RequestSliverGet(s:Sliver) : void
     {
-		super("SliverGet", "Getting the sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.getSliver, true);
+		super("SliverGet", "Getting the sliver on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.getSliver, true);
 		sliver = s;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setUrl(sliver.manager.Url);
+		op.setExactUrl(sliver.componentManager.Url);
     }
 
 	override public function complete(code : Number, response : Object) : *

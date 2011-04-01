@@ -1,18 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						title="Console"
-						contentCreationComplete="onCreationComplete()" 
-						close="LogHandler.closeConsole();" xmlns:communication="protogeni.communication.*">
-	<display:layout>
-		<s:VerticalLayout paddingBottom="0" paddingLeft="10" paddingRight="10" paddingTop="10"/>
-	</display:layout>
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace display "protogeni.display.*";
-		
+<display:DefaultWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
+	title="Console"
+	implements="LogRoot" initialize="init()" layout="horizontal" xmlns:protogeniflash="protogeniflash.*" xmlns:display="protogeni.display.*" width="700" height="400">
+	
+	<mx:Style>
 		.failedStyle {
 			color: red;
 			textRollOverColor: red;
@@ -40,115 +31,128 @@
 			textSelectedColor: #FF7F00;
 			themeColor: #FF7F00;
 		}
-	</fx:Style>
-	<fx:Script>
+	</mx:Style>
+	
+	<mx:Script>
 		<![CDATA[
-			import mx.collections.ArrayList;
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
 			import mx.controls.Button;
+			import mx.controls.HRule;
+			import mx.controls.Spacer;
+			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
 			
-			import protogeni.GeniEvent;
-			import protogeni.GeniHandler;
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
 			import protogeni.communication.CommunicationUtil;
 			import protogeni.communication.Request;
 			import protogeni.communication.RequestQueue;
 			import protogeni.communication.RequestQueueNode;
-			import protogeni.resources.GeniManager;
+			import protogeni.resources.ComponentManager;
 			
-			import spark.components.HGroup;
-			import spark.primitives.Rect;
-			
-			[Bindable]
 			public var selectedIndex:int;
-			
-			[Bindable]
-			public var groupNames:ArrayList;
+			private var logList:Array;
 			public var groups:Array;
 			
-			public function onCreationComplete():void
+			[Bindable]
+			public var groupNames:Array;
+			
+			public function init():void
 			{
-				selectedIndex = 0;
-				refreshView();
-				Main.geniDispatcher.addEventListener(GeniEvent.QUEUE_CHANGED, resetQueueView);
-				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, loadGeniManagers);
-				Main.geniDispatcher.addEventListener(GeniEvent.LOGS_CHANGED, logsChanged);
+				clear();
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.QUEUE_CHANGED, resetQueueView);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, loadComponentManagers);
 			}
 			
-			public override function closeWindow(event:Event=null):void {
-				Main.geniDispatcher.removeEventListener(GeniEvent.QUEUE_CHANGED, resetQueueView);
-				Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGERS_CHANGED, loadGeniManagers);
-				Main.geniDispatcher.removeEventListener(GeniEvent.LOGS_CHANGED, logsChanged);
-				super.closeWindow(event);
+			public function setStatus(s:String, isError:Boolean):void
+			{
+				var isWorking:Boolean = Main.protogeniHandler.rpcHandler.queue.working();
+				Main.Pgmap().waitingIcon.visible = isWorking;
+				Main.Pgmap().progressLabel.text = s;
+				if(isWorking && Main.protogeniHandler.rpcHandler.queue.workingCount() > 1)
+					Main.Pgmap().waitingCountLabel.text = Main.protogeniHandler.rpcHandler.queue.workingCount() + " reqs running";
+				else
+					Main.Pgmap().waitingCountLabel.text = "";
+				if(isWorking)
+					Main.Pgmap().progressLabel.styleName = "inprogressStyle";
+				else if(isError)
+					Main.Pgmap().progressLabel.styleName = "failedStyle";
+				else
+					Main.Pgmap().progressLabel.styleName = "validStyle";
 			}
 			
-			public function logsChanged(e:GeniEvent):void {
-				if(e.changedObject != null) {
-					var msg:LogMessage = e.changedObject as LogMessage;
-					if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
-						addMessage(msg);
-				} else {
-					this.resetLogView();
-				}
-				
+			public function appendMessage(msg:LogMessage):void {
+				logList.push(msg);
+				if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
+					addMessage(msg);
 			}
 			
 			private function doScroll(event:FlexEvent): void
 			{
-				// REDO
+				logs.verticalScrollPosition = logs.maxVerticalScrollPosition
+				logs.validateNow();
+				logs.removeEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
 			}
-			
-			private var sortingUp:Boolean = true;
-			private function toggleSorting():void {
-				sortingUp = !sortingUp;
-				if(sortingUp)
-					this.sortButton.setStyle("icon", DisplayUtil.upIcon);
-				else
-					this.sortButton.setStyle("icon", DisplayUtil.downIcon);
-				this.resetLogView();
-			}
+
 			
 			private function addMessage(msg:LogMessage):void
 			{
 				logs.addEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
 				if(msg.type == LogMessage.TYPE_START)
 				{
-					var split:Rect = new Rect();
-					logs.addElement(split);
+					var split:Spacer = new Spacer();
+					logs.addChild(split);
 				}
-				var b:mx.controls.Button = DisplayUtil.getLogMessageButton(msg);
-				var h:HGroup = new HGroup();
+				var b:Button = DisplayUtil.getLogMessageButton(msg);
+				var h:HBox = new HBox();
 				h.percentWidth = 100;
 				if(msg.type == LogMessage.TYPE_END)
-					h.horizontalAlign = "right";
-				h.addElement(b);
-				if(!sortingUp)
-					logs.addElement(h);
+					h.setStyle("horizontalAlign","right");
+				h.addChild(b);
+				if(this.oldestRadio.selected)
+					logs.addChild(h);
 				else
-					logs.addElementAt(h, 0);
+					logs.addChildAt(h, 0);
 			}
 			
-			public function loadGeniManagers(junk:* = null):void
+			public function clear():void {
+				selectedIndex = 0;
+				logList = new Array();
+				groups = new Array("", CommunicationUtil.sesUrl, CommunicationUtil.chUrl);
+				groupNames = new Array("All", "Slice Embedding Service", "Clearing House");
+				if(logs != null)
+					logs.removeAllChildren();
+				if(queue != null)
+					queue.removeAllChildren();
+			}
+			
+			public function loadComponentManagers(junk:* = null):void
 			{
 				groups = new Array("", CommunicationUtil.sesUrl, CommunicationUtil.chUrl);
-				groupNames = new ArrayList(["All", "Slice Embedding Service", "Clearing House"]);
+				groupNames = new Array("All", "Slice Embedding Service", "Clearing House");
 				
-				for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
+				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
 				{
-					groups.push(gm.Url);
-					groupNames.addItem(gm.Hrn);
+					groups.push(cm.Url);
+					groupNames.push(cm.Hrn);
 				}
 				this.validateNow();
 			}
 			
 			public function clearScreen():void
 			{
-				logs.removeAllElements();
-				queue.removeAllElements();
+				logs.removeAllChildren();
+				queue.removeAllChildren();
 			}
 			
 			public function open():void
 			{
-				showWindow();
+				PopUpManager.addPopUp(this, Main.Pgmap(), false);
+				PopUpManager.centerPopUp(this);
+				groupComboBox.selectedIndex = selectedIndex;
 			}
 			
 			public function openGroup(id:String):void
@@ -161,43 +165,45 @@
 			{
 				this.resetLogView();
 				this.resetQueueView();
-				this.loadGeniManagers();
+				
+				selectedIndex = groupComboBox.selectedIndex;
 			}
 			
 			public function addRequest(rqn:RequestQueueNode):void
 			{
-				var reqHbox:HGroup = new HGroup();
-				var removeButton:Button = DisplayUtil.getButton(DisplayUtil.cancelIcon, true);
+				var reqHbox:HBox = new HBox();
+				var removeButton:ImageButton = new ImageButton();
 				removeButton.data = rqn;
+				removeButton.source = DisplayUtil.cancelIcon;
 				removeButton.toolTip = "Cancel this operation";
 				removeButton.addEventListener(MouseEvent.CLICK,
 					function remove(e:MouseEvent):void
 					{
-						Main.geniHandler.requestHandler.remove(e.currentTarget.data.item);
+						Main.protogeniHandler.rpcHandler.remove(e.currentTarget.data);
 						/*
-						Alert.show("Really remove '" + e.currentTarget.data.item.name + "' from the queue?", "Remove?", Alert.YES|Alert.NO, Main.Application(),
-						function removeRequest(e:CloseEvent):void
-						{
-						if(e.detail == Alert.YES)
-						
-						});*/
+						Alert.show("Really remove '" + e.currentTarget.data.item.name + "' from the queue?", "Remove?", Alert.YES|Alert.NO, Main.Pgmap(),
+							function removeRequest(e:CloseEvent):void
+							{
+								if(e.detail == Alert.YES)
+									
+							});*/
 					});
-				reqHbox.addElement(removeButton);
-				reqHbox.addElement(DisplayUtil.getRequestButton(rqn.item));
-				queue.addElement(reqHbox);
+				reqHbox.addChild(removeButton);
+				reqHbox.addChild(DisplayUtil.getRequestButton(rqn.item));
+				queue.addChild(reqHbox);
 			}
 			
 			public function resetLogView(junk:* = null):void
 			{
-				logs.removeAllElements();
+				logs.removeAllChildren();
 				if(groupComboBox.selectedIndex == 0)
 				{
-					for each(var allMsg:LogMessage in LogHandler.logs)
+					for each(var allMsg:LogMessage in logList)
 					{
 						addMessage(allMsg);
 					}
 				} else {
-					for each(var msg:LogMessage in LogHandler.logs)
+					for each(var msg:LogMessage in logList)
 					{
 						if(msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1)
 							addMessage(msg);
@@ -207,14 +213,14 @@
 			
 			public function resetQueueView(junk:* = null):void
 			{
-				queue.removeAllElements();
+				queue.removeAllChildren();
 				
 				var selectedQueue:RequestQueue = new RequestQueue();
 				if(groupComboBox.selectedIndex == 0)
 				{
-					selectedQueue = Main.geniHandler.requestHandler.queue;
+					selectedQueue = Main.protogeniHandler.rpcHandler.queue;
 				} else {
-					var currentTestNode:RequestQueueNode = Main.geniHandler.requestHandler.queue.head;
+					var currentTestNode:RequestQueueNode = Main.protogeniHandler.rpcHandler.queue.head;
 					while(currentTestNode != null)
 					{
 						if((currentTestNode.item as Request).op.getUrl().indexOf(groups[groupComboBox.selectedIndex]) > -1)
@@ -228,7 +234,7 @@
 				{
 					var noneLabel:Label = new Label();
 					noneLabel.text = "None";
-					queue.addElement(noneLabel);
+					queue.addChild(noneLabel);
 				}
 				else
 				{
@@ -236,7 +242,7 @@
 					{
 						var currentLabel:Label = new Label();
 						currentLabel.text = "Currently running";
-						queue.addElement(currentLabel);
+						queue.addChild(currentLabel);
 						while(currentNode != null && currentNode.item.running)
 						{
 							addRequest(currentNode);
@@ -247,11 +253,11 @@
 					{
 						var noneWaitingLabel:Label = new Label();
 						noneWaitingLabel.text = "None waiting";
-						queue.addElement(noneWaitingLabel);
+						queue.addChild(noneWaitingLabel);
 					} else {
 						var waitingLabel:Label = new Label();
 						waitingLabel.text = "Waiting";
-						queue.addElement(waitingLabel);
+						queue.addChild(waitingLabel);
 						while(currentNode != null)
 						{
 							addRequest(currentNode);
@@ -260,72 +266,39 @@
 					}
 				}
 			}
+			
 		]]>
-	</fx:Script>
+	</mx:Script>
+	
 	<mx:HDividedBox width="100%" height="100%">
-		<s:VGroup height="100%" width="50%" horizontalAlign="center">
-			<s:Label text="Logs"  fontSize="14" fontWeight="bold"/>
-			<s:HGroup verticalAlign="middle">
-				<mx:Button label="Clear" click="LogHandler.clear();" height="24" />
-				<display:DefaultLine height="24" />
-				<s:Label text="Sort" />
-				<display:ImageButton id="sortButton"
-									  icon="{DisplayUtil.upIcon}"
-									  click="toggleSorting()"
-									  toolTip="Switch the ordering" />
-			</s:HGroup>
-			<s:Scroller height="100%" width="100%">
-				<s:VGroup height="100%" width="100%" id="logs" paddingRight="10" />
-			</s:Scroller>
-		</s:VGroup>
+		<mx:VBox height="100%" width="50%" horizontalAlign="center" horizontalScrollPolicy="off">
+			<mx:Label text="Logs"  fontSize="14" fontWeight="bold"/>
+			<mx:HBox verticalAlign="middle">
+				<mx:Label text="Sort by" />
+				<mx:RadioButtonGroup id="sortGroup" selectedValue="newest" itemClick="resetLogView()" />
+				<mx:RadioButton id="newestRadio" group="{sortGroup}" fontWeight="bold" label="newest" />
+				<mx:RadioButton id="oldestRadio" group="{sortGroup}" fontWeight="bold" label="oldest" />
+				<mx:Label text="at top" />
+			</mx:HBox>
+			<mx:VBox height="100%" width="100%" id="logs" paddingRight="20">
+			</mx:VBox>
+		</mx:VBox>
 		
-		<s:VGroup height="100%" width="50%" horizontalAlign="center">
-			<s:Label text="Queued Requests"  fontWeight="bold" fontSize="14"/>
-			<s:HGroup gap="12">
-				<display:ImageButton id="stopButton"
-									  icon="{DisplayUtil.stopIcon}"
-									  click="Main.geniHandler.requestHandler.stop();"
-									  toolTip="Force stop the queue" />
-				<display:ImageButton id="pauseButton"
-									  icon="{DisplayUtil.pauseControlIcon}"
-									  click="Main.geniHandler.requestHandler.pause();"
-									  toolTip="Force pause the queue" />
+		<mx:VBox height="100%" width="50%" horizontalAlign="center" horizontalScrollPolicy="off">
+			<mx:Label text="Queued Requests"  fontWeight="bold" fontSize="14"/>
+			<mx:HBox width="100%" horizontalAlign="center">
 				<display:ImageButton id="startButton"
-									  icon="{DisplayUtil.playControlIcon}"
-									  click="Main.geniHandler.requestHandler.start();"
-									  toolTip="Force start the queue" />
-				<mx:Button label="Step" click="Main.geniHandler.requestHandler.step()" height="24" />
-			</s:HGroup>
-			<s:Scroller id="s" height="100%" width="100%">
-				<s:VGroup height="100%" width="100%" id="queue" />
-			</s:Scroller>
-		</s:VGroup>
+									 source="{DisplayUtil.playIcon}"
+									 click="Main.protogeniHandler.rpcHandler.start();"
+									 toolTip="Force start the queue" />
+			</mx:HBox>
+			<mx:VBox height="100%" width="100%" id="queue">
+			</mx:VBox>
+		</mx:VBox>
 	</mx:HDividedBox>
-	<display:controlBarLayout>
-		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingTop="2" paddingLeft="2" paddingRight="10" />
-	</display:controlBarLayout>
-	<display:controlBarContent>
-		<s:Label text="View" fontWeight="bold" verticalAlign="middle"/>
-		<s:DropDownList id="groupComboBox" requireSelection="true"
-						dataProvider="{groupNames}"
-						selectedIndex="{selectedIndex}"
-						change="refreshView()"
-						width="250" height="24"
-						creationComplete="selectedIndex = 0" />
-		<s:Rect width="100%" />
-		<s:Label text="Max Running Ops" />
-		<s:NumericStepper id="maxRunningStepper" value="{Main.geniHandler.requestHandler.maxRunning}" minimum="1" valueCommit="Main.geniHandler.requestHandler.maxRunning = maxRunningStepper.value; Main.geniHandler.requestHandler.tryNext();" />
-		<display:DefaultLine height="90%" />
-		<s:DropDownList id="requestList" labelField="name" requireSelection="true" height="24">
-			<s:ArrayCollection>
-				<communication:RequestUserResolve />
-				<communication:RequestGetCredential />
-				<communication:RequestGetKeys />
-				<communication:RequestListComponents />
-				<communication:RequestListComponentsPublic />
-			</s:ArrayCollection>
-		</s:DropDownList>
-		<display:ImageButton id="runRequestButton" icon="{DisplayUtil.actionIcon}" toolTip="Run the selected request"
-							  click="Main.geniHandler.requestHandler.pushRequest(requestList.selectedItem)" />
-	</display:controlBarContent>
+	<mx:ControlBar>
+		<mx:Label text="View"  fontSize="12" fontWeight="bold"/>
+		<mx:ComboBox id="groupComboBox" dataProvider="{groupNames}" change="refreshView()"></mx:ComboBox>
+	</mx:ControlBar>
+	
 </display:DefaultWindow>

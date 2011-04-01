@@ -27,7 +27,7 @@ package protogeni.communication
 		op.addField("ticket", sliver.ticket.toXMLString());
 		op.addField("rspec", s.getRequestRspec());
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setUrl(sliver.componentManager.Url);
+		op.setExactUrl(sliver.componentManager.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *

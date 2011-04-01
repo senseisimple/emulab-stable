@@ -277,6 +277,7 @@ while (1) {
 
 	$reload_args{'debug'}     = $debug;
 	$reload_args{'waitmode'}  = 2; # XXX Wait till reboot after reload.
+	$reload_args{'prepare'}   = 1; # XXX Clear out old disk metadata.
 	$reload_args{'nodelist'}  = [ @nodenames ];
 	logit("Running osload on @nodenames", 0);
 	my $failures = osload(\%reload_args, \%reload_results);

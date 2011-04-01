@@ -32,10 +32,10 @@ package protogeni.communication
 		super("SliceResolve (" + name + ")", "Resolving slice named " + s.hrn, CommunicationUtil.resolve);
 		slice = s;
 		isCreating = willBeCreating;
-		op.addField("credential", Main.geniHandler.CurrentUser.credential);
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
 		op.addField("urn", slice.urn);
 		op.addField("type", "Slice");
-		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -46,21 +46,21 @@ package protogeni.communication
 			if(isCreating)
 			{
 				Alert.show("Slice '" + slice.urn + "' already exists");
-				Main.Application().setStatus("Slice exists", true);
+				Main.log.setStatus("Slice exists", true);
 			}
 			else
 			{
 				slice.uuid = response.value.uuid;
-				slice.creator = Main.geniHandler.CurrentUser;
+				slice.creator = Main.protogeniHandler.CurrentUser;
 				slice.hrn = response.value.hrn;
 				slice.urn = response.value.urn;
 				for each(var sliverCm:String in response.value.component_managers) {
 					var newSliver:Sliver = new Sliver(slice);
-					newSliver.manager = Main.geniHandler.GeniManagers.getByUrn(sliverCm);
+					newSliver.componentManager = Main.protogeniHandler.ComponentManagers.getByUrn(sliverCm);
 					slice.slivers.addItem(newSliver);
 				}
 				
-				Main.geniDispatcher.dispatchSliceChanged(slice);
+				Main.protogeniHandler.dispatchSliceChanged(slice);
 				newRequest = new RequestSliceCredential(slice);
 			}
 		}
@@ -72,8 +72,8 @@ package protogeni.communication
 			}
 			else
 			{
-				Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
-				//Main.geniHandler.mapHandler.drawAll();
+				Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+				Main.protogeniHandler.mapHandler.drawAll();
 			}
 			
 		}

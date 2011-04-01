@@ -22,8 +22,91 @@
 #include <sys/fcntl.h>
 #include <paths.h>
 #include "decls.h"
+
+#ifndef NO_EMULAB
 #include "log.h"
 #include "tmcc.h"
+#else
+void info(const char * fmt, ...)
+{
+  va_list args;
+  char	buf[BUFSIZ];
+
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  fprintf(stderr, "INFO: %s\n", buf);
+
+}
+void warning(const char * fmt, ...)
+{
+  va_list args;
+  char	buf[BUFSIZ];
+
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  fprintf(stderr, "WARNING: %s\n", buf);
+}
+void error(const char * fmt, ...)
+{
+  va_list args;
+  char	buf[BUFSIZ];
+
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  fprintf(stderr, "ERROR: %s\n", buf);
+}
+void fatal(const char * fmt, ...)
+{
+  va_list args;
+  char	buf[BUFSIZ];
+
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+
+  fprintf(stderr, "FATAL: %s\n", buf);
+  exit(-1);
+}
+void pfatal(const char *fmt, ...)
+{
+	va_list args;
+	char	buf[BUFSIZ];
+
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	fatal("%s : %s", buf, strerror(errno));
+}
+void pwarning(const char *fmt, ...)
+{
+	va_list args;
+	char	buf[BUFSIZ];
+
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	warning("%s : %s", buf, strerror(errno));
+}
+void errorc(const char *fmt, ...)
+{
+	va_list args;
+	char	buf[BUFSIZ];
+
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	error("%s : %s", buf, strerror(errno));
+}
+#endif
 
 int		debug   = 0;
 int		verbose = 0;
@@ -126,7 +209,9 @@ main(int argc, char **argv)
 	unsigned int		maxfd;
 	FILE			*fp;
 	char			buf[BUFSIZ];
+#ifndef NO_EMULAB
 	extern char		build_info[];
+#endif
 	fd_set			fds, sfds;
 	char			*logfile = (char *) NULL;
 	struct sigaction	sa;
@@ -160,7 +245,11 @@ main(int argc, char **argv)
 			verbose++;
 			break;
 		case 'V':
+#ifndef NO_EMULAB
 			fprintf(stderr, "%s\n", build_info);
+#else
+                        fprintf(stderr, "Built in standalone mode\n");
+#endif
 			exit(0);
 			break;
 		case 'h':
@@ -178,6 +267,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
+#ifndef NO_EMULAB
 	if (debug) 
 		loginit(0, logfile);
 	else {
@@ -186,8 +276,11 @@ main(int argc, char **argv)
 		else
 			loginit(1, "syncd");
 	}
+#endif
 	info("daemon starting (version %d)\n", CURRENT_VERSION);
+#ifndef NO_EMULAB
 	info("%s\n", build_info);
+#endif
 
 	/*
 	 * Create TCP/UDP server.
@@ -199,10 +292,12 @@ main(int argc, char **argv)
 	/*
 	 * Register with tmcc
 	 */
+#ifndef NO_EMULAB
 	if (PortRegister(SERVER_SERVNAME, portnum) < 0) {
 		error("Could not register service with tmcd!");
 		exit(1);
 	}
+#endif
 	
 	/* Now become a daemon */
 	if (!debug)
@@ -587,7 +682,6 @@ makesockets(int *portnum, int *udpsockp, int *tcpsockp)
 		pfatal("getsockname");
 	}
 	info("listening on UDP port %d\n", ntohs(name.sin_port));
-
 	*tcpsockp = tcpsock;
 	*udpsockp = udpsock;
 	return 0;
@@ -692,7 +786,6 @@ handle_request(int sock, struct sockaddr_in *client,
 	else if (barrier_reqp->request == BARRIER_WAIT) {
 		barrier_reqp->count = -1;
 		barrierp->count -= 1;
-
 		if (verbose)
 			info("%s: Barrier waiter: %s %d\n",
 			     inet_ntoa(client->sin_addr),

@@ -10,6 +10,5 @@ package protogeni.resources
 		public var os:String = "";
 		public var version:String = "";
 		public var description:String = "";
-		public var isDefault:Boolean = false;
 	}
 }

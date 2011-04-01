@@ -1,0 +1,19 @@
+#
+# Add isplaceholder slot to geni_slices
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_slices", "isplaceholder")) {
+	DBQueryFatal("alter table geni_slices ".
+		     "  add `isplaceholder` tinyint(1) NOT NULL default '0'");
+    }
+    return 0;
+}
+1;

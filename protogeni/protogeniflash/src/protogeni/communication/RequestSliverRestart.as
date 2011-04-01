@@ -20,11 +20,11 @@ package protogeni.communication
   {
     public function RequestSliverRestart(s:Sliver) : void
     {
-		super("SliverRestart", "Restarting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.restartSliver);
+		super("SliverRestart", "Restarting sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.restartSliver);
 		sliver = s;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setUrl(sliver.manager.Url);
+		op.setExactUrl(sliver.componentManager.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *

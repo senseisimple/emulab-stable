@@ -20,13 +20,13 @@ package protogeni.communication
   {
     public function RequestTicketRedeem(s:Sliver) : void
     {
-		super("TicketRedeem", "Updating ticket for sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.redeemTicket);
+		super("TicketRedeem", "Updating ticket for sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.redeemTicket);
 		sliver = s;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("ticket", sliver.ticket.toXMLString());
 		op.addField("keys", sliver.slice.creator.keys);
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setUrl(sliver.manager.Url);
+		op.setExactUrl(sliver.componentManager.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -40,8 +40,8 @@ package protogeni.communication
 			//sliver.parseRspec();
 			// update existing?
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
+			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 		}
 		else
 		{

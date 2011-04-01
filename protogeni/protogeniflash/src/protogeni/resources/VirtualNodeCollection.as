@@ -19,17 +19,6 @@ package protogeni.resources
 			return null;
 		}
 		
-		public function getByInterfaceId(id:String):VirtualInterface
-		{
-			for each(var node:VirtualNode in this)
-			{
-				var vi:VirtualInterface = node.interfaces.GetByID(id);
-				if(vi != null)
-					return vi;
-			}
-			return null;
-		}
-		
 		public function getByUrn(urn:String):VirtualNode
 		{
 			for each(var node:VirtualNode in this)
