@@ -2496,6 +2496,18 @@ sub doSyncVlansWithDB($) {
 		print "$vlan is using tag $tag but DB says $otag\n";
 		$errors++;
 	    }
+	    elsif ($vlan->IsAlias()) {
+		my $aliasid  = $vlan->IsAlias();
+		my $aliaslan = VLan->Lookup($aliasid);
+		if (!defined($aliaslan)) {
+		    die("$vlan is aliased to nonexistent lan $aliasid\n");
+		}
+		my $aliastag = $aliaslan->GetTag();
+		if ($tag != $aliastag) {
+		    die("$vlan is aliased to $aliaslan,".
+			"but tags are different\n")
+		}
+	    }
 	    else {
 		print "$vlan is using tag $tag but DB says no tag\n";
 		#
@@ -2639,14 +2651,14 @@ sub doSyncVlansWithDB($) {
 	next
 	    if (!@swports && !exists($vlans{$vlan_id}));
 
-	# Skip vlans that are on another stack.
-	next if
-	    ($vlan->GetStack() ne $stackid);
-
 	# Skip alias vlans.
 	next if
 	    ($vlan->IsAlias());
 	
+	# Skip vlans that are on another stack.
+	next if
+	    ($vlan->GetStack() ne $stackid);
+
 	#
 	# Skip vlans that have matching port lists.
 	#
