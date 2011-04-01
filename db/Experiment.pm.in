@@ -4384,7 +4384,8 @@ sub ReserveSharedBandwidth($;$$)
 	$previous_result = $tmp;
     }
     # Need to do this when we want to seek around inside the results.
-    $previous_result = $previous_result->WrapForSeek();
+    $previous_result = $previous_result->WrapForSeek()
+	if (defined($previous_result));
     $query_result = $query_result->WrapForSeek();
 
     #
