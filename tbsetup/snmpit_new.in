@@ -1547,7 +1547,7 @@ sub doRestorePortStatus($@) {
 	    $errors++;
 	}
 	my @tmp = ($port);
-	VLan->RecordVLanModification($source_vlan->id(), undef, \$tmp);
+	VLan->RecordVLanModification($source_vlan->id(), undef, \@tmp);
     }
     if (defined($target_vlan) && $target_vlan->KeepInSync()) {
 	if ($target_vlan->AddPort($port)) {
