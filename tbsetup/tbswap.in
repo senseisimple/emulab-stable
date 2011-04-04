@@ -575,6 +575,11 @@ sub doSwapout($) {
 	$experiment->DeleteInternalProgramAgents();
     }
 
+    if ($type >= RETRY) {
+	print "Removing dynamic blobs.\n";
+	$experiment->RemoveBlobs();
+    }
+
     if ($type >= CLEANUP) {
 	#
 	# Undo plab in elab specialness.
@@ -1100,6 +1105,18 @@ sub doSwapin($) {
 	return 1;
     }
     TBDebugTimeStamp("tarfiles_setup finished");
+
+    #
+    # Handle virt blobs.
+    #
+    if ($type >= RETRY) {
+	print "Creating virt blobs.\n";
+	$experiment->UploadBlobs(0);
+    }
+    elsif ($type == MODIFY) {
+	print "Updating virt blobs.\n";
+	$experiment->UploadBlobs(1);
+    }
 
     #
     # If there are any Plab dslice nodes in the experiment, create the
