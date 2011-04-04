@@ -34,6 +34,18 @@ my %allports = ();
 my %wiredports = ();
 
 #
+# check if a var is a Port instance
+#
+sub isPort($$)
+{
+	my ($c, $p) = @_;
+	if (ref($p) eq "Port") {
+		return 1;
+	}
+	return 0;
+}
+
+#
 # Get the other end port of a wire by triple representation of this end port
 # the classname can be ignored
 # the representation can be a triple-port string or triple tokens

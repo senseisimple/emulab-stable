@@ -851,7 +851,7 @@ sub convertPortFromNode2Dev($$) { #@@@@ deprecated
 #     returns number of failed ports on failure.
 #     returns -1 if the operation is unsupported
 #
-sub portControl ($$@) { #@@@@
+sub portControl ($$@) {
     my $self = shift;
 
     my $cmd = shift;
@@ -1016,7 +1016,7 @@ sub createVlan($$$) {
 #     returns 0 on sucess.
 #     returns the number of failed ports on failure.
 #
-sub setPortVlan($$@) { #@@@@
+sub setPortVlan($$@) {
     my $self = shift;
     my $vlan_id = shift;
     my @pcports = @_;
@@ -1090,7 +1090,7 @@ sub setPortVlan($$@) { #@@@@
 #     returns 0 on sucess.
 #     returns the number of failed ports on failure.
 #
-sub delPortVlan($$@) { #@@@@
+sub delPortVlan($$@) {
     my $self = shift;
     my $vlan_id = shift;
     my @pcports = @_;
@@ -1270,7 +1270,7 @@ sub convertPortFromDev2Node($$) { #@@@@ deprecated
 # usage: listVlans($self)
 # see snmpit_cisco_stack.pm for a description of return value format
 #
-sub listVlans($) { #@@@@
+sub listVlans($) {
     my $self = shift;
 
     my @list = ();
@@ -1293,7 +1293,7 @@ sub listVlans($) { #@@@@
 # usage: listPorts($self)
 # see snmpit_cisco_stack.pm for a description of return value format
 #
-sub listPorts($) { #@@@@
+sub listPorts($) {
     my $self = shift;
     my @ports = ();
 

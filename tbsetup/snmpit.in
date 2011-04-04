@@ -1756,7 +1756,7 @@ sub doVlansFromTables($$@) {
 	if (getPathVlanIfaces($vlanid, \%ifaces) != -1) {
 	    my @ifs = keys %ifaces;
 	    @ports = map { ifacemodport{$_} } @ifs;
-	    $errors += CreateOneVlan($snstack, $vlanid, @ports);
+	    $errors += CreateOneVlan($stacks, $vlanid, @ports);
 	}
     }
     return $errors;
