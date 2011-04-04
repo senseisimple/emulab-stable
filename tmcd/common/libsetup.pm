@@ -24,6 +24,7 @@ use Exporter;
 	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
          getlinkdelayconfig getloadinfo getbootwhat gendhcpdconf
 	 forcecopy
+         getmanifest fetchmanifestblobs runbootscript runhooks 
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -44,6 +45,8 @@ use Exporter;
 
 # Must come after package declaration!
 use English;
+
+my $debug = 1;
 
 # The tmcc library.
 use libtmcc;
@@ -722,6 +725,381 @@ sub donodeid()
 	warn "*** WARNING: Could not write nodeid to " . TMNODEID() . "\n";
     }
     return 0;
+}
+
+#
+# Get the boot script manifest -- whether scripts are enabled, or hooked, and 
+# how and when they or their hooks run!
+#
+sub getmanifest($;$)
+{
+    my ($rptr,$nofetch) = @_;
+    my @tmccresults;
+    my %manifest = ();
+
+    print "Checking manifest...\n";
+
+    if (tmcc(TMCCCMD_MANIFEST, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get manifest from server!\n");
+	%$rptr = ();
+	return -1;
+    }
+    if (@tmccresults == 0) {
+	%$rptr = ();
+	return 0;
+    }
+
+    my $servicepat = q(SERVICE NAME=([\w\.\-]+) ENV=(\w+) WHENCE=(\w+));
+    $servicepat   .= q( ENABLED=(0|1) HOOKS_ENABLED=(0|1));
+    $servicepat   .= q( FATAL=(0|1) BLOBID=([\w\-]*));
+
+    my $hookpat = q(HOOK SERVICE=([\w\.\-]+) ENV=(\w+) WHENCE=(\w+));
+    $hookpat   .= q( OP=(\w+) POINT=(\w+));
+    $hookpat   .= q( FATAL=(0|1) BLOBID=([\w\-]+));
+    $hookpat   .= q( ARGV="([^"]*)");
+
+    my @loadinforesults = ();
+    if (tmcc(TMCCCMD_LOADINFO, undef, \@loadinforesults) < 0) {
+	warn("*** WARNING: getmanifest could not get loadinfo from server,\n".
+	     "             unsure if node is in MFS and reloading, continuing!\n");
+    }
+
+    #
+    # Are we in a loading environment?  If yes, filter the manifest
+    # so that only the service and hook settings that apply to the 
+    # loading MFS apply.
+    #
+    if (@loadinforesults && MFS()) {
+	$manifest{'_ENV'} = 'load';
+    }
+    #
+    # Otherwise, if we're not in an MFS, we must be booting!
+    # NOTE: we don't do any configuration of the image in the 
+    # admin MFS!
+    #
+    elsif (!MFS()) {
+	$manifest{'_ENV'} = 'boot';
+    }
+    #
+    # Otherwise, don't return *anything* -- the admin mfs doesn't do any
+    # config of the node.
+    #
+    else {
+	%$rptr = ();
+	return 0;
+    }
+
+    #
+    # Process our results.
+    #
+    for (my $i = 0; $i < @tmccresults; ++$i) {
+	my $line = $tmccresults[$i];
+	my %service;
+
+	if ($line =~ /^$servicepat/) {
+	    my %service = ( 'ENABLED' => $4,
+			    'HOOKS_ENABLED' => $5,
+			    'BLOBID' => $7,
+			    'WHENCE' => $3,
+			    'FATAL' => $6 );
+	    #
+	    # Filter the service part of the manifest so that only the 
+	    # settings that apply here are passed to scripts.
+	    #
+	    if ($2 eq $manifest{'_ENV'}) {
+		# assume that there might be a hook line that applied to this
+		# service ahead of the service line!  Other possibility
+		# is that there was already a service line for this env...
+		# which is a bug -- so just silently stomp it in that case.
+		#
+		# anyway, just update the results pointer for this service
+		foreach my $k (keys(%service)) {
+		    $manifest{$1}{$k} = $service{$k};
+		}
+
+		if (!exists($manifest{$1}{'_PREHOOKS'})) {
+		    $manifest{$1}{'_PREHOOKS'} = [];
+		}
+		if (!exists($manifest{$1}{'_POSTHOOKS'})) {
+		    $manifest{$1}{'_POSTHOOKS'} = [];
+		}
+	    }
+	    # Otherwise just skip this entry -- it doesn't apply to us.
+	    else {
+		next;
+	    }
+	}
+	elsif ($line =~ /^$hookpat/) {
+	    #
+	    # Filter the service part of the manifest so that only the 
+	    # settings that apply here are passed to scripts.
+	    #
+	    if ($2 eq $manifest{'_ENV'}) {
+		my $hookstr = "_" . uc($5) . "HOOKS";
+		if (!exists($manifest{$1}) || !exists($manifest{$1}{$hookstr})) {
+		    $manifest{$1}{$hookstr} = [];
+		}
+
+		my $hook = { 'BLOBID' => $7,
+			     'OP' => $4, 
+			     'WHENCE' => $3, 
+			     'FATAL' => $6, 
+			     'ARGV' => $8 };
+
+		$manifest{$1}{$hookstr}->[@{$manifest{$1}{$hookstr}}] = $hook;
+	    }
+	    # Otherwise just skip this entry -- it doesn't apply to us.
+	    else {
+		next;
+	    }
+	}
+	else {
+	    warn("*** WARNING: did not recognize manifest line '$line'," . 
+		 " continuing!\n");
+	}
+    }
+
+    my $retval = 0;
+
+    if (!defined($nofetch) || $nofetch != 1) {
+	print "Downloading any manifest blobs...\n";
+	%$rptr = %manifest;
+	$retval = fetchmanifestblobs($rptr,undef,'manifest');
+    }
+
+    %$rptr = %manifest;
+    return $retval;
+}
+
+sub fetchmanifestblobs($;$$)
+{
+    my ($manifest,$savedir,$basename) = @_;
+    if (!defined($savedir)) {
+	$savedir = $BLOBDIR;
+    }
+    if (!defined($basename)) {
+	$basename = '';
+    }
+    my $blobpath = "$savedir/$basename";
+    my $retval;
+    my $failed = 0;
+
+    foreach my $script (keys(%$manifest)) {
+	# first grab the script replacement...
+	if (exists($manifest->{$script}{'BLOBID'})
+	    && $manifest->{$script}{'BLOBID'} ne '') {
+	    my $bpath = $blobpath . "." . $manifest->{$script}{'BLOBID'};
+	    $retval = libtmcc::blob::getblob($manifest->{$script}{'BLOBID'},
+					     $bpath);
+	    if ($retval == -1) {
+		print STDERR "ERROR(fetchmanifestblobs): could not fetch " . 
+		    $manifest->{$script}{'BLOBID'} . "!\n";
+		++$failed;
+	    }
+	    else {
+		$manifest->{$script}{'BLOBPATH'} = $bpath;
+		chmod(0755,$bpath);
+	    }
+	}
+
+	# now do hooks...
+	my @hooktypes = ('_PREHOOKS','_POSTHOOKS');
+	foreach my $hooktype (@hooktypes) {
+	    next 
+		if (!exists($manifest->{$script}{$hooktype}));
+
+	    foreach my $hook (@{$manifest->{$script}{$hooktype}}) {
+		my $bpath = $blobpath . "." . $hook->{'BLOBID'};
+		$retval = libtmcc::blob::getblob($hook->{'BLOBID'},$bpath);
+		if ($retval == -1) {
+		    print STDERR "ERROR(fetchmanifestblobs): could not fetch " . 
+			$hook->{'BLOBID'} . "!\n";
+		    ++$failed;
+		}
+		else {
+		    $hook->{'BLOBPATH'} = $bpath;
+		    chmod(0755,$bpath);
+		}
+	    }
+	}
+		
+    }
+
+    return $failed;
+}
+
+sub runhooks($$$$)
+{
+    my ($manifest,$which,$script,$what) = @_;
+    my $hookstr = "_".uc($which)."HOOKS";
+    my $failed = 0;
+
+    if (exists($manifest->{$script}) 
+	# if hooks are enabled because of a service line
+	&& ((exists($manifest->{$script}{'HOOKS_ENABLED'}) 
+	     && $manifest->{$script}{'HOOKS_ENABLED'} == 1)
+	    # or if there was no service line, in which case hooks are
+	    # enabled by default
+	    || !exists($manifest->{$script}{'HOOKS_ENABLED'}))
+	&& exists($manifest->{$script}{$hookstr})) {
+	print "  Running $script $which hooks\n"
+	    if ($debug);
+
+	for (my $i = 0; $i < @{$manifest->{$script}{$hookstr}}; ++$i) {
+	    my $hook = $manifest->{$script}{$hookstr}->[$i];
+	    my $blobid = $hook->{'BLOBID'};
+	    my $argv = $hook->{'ARGV'};
+	    my $hookrunfile = "$VARDIR/db/$script.${which}hook.$blobid.run";
+
+	    # if the path doesn't exist, probably we failed to fetch the blob
+	    if (!exists($hook->{'BLOBPATH'})) {
+		++$failed;
+		if ($hook->{'FATAL'}) {
+		    fatal("Failed running $script $which hook $blobid (no blobpath!)");
+		}
+		else {
+		    warn("  $script $which hook $blobid failed! (no blobpath!)");
+		}
+		next;
+	    }
+
+	    my $blobpath = $hook->{'BLOBPATH'};
+
+	    # Only run the hook if its operation matches the operation we're
+	    # doing (boot,shutdown,reconfig,reset)
+	    if ($hook->{'OP'} ne $what) {
+		next;
+	    }
+
+	    # If this is a first-only hook, skip if we've already done it!
+	    if ($hook->{'WHENCE'} eq 'first' && -e $hookrunfile) {
+		print "  Not running $which hook $blobid (first config only)\n";
+		next;
+	    }
+
+	    print "  Running $script $which hook $blobid\n"
+		if ($debug);
+
+	    # NOTE: the last arg is always $what (boot,shutdown,reconfig,reset)
+	    system("$blobpath $argv $what");
+	    if ($?) {
+		++$failed;
+		if ($hook->{'FATAL'} == 1) {
+		    fatal("Failed running $script $which hook $blobid");
+		}
+		else {
+		    warn("  $script $which hook $blobid failed! ($?)");
+		}
+		# Don't write the hook run file if the hook failed!
+		next;
+	    }
+
+	    open(FD,">$hookrunfile")
+		or warn("open($hookrunfile): $!");
+	    close(FD);
+	}
+    }
+
+    return $failed;
+}
+
+sub runbootscript($$$$;@)
+{
+    my ($manifest,$path,$script,$what,@args) = @_;
+    my $failed = 0;
+    my $runfile = "$VARDIR/db/$script.run";
+    # do we have a manifest entry for this script, and is it more than
+    # just hooks!
+    my $havemanifest = 0;
+    if (exists($manifest->{$script}) 
+	&& exists($manifest->{$script}{'ENABLED'})) {
+	$havemanifest = 1;
+    }
+
+    #
+    # If the script does not exist, don't run it or any hooks specified for it!
+    # If we don't have a path, it's a "virtual" script like TBSETUP or ISUP, so
+    # don't skip the hooks.  Only skip the script.
+    #
+    return 0
+	if (defined($path) && ! -x "$path/$script");
+
+    #
+    # Don't do anything if the script or its hooks are disabled!
+    #
+    if ($havemanifest && $manifest->{$script}{'ENABLED'} != 1
+	&& $manifest->{$script}{'HOOKS_ENABLED'} != 1) {
+	print "Not running $script or hooks (disabled)\n"
+	    if ($debug);
+	return 0;
+    }
+
+    TBDebugTimeStamp("Executing $script");
+
+    #
+    # Handle any pre hooks
+    #
+    $failed += runhooks($manifest,'pre',$script,$what);
+
+    #
+    # Handle the script itself -- if there is a path defined.  If $path is
+    # undef, it means that we don't really have a script to run here -- we
+    # just want to run pre and post hooks around a bit of code -- like in 
+    # rc.bootsetup where we tell tmcd we're in TBSETUP or ISUP.
+    #
+    if (defined($path) && (!$havemanifest
+			   || $manifest->{$script}{'ENABLED'} == 1)) {
+	# If this is a first-only script, skip if we've already done it!
+	if ($havemanifest && $manifest->{$script}{'WHENCE'} eq 'first' 
+	    && -e $runfile) {
+	    print "  Not running $script (first config only)\n";
+	    return 0;
+	}
+	
+	# If there are no args, we pass $what as the single arg!
+	# XXX actually pass user defined args!
+	my $argv = "";
+	if (@args) {
+	    $argv .= " " . join(' ',@args);
+	}
+	else {
+	    $argv .= " $what";
+	}
+	if ($havemanifest && $manifest->{$script}{'BLOBID'} ne '') {
+	    my $blobpath = $manifest->{$script}{'BLOBPATH'};
+	    print "  Running $blobpath (instead of $path/$script)\n"
+		if ($debug);
+	    system("$blobpath $argv");
+	}
+	else {
+	    print "  Running $path/$script\n"
+		if ($debug);
+	    system("$path/$script $argv");
+	}
+	if ($?) {
+	    ++$failed;
+	    if (exists($manifest->{$script}) 
+		&& exists($manifest->{$script}{'FATAL'}) 
+		&& $manifest->{$script}{'FATAL'} == 1) {
+		fatal("  Failed running $script ($?)!");
+	    }
+	    else {
+		warn("  Failed running $script ($?)!");
+	    }
+	    return 0;
+	}
+
+	open(FD,">$runfile")
+	    or warn("open($runfile): $!");
+	close(FD);
+    }
+
+    #
+    # Handle any post hooks
+    #
+    $failed += runhooks($manifest,'post',$script,$what);
+
+    return $failed;
 }
 
 #
