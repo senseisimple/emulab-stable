@@ -123,8 +123,8 @@ sub Map($)
 				     "Could not merge advertisements" )
 	    unless $result == 0;
     }
-    # It is not a reference and it must be a single file that was passed
-    elsif (!ref($ad)) {
+    # It is not an array and it must be a single file that was passed
+    else {
 	# If the ad is Binary typed (and therefore base64 encoded), assume
 	# it is compressed.
 	if( Scalar::Util::blessed( $ad ) 
