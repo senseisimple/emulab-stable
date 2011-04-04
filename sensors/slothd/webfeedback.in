@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -219,8 +219,6 @@ if ($mode eq "record") {
     
     # Sleep for the duration of the run, then
     sleep($duration + 3);
-    
-    $query_result->dataseek(0);
     
     print STDOUT "Pulling logs...\n";
     

@@ -1,11 +1,11 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
-use Mysql;
+use libtbdb;
 
 #
 # usage: dumperrorlog.proxy
@@ -78,17 +78,10 @@ else {
     fatal("Bad characters in password!");
 }
 
-my $DB = Mysql->connect('localhost', $DBNAME, $DBUSER, $pwd);
-
-fatal("Could not connect to errorlog DB!")
-    if (!defined($DB));
-
-my $query_result =
-    $DB->query("load data infile '${tempfile}.${tablename}' ".
-	       "replace into table $tablename");
-
-if (! defined($query_result)) {
-    fatal("DB Error: " . $DB->errstr . "\n");
+if (TBDBConnect($DBNAME, $DBUSER, $pwd) < 0) {
+    fatal("Could not connect to errorlog database!");
 }
+DBQueryFatal("load data infile '${tempfile}.${tablename}' ".
+	     "replace into table $tablename");
 exit(0);
 

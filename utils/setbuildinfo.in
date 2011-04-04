@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Set the version and build info into the DB, at a toplevel install.
@@ -17,16 +17,18 @@ my $DBNAME    = '@TBDBNAME@';
 my $SRCDIR    = "@top_srcdir@";
 
 #
-# We use the bare Mysql module instead of the testbed libdb, so that this
+# We use the bare module instead of the testbed libdb, so that this
 # script can run from a first-time installation, before the latter is
 # installed.
 #
-use Mysql;
+use DBI;
 
 #
 # Build a list of tables to export
 #
-my $dbh = Mysql->connect('localhost', $DBNAME, undef, undef);
+my $dbh = DBI->connect("DBI:mysql:database=$DBNAME;host=localhost",
+		       undef, "none",
+		       {'PrintError' => 0});
 if (!$dbh) {
     die("*** $0:\n".
 	"    Unable to connect to mysqld\n");
@@ -41,21 +43,15 @@ $buildinfo = $dbh->quote($buildinfo);
 #
 # And store into the appropriate sitevar.
 #
-my $query_result =
-    $dbh->query("update sitevariables set value=$buildinfo ".
-		"where name='general/version/build'");
-if (!$query_result) {
-    die("*** $0:\n".
-	"    Unable to set sitevar 'general/version/build' to $buildinfo\n");
-}
+$dbh->do("update sitevariables set value=$buildinfo ".
+	 "where name='general/version/build'")
+    or die("*** $0:\n".
+	   "    Unable to set sitevar 'general/version/build' to $buildinfo\n");
 
-$query_result =
-    $dbh->query("replace into version_info set ".
-		"   name='buildinfo', value=$buildinfo");
-if (!$query_result) {
-    die("*** $0:\n".
-	"    Unable to set version_info 'buildinfo' to $buildinfo\n");
-}
+$dbh->do("replace into version_info set ".
+	 "   name='buildinfo', value=$buildinfo")
+    or die("*** $0:\n".
+	   "    Unable to set version_info 'buildinfo' to $buildinfo\n");
 
 #
 # Also store the Git hash into the DB so we can inspect it.
@@ -73,12 +69,9 @@ else {
 }
 $hash = $dbh->quote($hash);
 
-$query_result =
-    $dbh->query("replace into version_info set ".
-		"   name='commithash', value=$hash");
-if (!$query_result) {
-    die("*** $0:\n".
-	"    Unable to set version_info 'commithash' to $hash\n");
-}
+$dbh->do("replace into version_info set ".
+	 "   name='commithash', value=$hash")
+    or die("*** $0:\n".
+	   "    Unable to set version_info 'commithash' to $hash\n");
 
 exit(0);
