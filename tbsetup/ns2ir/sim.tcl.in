@@ -758,6 +758,34 @@ Simulator instproc run {} {
 	    $self spitxml_data "experiment_blobs" [list "path" "action"] [list $path "unpack:$dest"]
 	}
     }
+
+    if [info exists ::TBCOMPAT::virt_blobs] {
+	set fields [list "vblob_id" "filename"]
+	foreach vallist $::TBCOMPAT::virt_blobs {
+	    $self spitxml_data "virt_blobs" $fields $vallist
+	}
+    }
+
+    if [info exists ::TBCOMPAT::virt_service_ctls] {
+	set fields [list "vnode" "service_idx" "env" "whence" "alt_vblob_id" \
+			"enable" "enable_hooks" "fatal"]
+	foreach key [array names ::TBCOMPAT::virt_service_ctls] {
+	    $self spitxml_data "virt_client_service_ctl" \
+		$fields $::TBCOMPAT::virt_service_ctls($key)
+	}
+    }
+
+    if [info exists ::TBCOMPAT::virt_service_hooks] {
+	set fields [list "vnode" "service_idx" "env" "whence" "hook_vblob_id" \
+			"hook_op" "hook_point" "argv" "fatal"]
+	foreach key [array names ::TBCOMPAT::virt_service_hooks] {
+	    foreach vallist $::TBCOMPAT::virt_service_hooks($key) {
+		$self spitxml_data "virt_client_service_hooks" \
+		    $fields $vallist
+	    }
+	}
+    }
+
     $self spitxml_finish
 }
 
