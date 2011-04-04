@@ -7,7 +7,7 @@
 package emulabpaths;
 use Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( $BINDIR $ETCDIR $VARDIR $BOOTDIR $DBDIR $LOGDIR $LOCKDIR );
+@EXPORT = qw( $BINDIR $ETCDIR $VARDIR $BOOTDIR $DBDIR $LOGDIR $LOCKDIR $BLOBDIR);
 
 #
 # This path stuff will go away when the world is consistent. Until then
@@ -57,6 +57,8 @@ else {
     print "$0: Cannot find proper emulab paths!\n";
     exit 1;
 }
+
+$BLOBDIR = $BOOTDIR;
 
 #
 # Untaint path
