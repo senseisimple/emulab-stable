@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 use English;
-use libtbdb;
 
 #
 # usage: dumperrorlog.proxy
@@ -44,6 +43,7 @@ $| = 1;
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libtestbed;
+use libtbdb;
 
 sub fatal($) {
     my ($msg) = @_;
