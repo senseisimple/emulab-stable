@@ -233,7 +233,7 @@ sub IsLanNode($)
     my ($node) = @_;
     my $result = 0;
     if (defined($node) && $node->localname() eq "node") {
-	foreach my $lan (FindNodes("n:node_type | n:hardware_type",
+	foreach my $lan (FindNodes("n:hardware_type",
 				   $node)->get_nodelist()) {
 	    my $typeName = GetFirstText($lan, "type_name", "name");
 	    if (defined($typeName) && $typeName eq "lan") {
@@ -272,7 +272,7 @@ sub IsTunnel($)
 	my $link_type = GetText("link_type", $link);
 	$result = (defined($link_type) && $link_type eq "tunnel");
     } else {
-	my @types = FindNodes("n:link_type", $link);
+	my @types = FindNodes("n:link_type", $link)->get_nodelist();
 	foreach my $current (@types) {
 	    my $name = GetText("name", $current);
 	    if ($name eq "gre-tunnel") {
@@ -390,16 +390,10 @@ sub GetVirtualizationSubtype($)
     my ($node) = @_;
     my $result = undef;
     if (IsVersion0($node)) {
-	$result = GeniXML::GetText("virtualization_subtype", $node);
+	$result = GetText("virtualization_subtype", $node);
     } else {
-	my @types = FindNodes("n:type", $node)->get_nodelist();
-	foreach my $current (@types) {
-	    my $parent = GetText("implemented_by", $current);
-	    if (defined($parent)) {
-		$result = GetText("name", $current);
-		last;
-	    }
-	}
+	my $type = FindFirst("n:sliver_type", $node);
+	$result = GetText("name", $type);
     }
     return $result;
 }
@@ -434,7 +428,7 @@ sub SetExclusive($$)
 sub GetLinkManager($)
 {
     my ($link) = @_;
-    return GetText("id", $link) || GetText("name", $link);
+    return GetFirstText($link, "id", "name");
 }
 
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets

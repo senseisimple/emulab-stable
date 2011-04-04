@@ -48,6 +48,8 @@ int		debug = 0;
 static int	dumpconfig = 0;
 static int	onlymethods = (MS_METHOD_UNICAST|MS_METHOD_MULTICAST);
 static int	parentmethods = (MS_METHOD_UNICAST|MS_METHOD_MULTICAST);
+static int	myuid = -1;
+static int	mygid = -1;
 
 /*
  * For recursively GETing images:
@@ -85,10 +87,13 @@ main(int argc, char **argv)
 
 	get_options(argc, argv);
 
+	myuid = geteuid();
+	mygid = getegid();
+
 	MasterServerLogInit();
 
-	log("mfrisbeed daemon starting, methods=%s (debug level %d)",
-	    GetMSMethods(onlymethods), debug);
+	log("mfrisbeed daemon starting as %d/%d, methods=%s (debug level %d)",
+	    myuid, mygid, GetMSMethods(onlymethods), debug);
 	if (fetchfromabove)
 		log("  using parent %s:%d%s, methods=%s",
 		    inet_ntoa(parentip), parentport,
@@ -203,6 +208,8 @@ struct childinfo {
 	int method;
 	int pid;
 	char *pidfile;
+	int uid;		/* UID to run child as */
+	int gid;		/* GID to run child as */
 	int retries;
 	in_addr_t servaddr;	/* -S arg */
 	in_addr_t ifaceaddr;	/* -i arg */
@@ -269,6 +276,8 @@ copy_imageinfo(struct config_imageinfo *ii)
 	    (nii->get_options = strdup(ii->get_options)) == NULL)
 		goto fail;
 	nii->get_methods = ii->get_methods;
+	nii->get_uid = ii->get_uid;
+	nii->get_gid = ii->get_gid;
 	/* XXX don't care about put_options and extra right now */
 	return nii;
 
@@ -854,9 +863,9 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 
 		in.s_addr = htonl(ci->addr);
-		log("%s: started %s server on %s:%d (pid %d)",
+		log("%s: started %s server on %s:%d (pid %d, ugid %d/%d)",
 		    imageid, GetMSMethods(ci->method),
-		    inet_ntoa(in), ci->port, ci->pid);
+		    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid);
 
 		/*
 		 * Watch for an immediate death so we don't tell our client
@@ -885,13 +894,13 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 		in.s_addr = htonl(ci->addr);
 		if (wantstatus)
-			log("%s: STATUS is running %s on %s:%d (pid %d)",
+			log("%s: STATUS is running %s on %s:%d (pid %d, ugid %d/%d)",
 			    imageid, GetMSMethods(ci->method),
-			    inet_ntoa(in), ci->port, ci->pid);
+			    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid);
 		else
-			log("%s: %s server already running on %s:%d (pid %d)",
+			log("%s: %s server already running on %s:%d (pid %d, ugid %d/%d)",
 			    imageid, GetMSMethods(ci->method),
-			    inet_ntoa(in), ci->port, ci->pid);
+			    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid);
 	}
 
 	msg->body.getreply.hisize = htonl(isize >> 32);
@@ -1206,6 +1215,15 @@ startchild(struct childinfo *ci)
 		struct in_addr in;
 		char *pname;
 
+		if (myuid == 0) {
+			if ((ci->gid != mygid && setgid(ci->gid) != 0) ||
+			    (ci->uid != myuid && setuid(ci->uid) != 0)) {
+				error("could not setuid/gid to %d/%d",
+				      ci->uid, ci->gid);
+				exit(-2);
+			}
+		}
+
 		pname = (ci->ptype == PTYPE_SERVER) ?
 			FRISBEE_SERVER : FRISBEE_CLIENT;
 		in.s_addr = htonl(ci->ifaceaddr);
@@ -1305,6 +1323,22 @@ startserver(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	if (ci->method == MS_METHOD_UNICAST)
 		ci->addr = youaddr;
 
+	/*
+	 * If we are running as root, prefer to run the frisbee server
+	 * for the image as indicated in the imageinfo (if set).
+	 * Otherwise just run it as our uid/gid.
+	 */
+	if (myuid == 0) {
+		if (ii->get_uid >= 0 && myuid != ii->get_uid)
+			ci->uid = ii->get_uid;
+		else
+			ci->uid = myuid;
+		if (ii->get_gid >= 0 && mygid != ii->get_gid)
+			ci->gid = ii->get_gid;
+		else
+			ci->gid = mygid;
+	}
+
 	ci->servaddr = meaddr;
 	ci->ifaceaddr = meaddr;
 	ci->imageinfo = copy_imageinfo(ii);
@@ -1396,6 +1430,10 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	ci->imageinfo = copy_imageinfo(ii);
 	ci->ptype = PTYPE_CLIENT;
 	ci->retries = 0;
+
+	/* For now, we just run the client as us */
+	ci->uid = myuid;
+	ci->gid = mygid;
 
 	ce = ci->extra = malloc(sizeof(struct clientextra));
 	if (ce == NULL) {

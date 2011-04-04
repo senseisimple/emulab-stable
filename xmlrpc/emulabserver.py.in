@@ -4892,7 +4892,7 @@ class elabinelab:
         argstr  = "-o " + outfilename + " ";
         argstr += "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
 
-        (exitval,output) = runcommand("/usr/testbed/devel/stoller/sbin/snmpit.proxyv3 " + argstr)
+        (exitval,output) = runcommand("/usr/testbed/sbin/snmpit.proxyv3 " + argstr)
 	if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
 
@@ -5748,7 +5748,29 @@ class blob:
         if (argerror):
             return argerror
 
-        (exitval, output) = runcommand( TBDIR + "/bin/mkblob " + argdict[ "filename" ] )
+        (exitval, output) = runcommand( TBDIR + "/bin/mkblob " + self.uid + " " + argdict[ "filename" ] )
+
+        if exitval:
+            return EmulabResponse( RESPONSE_ERROR, exitval >> 8, output=output )
+        else:
+            return EmulabResponse( RESPONSE_SUCCESS, value=0, output=output )
+
+    def rmblob( self, version, argdict ):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        
+        argerror = CheckRequiredArgs(argdict, ("uuid",))
+        if (argerror):
+            return argerror
+
+        (exitval, output) = runcommand( TBDIR + "/bin/rmblob " + self.uid + " " + argdict[ "uuid" ] )
 
         if exitval:
             return EmulabResponse( RESPONSE_ERROR, exitval >> 8, output=output )

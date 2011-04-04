@@ -42,6 +42,8 @@ sub TBDBConnect($)	{ return emdbi::TBDBConnect($_[0], $DBNAME); }
 sub TBDBReconnect($)    { return emdbi::TBDBReconnect($_[0]); }
 sub TBDBDisconnect()    { return emdbi::TBDBDisconnect(); }
 sub NewTBDBHandle()     { return emdbi::NewTBDBHandle($DBNAME); }
+sub DBHandle()		{ return emdbi::DBHandleN(0); }
+sub DBHandleN($)	{ return emdbi::DBHandleN($_[0]); }
 sub DBQueryN($$)	{ return emdbi::DBQueryN($_[0], $_[1]); }
 sub DBQuery($)		{ return emdbi::DBQuery($_[0]); }
 sub DBQueryFatalN($$)   { return emdbi::DBQueryFatalN($_[0], $_[1]); }

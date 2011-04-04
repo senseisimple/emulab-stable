@@ -382,15 +382,9 @@ sub GetTicketAux($$$$$$$)
     # Create user from the certificate.
     #
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	if ($isupdate) {
-	    print STDERR "Could not locate $user_urn for UpdateTicket\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"No user found for UpdateTicket");
-	}
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
-
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     #
     # Create slice from the certificate.
     #
@@ -850,7 +844,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$exclusive = 0;
 			$virtexperiment->encap_style("vlan");
 		    }
-		    elsif ($virtualization_subtype eq "raw") {
+		    elsif ($virtualization_subtype eq "raw"
+			   || $virtualization_subtype eq "raw-pc") {
 			$pctype = undef;
 			goto raw;
 		    }
@@ -1201,6 +1196,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 			goto bad;
 		    }
 		    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+		    # We seem to ignore this for now, since the node we want
+		    # to use is inside the network data structure.
 		    my $iface_node_urn =
 			GeniXML::GetText("component_node_urn", $ifaceref);
 		    my $iface_iface_id =
@@ -1235,7 +1232,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "$lanname: unknown component_hop");
 			goto bad;
 		    }
-		    my $network_node = Node->Lookup($iface_node_id);
+		    my $network_node = Node->Lookup($network->node_id());
 		    if (!defined($network_node)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1603,45 +1600,82 @@ sub GetTicketAuxAux($$$$$$$$$)
     foreach my $linkname (keys(%external_linkmap)) {
 	my ($linkref, $ifaceref) = @{ $external_linkmap{$linkname} };
 	my $slice_urn = $slice->urn();
+	my $retries   = 10;
 
-	#
-	# Already have a reserved tag? This could happen if the other CM
-	# acted first and talked to this CM before we saw the ticket
-	# request. Or this is an update and we already have tags reserved.
-	#
-	my $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
-	goto tagged
-	    if (defined($tag));
+	while ($retries) {
+	    #
+	    # Already have a reserved tag? This could happen if the other CM
+	    # acted first and talked to this CM before we saw the ticket
+	    # request. Or this is an update and we already have tags reserved.
+	    #
+	    my $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
+	    last
+		if (defined($tag));
 
-	my ($fh, $filename) = tempfile(UNLINK => 0);
-	if (!defined($fh)) {
-	    print STDERR "Could not create temp file for rspec\n";
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
-	    goto bad;
-	}
-	print $fh GeniXML::Serialize($rspec);
-	close($fh);
-	system("$RESERVEVLANS '$slice_urn' '$linkname' $filename");
-	if ($?) {
-	    unlink($filename);
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			     "Could not reserve vlan tags for $linkname");
-	    goto bad;
-	}
-	unlink($filename);
+	    my ($fh, $filename) = tempfile(UNLINK => 0);
+	    if (!defined($fh)) {
+		print STDERR "Could not create temp file for rspec\n";
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+		goto bad;
+	    }
+	    print $fh GeniXML::Serialize($rspec);
+	    close($fh);
+	    system("$RESERVEVLANS '$slice_urn' '$linkname' $filename");
+	    if ($CHILD_ERROR) {
+		unlink($filename);
 
-	#
-	# Need to find out what vlan was assigned.
-	#
-	$tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
-	if (!defined($tag)) {
-	    print STDERR "Did not find the reserved tag for $linkname\n";
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					     "Error reserving vlan tag");
-	    goto bad;
+		#
+		# Positive exit value indicates the other side returned busy.
+		# This could be for several reasons, not the least of which is
+		# that it is trying to stitch the slice at the same time, and
+		# this side is deadlocked with the other side.
+		#
+		# So, lets try to backoff, dropping the stitching lock for a
+		# while so that other side can proceed. Once we get the lock
+		# back, look to see if we now have a tag (other side was able
+		# to proceed). If so we are done, otherwise try again and repeat
+		# for a while. 
+		#
+		if (($CHILD_ERROR >> 8) == 1) {
+		    print STDERR "reservevlans for $linkname returned busy, ".
+			"will retry in a bit.\n";
+		    $slice->StitchUnLock();
+		    # random backoff. 
+		    sleep(int(rand(20)) + 5);
+		    # We should be able to get the lock at some point.
+		    for (my $r = 20; $r > 0; $r--) {
+			goto again
+			    if ($slice->StitchLock() == 0);
+			sleep(5);
+		    }
+		    print STDERR
+			"Could not get the stitching lock back. Giving up\n";
+		}
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				 "Could not reserve vlan tags for $linkname");
+		goto bad;
+	    }
+	    else {
+		unlink($filename);
+
+		#
+		# Need to find out what vlan was assigned.
+		#
+		$tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
+		if (defined($tag)) {
+		    GeniXML::SetText("vlantag", $linkref, $tag);
+		    last;
+		}
+		# This should not happen. 
+		print STDERR "Did not find the reserved tag for $linkname\n";
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "Error reserving vlan tag");
+		goto bad;
+	    }
+	    # Try again.
+	  again:
+	    $retries--;
 	}
-      tagged:
-	GeniXML::SetText("vlantag", $linkref, $tag);
     }
     
     print GeniXML::Serialize($rspec);
@@ -1893,9 +1927,9 @@ sub SliverWorkAux($$$$$$$)
     # Create the user.
     #
     my $owner = CreateUserFromCertificate($owner_cert);
-    if (!defined($owner)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $owner
+	if (GeniResponse::IsResponse($owner));
+
     if (defined($keys)) {
 	$response = CheckKeys($keys);
 	return $response
@@ -3383,9 +3417,8 @@ sub GetSliverAux($)
 				     "Insufficient privilege" );
 
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
 
     my $slice = GeniSlice->Lookup($credential->target_urn());
     if (!defined($slice)) {
@@ -3462,9 +3495,8 @@ sub BindToSlice($)
     # Find or create the user.
     #
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
     if (defined($keys)) {
 	my $response = CheckKeys($keys);
 	return $response
@@ -3806,9 +3838,9 @@ sub SliverTicket($)
     }
 
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+
     my $aggregate = GeniAggregate->Lookup($credential->target_urn());
     if (!defined($aggregate)) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -3996,10 +4028,8 @@ sub ListTickets($)
 	if (GeniResponse::IsResponse($credential));
 
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "No such user found");
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
 
     #
     # A plain credential issued to a user lets that user get a list
@@ -4109,21 +4139,30 @@ sub CreateUserFromCertificate($)
 	$certificate->Store();
 	$user = GeniUser->Lookup($certificate->urn());
 	if (!defined($user)) {
-	    print STDERR "Could not reload user for $certificate\n";
-	    return undef;
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Problem loading your certificate");
 	}
 	return $user;
     }
 
+    #
+    # Check urn. Must be a "user" urn. The uid is checked in Create().
+    #
+    my (undef,$type,$uid) = GeniHRN::Parse($certificate->urn());
+    if (!defined($uid) || $type ne "user") {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed user URN");
+    }
     my $authority = CreateAuthorityFromRegistry($certificate);
-    return undef    
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not create authority object")
 	if (!defined($authority));
 
     $user = GeniUser->Create($certificate, $authority);
-    if (!defined($user)) {
-	print STDERR "Could not create user from $certificate\n";
-	return undef;
-    }
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not create user from your certificate")
+	if (!defined($user));
+
     return $user;
 }
 

@@ -200,8 +200,8 @@ sub MapResources($$$$$)
 	# If so, must convert it to something assign can grok.
 	#
 	if ($resource->IsSFA()) {
-	    $advertisement = ConvertAdSFAtoPG($advertisement,
-					      $resource->manager_urn());
+	    $advertisement = ConvertSFAtoPG($advertisement, "ad",
+					    $resource->manager_urn());
 	    return -1
 		if (!defined($advertisement));
 	    $advertisement = GeniXML::Serialize($advertisement, 1);
@@ -573,8 +573,8 @@ sub MapResourcesNew($$$$$)
 	# If so, must convert it to something assign can grok.
 	#
 	if ($resource->IsSFA()) {
-	    $advertisement = ConvertAdSFAtoPG($advertisement,
-					      $resource->manager_urn());
+	    $advertisement = ConvertSFAtoPG($advertisement, "ad",
+					    $resource->manager_urn());
 	    return -1
 		if (!defined($advertisement));
 	    $advertisement = GeniXML::Serialize($advertisement, 1);
@@ -1059,6 +1059,24 @@ sub GetTickets($)
 		#
 		$object = $resource->Manifest();
 
+		#
+		# Convert SFA manifest to rspec format.
+		#
+		if ($object && $resource->IsSFA()) {
+		    my $tmp = ConvertSFAtoPG($object, "manifest",
+					     $resource->manager_urn());
+		    if (!defined($tmp) ||
+			$resource->UpdateManifest($tmp)) {
+			print STDERR "Could not store manifest for $resource\n";
+			$errors++;
+			$object = undef;
+		    }
+		    else {
+			# reload.
+			$object = $tmp;
+		    }
+		}
+		
 		# File the rspec away since that is what we have.
 		if ($resource->UpdateRspec($resource->stashedrspec())) {
 		    print STDERR "Could not store rspec for $resource\n";
@@ -2378,9 +2396,9 @@ sub AddLinkToRspec($$)
     return $rspeclink;
 }
 
-sub ConvertAdSFAtoPG($$)
+sub ConvertSFAtoPG($$$)
 {
-    my ($rspec, $manager_urn) = @_;
+    my ($rspec, $type, $manager_urn) = @_;
 
     # Parse if a string.
     if (! ref($rspec)) {
@@ -2414,31 +2432,29 @@ sub ConvertAdSFAtoPG($$)
 	    my $siteid = GeniXML::GetText("id", $site);
 	    foreach my $node (GeniXML::FindNodes("node",
 						 $site)->get_nodelist()) {
-		# Dumb; plc uses the hostname in the URN.
+		# plc uses the qualified hostname in the URN.
 		my $hostname  = GeniXML::GetText("hostname", $node);
-		my ($hname)   = ($hostname =~ /^([^.]*)\./);		
-		my $nodeid    = GeniXML::GetText("id", $node);
-		my $urn       = GeniHRN::Generate("$netid:$siteid",
-						  "node", $hname);
-		# Dumb; the name to urn scheme for plc causes duplicates.
-		next
-		    if (exists($names{$urn}));
-		$names{$urn} = 1;
-		
+		my $id        = GeniXML::GetText("id", $node);
+		my $urn       = GeniXML::GetText("urn", $node);
+		my $name      = GeniXML::GetText("name", $site);
+
 		my $rspecnode = addChildToRspec($doc, $root, 'node');
 		$rspecnode->setAttribute('component_manager_urn', $manager_urn);
-		$rspecnode->setAttribute('component_manager_uuid', $manager_urn);
+		$rspecnode->setAttribute('component_manager_uuid',$manager_urn);
 		$rspecnode->setAttribute('component_uuid', $urn);
 		$rspecnode->setAttribute('component_urn', $urn);
-		$rspecnode->setAttribute('component_name', "$nodeid:$hostname");
-		my $tmp = addChildToRspec($doc, $rspecnode, 'node_type');
-		$tmp->setAttribute("type_name",  "pc");
-		$tmp->setAttribute("type_slots", "1");
+		$rspecnode->setAttribute('component_name', "$id:$name");
 
-		$tmp = addChildToRspec($doc, $rspecnode, 'available');
-		$tmp->appendText("true");
-		$tmp = addChildToRspec($doc, $rspecnode, 'exclusive');
-		$tmp->appendText("true");
+		if ($type eq "ad") {
+		    my $tmp = addChildToRspec($doc, $rspecnode, 'node_type');
+		    $tmp->setAttribute("type_name",  "pc");
+		    $tmp->setAttribute("type_slots", "1");
+
+		    $tmp = addChildToRspec($doc, $rspecnode, 'available');
+		    $tmp->appendText("true");
+		    $tmp = addChildToRspec($doc, $rspecnode, 'exclusive');
+		    $tmp->appendText("true");
+		}
 	    }
 	}
     }
@@ -2465,7 +2481,7 @@ sub ConvertReqPGtoSFA($$)
 
     my $network;
     my $request;
-    if (0) {
+    if (1) {
 	$network = addChildToRspec($doc, $root, 'network');
 	$network->setAttribute("name", "plc");
     }
@@ -2477,24 +2493,31 @@ sub ConvertReqPGtoSFA($$)
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$rspec)->get_nodelist()) {
 	my $urn    = GeniXML::GetText("component_urn", $ref);
-	my $name   = GeniXML::GetText("component_name", $ref);
-	my ($auth,$which,$hname) = GeniHRN::Parse($urn);
+	my $comname= GeniXML::GetText("component_name", $ref);
+	my ($auth,$which,$hostname) = GeniHRN::Parse($urn);
 	my ($netid,$siteid) = split(":", $auth);
-	my ($nodeid,$hostname) = split(":", $name);
+	my ($id,$name) = split(":", $comname);
 
-	if (0) {
+	if (1) {
 	    my $sitenode = addChildToRspec($doc, $network, 'site');
 	    $sitenode->setAttribute("id", $siteid);
+
+	    my $namenode = addChildToRspec($doc, $sitenode, 'name');
+	    $namenode->appendText("$name");
+	    
 	    my $nodenode = addChildToRspec($doc, $sitenode, 'node');
-	    $nodenode->setAttribute("id", $nodeid);
+	    $nodenode->setAttribute("id", $id);
 
 	    my $tmp = addChildToRspec($doc, $nodenode, 'hostname');
 	    $tmp->appendText("$hostname");
+	    
+	    $tmp = addChildToRspec($doc, $nodenode, 'urn');
+	    $tmp->appendText("$urn");
 	    addChildToRspec($doc, $nodenode, 'sliver');
 	}
 	else {
 	    my $sliver = addChildToRspec($doc, $request, 'sliver');
-	    $sliver->setAttribute("nodeid", $nodeid);
+	    $sliver->setAttribute("nodeid", $id);
 	}
     }
     return $root;

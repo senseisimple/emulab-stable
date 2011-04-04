@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:display="protogeni.display.*" title="Search" width="500" height="300">
+
+	<mx:Script>
+		<![CDATA[
+			protected function search():void
+			{
+				resultsBox.removeAllChildren();
+				var results:Array = Main.protogeniHandler.search(searchText.text, matchCheck.selected);
+				for each(var d:DisplayObject in results)
+					resultsBox.addChild(d);
+				if(results.length == 0)
+					resultsBox.addChild(DisplayUtil.getLabel("No results"));
+			}
+		]]>
+	</mx:Script>
+
+	<mx:HBox width="100%">
+		<mx:TextInput width="100%" id="searchText" enter="search()"/>
+		<mx:Button label="Search" click="search()"/>
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:CheckBox label="Match entire string" id="matchCheck"/>
+	</mx:HBox>
+	<mx:VBox width="100%" height="100%" id="resultsBox">
+	</mx:VBox>
+</display:DefaultWindow>

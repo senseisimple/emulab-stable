@@ -54,6 +54,7 @@ CREATE TABLE `geni_slices` (
   `expires` datetime default NULL,
   `shutdown` datetime default NULL,
   `locked` datetime default NULL,
+  `stitch_locked` datetime default NULL,
   `creator_uuid` varchar(40) NOT NULL default '',
   `creator_urn` tinytext,
   `name` tinytext,

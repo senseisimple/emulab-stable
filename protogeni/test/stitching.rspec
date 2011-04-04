@@ -5,12 +5,12 @@
        type="request" >
   <node virtual_id="geni1"
         virtualization_type="emulab-vnode"
+        component_id="urn:publicid:IDN+emulab.net+node+pg41"
         exclusive="1"
 	component_manager_urn="urn:publicid:IDN+emulab.net+authority+cm"> 
-    <node_type type_name="pc" type_slots="1"/>
     <interface virtual_id="if0"/>
     <disk_image
-      name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA8-OVZ-STD" />
+      name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA10-STD" />
   </node>
   <node virtual_id="geni2"
         virtualization_type="emulab-vnode"
@@ -31,8 +31,17 @@
     <interface_ref virtual_node_id="geni2" 
                    virtual_interface_id="if0" />
     <component_hop
-	component_urn="urn:publicid:IDN+emulab.net+link+link-ion%3Aeth2-procurve-pgeni-wash%3A(null)"/>
+	component_urn="urn:publicid:IDN+emulab.net+link+ion">
+      <interface_ref
+	component_node_urn="urn:publicid:IDN+emulab.net+node+ion"
+	component_interface_id="eth0"/>
+    </component_hop>
     <component_hop
-	component_urn="urn:publicid:IDN+myelab.testbed.emulab.net+link+link-ion%3Aeth0-cisco1%3A(null)"/>
+	component_urn="urn:publicid:IDN+myelab.testbed.emulab.net+link+ion">
+      <interface_ref
+	component_node_urn="urn:publicid:IDN+myelab.testbed.emulab.net+node+ion"
+	component_interface_id="eth0"/>
+    </component_hop>
   </link>
 </rspec>
+

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,7 +14,6 @@ my $CLIENT_ETCDIR = "@CLIENT_ETCDIR@";
 use lib '@prefix@/lib';
 
 use libdb;
-#use Mysql;
 use English;
 use Getopt::Long;
 use strict;

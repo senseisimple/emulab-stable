@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						width="500" height="300"
+						title="Search"
+						close="closeWindow()">
+	<fx:Script>
+		<![CDATA[
+			import mx.core.IVisualElement;
+			import mx.events.FlexEvent;
+			
+			protected function search():void
+			{
+				resultsBox.removeAllElements();
+				var results:Array = Main.geniHandler.search(searchField.textInput.text, matchCheck.selected);
+				for each(var d:DisplayObject in results)
+					resultsBox.addElement(d as IVisualElement);
+				if(results.length == 0)
+					resultsBox.addElement(DisplayUtil.getLabel("No results"));
+			}
+		]]>
+	</fx:Script>
+
+	<s:HGroup width="100%">
+		<display:KeyboardTextInput id="searchField" width="100%" creationComplete="searchField.setEnter(search)" />
+		<display:ImageButton icon="{DisplayUtil.searchIcon}" click="search()" />
+	</s:HGroup>
+	<s:HGroup width="100%">
+		<s:CheckBox label="Match entire string" id="matchCheck"/>
+	</s:HGroup>
+	<s:Scroller width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" id="resultsBox" />
+	</s:Scroller>
+</display:DefaultWindow>

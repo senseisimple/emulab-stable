@@ -1,0 +1,47 @@
+#
+# Snmpit changes. vlan tags are managed exclusively in the DB now
+# rather then on the switches. All of vlans are associated with an
+# experiment; system vlans are associated with emulab-ops/vlan-holding.
+# This script simply creates the holding experiment; a later script
+# will do the rest of whatever is needed. 
+#
+use strict;
+use libinstall;
+use emdb;
+use OSinfo;
+use NodeType;
+
+my $EID       = "vlan-holding";
+my $DESC      = "Holding experiment for internal vlans";
+my $SUDO      = "/usr/local/bin/sudo";
+my $BATCHEXP  = "$TBROOT/bin/batchexp";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+    my $pid  = "emulab-ops";
+
+
+    if ($phase eq "pre") {
+	Phase "vlan-holding", "Setting up vlan holding support", sub {
+	    #
+	    # Holding experiment.
+	    #
+	    Phase "experiment", "Creating vlan holding experiment", sub {
+		PhaseSkip("Experiment exists")
+		    if (-d "$PROJROOT/$pid/exp/$EID");
+	
+		ExecQuietFatal("$SUDO -u $PROTOUSER $WAP $BATCHEXP ".
+			    "  -q -i -k -j -w -f -n ".
+			    "  -S 'System Experiment' ".
+			    "  -L 'System Experiment' ".
+			    "  -E '$DESC - DO NOT DELETE' ".
+			    "  -p $pid -e $EID");
+		PhaseSucceed();
+	    };
+	    PhaseSucceed();
+	};
+    }
+}
+
+1;

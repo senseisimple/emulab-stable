@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:mapping="protogeni.display.mapping.*"
+			   minWidth="700" minHeight="400" xmlns:display="protogeni.display.*"
+			   preinitialize="preinit();"
+			   backgroundColor="#D2E1F0"
+			   applicationComplete="init();">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace display "protogeni.display.*";
+		@namespace mapping "protogeni.display.mapping.*";
+		
+		.authenticatedStyle {
+			themeColor: green;
+			chromeColor: green;
+		}
+		
+		.unauthenticatedStyle {
+			themeColor: red;
+			chromeColor: red;
+		}
+		
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+		}
+		
+		s|TextArea {
+			skinClass: ClassReference("protogeni.display.skins.TextAreaSkin");
+		}
+		
+		s|Scroller {
+			skinClass: ClassReference("protogeni.display.skins.ScrollerSkin");
+		}
+		
+		s|CheckBox {
+			skinClass: ClassReference("protogeni.display.skins.CheckBoxSkin");
+		}
+		
+		s|List {
+			skinClass: ClassReference("protogeni.display.skins.ListSkin");
+		}
+		
+	</fx:Style>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import protogeni.GeniDispatcher;
+			import protogeni.GeniEvent;
+			import protogeni.GeniHandler;
+			import protogeni.Util;
+			import protogeni.communication.RequestGeniBundle;
+			import protogeni.communication.RequestRootBundle;
+			import protogeni.communication.RequestTest;
+			import protogeni.display.DisplayUtil;
+			import protogeni.display.KeyboardWindow;
+			import protogeni.resources.Slice;
+			import protogeni.resources.SliceAuthority;
+			
+			//------------------------------------------
+			// Embedded resources
+			[Bindable]
+			[Embed(source="../images/arrow_out.png")] 
+			private var arrowOut:Class;
+			
+			[Embed(source="../images/arrow_in.png")] 
+			private var arrowIn:Class;
+			
+			[Bindable]
+			public var allowAuthenticate:Boolean;
+			
+			[Bindable]
+			public var slicesMenu : ArrayCollection;
+			
+			public var geniLocalSharedObject:SharedObject;
+			
+			public var forceMapKey:String;
+			
+			private function preinit():void {
+				Security.allowDomain("*");
+				Security.allowInsecureDomain("*");
+				Security.allowDomain("localhost");	
+				
+				// Force a different Google Maps API key if given
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.mapkey != null)
+					{
+						forceMapKey = FlexGlobals.topLevelApplication.parameters.mapkey;
+					}
+				} catch(all:Error) {
+				}
+				
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.debug != null)
+					{
+						Main.debugMode = FlexGlobals.topLevelApplication.parameters.debug == "1";
+					}
+				} catch(all:Error) {
+				}
+				
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.usejs != null)
+					{
+						Main.useJavascript = FlexGlobals.topLevelApplication.parameters.usejs == "1";
+					}
+				} catch(all:Error) {
+				}
+				
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.pgonly != null)
+					{
+						Main.protogeniOnly = FlexGlobals.topLevelApplication.parameters.pgonly == "1";
+					}
+				} catch(all:Error) {
+				}
+			}
+			
+			private function init():void {
+				Main.geniDispatcher = new GeniDispatcher();
+				Main.geniHandler = new GeniHandler();
+				Main.geniHandler.mapHandler.map = map;
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, fillCombobox);
+				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				
+				// Default behavior (public)
+				allowAuthenticate = true;
+				Main.geniHandler.unauthenticatedMode = true;
+				
+				// Flash options
+				loadParams();
+				
+				// Saved variables
+				try {
+					geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
+				} catch(e:Error) {
+					Alert.show("It looks like Flash is unable to save/load local data." +
+						"  Would you like to load directions on how to enable local data?",
+						"Enable Local Data?", Alert.YES|Alert.NO, this,
+						function allowData(e:CloseEvent):void {
+							if(e.detail == Alert.YES) {
+								Util.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
+							}
+						});
+				}
+				
+				loadLocalUserData();
+				
+				if(Main.debugMode) {
+					LogHandler.viewConsole();
+					DisplayUtil.viewManagersWindow();
+				}
+
+				// Load the certificate bundle
+				if(Main.useJavascript) {
+					loadLocalBundleData();
+					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
+					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
+				}
+
+				if(Main.useJavascript && Main.geniHandler.CurrentUser.hasSetupJavascript) {
+					Main.geniHandler.unauthenticatedMode = false;
+					Main.geniHandler.requestHandler.startInitiationSequence(true);
+				} else {
+					var startOptions:StartOptionsWindow = new StartOptionsWindow();
+					startOptions.showWindow();
+				}
+			}
+			
+			//------------------------------------------
+			// GUI
+			private function toggleFullScreen():void {
+				try {
+					switch (systemManager.stage.displayState) {
+						case StageDisplayState.FULL_SCREEN:
+							systemManager.stage.displayState = StageDisplayState.NORMAL;
+							fullscreenButton.setStyle("icon", arrowOut);
+							break;
+						default:
+							systemManager.stage.displayState = StageDisplayState.FULL_SCREEN;
+							fullscreenButton.setStyle("icon", arrowIn);
+							break;
+					}
+				} catch (err:SecurityError) {
+					Alert.show("Fullscreen isn't supported on the current system." +
+						"  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
+				}
+			}
+			
+			public function userChanged(pe:GeniEvent):void {
+				if(Main.geniHandler.CurrentUser == null
+					|| Main.geniHandler.CurrentUser.credential == null
+					|| Main.geniHandler.CurrentUser.credential.length == 0)
+				{
+					this.userButton.setStyle("icon", DisplayUtil.noUserIcon);
+					this.userButton.toolTip = "Authenticate";
+					this.userButton.label = "Authenticate";
+				} else {
+					this.userButton.setStyle("icon", DisplayUtil.userIcon);
+					this.userButton.toolTip = "View user information"
+					this.userButton.label = Main.geniHandler.CurrentUser.uid;
+				}
+			}
+			
+			public function showAuthenticate():void
+			{
+				if(!allowAuthenticate)
+					return;
+				
+				userButton.styleName = "unauthenticatedStyle";
+			}
+			
+			public function hideAuthenticate():void
+			{
+				if(!allowAuthenticate)
+					return;
+				
+				userButton.styleName = "authenticatedStyle";
+			}
+			
+			protected function loadUser():void
+			{
+				if(Main.geniHandler.unauthenticatedMode) {
+					Main.geniHandler.requestHandler.startInitiationSequence(true);
+				} else {
+					DisplayUtil.viewUserWindow();
+				}
+			}
+			
+			// ComboBox
+			public function fillCombobox(junk:* = null):void {
+				slicesMenu = Main.geniHandler.CurrentUser.slices.displaySlices();
+			}
+			
+			public function getSliceLabel(s:Slice):String {
+				return s.DisplayString();
+			}
+			
+			public function sliceSelected(evt:ListEvent):void {
+				Main.geniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
+				onlyMyResourcesCheckbox.selected = Main.geniHandler.mapHandler.selectedSlice.hrn != null &&
+					Main.geniHandler.mapHandler.selectedSlice.hrn.length > 0;
+				Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
+				Main.geniHandler.mapHandler.drawMap();
+			}
+			
+			public function startover():void {
+				reinit();
+				Main.geniHandler.requestHandler.startInitiationSequence();
+			}
+			
+			public function reinit():void
+			{
+				if(Main.geniHandler != null)
+					Main.geniHandler.destroy();
+				Main.geniHandler = new GeniHandler();
+				Main.geniHandler.mapHandler.map = map;
+				//loadParams();
+				//loadLocalUserData();
+				// Override the params
+				//Main.geniHandler.unauthenticatedMode = !authenticateUser;
+				
+				//Main.geniHandler.requestHandler.startInitiationSequence();
+			}
+			
+			
+			public function loadParams():void
+			{
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.mode != null)
+					{
+						var input:String = FlexGlobals.topLevelApplication.parameters.mode;
+						
+						allowAuthenticate = input != "publiconly";
+						Main.geniHandler.unauthenticatedMode = input != "authenticate";
+					}
+				} catch(all:Error) {
+				}
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.saurl != null)
+					{
+						for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
+							if(sa.Url == FlexGlobals.topLevelApplication.parameters.saurl) {
+								Main.geniHandler.forceAuthority = sa;
+								break;
+							}
+						}
+					}
+				} catch(all:Error) {
+				}
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.publicurl != null)
+					{
+						Main.geniHandler.publicUrl = FlexGlobals.topLevelApplication.parameters.publicurl;
+					}
+				} catch(all:Error) {
+				}
+			}
+			
+			public function loadLocalUserData():void
+			{
+				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
+				{
+					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
+						if(sa.Url == geniLocalSharedObject.data.authority) {
+							Main.geniHandler.CurrentUser.authority = sa;
+							break;
+						}
+					}
+					
+					Main.geniHandler.CurrentUser.sslPem = geniLocalSharedObject.data.sslPem;
+					if(geniLocalSharedObject.data.password != null && geniLocalSharedObject.data.password.length > 0)
+						Main.geniHandler.CurrentUser.setPassword(geniLocalSharedObject.data.password, true);
+				}
+			}
+			
+			public function saveLocalUserData():void
+			{
+				if(geniLocalSharedObject == null)
+					return;
+
+				geniLocalSharedObject.data.password = Main.geniHandler.CurrentUser.encryptedPassword;
+				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
+				geniLocalSharedObject.data.sslPem = Main.geniHandler.CurrentUser.sslPem;
+				try
+				{
+					geniLocalSharedObject.flush();
+				}
+				catch (e:Error)
+				{
+					trace("Problem saving shared object");
+				}
+			}
+			
+			public function loadLocalBundleData():void
+			{
+				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
+					Main.setCertBundle(geniLocalSharedObject.data.certBundle);
+				if(Main.certBundle == null || Main.certBundle.length == 0)
+					Main.setCertBundle((new FallbackGeniBundle()).toString() + (new FallbackRootBundle()).toString());
+			}
+			
+			public function saveLocalBundleData():void
+			{
+				if(geniLocalSharedObject == null)
+					return;
+				
+				geniLocalSharedObject.data.certBundle = Main.certBundle;
+				try
+				{
+					geniLocalSharedObject.flush();
+				}
+				catch (e:Error)
+				{
+					trace("Problem saving shared object");
+				}
+			}
+			
+			public function setStatus(s:String, isError:Boolean):void
+			{
+				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
+				waitingIcon.visible = isWorking;
+				progressLabel.text = s;
+				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
+					waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
+				else
+					waitingCountLabel.text = "";
+				if(isWorking)
+					progressLabel.styleName = "inprogressStyle";
+				else if(isError)
+					progressLabel.styleName = "failedStyle";
+				else
+					progressLabel.styleName = "validStyle";
+			}
+		]]>
+	</fx:Script>
+	<s:controlBarLayout>
+		<s:HorizontalLayout verticalAlign="middle" gap="4" paddingTop="2" paddingBottom="2" paddingLeft="2" paddingRight="2" />
+	</s:controlBarLayout>
+	<s:controlBarContent>
+		<display:ImageButton id="infoButton"
+							 icon="@Embed('../images/protogeni-logo.png')"
+							 click="DisplayUtil.viewAboutWindow()"
+							 toolTip="View more information about Flack" />
+		<display:DefaultLine percentHeight="90" />
+		<display:ImageButton id="refreshButton"
+							  icon="{DisplayUtil.refreshIcon}"
+							 click="startover()" includeInLayout="false" visible="false"
+							 toolTip="Reload all data" />
+		<display:ImageButton id="cmButton"
+							  icon="@Embed('../images/building.png')"
+							 click="DisplayUtil.viewManagersWindow();"
+							 toolTip="GENI managers"/>
+		<display:ImageButton id="consoleButton"
+							  icon="{DisplayUtil.consoleIcon}"
+							 click="LogHandler.viewConsole();" 
+							 toolTip="Console"/>
+		<display:DefaultLine percentHeight="90" />
+		<display:ImageButton id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
+							  icon="{DisplayUtil.graphIcon}"
+							 click="DisplayUtil.viewSlicesWindow();"
+							 toolTip="Work with slices"/>
+		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
+							 visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" height="24"
+					 change="sliceSelected(event)"
+					 includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox"
+					click="Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.geniHandler.mapHandler.drawMap()"
+					includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
+					visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<s:Rect percentWidth="100" />
+		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
+		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
+		<s:Rect percentWidth="100" />
+		<mx:Button icon="{DisplayUtil.noUserIcon}"
+				   click="loadUser()"
+				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
+				   toolTip="Authenticate" label="Authenticate" styleName="unauthenticatedStyle"
+				   id="userButton" height="24" />
+		<display:ImageButton id="searchButton"
+							  icon="{DisplayUtil.findIcon}"
+							 click="DisplayUtil.viewSearchWindow()"
+							 toolTip="Search" />
+		<display:ImageButton id="resetZoomButton"
+							  icon="@Embed('../images/zoom.png')"
+							 click="map.resetZoom();"
+							 toolTip="Reset zoom" />
+		<display:ImageButton id="fullscreenButton"
+							  icon="{arrowOut}"
+							 click="toggleFullScreen()"
+							 toolTip="Toggle fullscreen" />
+		<display:ImageButton id="helpButton"
+							  icon="{DisplayUtil.helpIcon}"
+							 click="Util.showManual()"
+							 toolTip="View more information" />
+	</s:controlBarContent>
+	<mapping:GeniMap id="map" />
+</s:Application>

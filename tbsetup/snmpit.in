@@ -480,12 +480,24 @@ if ($pid && $eid) {
 if ($MAINSITE && $TB eq "/usr/testbed" && !$opt{Z}) {
     my $group = (defined($experiment) ? $experiment->GetGroup() : undef);
     $EmulabFeatures::verbose = 0;
-    my $newsnmpit =
+    my $robsnmpit =
         (EmulabFeatures->FeatureEnabled("RobSnmpit",
 					$this_user, $group, $experiment));
-    if ($newsnmpit) {
+    if ($robsnmpit) {
 	# Rob, change this path:
 	my $newpath = "$TB/bin/snmpit";
+	print STDERR "Invoking alternate snmpit from $newpath\n";
+	
+        unshift(@SAVEARGV, "-Z");
+	exec $newpath, @SAVEARGV;
+	die("*** $0:\n".
+	    "    Could not exec $newpath: $!");
+    }
+    my $newsnmpit =
+        (EmulabFeatures->FeatureEnabled("NewSnmpit",
+					$this_user, $group, $experiment));
+    if ($newsnmpit) {
+	my $newpath = "$TB/bin/snmpit_new";
 	print STDERR "Invoking alternate snmpit from $newpath\n";
 	
         unshift(@SAVEARGV, "-Z");
@@ -1787,7 +1799,7 @@ sub CreateOneVlan($$$@)
 	}
     }
     else {
-	my $vlan_number = $stack->createVlan($vlanid,\@ports);
+	my $vlan_number = $stack->createVlan($vlanid, $vlanid, \@ports);
 	if (!$vlan_number) {
 	    tberror({type => 'secondary', severity => SEV_SECONDARY,
 		     error => ['create_vlan_failed', $vlanid]},
@@ -1798,8 +1810,7 @@ sub CreateOneVlan($$$@)
 	    $errors++;
 	}
 	else {
-	    setVlanTag($vlanid, $vlan_number);
-	    VLan->RecordVlanInsertion($experiment, $vlanid,$stack->{STACKID});
+	    VLan->RecordVlanInsertion($vlanid,$stack->{STACKID});
 	}
     }
     return $errors
@@ -1870,7 +1881,6 @@ sub doReset($@) {
 	    $errors++;
 	}
 	foreach my $vlan (@existant_vlans) {
-	    setVlanTag($vlan, 0);
 	    clearReservedVlanTag($vlan)
 		if ($opt{C});
 	    VLan->RecordVLanDeletion($vlan);
@@ -2263,7 +2273,7 @@ sub doReserveVlanTags($$@) {
 	# If we can assign a tag, remember we did so that we can
 	# undo whatever we did, if there is an error. 
 	#
-	my $tag = $stack->newVlanNumber($vlanid);
+	my $tag = $stack->newVlanNumber($vlanid, $vlanid);
 	if ($tag) {
 	    push(@assigned, [$vlan,$tag]);
 	}
@@ -2503,7 +2513,8 @@ sub doMakeVlan($$@) {
     new_number:
 	print "Creating VLAN $vlan_name ...\n"
 	    if (!$quiet);
-	my $vlan_number = $stack->createVlan($vlan_id,\@ports,@pvlanArgs);
+	my $vlan_number = $stack->createVlan($vlan_id,$vlan_id,
+					     \@ports,@pvlanArgs);
 	if (!$quiet) {
 	    print "VLAN creation ";
 	    print $vlan_number? "succeeded":"failed",".\n";
@@ -2519,8 +2530,7 @@ sub doMakeVlan($$@) {
 	    VLan->RecordVLanDeletion($source_vlan->id());
 	}
 	if (defined($target_vlan)) {
-	    VLan->RecordVlanInsertion($experiment, $target_vlan->id(),
-                $stack->{STACKID});
+	    VLan->RecordVlanInsertion($target_vlan->id(), $stack->{STACKID});
 	}
     }
     return $errors;
@@ -2542,7 +2552,13 @@ sub doDeleteVlan($@) {
     #
     if (defined($experiment)) {
 	foreach my $vlan_name (@vlan_names) {
-	    my $vlan = VLan->Lookup($vlan_name);
+	    my $vlan;
+	    if ($vlan_name =~ /^\d*$/) {
+	       $vlan = VLan->Lookup($vlan_name);
+	    }
+	    else {
+	       $vlan = VLan->Lookup($experiment, $vlan_name);
+	    }
 	    if (defined($vlan) &&
 		!$experiment->SameExperiment($vlan->GetExperiment())) {
 		die("$vlan is not in the correct experiment\n");

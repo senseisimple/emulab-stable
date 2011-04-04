@@ -41,7 +41,7 @@ if (! defined($nodes)) {
 	$nodes = $hosts;
 }
 
-$command = "sh -i -c 'pssh -h $filename -o out -e err -t 3000 sh $runpath/standalone.sh $level $runpath $varpath $logpath $nodes'";
+$command = "sh -i -c 'pssh -x \"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ForwardX11=no -o ForwardX11Trusted=no\" -h $filename -o out -e err -t 30000 sh $runpath/standalone.sh $level $runpath $varpath $logpath $nodes'";
 
 print($command."\n");
 system($command);

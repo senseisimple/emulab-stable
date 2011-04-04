@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -316,6 +316,8 @@ $message .=
     "Method:  $method\n";
 $message .=
     "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
+$message .=
+    "Start:   " . TBTimeStamp() . "\n";
 
 my $starttime = [gettimeofday()];
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
@@ -333,47 +335,63 @@ if ($@) {
 }
 else {
     my $elapsed = tv_interval($starttime);
+    $message .= "End:     " . TBTimeStamp() . "\n";
     $message .= "Elapsed: " . sprintf("%f", $elapsed) . "\n";
-    
-    if (GeniResponse::IsError($result)) {
-	$message .= "Error:   " . $result->{'code'} . "\n";
+
+    if (!ref($result)) {
+	$message .= "Return:    $result\n";
     }
     else {
-	$message .= "Code:    " . $result->{'code'} . "\n";
-    }
-    $message .= "Output:  " . $result->{'output'} . "\n"
-	if (defined($result->{'output'}));
+	if (GeniResponse::IsError($result)) {
+	    $message .= "Error:   " . $result->{'code'} . "\n";
+	}
+	else {
+	    $message .= "Code:    " . $result->{'code'} . "\n";
+	}
+	$message .= "Output:  " . $result->{'output'} . "\n"
+	    if (defined($result->{'output'}));
 
-    $message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
+	$message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
+    }
     $message .= "Request:\n" . $request . "\n";
     
     AddAuditInfo("message", $message);
 
-    #
-    # If the response indicates error, and no output is defined in
-    # the response, then send back the contents of the audit file.
-    # Not sure this makes any sense at all yet, but the point is to
-    # get more info back to the user.
-    #
-    if (GeniResponse::IsError($result) &&
-	(!defined($result->{'output'}) || $result->{'output'} eq "") &&
-	exists($ENV{'TBAUDITLOG'}) && -s $ENV{'TBAUDITLOG'}) {
-	$result->{'output'} = `cat $ENV{'TBAUDITLOG'}`;
-    }
-    # Do this after above so that silly comment is not sent to user.
-    if (GeniResponse::IsError($result) && $mailerrors &&
-	$result->{'code'} != GENIRESPONSE_SEARCHFAILED()) {
-	print STDERR "Mail Errors is on.\n";
-    }
-
-    #
-    # Added this for geni-am ...
-    #
-    if (defined($GENI_RESPONSE_CONVERTER)) {
-	$response = &$GENI_RESPONSE_CONVERTER($result);
+    if (! ref($result)) {
+	#
+	# This could happen if the child forks. 
+	#
+	if ($result) {
+	    print STDERR "Child forked but returned an error\n";
+	}
     }
     else {
-	$response = $decoder->encode_response($result);
+	#
+	# If the response indicates error, and no output is defined in
+	# the response, then send back the contents of the audit file.
+	# Not sure this makes any sense at all yet, but the point is to
+	# get more info back to the user.
+	#
+	if (GeniResponse::IsError($result) &&
+	    (!defined($result->{'output'}) || $result->{'output'} eq "") &&
+	    exists($ENV{'TBAUDITLOG'}) && -s $ENV{'TBAUDITLOG'}) {
+	    $result->{'output'} = `cat $ENV{'TBAUDITLOG'}`;
+	}
+	# Do this after above so that silly comment is not sent to user.
+	if (GeniResponse::IsError($result) && $mailerrors &&
+	    $result->{'code'} != GENIRESPONSE_SEARCHFAILED()) {
+	    print STDERR "Mail Errors is on.\n";
+	}
+
+	#
+	# Added this for geni-am ...
+	#
+	if (defined($GENI_RESPONSE_CONVERTER)) {
+	    $response = &$GENI_RESPONSE_CONVERTER($result);
+	}
+	else {
+	    $response = $decoder->encode_response($result);
+	}
     }
 }
 
@@ -387,7 +405,8 @@ if ($debug) {
 #
 LogEnd(0);
 
-print "Content-Type: text/xml \n\n" . $response;
+print "Content-Type: text/xml \n\n" . $response
+    if (defined($response));
 exit(0);
 
 #

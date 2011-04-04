@@ -108,6 +108,10 @@ sub Lookup($$)
     
     # Add to cache. 
     $authorities{$self->{'AUTHORITY'}->{'uuid'}} = $self;
+
+    # Get the domain as a convenience.
+    my ($domain,undef,undef) = GeniHRN::Parse($self->{'AUTHORITY'}->{'urn'});
+    $self->{'DOMAIN'} = $domain;
     
     return $self;
 }
@@ -177,6 +181,8 @@ sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub type($)		{ return field($_[0], "type"); }
 sub disabled($)		{ return field($_[0], "disabled"); }
+# Convenience. 
+sub domain($)     	{ return $_[0]->{"DOMAIN"}; }
 sub _version_info($)	{ return $_[0]->{"_version_info"}; }
 sub version($)		{ return $_[0]->VersionInfo()->{"version"}; }
 sub apilevel($)		{ return $_[0]->VersionInfo()->{"apilevel"}; }
@@ -541,6 +547,68 @@ sub Resolve($$)
     }
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR "Could not resolve $urn at $self Error:";
+	print STDERR " " . $response->output() . "\n";
+	return undef;
+    }
+    return $response->value();
+}
+
+#
+# Discover resources at an authority (CM).
+#
+sub DiscoverResources($$;$$)
+{
+    my ($self, $urn, $available, $compress) = @_;
+
+    if (! defined($available)) {
+	$available = 1;
+    }
+    if (! defined($compress)) {
+	$compress = 0;
+    }
+
+    my $manager_version = $self->Version();
+    return undef
+	if (!defined($manager_version));
+
+    #
+    # Need a credential to make this call. 
+    #
+    if (!defined(Genixmlrpc->GetContext())) {
+	print STDERR "Need an RPC context to generate a self credential\n";
+	return undef;
+    }
+    my $context = Genixmlrpc->GetContext();
+    my $me      = GeniAuthority->Lookup($context->certificate()->uuid());
+    if (!defined($me)) {
+	print STDERR "Could not find my own authority for $context\n";
+	return undef;
+    }
+    my $credential = GeniCredential->GetSelfCredential($me);
+    if (!defined($credential)) {
+	print STDERR "Could not create self credential for $me\n";
+	return undef;
+    }
+
+    my $method_args;
+    if ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$credential->asString()];
+	$method_args->{'available'}   = $available;
+	$method_args->{'compress'}    = $compress;
+    }
+    else {
+	print STDERR "GeniAuthority::Discover: Unknown version at $self\n";
+	return undef;
+    }
+    my $response =
+	Genixmlrpc::CallMethod($self->url(), undef,
+			       "DiscoverResources", $method_args);
+    if (!defined($response)) {
+	print STDERR "*** Internal error discovering resources at $self\n";
+	return undef;
+    }
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not discover resources at $self Error:";
 	print STDERR " " . $response->output() . "\n";
 	return undef;
     }

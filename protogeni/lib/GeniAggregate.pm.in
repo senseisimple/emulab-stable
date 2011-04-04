@@ -449,13 +449,6 @@ sub SetAggregate($$)
 			 "  aggregate_idx='$agg_idx' ".
 			 "where idx='$idx'"));
     
-    if (!DBQueryWarn("update aggregate_history set ".
-		     "  aggregate_uuid='$agg_uuid' ".
-		     "where idx='$idx'")) {
-	print STDERR "GeniAggregate::SetAggregate: ".
-	    "Failed to update aggregate_history for $self\n";
-    }
-
     $self->{'AGGREGATE'}->{'aggregate_idx'} = $agg_idx;
     $self->{'PARENT'} = $aggregate;
     return 0;
@@ -910,7 +903,10 @@ sub Start($$$)
 		# reboot the physnode since we might only be adding a new node
 		# in which case, a full reboot is wrong.
 		#
-		if (! $node->IsUp()) {
+		if (! $node->IsUp() ||
+		    # This catches the pg nodes which are in ISUP while free.
+		    ($sliver->status() eq "created" && !defined($vnode))) {
+		    # We should be using allocstatus. 
 		    if ($sliver->state() eq "stopped" && !defined($vnode)) {
 			$poweron{$node->node_id} = $node;
 		    }
@@ -994,7 +990,7 @@ sub Start($$$)
 		return -1;
 	    }
 	}
-	system("$SNMPIT -q -t $pid $eid");
+	system("$SNMPIT -t $pid $eid");
 	if ($?) {
 	    print STDERR "$SNMPIT failed\n";
 	    return -1;
@@ -1124,7 +1120,7 @@ sub Stop($$)
     %vnodes = %tmp;
 
     if ($version >= 2) {
-	system("$SNMPIT -q -r $pid $eid");
+	system("$SNMPIT -r $pid $eid");
 	if ($?) {
 	    print STDERR "$SNMPIT failed\n";
 	    return -1;

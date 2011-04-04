@@ -1,0 +1,100 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Remove a geni user from the DB.
+# 
+sub usage()
+{
+    print "Usage: delgeniuser -c | -m | -s <urn|hrn>\n";
+    exit(1);
+}
+sub fatal($);
+my $optlist = "cmsf";
+my $doch    = 0;
+my $docm    = 0;
+my $dosa    = 0;
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use GeniDB;
+use GeniUser;
+use GeniCertificate;
+use GeniSlice;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"c"})) {
+    $doch = 1;
+}
+if (defined($options{"m"})) {
+    $docm = 1;
+}
+if (defined($options{"s"})) {
+    $dosa = 1;
+}
+usage()
+    if (@ARGV != 1 ||
+	($dosa + $doch + $docm) == 0 || ($dosa + $doch + $docm) > 1);
+my $token = $ARGV[0];
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+# Connect to the proper DB.
+DBConnect(($doch ? GENICH_DBNAME() :
+	   ($docm ? GENICM_DBNAME() : GENISA_DBNAME())));
+
+my $geniuser = GeniUser->Lookup($token);
+if (!defined($geniuser)) {
+    fatal("No such user");
+}
+my @slices = GeniSlice->LookupByCreator($geniuser);
+if (@slices) {
+    fatal("$geniuser has active slices. Not deleting.\n");
+}
+$geniuser->Delete() == 0
+    or fatal("Could not delete $geniuser\n");
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}

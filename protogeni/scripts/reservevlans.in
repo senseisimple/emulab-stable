@@ -19,8 +19,6 @@ sub usage()
     exit(1);
 }
 my $optlist = "";
-my $mintag  = 750;
-my $maxtag  = 1000;
 my $other_manager;
 #
 # Configure variables
@@ -39,6 +37,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Protos
 sub fatal($);
+sub busy();
 sub ReserveLocalTags(@);
 sub ReserveRemoteTags($$@);
 
@@ -140,6 +139,33 @@ if (!defined($other_manager)) {
 }
 
 #
+# Go through the component hops and find the one that refers to us.
+# This is our external network point.
+#
+my $hopref;
+foreach my $ref (GeniXML::FindNodes("n:component_hop",
+				    $linkref)->get_nodelist()) {
+    my $component_urn = GeniXML::GetNodeId($ref);
+    my ($domain,undef,undef) = GeniHRN::Parse($component_urn);
+    if (defined($domain) and $domain eq $me->domain()) {
+	$hopref = $ref;
+	last;
+    }
+}
+if (!defined($hopref)) {
+    fatal("Could not find hop in link");
+}
+my $hop_urn = GeniXML::GetNodeId($hopref);
+my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+my $network = ExternalNetwork->Lookup($network_id);
+if (!defined($network)) {
+    fatal("$hop_urn is not an external network");
+}
+# The bounds of the vlan tags we can use for this network point.
+my $mintag  = $network->min_vlan();
+my $maxtag  = $network->max_vlan();
+
+#
 # Need the slice experiment as the context within to allocate the
 # the tags. 
 #
@@ -163,12 +189,24 @@ if (!defined($vlan)) {
     fatal("Could not create vlan for $linkname");
 }
 my $lanid = $vlan->lanid();
+
+#
+# Setup a signal handler to clean things up.
+#
+sub handler()
+{
+    fatal("Caught a signal ... cleaning up and exiting");
+}
+$SIG{HUP}  = \&handler;
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
 my @othertags = ();
 
 while (my @tags = ReserveLocalTags(@othertags)) {
     my $tag = ReserveRemoteTags($other_manager, \@othertags, @tags);
     if ($tag) {
-	print STDERR "Agreeded on tag $tag. Releasing the rest.\n";
+	print STDERR "Agreed on tag $tag. Releasing the rest.\n";
 	foreach my $t (@tags) {
 	    $vlan->ClearReservedVlanTag($t)
 		if ($t != $tag);
@@ -184,6 +222,9 @@ exit(0);
 sub ReserveRemoteTags($$@)
 {
     my ($authority, $othertags, @tags) = @_;
+    # Lets avoid terminal retry. Try a couple of times, and
+    # return to caller so it can decide what to do.
+    my $retries = 2;
 
     my $method_args = {};
     $method_args->{'credentials'}   = [$credential->asString()];
@@ -194,6 +235,8 @@ sub ReserveRemoteTags($$@)
     $method_args->{'taglist'}       = \@tags;
     @$othertags = ();
     
+    print STDERR "Calling $authority with tags: @tags\n";
+again:    
     my $response =
 	Genixmlrpc::CallMethod($authority->url(),
 			       undef, "ReserveVlanTags", $method_args);
@@ -202,12 +245,24 @@ sub ReserveRemoteTags($$@)
 	fatal("*** Internal error reserving tags at $authority");
     }
     if ($response->code() != GENIRESPONSE_SUCCESS &&
+	$response->code() != GENIRESPONSE_BUSY &&
 	$response->code() != GENIRESPONSE_SEARCHFAILED) {
 	print STDERR "Could not reserve tags at $authority - Error: ";
 	print STDERR "  " . $response->output() . "\n";
-	fatal("");
+	# This does not return.
+	busy();
     }
-    if ($response->code == GENIRESPONSE_SEARCHFAILED) {
+    if ($response->code() == GENIRESPONSE_BUSY) {
+	if ($retries) {
+	    print STDERR
+		"  slice is busy at other CM. Will retry in a moment.\n";
+	    sleep(10);
+	    $retries--;
+	    goto again;
+	}
+	fatal("*** slice was busy for way too long at $authority");
+    }
+    if ($response->code() == GENIRESPONSE_SEARCHFAILED) {
 	print STDERR "*** Target CM did not like any of the tags we sent\n";
 	if (defined($response->value()) && ref($response->value()) eq "ARRAY"){
 	    my @otags = @{ $response->value() };
@@ -256,7 +311,8 @@ sub ReserveLocalTags(@)
 	    while (@otags) {
 		my $t = pop(@otags);
 		push(@try, $t)		
-		    if (VLan->VlanTagAvailable($t));
+		    if ($network->VlanTagOkay($t) &&
+			VLan->VlanTagAvailable($t));
 		
 		# But do not let the other CM make us reserve too many at once
 		last
@@ -313,6 +369,16 @@ sub fatal($)
 
     print STDERR "*** $0:\n".
 	         "    $msg\n";
-    # exit value important.
+    # Exit value important. negative value indicates fatal error to caller.
     exit(-1);
+}
+sub busy()
+{
+    if (defined($vlan)) {
+	# Clears all the tags.
+	$vlan->ClearReservedVlanTag();
+	$vlan->Destroy();
+    }
+    # Exit value important; positive integer indicate BUSY to caller.
+    exit(1);
 }

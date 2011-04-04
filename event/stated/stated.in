@@ -47,6 +47,7 @@ use POSIX;			# for strftime, and sigprocmask and friends
 use Fcntl;			# file constants for pidfile
 use POSIX ":sys_wait_h";
 use IO::Poll qw(POLLIN);
+use POSIX qw(:errno_h);
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
@@ -58,6 +59,11 @@ my %msgs = ();
 # that's _too_ out of sync.
 my $reload_time = 600;
 my $last_reload = time;
+
+# For startup and reload: maximum time in the past for which we will schedule
+# a timeout. Anything older is assumed to be ancient history and is ignored.
+# Note it is a negative value.
+my $maxpasttimeout = -(2 * 24 * 60 * 60);	# 2 days
 
 # Handling of SECVIOLATIONS, eventually controlled by a sitevar
 my $soft_secviolation = 1;
@@ -226,6 +232,7 @@ if ($debug) { qshow(); }
 
 # Gets set if a reload of state from the database should happen.
 my $do_reload = 0;
+my $do_reopen = 0;
 my $sigrestart= 0;
 my $sigcleanup= 0;
 my $exiting   = 0;
@@ -234,7 +241,7 @@ my $exiting   = 0;
 # about what would happen if we tried to do this mid-loop. So, we'll
 # just set a flag and do it when we're done with our current pass.
 $SIG{HUP}  = sub { info("SIGHUP - Reloading DB state\n"); $do_reload = 1; };
-$SIG{USR2} = sub { info("SIGUSR2 - Reopening logfile\n"); ReOpenLog($LOGFILE); };
+$SIG{USR2} = sub { info("SIGUSR2 - Reopening logfile\n"); $do_reopen = 1; };
 
 # Set up other signals.
 $SIG{USR1} = \&restart_wrap;
@@ -258,7 +265,7 @@ sub process_event_queue() {
     my $lastcount=-1;
     my $wait;
     my $now = time();
-    debug("Polling - mq=$mailqueue bw=$blockwait\n");
+    debug("Polling at $now - mq=$mailqueue bw=$blockwait ndl=$nextdeadline\n");
     if ( $mailqueue == 0) {
 	# no messages waiting...
 	if ($blockwait) {
@@ -281,10 +288,10 @@ sub process_event_queue() {
     if ($wait < 0) { debug("Wait was $wait!\n"); $wait=0; }
     my $finish = $now + $wait;
     while (($event_count != $lastcount || $wait > 0) &&
-	   !($sigrestart || $sigcleanup || $do_reload)) {
+	   !($sigrestart || $sigcleanup || $do_reload || $do_reopen)) {
 	$lastcount = $event_count;
 	# Don't block if we got a signal!
-	if ($wait<=0 || $sigrestart || $sigcleanup || $do_reload) {
+	if ($wait<=0 || $sigrestart || $sigcleanup || $do_reload || $do_reload){
 	    PollEvents(0, 0);
 	} else {
 	    #debug("Using blocking event poll - $wait seconds\n");
@@ -296,7 +303,7 @@ sub process_event_queue() {
 	    #debug("Finished blocking event poll - $wait seconds remain\n");
 	    if ($event_count > 0 &&
 		(qsize() > 0 || $mailqueue ||
-		 $sigrestart || $sigcleanup || $do_reload)) {
+		 $sigrestart || $sigcleanup || $do_reload || $do_reopen)) {
 		$blockwait=0;
 		$wait=0;
 		#debug("Cancelling wait - timeouts/msgs waiting, or HUP'd\n");
@@ -321,7 +328,19 @@ while (1) {
 	while ($now >= $deadline && $node ne "") {
 	    qpop($deadline,$node);
 	    info("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
-	    handleCtrlEvent($node,$TBTIMEOUT);
+	    #
+	    # If the node is no longer in the nodes array, it was most
+	    # likely a dynamic virtual node which is now gone. Ignore.
+	    # Need to look at reload() to see if we can catch this earlier. 
+	    #
+	    if (exists($nodes{$node})) {
+		handleCtrlEvent($node,$TBTIMEOUT);
+	    }
+	    else {
+		info("POP: $node is no longer in the nodes array. Skipping\n");
+		delete($timeout_tag{$node})
+		    if (exists($timeout_tag{$node}));
+	    }
 	    if (0) { qshow(); }
 	    if (qhead($deadline,$node)) {
 		$deadline=0; $node="";
@@ -332,14 +351,14 @@ while (1) {
     }
     $nextdeadline = $deadline;
 
-    if (qsize()==0) {
-	$blockwait=1;
-	debug("---Blocking wait okay---\n");
-    }
-
     if ($do_reload || ($now - $last_reload > $reload_time)) {
 	reload();
 	$do_reload = 0;
+    }
+
+    if (qsize()==0) {
+	$blockwait=1;
+	debug("---Blocking wait okay---\n");
     }
 
     # Send any messages in the queue if it is time
@@ -347,7 +366,13 @@ while (1) {
 
     if ($sigrestart) { restart(); }
     if ($sigcleanup) { cleanup(); }
-
+    if ($do_reopen)  {
+	ReOpenLog($LOGFILE);
+	if (! kill('USR2', $eventchild)) {
+	    fatal("Could not signal(USR2) event reader child\n");
+	}
+	$do_reopen = 0;
+    }
     process_event_queue;
 }
 
@@ -356,6 +381,7 @@ exit(0);
 # Read the current states of nodes from the database
 sub readStates(;@) {
     my %oldnodes = @_;
+    my $now = time();
 
     # Guard against undefined variable warnings
     if (! %oldnodes) {
@@ -403,8 +429,14 @@ sub readStates(;@) {
 	    $nodes{$node_id}{timedout}       = 0;
 	    $nodes{$node_id}{noretry}        = 0;
 	    # Is there a timeout? If so, set it up!
-	    if ($dbtag eq $nodes{$node_id}{"tag"}) {
-		setTimeout($mode,$state,$node_id,$timestamp);
+	    if (defined($timestamp) && $dbtag eq $nodes{$node_id}{"tag"}) {
+		my $TO = $timestamp - $now;
+		if ($TO > $maxpasttimeout) {
+		    setTimeout($mode,$state,$node_id,$timestamp);
+		} else {
+		    debug("Ignoring ancient timeout $TO for ",
+			  "($node_id,$mode,$state)\n");
+		}
 	    }
 	}
     }
@@ -1788,6 +1820,17 @@ sub StartEvents()
     # We want to exit on any warning. Let the caller notice.
     $SIG{__WARN__} = sub { print STDERR $_[0]; exit(-1); };
 
+    # Make sure this child starts writing into the new logfile.
+    $SIG{USR2} = sub {
+	print STDERR "Caught a USR2 in child\n";
+	# Only STDERR can be redirected to the newfile. STDOUT is writing
+	# to the parent process.
+	open(STDERR, ">> $LOGFILE") or fatal("reopening $LOGFILE: $!");	
+	select STDERR;
+	$OUTPUT_AUTOFLUSH = 1;
+	print STDERR "Opened new logfile in child\n";
+    };
+
     #
     # Just read events and print them to stdout. Parent gets them.
     #
@@ -1806,7 +1849,7 @@ sub StubHandleEvent($$$) {
     #
     # Print the stuff we care about to stdout for the parent to pick up.
     #
-    print  "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
+    print "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
     if (1) {
 	print STDERR
 	    "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
@@ -1857,10 +1900,18 @@ sub PollEvents($$)
 		    fatal("unrecognizable line $line from event reader");
 		}
 	    }
+	    #
+	    # If there is still more immediately available, loop back
+	    # and read again. Otherwise stop.
+	    #
+	    if ($eventpoll->poll(0) <= 0) {
+		last;
+	    }
 	}
     }
     elsif ($pollval < 0) {
-	fatal("Error in nonblocking poll\n");
+	fatal("Error in nonblocking poll: $!\n")
+	    if ($! != EINTR);
     }
     return undef;
 }

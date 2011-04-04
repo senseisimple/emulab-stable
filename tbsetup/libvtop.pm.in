@@ -1555,6 +1555,7 @@ sub LoadVirtLans($)
 	    $vlanmember->virt_node()->type() eq "bbgenivm") {
 	    $vlanmember->_reservebw($bandwidth);
 	    $vlanmember->_needtrunk(1);
+	    $vlanmember->_nobwshaping(1);
 	    $self->printdb("  Forcing $vlanmember to reserve shared bandwidth\n");
 	}
     }
@@ -2474,11 +2475,11 @@ sub GenVirtLans($)
 	    # since these do not get vlans.  Some other special
 	    # treatment applies as well.
 	    #
-	    $self->createNode("fakelan/$vname",
-			      $mycmurn, $protocol, '1', undef, undef);
+	    my $lanname = "fakelan/$vname";
+	    $self->createNode($lanname, $mycmurn, $protocol, '1', undef, undef);
 	    
 	    # So we ignore it when it comes back from assign.
-	    $self->lannodes()->{"fakelan/$vname"} = 1;
+	    $self->lannodes()->{$lanname} = 1;
 	    
 	    # XXX If not ethernet, assume wireless. Need more info someplace.
 	    $self->exptstats()->{'wirelesslans'} += 1;
@@ -2491,7 +2492,7 @@ sub GenVirtLans($)
 		$self->createLink($vname, $plink, [$mycmurn],
 				  {'virtual_node_id' => $vname,
 				   'virtual_interface_id' => "$member" },
-				  {'virtual_node_id' => "fakelan/$vname",
+				  {'virtual_node_id' => $lanname,
 				   'virtual_interface_id' => "$member" },
 				  $top_bw, $protocol);
 		next;
@@ -3641,7 +3642,7 @@ sub MapResources($)
 	
 	$self->printdb("Mapping geni resources ...\n");
 	
-	if (libGeni::MapResources($self->experiment(),
+	if (libGeni::MapResourcesNew($self->experiment(),
 				  $self->user(), $self->rspec(),
 				  \$genirspec, $self->verbose())) {
 	    tberror("Could not map Geni resources\n");
@@ -5509,11 +5510,20 @@ sub InterpLinksAux($)
 						  $self->impotent() ||
 						  $self->alloconly(),
 						  $protovlan);
-		    $protolink->SetType((defined($protovlan) ?
-					"emulated" : "vlan"));
-		    $protolink->SetRole("link/lan");
-		    $protolink->SetAttribute("link/lan", $lan)
-			if (!defined($protovlan));
+		    my $vlan_type;
+		    my $vlan_role;
+
+		    if (defined($protovlan)) {
+			$vlan_type = "emulated";
+			$vlan_role = "link/lan";
+		    }
+		    else {
+			$vlan_type = "vlan";
+			$vlan_role = "emulated";
+			$protolink->SetAttribute("link/lan", $lan);
+		    }
+		    $protolink->SetType($vlan_type);
+		    $protolink->SetRole($vlan_role);
 
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA,
 					     $virtifaceA->viface(),
@@ -6929,24 +6939,30 @@ sub UploadVlans($)
 	foreach my $lan (@lans) {
 	    # Only care about encapsulated links.
 	    next
-		if ($lan->type() ne "emulated");
+		if (! ($lan->type() eq "emulated" ||
+		       $lan->GetRole() eq "emulated"));
 
-	    my $linkedlan = $lan->GetLinkedLan();
-	    if (!defined($linkedlan)) {
-		tberror("Emulated lan $lan does not have a linked vlan!\n");
-		return -1;
-	    }
 	    my $virtlan     = $self->vlans()->{$lan->vname()};
 	    if (!defined($virtlan)) {
 		tberror("Could not find lan $lan in local lan list!\n");
 		return -1;
 	    }
 	    my $virtlanidx  = $virtlan->idx();
-	    my $linkedlanid = $linkedlan->lanid();
-	    
-	    $self->printdb("Update vinterfaces: $virtlan: ".
-			   "$virtlanidx -> $linkedlanid\n");
-	    
+	    my $linkedlanid = $lan->lanid();
+
+	    #
+	    # An encapsulated lan is linked to the real lan.
+	    # A vlan encapsulated link does not have a linked lan;
+	    # there is no need for it.
+	    #
+	    if ($lan->type() eq "emulated") {
+		my $linkedlan = $lan->GetLinkedLan();
+		if (!defined($linkedlan)) {
+		    tberror("Emulated lan $lan does not have a linked vlan!\n");
+		    return -1;
+		}
+		$linkedlanid = $linkedlan->lanid();
+	    }
 	    DBQueryWarn("update vinterfaces set vlanid='$linkedlanid' ".
 			"where virtlanidx='$virtlanidx' and ".
 			"      exptidx='$exptidx'")

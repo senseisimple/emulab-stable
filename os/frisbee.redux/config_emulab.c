@@ -35,7 +35,9 @@ struct emulab_ha_extra_info {
 	char *pid;	/* project */
 	char *gid;	/* group */
 	char *eid;	/* experiment */
-	char *suid;	/* swapper user name */
+	char *sname;	/* swapper user name */
+	int suid;	/* swapper's unix uid */
+	int egid;	/* experiment's unix gid */
 };
 
 static char *MC_BASEADDR = FRISEBEEMCASTADDR;
@@ -184,7 +186,7 @@ emulab_free_host_authinfo(struct config_host_authinfo *ai)
 		FREE(ei->pid);
 		FREE(ei->gid);
 		FREE(ei->eid);
-		FREE(ei->suid);
+		FREE(ei->sname);
 		free(ai->extra);
 	}
 	free(ai);
@@ -333,7 +335,7 @@ allow_stddirs(char *imageid,
 	snprintf(tpath, sizeof tpath, "%s/%s/%s", GROUPSDIR, ei->pid, ei->gid);
 	gdir = mystrdup(tpath);
 
-	snprintf(tpath, sizeof tpath, "%s/%s", USERSDIR, ei->suid);
+	snprintf(tpath, sizeof tpath, "%s/%s", USERSDIR, ei->sname);
 	udir = mystrdup(tpath);
 
 	if (SCRATCHDIR) {
@@ -375,6 +377,7 @@ allow_stddirs(char *imageid,
 					ci->sig = NULL;
 				ci->get_options = NULL;
 				ci->get_methods = 0;
+				ci->get_uid = ci->get_gid = -1;
 				ci->put_options = NULL;
 				ci->extra = NULL;
 			}
@@ -408,6 +411,8 @@ allow_stddirs(char *imageid,
 					ci->sig = NULL;
 				set_get_options(get, i);
 				set_get_methods(get, i);
+				ci->get_uid = ei->suid;
+				ci->get_gid = ei->egid;
 				ci->put_options = NULL;
 				ci->extra = NULL;
 			}
@@ -455,6 +460,7 @@ allow_stddirs(char *imageid,
 			ci->sig = NULL;
 		ci->get_options = NULL;
 		ci->get_methods = 0;
+		ci->get_uid = ci->get_gid = -1;
 		ci->put_options = NULL;
 		ci->extra = NULL;
 	}
@@ -475,6 +481,8 @@ allow_stddirs(char *imageid,
 			ci->sig = NULL;
 		set_get_options(get, 0);
 		set_get_methods(get, 0);
+		ci->get_uid = ei->suid;
+		ci->get_gid = ei->egid;
 		ci->put_options = NULL;
 		ci->extra = NULL;
 	}
@@ -699,12 +707,17 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		free(proxy);
 	}
 
-	/* Find the pid/gid to which the node is currently assigned */
-	res = mydb_query("SELECT e.pid,e.gid,r.eid,u.uid"
-			 " FROM reserved AS r,experiments AS e,users AS u"
+	/*
+	 * Find the pid/gid to which the node is currently assigned
+	 * and also the unix uid of the swapper and unix gid for the
+	 * experiment in case we need to run a server process.
+	 */
+	res = mydb_query("SELECT e.pid,e.gid,r.eid,u.uid,u.unix_uid,g.unix_gid"
+			 " FROM reserved AS r,experiments AS e,"
+			 "  users AS u,groups as g"
 			 " WHERE r.pid=e.pid AND r.eid=e.eid"
-			 "  AND e.swapper_idx=u.uid_idx"
-			 "  AND r.node_id='%s'", 4, node);
+			 "  AND e.swapper_idx=u.uid_idx AND e.gid=g.gid"
+			 "  AND r.node_id='%s'", 6, node);
 	assert(res != NULL);
 
 	/* Node is free */
@@ -717,8 +730,8 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	}
 
 	row = mysql_fetch_row(res);
-	if (!row[0] || !row[1] || !row[2] || !row[3]) {
-		error("config_host_authinfo: null pid/gid/eid/uid!?");
+	if (!row[0] || !row[1] || !row[2] || !row[3] || !row[4] || !row[5]) {
+		error("config_host_authinfo: null pid/gid/eid/uname/uid!?");
 		mysql_free_result(res);
 		emulab_free_host_authinfo(get);
 		emulab_free_host_authinfo(put);
@@ -731,7 +744,9 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		ei->pid = mystrdup(row[0]);
 		ei->gid = mystrdup(row[1]);
 		ei->eid = mystrdup(row[2]);
-		ei->suid = mystrdup(row[3]);
+		ei->sname = mystrdup(row[3]);
+		ei->suid = atoi(row[4]);
+		ei->egid = atoi(row[5]);
 		get->extra = ei;
 	}
 	if (put != NULL) {
@@ -739,7 +754,9 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		ei->pid = mystrdup(row[0]);
 		ei->gid = mystrdup(row[1]);
 		ei->eid = mystrdup(row[2]);
-		ei->suid = mystrdup(row[3]);
+		ei->sname = mystrdup(row[3]);
+		ei->suid = atoi(row[4]);
+		ei->egid = atoi(row[5]);
 		put->extra = ei;
 	}
 	mysql_free_result(res);
@@ -828,6 +845,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 				ci->sig = NULL;
 			ci->get_methods = 0;
 			ci->get_options = NULL;
+			ci->get_uid = ci->get_gid = -1;
 			ci->put_options = NULL;
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);
@@ -896,6 +914,8 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 				ci->sig = NULL;
 			set_get_methods(get, get->numimages);
 			set_get_options(get, get->numimages);
+			ci->get_uid = ei->suid;
+			ci->get_gid = ei->egid;
 			ci->put_options = NULL;
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);
