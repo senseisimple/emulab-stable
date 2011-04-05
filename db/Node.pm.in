@@ -167,8 +167,18 @@ sub Lookup($$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
+    #
+    # Make a copy of the array. Still fighting memory corruption error.
+    #
+    my $hash_orig = $query_result->fetchrow_hashref();
+    my $hash_copy = {};
+    foreach my $key (keys(%{ $hash_orig })) {
+	my $val = $hash_orig->{$key};
+	$hash_copy->{$key} = $val;
+    }
+
     my $self            = {};
-    $self->{"DBROW"}    = $query_result->fetchrow_hashref();
+    $self->{"DBROW"}    = $hash_copy;
     $self->{"RSRV"}     = undef;
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
