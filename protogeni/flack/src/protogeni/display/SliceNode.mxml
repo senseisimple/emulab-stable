@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:BorderContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx"
+				   initialize="adjustWidth();"
+				   width="164" height="29" borderStyle="solid" backgroundColor="#EAEAEA"
+				   mouseDown="mouseMoveHandler(event)" xmlns:display="protogeni.display.*">
+	<s:layout>
+		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" gap="2" verticalAlign="middle" />
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.core.DragSource;
+			import mx.managers.DragManager;
+			
+			import protogeni.resources.VirtualNode;
+			
+			[Bindable]
+			public var node:VirtualNode;
+			public var links:ArrayCollection = new ArrayCollection();
+			
+			public var startX:int;
+			public var startY:int;
+			public var canvas:SliceCanvas;
+			
+			public function resetToStatus():void
+			{
+				this.toolTip = "";
+				if(node.status == VirtualNode.STATUS_READY)
+				{
+					this.styleName = "validStyle";
+					this.toolTip = node.state;
+				} else if(node.status == VirtualNode.STATUS_FAILED)
+				{
+					this.styleName = "failedStyle";
+					this.toolTip = "Error: " + node.error;
+				} else {
+					if(node.state == null || node.status == null ||
+						(node.state.length == 0 && node.status.length == 0))
+					{
+						toolTip = "Name: " + node.id;
+						if(node.urn != null && node.urn.length > 0)
+							toolTip += "\nURN: " + node.urn;
+						if(node.manager != null)
+							toolTip += "\nManager: " + node.manager.Hrn;
+					}
+					else
+						toolTip = "State: " + node.state + " Status: " + node.status;
+					if(node.status == VirtualNode.STATUS_CHANGING)
+						this.styleName = "inprogressStyle";
+					else
+						this.styleName = "unknownStyle";
+				}
+				adjustWidth();
+			}
+			
+			public function setNode(n:VirtualNode):void
+			{
+				node = n;
+				lastId = n.id;
+				resetToStatus();
+				adjustWidth();
+			}
+			
+			public function adjustWidth():void
+			{
+				this.validateNow();
+				if(nameLabel != null)
+					width = width + (nameLabel.measuredWidth - nameLabel.width) + 5;
+			}
+			
+			public var lastId:String = "";
+			
+			public function removeLink(l:SliceLink):void
+			{
+				links.removeItemAt(links.getItemIndex(l));
+			}
+			
+			public function showInfo(event:MouseEvent):void
+			{
+				event.stopImmediatePropagation();
+				DisplayUtil.viewVirtualNode(node);
+			}
+			
+			public function remove(event:MouseEvent):void
+			{
+				event.stopImmediatePropagation();
+				canvas.removeSliceNode(this)
+			}
+			
+			private  function mouseMoveHandler(event:MouseEvent):void{
+				var d:Array = getObjectsUnderPoint(new Point(event.localX, event.localY));
+				var dragInitiator:BorderContainer = BorderContainer(event.currentTarget);
+				var ds:DragSource = new DragSource();
+				ds.addData(dragInitiator, "canvas"); 
+				
+				startX = event.localX;
+				startY = event.localY;
+				DragManager.doDrag(dragInitiator, ds, event);
+			}
+			
+			private  function mouseDownHandler(event:MouseEvent):void{
+				event.stopImmediatePropagation();
+				canvas.startLinkingFrom(this);
+			}
+			
+			public function setLocation(x:int = -1, y:int = -1):void
+			{
+				var finalX:int = x;
+				var finalY:int = y;
+				if(x == -1)
+					finalX = Math.round(Math.random() * parent.width);
+				if(y == -1)
+					finalY = Math.round(Math.random() * parent.height);
+				
+				// right edge
+				if(finalX > (parent.width - this.width/2))
+					finalX = parent.width - this.width/2;
+				// bottom edge
+				if(finalY > (parent.height - this.height/2))
+					finalY = parent.height - this.height/2;
+				// left edge
+				if(finalX < this.width/2)
+					finalX = this.width/2;
+				// top edge
+				if(finalY < this.height/2)
+					finalY = this.height/2;
+				
+				this.x = finalX - (this.width/2);
+				this.y = finalY - (this.height/2);
+			}
+			
+			public function getMiddleX():int
+			{
+				return x + width/2;
+			}
+			
+			public function getMiddleY():int
+			{
+				return y + height/2;
+			}
+		]]>
+	</fx:Script>
+	
+	
+	<display:ImageButton id="removeButton" icon="{DisplayUtil.crossIcon}"
+						  mouseDown="remove(event)" />
+	<display:ImageButton id="infoButton" icon="@Embed('../../../images/information.png')"
+						  mouseDown="showInfo(event)" />
+	<s:Label id="nameLabel" text="{node.id}" width="100%" />
+	<display:ImageButton id="addLink" icon="{DisplayUtil.addIcon}"
+						  mouseDown="mouseDownHandler(event)" />
+	
+</s:BorderContainer>

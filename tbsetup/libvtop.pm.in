@@ -2475,11 +2475,11 @@ sub GenVirtLans($)
 	    # since these do not get vlans.  Some other special
 	    # treatment applies as well.
 	    #
-	    $self->createNode("fakelan/$vname",
-			      $mycmurn, $protocol, '1', undef, undef);
+	    my $lanname = "fakelan/$vname";
+	    $self->createNode($lanname, $mycmurn, $protocol, '1', undef, undef);
 	    
 	    # So we ignore it when it comes back from assign.
-	    $self->lannodes()->{"fakelan/$vname"} = 1;
+	    $self->lannodes()->{$lanname} = 1;
 	    
 	    # XXX If not ethernet, assume wireless. Need more info someplace.
 	    $self->exptstats()->{'wirelesslans'} += 1;
@@ -2492,7 +2492,7 @@ sub GenVirtLans($)
 		$self->createLink($vname, $plink, [$mycmurn],
 				  {'virtual_node_id' => $vname,
 				   'virtual_interface_id' => "$member" },
-				  {'virtual_node_id' => "fakelan/$vname",
+				  {'virtual_node_id' => $lanname,
 				   'virtual_interface_id' => "$member" },
 				  $top_bw, $protocol);
 		next;

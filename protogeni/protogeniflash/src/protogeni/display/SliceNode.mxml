@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas
+	xmlns:mx="http://www.adobe.com/2006/mxml" initialize="adjustWidth();"
+	width="164" height="21" borderStyle="solid" backgroundColor="#EAEAEA" borderThickness="2"
+	mouseDown="mouseMoveHandler(event)"
+	xmlns:protogeniflash="protogeniflash.*" verticalScrollPolicy="off" horizontalScrollPolicy="off" xmlns:display="protogeni.display.*">
+	
+	<mx:Style>
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+			borderColor:red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+			borderColor:green;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+			borderColor:#B6B6B6;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+	</mx:Style>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.DragSource;
+			import mx.core.mx_internal;
+			import mx.graphics.ImageSnapshot;
+			import mx.managers.DragManager;
+			
+			import protogeni.resources.VirtualNode;
+			
+			[Bindable]
+			public var node:VirtualNode;
+			public var links:ArrayCollection = new ArrayCollection();
+			
+			public var startX:int;
+			public var startY:int;
+			public var canvas:SliceCanvas;
+			
+			public function resetToStatus():void
+			{
+				this.toolTip = "";
+				if(node.status == VirtualNode.STATUS_READY)
+				{
+					this.styleName = "validStyle";
+					this.toolTip = node.state;
+				} else if(node.status == VirtualNode.STATUS_FAILED)
+				{
+					this.styleName = "failedStyle";
+					this.toolTip = "Error: " + node.error;
+				} else {
+					if(node.state == null || node.status == null ||
+						(node.state.length == 0 && node.status.length == 0))
+					{
+						toolTip = "Name: " + node.id;
+						if(node.urn != null && node.urn.length > 0)
+							toolTip += "\nURN: " + node.urn;
+						if(node.manager != null)
+							toolTip += "\nManager: " + node.manager.Hrn;
+					}
+					else
+						toolTip = "State: " + node.state + " Status: " + node.status;
+					if(node.status == VirtualNode.STATUS_CHANGING)
+						this.styleName = "inprogressStyle";
+					else
+						this.styleName = "unknownStyle";
+				}
+				adjustWidth();
+			}
+			
+			public function setNode(n:VirtualNode):void
+			{
+				node = n;
+				lastId = n.id;
+				resetToStatus();
+				adjustWidth();
+			}
+			
+			public function adjustWidth():void
+			{
+				this.validateNow();
+				if(nameLabel != null)
+					width = width + (nameLabel.textWidth - nameLabel.width) + 5;
+			}
+			
+			public var lastId:String = "";
+			
+			public function removeLink(l:SliceLink):void
+			{
+				links.removeItemAt(links.getItemIndex(l));
+			}
+			
+			public function showInfo(event:MouseEvent):void
+			{
+				event.stopImmediatePropagation();
+				DisplayUtil.viewVirtualNode(node);
+			}
+			
+			public function remove(event:MouseEvent):void
+			{
+				event.stopImmediatePropagation();
+				canvas.removeSliceNode(this)
+			}
+			
+			private  function mouseMoveHandler(event:MouseEvent):void{
+				var d:Array = getObjectsUnderPoint(new Point(event.localX, event.localY));
+				var dragInitiator:Canvas = Canvas(event.currentTarget);
+				var ds:DragSource = new DragSource();
+				ds.addData(dragInitiator, "canvas"); 
+				
+				startX = event.localX;
+				startY = event.localY;
+				DragManager.doDrag(dragInitiator, ds, event);
+			}
+			
+			private  function mouseDownHandler(event:MouseEvent):void{
+				event.stopImmediatePropagation();
+				canvas.startLinkingFrom(this);
+			}
+			
+			public function setLocation(x:int = -1, y:int = -1):void
+			{
+				var finalX:int = x;
+				var finalY:int = y;
+				if(x == -1)
+				{
+					finalX = Math.round(Math.random() * parent.width);
+					finalY = Math.round(Math.random() * parent.height);
+					
+					// Make sure it isn't off the edges
+					if(finalX > (parent.width - this.width))
+						finalX -= this.width;
+					if(finalY > (parent.height - this.height))
+						finalY -= this.height;
+					if(finalX < this.width)
+						finalX = this.width;
+					if(finalY < this.height)
+						finalY = this.height;
+				}
+				this.x = finalX - (this.width/2);
+				this.y = finalY - (this.height/2);
+			}
+			
+			public function getMiddleX():int
+			{
+				return x + width/2;
+			}
+			
+			public function getMiddleY():int
+			{
+				return y + height/2;
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Label id="nameLabel" text="{node.id}" height="18" verticalCenter="0" right="18" left="34" fontSize="9" />
+	<display:ImageButton id="addLink" width="16" height="16" source="{DisplayUtil.addIcon}" mouseDown="mouseDownHandler(event)" right="0" verticalCenter="-1"/>
+	<display:ImageButton id="infoButton" width="16" height="16" source="@Embed('../images/information.png')" mouseDown="showInfo(event)" verticalCenter="-1" x="17"/>
+	<display:ImageButton id="removeButton" height="16" source="{DisplayUtil.crossIcon}" mouseDown="remove(event)" verticalCenter="-1" left="0" width="16"/>
+	
+</mx:Canvas>

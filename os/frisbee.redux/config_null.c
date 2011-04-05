@@ -5,9 +5,11 @@
  */
 
 /*
- * Configuration "file" handling for Emulab.
+ * Configuration "file" handling for a "null" or default configuration.
+ * Just uses globally configurated info for all images:
  *
- * Uses info straight from the Emulab database.
+ *  - images get/put to a standard image directory
+ *  - servers run as same user as master server
  */ 
 
 #ifdef USE_NULL_CONFIG
@@ -282,6 +284,7 @@ allow_stddirs(char *imageid,
 					ci->sig = NULL;
 				ci->get_options = NULL;
 				ci->get_methods = 0;
+				ci->get_uid = ci->get_gid = -1;
 				ci->put_options = NULL;
 				ci->extra = NULL;
 			}
@@ -311,6 +314,7 @@ allow_stddirs(char *imageid,
 					ci->sig = NULL;
 				set_get_options(get, i);
 				set_get_methods(get, i);
+				ci->get_uid = ci->get_gid = -1;
 				ci->put_options = NULL;
 				ci->extra = NULL;
 			}
@@ -433,6 +437,7 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			ci->sig = NULL;
 		ci->get_methods = 0;
 		ci->get_options = NULL;
+		ci->get_uid = ci->get_gid = -1;
 		ci->put_options = NULL;
 		ci->extra = NULL;
 	}
@@ -452,6 +457,7 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			ci->sig = NULL;
 		set_get_methods(get, 0);
 		set_get_options(get, 0);
+		ci->get_uid = ci->get_gid = -1;
 		ci->put_options = NULL;
 		ci->extra = NULL;
 	}

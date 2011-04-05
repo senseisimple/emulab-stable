@@ -277,13 +277,12 @@ sub GenerateFederatesList()
     }
     foreach my $authority (@authorities) {
 	my $urn = $authority->urn();
-	
     }
 
     if (open(MAP, "> $ADDIR/list.txt")) {
-	foreach my $urn (keys(%ads)) {
-	    print MAP "$urn\n";
-	}
+#	foreach my $urn (keys(%ads)) {
+#	    print MAP "$urn\n";
+#	}
 	close(MAP);
     }
     else {

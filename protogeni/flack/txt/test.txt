@@ -1,0 +1,150 @@
+<?xml version="1.0"?>
+<methodResponse>
+<params>
+<param><value><struct>
+<member><name>value</name><value><array><data>
+<value><string>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;
+&lt;signed-credential xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xsi:noNamespaceSchemaLocation=&quot;http://www.protogeni.net/resources/credential/credential.xsd&quot; xsi:schemaLocation=&quot;http://www.protogeni.net/resources/credential/ext/policy/1 http://www.protogeni.net/resources/credential/ext/policy/1/policy.xsd&quot;&gt;
+  &lt;credential xml:id=&quot;ref490A02A0C4072A7E&quot;&gt;
+ &lt;type&gt;privilege&lt;/type&gt;
+ &lt;serial&gt;110128&lt;/serial&gt;
+ &lt;owner_gid&gt;MIIDVzCCAsCgAwIBAgIDAMI0MA0GCSqGSIb3DQEBBAUAMIG4MQswCQYDVQQGEwJV
+UzENMAsGA1UECBMEVXRhaDEXMBUGA1UEBxMOU2FsdCBMYWtlIENpdHkxHTAbBgNV
+BAoTFFV0YWggTmV0d29yayBUZXN0YmVkMR4wHAYDVQQLExVDZXJ0aWZpY2F0ZSBB
+dXRob3JpdHkxGDAWBgNVBAMTD2Jvc3MuZW11bGFiLm5ldDEoMCYGCSqGSIb3DQEJ
+ARYZdGVzdGJlZC1vcHNAZmx1eC51dGFoLmVkdTAeFw0xMTAxMTkyMTIzMjBaFw0x
+MjAxMTkyMTIzMjBaMIGqMQswCQYDVQQGEwJVUzENMAsGA1UECBMEVXRhaDEdMBsG
+A1UEChMUVXRhaCBOZXR3b3JrIFRlc3RiZWQxGzAZBgNVBAsTEnV0YWhlbXVsYWIu
+c3RvbGxlcjEtMCsGA1UEAxMkMGIyZWI5N2UtZWQzMC0xMWRiLTk2Y2ItMDAxMTQz
+ZTQ1M2ZlMSEwHwYJKoZIhvcNAQkBFhJzdG9sbGVyQGVtdWxhYi5uZXQwgZ8wDQYJ
+KoZIhvcNAQEBBQADgY0AMIGJAoGBANGdbugXqOQo/KIN1pLeOcli0mGBAw6ObiOC
+d7Nx+KXNWvEihC616Gu2R0nvkilC0kyro+1NyWovMyvoAnPtqedSZ58Y36U2eTPk
+OesaCIzB16t78iauk8bLV6fh58caVEeaZBT0GAgkw6zNARtBXrOLnNIKUcnFWxBT
+zD9+rDAhAgMBAAGjezB5MA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFCrxH+HV
+dhXuE3HAoFqOzbSoDAOYMEcGA1UdEQRAMD6GKHVybjpwdWJsaWNpZDpJRE4rZW11
+bGFiLm5ldCt1c2VyK3N0b2xsZXKBEnN0b2xsZXJAZW11bGFiLm5ldDANBgkqhkiG
+9w0BAQQFAAOBgQAvp0G035BXJ7an4GP88BdqSQenGJfGhhLo3SogJ6Tnw8O9j06+
+Y97XAEPKQwRejUlWMRyB+j09LLC4KT5pZ/Hgl4hE33myuvp11vChqG9d+uOuG8fs
+wiuywjxVNZmbWKI8cRASzpAxasoTMqgNnbvhlLP+hTWqIee1TFOCxAAZzg==
+&lt;/owner_gid&gt;
+ &lt;owner_urn&gt;urn:publicid:IDN+emulab.net+user+stoller&lt;/owner_urn&gt;
+ &lt;target_gid&gt;MIIDTTCCAragAwIBAgIDAMxaMA0GCSqGSIb3DQEBBAUAMIG4MQswCQYDVQQGEwJV
+UzENMAsGA1UECBMEVXRhaDEXMBUGA1UEBxMOU2FsdCBMYWtlIENpdHkxHTAbBgNV
+BAoTFFV0YWggTmV0d29yayBUZXN0YmVkMR4wHAYDVQQLExVDZXJ0aWZpY2F0ZSBB
+dXRob3JpdHkxGDAWBgNVBAMTD2Jvc3MuZW11bGFiLm5ldDEoMCYGCSqGSIb3DQEJ
+ARYZdGVzdGJlZC1vcHNAZmx1eC51dGFoLmVkdTAeFw0xMTAzMDcyMzI0MDdaFw0x
+NjA4MjcyMzI0MDdaMIG0MQswCQYDVQQGEwJVUzENMAsGA1UECBMEVXRhaDEdMBsG
+A1UEChMUVXRhaCBOZXR3b3JrIFRlc3RiZWQxHjAcBgNVBAsTFWVtdWxhYi5uZXQu
+bGJzdXRhaHVreTEtMCsGA1UEAxMkZmZiMDhlYzUtNDkxMS0xMWUwLWIzNWQtMDAx
+MTQzZTQ1M2ZlMSgwJgYJKoZIhvcNAQkBFhl0ZXN0YmVkLW9wc0BmbHV4LnV0YWgu
+ZWR1MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQD40dnSwZtsFFgDivb7dv62
+Ct+2l30lYDSXGlR5imGQb9futIdYr82pVJniVZlG1N2uDReUG/utanMDSmJA3/Rb
+5uIiPwOdAO184i+GJnGwjyF31hBZ7+N4UWhwD763vc8seum+GfU73XMpTPjU5qfd
+Zcke97V/ND4gG48b4YX8NwIDAQABo2cwZTAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud
+DgQWBBSgBxtQAcDr6/cTBTGfEUYGFmiKPzAzBgNVHREELDAqhih1cm46cHVibGlj
+aWQ6SUROK2VtdWxhYi5uZXQrc2xpdmVyKzM2MTM3MA0GCSqGSIb3DQEBBAUAA4GB
+AAmd6V4dvXtlufpUcn4n/MOz6L67T85nOoaA1ZXGGzwFe357g6aoxbbDaQyChUKw
+h5eMeTw54US3HxLvRNuDPbYGv1DjT8cA5y3KLgE61kbd3VqMQrVuBjeqN3NIqAPL
+mfeQqZLVZ0hzB341yoFwuMpQWykarjHRReC0qfl/EJ7W
+&lt;/target_gid&gt;
+ &lt;target_urn&gt;urn:publicid:IDN+emulab.net+sliver+36137&lt;/target_urn&gt;
+ &lt;uuid&gt;080787c3-4912-11e0-b35d-001143e453fe&lt;/uuid&gt;
+ &lt;expires&gt;2011-03-08T00:10:53&lt;/expires&gt;
+  &lt;privileges&gt;
+&lt;privilege&gt;&lt;name&gt;*&lt;/name&gt;&lt;can_delegate&gt;1&lt;/can_delegate&gt;&lt;/privilege&gt;
+&lt;/privileges&gt;
+&lt;extensions&gt;&lt;nickname&gt;utahemulab.lbsutahuky&lt;/nickname&gt;&lt;/extensions&gt;
+&lt;/credential&gt;
+  &lt;signatures&gt;
+    &lt;Signature xmlns=&quot;http://www.w3.org/2000/09/xmldsig#&quot; xml:id=&quot;Sig_ref490A02A0C4072A7E&quot;&gt;
+ &lt;SignedInfo&gt;
+  &lt;CanonicalizationMethod Algorithm=&quot;http://www.w3.org/TR/2001/REC-xml-c14n-20010315&quot;/&gt;
+  &lt;SignatureMethod Algorithm=&quot;http://www.w3.org/2000/09/xmldsig#rsa-sha1&quot;/&gt;
+  &lt;Reference URI=&quot;#ref490A02A0C4072A7E&quot;&gt;
+    &lt;Transforms&gt;
+      &lt;Transform Algorithm=&quot;http://www.w3.org/2000/09/xmldsig#enveloped-signature&quot;/&gt;
+    &lt;/Transforms&gt;
+    &lt;DigestMethod Algorithm=&quot;http://www.w3.org/2000/09/xmldsig#sha1&quot;/&gt;
+    &lt;DigestValue&gt;R0AUZ7kQJfA3QWsEhywm1tnDIRs=&lt;/DigestValue&gt;
+    &lt;/Reference&gt;
+ &lt;/SignedInfo&gt;
+ &lt;SignatureValue&gt;lpuRHdsG9qBrEaAs892Eibt4wK1XmlG5uFkfYtCKL6YVZlPDImlIT2h9loZmrbmZ
+vTSuBLDRaSfAx2oO28BmHhY/QsqUHU2ko/IQ+tp1cK9l6kKmy7Ty3SQpNSDg4bjv
+gux3gTuq2/NG6CzrgXaNL4f4rNQWXqVY5BNUvjUNuiU=&lt;/SignatureValue&gt;
+ &lt;KeyInfo&gt;
+  &lt;X509Data&gt;
+   
+   
+   
+  &lt;X509Certificate&gt;MIIDTTCCAragAwIBAgIDAMxaMA0GCSqGSIb3DQEBBAUAMIG4MQswCQYDVQQGEwJV
+UzENMAsGA1UECBMEVXRhaDEXMBUGA1UEBxMOU2FsdCBMYWtlIENpdHkxHTAbBgNV
+BAoTFFV0YWggTmV0d29yayBUZXN0YmVkMR4wHAYDVQQLExVDZXJ0aWZpY2F0ZSBB
+dXRob3JpdHkxGDAWBgNVBAMTD2Jvc3MuZW11bGFiLm5ldDEoMCYGCSqGSIb3DQEJ
+ARYZdGVzdGJlZC1vcHNAZmx1eC51dGFoLmVkdTAeFw0xMTAzMDcyMzI0MDdaFw0x
+NjA4MjcyMzI0MDdaMIG0MQswCQYDVQQGEwJVUzENMAsGA1UECBMEVXRhaDEdMBsG
+A1UEChMUVXRhaCBOZXR3b3JrIFRlc3RiZWQxHjAcBgNVBAsTFWVtdWxhYi5uZXQu
+bGJzdXRhaHVreTEtMCsGA1UEAxMkZmZiMDhlYzUtNDkxMS0xMWUwLWIzNWQtMDAx
+MTQzZTQ1M2ZlMSgwJgYJKoZIhvcNAQkBFhl0ZXN0YmVkLW9wc0BmbHV4LnV0YWgu
+ZWR1MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQD40dnSwZtsFFgDivb7dv62
+Ct+2l30lYDSXGlR5imGQb9futIdYr82pVJniVZlG1N2uDReUG/utanMDSmJA3/Rb
+5uIiPwOdAO184i+GJnGwjyF31hBZ7+N4UWhwD763vc8seum+GfU73XMpTPjU5qfd
+Zcke97V/ND4gG48b4YX8NwIDAQABo2cwZTAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud
+DgQWBBSgBxtQAcDr6/cTBTGfEUYGFmiKPzAzBgNVHREELDAqhih1cm46cHVibGlj
+aWQ6SUROK2VtdWxhYi5uZXQrc2xpdmVyKzM2MTM3MA0GCSqGSIb3DQEBBAUAA4GB
+AAmd6V4dvXtlufpUcn4n/MOz6L67T85nOoaA1ZXGGzwFe357g6aoxbbDaQyChUKw
+h5eMeTw54US3HxLvRNuDPbYGv1DjT8cA5y3KLgE61kbd3VqMQrVuBjeqN3NIqAPL
+mfeQqZLVZ0hzB341yoFwuMpQWykarjHRReC0qfl/EJ7W&lt;/X509Certificate&gt;
+&lt;X509SubjectName&gt;emailAddress=testbed-ops@flux.utah.edu,CN=ffb08ec5-4911-11e0-b35d-001143e453fe,OU=emulab.net.lbsutahuky,O=Utah Network Testbed,ST=Utah,C=US&lt;/X509SubjectName&gt;
+&lt;X509IssuerSerial&gt;
+&lt;X509IssuerName&gt;emailAddress=testbed-ops@flux.utah.edu,CN=boss.emulab.net,OU=Certificate Authority,O=Utah Network Testbed,L=Salt Lake City,ST=Utah,C=US&lt;/X509IssuerName&gt;
+&lt;X509SerialNumber&gt;52314&lt;/X509SerialNumber&gt;
+&lt;/X509IssuerSerial&gt;
+&lt;/X509Data&gt;
+  &lt;KeyValue&gt;
+&lt;RSAKeyValue&gt;
+&lt;Modulus&gt;
++NHZ0sGbbBRYA4r2+3b+tgrftpd9JWA0lxpUeYphkG/X7rSHWK/NqVSZ4lWZRtTd
+rg0XlBv7rWpzA0piQN/0W+biIj8DnQDtfOIvhiZxsI8hd9YQWe/jeFFocA++t73P
+LHrpvhn1O91zKUz41Oan3WXJHve1fzQ+IBuPG+GF/Dc=
+&lt;/Modulus&gt;
+&lt;Exponent&gt;
+AQAB
+&lt;/Exponent&gt;
+&lt;/RSAKeyValue&gt;
+&lt;/KeyValue&gt;
+ &lt;/KeyInfo&gt;
+&lt;/Signature&gt;
+  &lt;/signatures&gt;
+&lt;/signed-credential&gt;
+</string></value><value><string>&lt;rspec xmlns=&quot;http://www.protogeni.net/resources/rspec/0.1&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xsi:schemaLocation=&quot;http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd&quot; type=&quot;request&quot;&gt;
+  &lt;node component_uuid=&quot;f4680884-fefc-11df-ad83-001143e453fe&quot; virtual_id=&quot;pg54&quot; component_manager_uuid=&quot;28a10955-aa00-11dd-ad1f-001143e453fe&quot; virtualization_type=&quot;raw&quot; exclusive=&quot;1&quot; component_urn=&quot;urn:publicid:IDN+emulab.net+node+pg54&quot; component_manager_urn=&quot;urn:publicid:IDN+emulab.net+authority+cm&quot; hostname=&quot;pg54.emulab.net&quot; sshdport=&quot;22&quot; sliver_uuid=&quot;054102fa-4912-11e0-b35d-001143e453fe&quot; sliver_urn=&quot;urn:publicid:IDN+emulab.net+sliver+36138&quot;&gt;
+    &lt;node_type type_name=&quot;pc&quot; type_slots=&quot;1&quot;/&gt;
+    &lt;interface virtual_id=&quot;control&quot;/&gt;
+    &lt;interface virtual_id=&quot;pg54:if1&quot; component_id=&quot;eth1&quot;/&gt;
+  &lt;services&gt;&lt;login authentication=&quot;ssh-keys&quot; hostname=&quot;pg54.emulab.net&quot; port=&quot;22&quot;/&gt;&lt;/services&gt;&lt;/node&gt;
+  &lt;node component_uuid=&quot;urn:publicid:IDN+uky.emulab.net+node+pc28&quot; virtual_id=&quot;pc28&quot; component_manager_uuid=&quot;urn:publicid:IDN+uky.emulab.net+authority+cm&quot; virtualization_type=&quot;emulab-vnode&quot; exclusive=&quot;1&quot;&gt;
+    &lt;node_type type_name=&quot;pc&quot; type_slots=&quot;1&quot;/&gt;
+    &lt;interface virtual_id=&quot;control&quot;/&gt;
+    &lt;interface virtual_id=&quot;pc28:if1&quot;/&gt;
+  &lt;/node&gt;
+  &lt;link virtual_id=&quot;link-0&quot; sliver_uuid=&quot;05e65a53-4912-11e0-b35d-001143e453fe&quot; sliver_urn=&quot;urn:publicid:IDN+emulab.net+sliver+36139&quot; vlantag=&quot;850&quot;&gt;
+    &lt;component_manager name=&quot;urn:publicid:IDN+emulab.net+authority+cm&quot;/&gt;
+    &lt;component_manager name=&quot;urn:publicid:IDN+uky.emulab.net+authority+cm&quot;/&gt;
+    &lt;bandwidth&gt;100000&lt;/bandwidth&gt;
+    &lt;interface_ref virtual_node_id=&quot;pg54&quot; virtual_interface_id=&quot;pg54:if1&quot; component_urn=&quot;urn:publicid:IDN+emulab.net+interface+pg54:eth1&quot; sliver_uuid=&quot;06611084-4912-11e0-b35d-001143e453fe&quot; sliver_urn=&quot;urn:publicid:IDN+emulab.net+sliver+36140&quot; MAC=&quot;0024e830b27c&quot; VMAC=&quot;00000a0a0101&quot; IP=&quot;10.10.1.1&quot;/&gt;
+    &lt;interface_ref virtual_node_id=&quot;pc28&quot; virtual_interface_id=&quot;pc28:if1&quot;/&gt;
+    &lt;component_hop component_urn=&quot;urn:publicid:IDN+emulab.net+link+ion&quot;&gt;
+      &lt;interface_ref component_node_urn=&quot;urn:publicid:IDN+emulab.net+node+ion&quot; component_interface_id=&quot;eth0&quot;/&gt;
+    &lt;/component_hop&gt;
+    &lt;component_hop component_urn=&quot;urn:publicid:IDN+uky.emulab.net+link+ion&quot;&gt;
+      &lt;interface_ref component_node_urn=&quot;urn:publicid:IDN+uky.emulab.net+node+ion&quot; component_interface_id=&quot;eth0&quot;/&gt;
+    &lt;/component_hop&gt;
+  &lt;/link&gt;
+&lt;/rspec&gt;</string></value></data></array></value>
+</member>
+<member><name>output</name><value><string></string></value></member>
+<member><name>code</name><value><i4>0</i4></value></member>
+</struct></value>
+</param>
+</params>
+</methodResponse>
