@@ -2513,8 +2513,9 @@ sub doSyncVlansWithDB($) {
 	foreach my $port (@$memberref) {
 	    push(@{ $allports{$vlan_id} }, $port);
 	    # Convert the ports to node:iface for the next call.
-	    push(@{ $portmap{$vlan_id} }, portiface($port))
-		if ((!($port =~ /\./)) && portiface($port));
+	    # push(@{ $portmap{$vlan_id} }, portiface($port))
+		# if ((!($port =~ /\./)) && portiface($port));
+	    push (@{ $portmap{$vlan_id} }, $port);
 	}
     }
     #
@@ -2649,7 +2650,7 @@ sub doSyncVlansWithDB($) {
 	    print "$vlan_id is using unreserved tag $tag";
 
 	    if (@swports) {
-		print ": @swports\n";
+		print ": ".join(" ", map($_->toString(), @swports))."\n";
 	    }
 	    else {
 		print " but has no node ports\n";
@@ -2700,6 +2701,7 @@ sub doSyncVlansWithDB($) {
 
 	my @swports = (exists($portmap{$vlan_id}) ?
 		       @{ $portmap{$vlan_id} } : ());
+	@swports = map($_->getPCPort()->toIfaceString(), @swports);
 	my @dbports = ();
 	if ($vlan->PortList(\@dbports)) {
 	    die("Could not get list of ports for $vlan!\n");

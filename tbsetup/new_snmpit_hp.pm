@@ -489,7 +489,7 @@ sub convertPortFormat($$@) {
 	    return @mps;
 	} 
 	
-	my @pos = map Port->LookupByTriple($self->{NAME}.":".$_), @mps;
+	my @pos = map Port->LookupByStringForced($self->{NAME}.":".$_), @mps;
 	
 	if ($output == $PORT_FORMAT_NODEPORT) {
 	    $self->debug("Converting ifindex to nodeport\n",3);
@@ -503,7 +503,7 @@ sub convertPortFormat($$@) {
 	    return map $self->{IFINDEX}{$_}, @ports;
 	} 
 	
-	my @pos = map Port->LookupByTriple($self->{NAME}.":".$_), @ports;
+	my @pos = map Port->LookupByStringForced($self->{NAME}.":".$_), @ports;
 	
 	if ($output == $PORT_FORMAT_NODEPORT) {
 	    $self->debug("Converting modport to nodeport\n",3);
@@ -512,7 +512,7 @@ sub convertPortFormat($$@) {
 		return @pos;
 	}
     } elsif ($input == $PORT_FORMAT_NODEPORT) {    
-    	my @pos = map Port->LookupByTriple($_)->getSwitchPort(), @ports;
+    	my @pos = map Port->LookupByStringForced($_)->getSwitchPort(), @ports;
     	
 	if ($output == $PORT_FORMAT_IFINDEX) {
 	    $self->debug("Converting nodeport to ifindex\n",3);
@@ -1369,7 +1369,7 @@ sub listPorts($) {
 	#
 	if (!$port && $self->{DOALLPORTS}) {
 		$modport =~ s/\./\//;
-		$port = convertPortFromString($self->{NAME} . ":$modport");
+		$port = Port->LookupByStringForced($self->{NAME} . ":$modport");
 	}
 	if (!$port) {
 	    $self->debug("$id ($modport) not connected, skipping\n");

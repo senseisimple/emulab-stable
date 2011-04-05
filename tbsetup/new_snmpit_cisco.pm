@@ -13,16 +13,18 @@
 # TODO: Fix uninitialized variable warnings in getStats()
 #
 
-package snmpit_cisco;
+package new_snmpit_cisco;
 use strict;
 
 $| = 1; # Turn off line buffering on output
 
 use English;
 use SNMP;
-use snmpit_lib;
+use new_snmpit_lib;
 use Socket;
 use libtestbed;
+use Port;
+use Lan;
 
 #
 # These are the commands that can be passed to the portControl function
@@ -55,6 +57,7 @@ my %cmdOIDs =
 my $PORT_FORMAT_IFINDEX  = 1;
 my $PORT_FORMAT_MODPORT  = 2;
 my $PORT_FORMAT_NODEPORT = 3;
+my $PORT_FORMAT_PORT     = 4;
 
 # 
 # used by vlanTrunkUtil()
@@ -278,7 +281,7 @@ sub portControl ($$@) {
     my $cmd = shift;
     my @ports = @_;
 
-    $self->debug("portControl: $cmd -> (@ports)\n");
+    $self->debug("portControl: $cmd -> (".Port->toStrings(@ports).")\n");
 
     #
     # Find the command in the %cmdOIDs hash (defined at the top of this file)
@@ -371,6 +374,7 @@ sub convertPortFormat($$@) {
 
     my $input;
     SWITCH: for ($sample) {
+	(Port->isPort($sample)) && do { $input = $PORT_FORMAT_PORT; last; };
 	(/^\d+$/) && do { $input = $PORT_FORMAT_IFINDEX; last; };
 	(/^\d+\.\d+$/) && do { $input = $PORT_FORMAT_MODPORT; last; };
 	(/^$self->{NAME}\.\d+\/\d+$/) && do { $input = $PORT_FORMAT_MODPORT;

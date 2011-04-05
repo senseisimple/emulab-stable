@@ -231,29 +231,6 @@ sub ReadTranslationTable { #@@@@ deprecated
 }
 
 #
-# Return different(union(@lhs,@rhs), intersection(@lhs,@rhs))
-#
-sub arraySub($$) {
-    my ($l,$r) = @_;
-    my @lhs = @$l;
-    my @rhs = @$r;
-    my @result = ();
-
-    my %count = ();
-    foreach my $e (@lhs, @rhs) {
-	$count{$e}++;
-    }
-    
-    foreach my $e (keys %count) {
-	if ($count{$e} == 1) {
-	    push @result, $e;
-	}
-    }
-
-    return @result;
-}
-
-#
 # Return an array of ifaces belonging to the VLAN
 #
 sub getVlanIfaces($) { #@@@@ deprecated
@@ -285,8 +262,6 @@ sub getVlanIfaces($) { #@@@@ deprecated
     #return @ports;
     return undef;
 }
-
-
 
 #
 # Get real ifaces on switch node in a VLAN that implements a path
@@ -744,6 +719,10 @@ sub isSwitchPort($) { #@@@@ OK
 	my $node = $port->node_id();	
 	my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
 				  "(SELECT type FROM nodes WHERE node_id='$node')");
+				  
+	if ($result->numrows() != 1) {
+	    return 0;
+	}
 	
 	if (($result->fetchrow())[0] == 1) {
 	    return 1;

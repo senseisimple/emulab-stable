@@ -300,9 +300,79 @@ sub fake_IfaceString2TripleTokens($;$)
     return (undef, undef, undef);
 }
 
+sub LookupByStringForced($$)
+{
+    my ($class, $str) = @_;
+    my $inst = {};
+    
+    my $p = Port->LookupByIface($str);
+    if (defined($p)) {
+	return $p;
+    }
+    else {
+	$p = Port->LookupByTriple($str);
+	if (defined($p)) {
+	    return $p;
+	}
+    }
+    
+    my $iface;
+    my ($nodeid, $card, $port) = Port->ParseTripleString($str);
+    if (!defined($port)) {
+	($nodeid, $card, $port) = Port->fake_IfaceString2TripleTokens($str);
+	if (!defined($port)) {
+	    ($nodeid, $iface) = Port->ParseIfaceString($str);
+	    if (!defined($iface)) {
+		$port = undef;
+	    } else {
+		$port = 1;
+		$card = $iface;
+	    }
+	} else {
+	    $iface = Prot->fake_CardPort2Iface($card, $port);
+	}
+    } else {
+	$iface = Prot->fake_CardPort2Iface($card, $port);
+    }
+    
+    if (defined($port)) {
+	my $rowref = {};
+	
+	$inst->{"RAW_STRING"} = $str;
+	$inst->{"FORCED"} = 1;
+	$inst->{"HAS_FIELDS"} = 1;
+	
+	$rowref->{'iface'} = $iface;
+	$rowref->{'node_id'} = $nodeid;
+	$rowref->{'card'} = $card;
+	$rowref->{'port'} = $port;
+	$rowref->{'mac'} = "";
+	$rowref->{'IP'} = "";
+	$rowref->{'role'} = "";
+	$rowref->{'interface_type'} = "";
+	$rowref->{'mask'} = "";
+	$rowref->{'uuid'} = "";
+	$inst->{"INTERFACES_ROW"} = $rowref;
+    }
+    else {
+	$inst->{"RAW_STRING"} = $str;
+	$inst->{"FORCED"} = 1;
+	$inst->{"HAS_FIELDS"} = 0;
+    }
+    
+    #
+    # We should determine this according to the query result
+    # in nodes table by nodeid.
+    #
+    $inst->{"WIRE_END"} = "switch";
+    
+    bless($inst, $class);
+    return $inst;
+}
+
 sub LookupByIface($$;$)
 {
-    my ($class, $nodeid, $iface) = @_;
+    my ($class, $nodeid, $iface, $force) = @_;
     my $striface="";
 
     if (!defined($iface)) {
@@ -365,6 +435,8 @@ sub LookupByIface($$;$)
 
     $rowref = $query_result->fetchrow_hashref();
     $inst->{"WIRES_ROW"} = $rowref;
+    $inst->{"FORCED"} = 0;
+    $inst->{"HAS_FIELDS"} = 1;
 
     bless($inst, $class);
 
@@ -444,6 +516,8 @@ sub LookupByTriple($$;$$)
     my $iface = $rowref->{'iface'};
 
     $inst->{"INTERFACES_ROW"} = $rowref;
+    $inst->{"FORCED"} = 0;
+    $inst->{"HAS_FIELDS"} = 1;
 
     # wire mapping
     
@@ -494,7 +568,8 @@ sub LookupByWireType($$)
 	return @ports;
 }
 
-sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'INTERFACES_ROW'}->{$_[1]}); }
+sub field($$)  { return (((! ref($_[0])) || ($_[0]->{'HAS_FIELDS'} == 1)) ? 
+    -1 : $_[0]->{'INTERFACES_ROW'}->{$_[1]}); }
 sub node_id($) { return field($_[0], 'node_id'); }
 sub card($)    { return field($_[0], 'card'); }
 sub port($)    { return field($_[0], 'port'); }
@@ -510,6 +585,10 @@ sub wire_end($) { return $_[0]->{'WIRE_END'}; }
 sub is_switch_side($) { return $_[0]->wire_end() eq "switch"; }
 
 sub wire_type($)   { return $_[0]->{'WIRES_ROW'}->{'type'}; }
+
+sub is_forced($) { return $_[0]->{"FORCED"};}
+sub has_fields($) { return $_[0]->{"HAS_FIELDS"};}
+sub raw_string($) { return $_[0]->{"RAW_STRING"};}
 
 sub switch_node_id($)
 {
@@ -594,6 +673,14 @@ sub pc_iface($)
 sub other_end_node_id($)   
 { 
     my $self = $_[0];
+    
+    if ($self->is_forced) {
+	if ($self->has_fields()) {
+	    return $self->node_id();
+	} else {
+	    return $self->raw_string();
+	}
+    }
 
     if ($self->wire_end() eq "pc") {
 	return $self->{'WIRES_ROW'}->{'node_id2'}; 
@@ -605,6 +692,14 @@ sub other_end_node_id($)
 sub other_end_card($) 
 {
     my $self = $_[0];
+    
+    if ($self->is_forced) {
+	if ($self->has_fields()) {
+	    return $self->card();
+	} else {
+	    return $self->raw_string();
+	}
+    }
 
     if ($self->wire_end() eq "pc") {
 	return $self->{'WIRES_ROW'}->{'card2'}; 
@@ -616,6 +711,14 @@ sub other_end_card($)
 sub other_end_port($) 
 {
     my $self = $_[0];
+    
+    if ($self->is_forced) {
+	if ($self->has_fields()) {
+	    return $self->port();
+	} else {
+	    return $self->raw_string();
+	}
+    }
 
     if ($self->wire_end() eq "pc") {
 	return $self->{'WIRES_ROW'}->{'port2'}; 
@@ -627,6 +730,14 @@ sub other_end_port($)
 sub other_end_iface($)
 {
     my $self = $_[0];
+    
+    if ($self->is_forced) {
+	if ($self->has_fields()) {
+	    return $self->iface();
+	} else {
+	    return $self->raw_string();
+	}
+    }
 
     if ($self->wire_end() eq "pc") {
 	return Port->LookupByTriple(
@@ -642,15 +753,27 @@ sub other_end_iface($)
 }
 
 sub toIfaceString($) {
-    return Tokens2IfaceString($_[0]->node_id(), $_[0]->iface());
+    my $self = shift;
+    if (!$self->has_fields()) {
+	return $self->raw_string();
+    }
+    return Tokens2IfaceString($self->node_id(), $self->iface());
 }
     
 sub toTripleString($) {
-    return Tokens2TripleString($_[0]->node_id(), $_[0]->card(), $_[0]->port());
+    my $self = shift;
+    if (!$self->has_fields()) {
+	return $self->raw_string();
+    }
+    return Tokens2TripleString($self->node_id(), $self->card(), $self->port());
 }
 
 sub toString($) {
-	return $_[0]->toTripleString();
+    my $self = shift;
+    if (!$self->has_fields()) {
+	return $self->raw_string();
+    }
+    return $self->toTripleString();
 }
 #
 # Should not support.
@@ -673,6 +796,10 @@ sub getOtherEndPort($) {
 
 sub getPCPort($) {
     my $self = $_[0];
+    
+    if ($self->is_forced) {
+	return $self;
+    }
 
     if ($self->wire_end() eq "pc") {
 	return $self;
@@ -683,6 +810,10 @@ sub getPCPort($) {
 
 sub getSwitchPort($) {
     my $self = $_[0];
+    
+    if ($self->is_forced) {
+	return $self;
+    }
 
     if ($self->wire_end() ne "pc") {
 	return $self;
@@ -694,18 +825,33 @@ sub getSwitchPort($) {
 sub toIfaceStrings($@)
 {
 	my ($c, @pts) = @_;
-	return join(" ", map($_->toIfaceString(), @pts));
+	if (@pts != 0) {
+	    if (Port->isPort($pts[0])) {
+		return join(" ", map($_->toIfaceString(), @pts)); 
+	    }
+	}
+	return join(" ", @pts);
 }
 
 sub toTripleStrings($@)
 {
 	my ($c, @pts) = @_;
-	return join(" ", map($_->toTripleString(), @pts));
+	if (@pts != 0) {
+	    if (Port->isPort($pts[0])) {
+		return join(" ", map($_->toTripleString(), @pts)); 
+	    }
+	}
+	return join(" ", @pts);
 }
 
 sub toStrings($@)
 {
 	my ($c, @pts) = @_;
-	return join(" ", map($_->toString(), @pts)); 
+	if (@pts != 0) {
+	    if (Port->isPort($pts[0])) {
+		return join(" ", map($_->toString(), @pts)); 
+	    }
+	}
+	return join(" ", @pts);
 }
 return 1;

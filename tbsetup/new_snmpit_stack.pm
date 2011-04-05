@@ -1540,8 +1540,8 @@ sub snap($) {
 	#
 	SWITCH: for ($type) {
 	    (/cisco/) && do {
-		require snmpit_cisco;
-		$device = new snmpit_cisco($devicename,$self->{DEBUG});
+		require new_snmpit_cisco;
+		$device = new new_snmpit_cisco($devicename,$self->{DEBUG});
 		last;
 		}; # /cisco/
 	    (/foundry1500/ || /foundry9604/)
