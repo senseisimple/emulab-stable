@@ -512,7 +512,7 @@ sub PipeTo($$$)
 {
     my ($self, $withkey, $string) = @_;
 
-    print STDERR "PipeTo: $self, '$string'\n";
+#    print STDERR "PipeTo: $self, '$string'\n";
 
     require Socket;
     import Socket qw(:DEFAULT);
