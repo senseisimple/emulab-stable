@@ -96,7 +96,3 @@ InterfaceMapping = element interface_ref {
 }
 
 start = RSpec
-
-
-
-

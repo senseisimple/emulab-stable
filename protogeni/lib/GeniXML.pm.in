@@ -564,6 +564,7 @@ sub ReplaceNode($$)
     my ($oldnode, $newnode) = @_;
     my $copy = $newnode->cloneNode(1);
     $oldnode->replaceNode($copy);
+    return $copy;
 }
 
 # checks for the existense of policy in extensions of the given

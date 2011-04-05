@@ -68,7 +68,9 @@ ServiceContents &=
 LoginServiceContents &=
   AnyExtension &
   # Authentication mechanism
-  attribute authentication { "ssh-keys" } &
+  # 'ssh-keys' is used to denote an ssh connection accessed via the
+  #   ssh keys passed to CreateSliver or RedeemTicket.
+  attribute authentication { text } &
   # Access mechanism
   attribute hostname { text }? &
   attribute port { text }?
@@ -86,7 +88,16 @@ LocationContents =
   attribute longitude { text }? &
   attribute latitude { text }?
 
-InterfaceContents = AnyExtension
+InterfaceContents = 
+  AnyExtension &
+  element ip { IpContents }*
+
+IpContents =
+  AnyExtention &
+  attribute address { text } &
+  attribute netmask { text }? &
+  # type should usually be 'ipv4' or 'ipv6'. If absent, defaults to ipv4.
+  attribute type { text }? &
 
 LinkContents =
     AnyExtension &
