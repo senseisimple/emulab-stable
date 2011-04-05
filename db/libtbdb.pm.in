@@ -299,7 +299,7 @@ sub DBQuoteSpecial($;$)
     if (!defined($handle)) {
 	$dbhandle = $DB;
     } else {
-	$dbhandle = $dbhandle->{'DB'};
+	$dbhandle = $handle->{'DB'};
     }
     $string = $dbhandle->quote($string);
 
@@ -320,7 +320,7 @@ sub DBDateTime(;$)
 	$seconds = 0;
     }
 
-    return strftime("20%y-%m-%d %H:%M:%S", localtime(time() + $seconds));
+	    return strftime("20%y-%m-%d %H:%M:%S", localtime(time() + $seconds));
 }
 
 # Binary mode for database query
@@ -336,7 +336,7 @@ sub DBDateTime(;$)
 sub DBBinaryQuery {
    my ($handle, $statement, @data) = @_; 
    
-   my $dbh = $handle->{'DB'}->{'dbh'};
+   my $dbh = $handle->{'DB'};
    my $sth = $dbh->prepare($statement);
    if (!$sth) {
        $DBErrorString =
