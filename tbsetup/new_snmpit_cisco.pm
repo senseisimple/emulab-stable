@@ -391,28 +391,56 @@ sub convertPortFormat($$@) {
     }
 
     if ($input == $PORT_FORMAT_IFINDEX) {
+	my @mps = map $self->{IFINDEX}{$_}, @ports;
 	if ($output == $PORT_FORMAT_MODPORT) {
 	    $self->debug("Converting ifindex to modport\n",2);
-	    return map $self->{IFINDEX}{$_}, @ports;
-	} elsif ($output == $PORT_FORMAT_NODEPORT) {
-	    $self->debug("Converting ifindex to nodeport\n",2);
-	    return map portnum($self->{NAME}.":".$self->{IFINDEX}{$_}), @ports;
+	    return @mps;
 	}
+	
+	my @pos = map Port->LookupByStringForced($self->{NAME}.":".$_), @mps;
+	
+	if ($output == $PORT_FORMAT_NODEPORT) {
+	    $self->debug("Converting ifindex to nodeport\n",2);
+	    return map $_->getPCPort()->toTripleString(), @pos;
+	} elsif ($output == $PORT_FORMAT_PORT) {
+		return @pos;
+	} 
     } elsif ($input == $PORT_FORMAT_MODPORT) {
 	if ($output == $PORT_FORMAT_IFINDEX) {
 	    $self->debug("Converting modport to ifindex\n",2);
 	    return map $self->{IFINDEX}{$_}, @ports;
-	} elsif ($output == $PORT_FORMAT_NODEPORT) {
-	    $self->debug("Converting modport to nodeport\n",2);
-	    return map portnum($self->{NAME} . ":$_"), @ports;
+	} 
+	
+	my @pos = map Port->LookupByStringForced($self->{NAME}.":".$_), @ports;
+	
+	if ($output == $PORT_FORMAT_NODEPORT) {
+	    $self->debug("Converting modport to nodeport\n",3);
+	    return map $_->getPCPort()->toTripleString(), @pos;
+	} elsif ($output == $PORT_FORMAT_PORT) {
+		return @pos;
 	}
-    } elsif ($input == $PORT_FORMAT_NODEPORT) {
+    } elsif ($input == $PORT_FORMAT_NODEPORT) {	
+	my @pos = map Port->LookupByStringForced($_)->getSwitchPort(), @ports;
+    	
 	if ($output == $PORT_FORMAT_IFINDEX) {
-	    $self->debug("Converting nodeport to ifindex\n",2);
-	    return map $self->{IFINDEX}{(split /:/,portnum($_))[1]}, @ports;
+	    $self->debug("Converting nodeport to ifindex\n",3);
+	    return map $self->{IFINDEX}{(split /:/, $_->toTripleString())[1]}, @pos;
 	} elsif ($output == $PORT_FORMAT_MODPORT) {
-	    $self->debug("Converting nodeport to modport\n",2);
-	    return map { (split /:/,portnum($_))[1] } @ports;
+	    $self->debug("Converting nodeport to modport\n",3);
+	    return map { (split /:/, $_->toTripleString())[1] } @pos;
+	} elsif ($output == $PORT_FORMAT_PORT) {
+		return @pos;
+	}
+    } elsif ($input == $PORT_FORMAT_PORT) { 
+    	if ($output == $PORT_FORMAT_IFINDEX) {
+	    $self->debug("Converting nodeport to ifindex\n",3);
+	    return map $self->{IFINDEX}{(split /:/, $_->getSwitchPort()->toTripleString())[1]}, @ports;
+	} elsif ($output == $PORT_FORMAT_MODPORT) {
+	    $self->debug("Converting nodeport to modport\n",3);
+	    return map { (split /:/, $_->getSwitchPort()->toTripleString())[1] } @ports;
+	} elsif ($output == $PORT_FORMAT_NODEPORT) {
+	    $self->debug("Converting modport to nodeport\n",3);
+	    return map $_->getPCPort()->toTripleString(), @ports;
 	}
     }
 
@@ -1026,7 +1054,7 @@ sub opPortVlan($$$@) {
     my %BumpedVlans = ();
 
     foreach my $port (@ports) {
-	$self->debug("Putting port $port in VLAN $vlan_number\n");
+	$self->debug("Putting port ".Port->toStrings(($port))." in VLAN $vlan_number\n");
 	#
 	# Check to see if it's a trunk ....
 	#
@@ -1091,16 +1119,16 @@ sub opPortVlan($$$@) {
     # disable them. Otherwise, we need to make sure they get enabled.
     #
     if (($vlan_number == 1) || $remove) {
-	$self->debug("Disabling " . join(',',@okports) . "...");
+	$self->debug("Disabling " . Port->toStrings(@okports) . "...");
 	if ( my $rv = $self->portControl("disable",@okports) ) {
 	    print STDERR "Port disable had $rv failures.\n";
 	    $errors += $rv;
 	}
     } else {
-	$self->debug("Enabling "  . join(',',@okports) . "...");
+	$self->debug("Enabling "  . Port->toStrings(@okports) . "...");
 	if ( my $rv = $self->portControl("enable",@okports) ) {
 	    print STDERR "Port enable had $rv failures.\n";
-	    $errors += $rv;
+	    $errors += $rv; 
 	}
     }
 
@@ -1136,6 +1164,8 @@ sub setPortVlan($$@) {
 # usage: removePortsFromVlan(self,int vlans)
 #	 returns 0 on sucess.
 #	 returns the number of failed ports on failure.
+#
+# use old port format because all ports used here are from SNMP.
 #
 sub removePortsFromVlan($@) {
     my $self = shift;
@@ -1297,6 +1327,8 @@ sub removeVlan($@) {
 
 #
 # TODO: Cleanup
+#
+# ports passed must be either ifindex or modport
 #
 sub UpdateField($$$@) {
     my $self = shift;
@@ -1516,7 +1548,7 @@ sub listVlans($) {
 	    $modport =~ s/\./\//;
 	    $node = $self->{NAME} . ".$modport";
 	}
-	push @{$Members{$vlan_number}}, $node;
+	push @{$Members{$vlan_number}}, Port->LookupByStringForced($node);
 	if (!$Names{$vlan_number}) {
 	    $self->debug("listVlans: WARNING: port $self->{NAME}.$modport in non-existant " .
 		"VLAN $vlan_number\n");
@@ -1547,7 +1579,7 @@ sub listVlans($) {
 
 	foreach my $vlan_number (@trunklans) {
 	    $self->debug("got vlan $vlan_number on trunk $node\n",3);
-	    push @{$Members{$vlan_number}}, $node;
+	    push @{$Members{$vlan_number}}, Port->LookupByStringForced($node);
 	}
     }
 
@@ -1613,9 +1645,10 @@ sub walkTableIfIndex($$$;$) {
             # historical code in case it has some special behavior we depend on
             #
             if (! defined $self->{IFINDEX}{$index}) { next; }
-            my $port = portnum("$self->{NAME}:$index")
-                || portnum("$self->{NAME}:".$self->{IFINDEX}{$index});
-            if (! defined $port) { next; } # Skip if we don't know about it
+            my $po = convertPortFromString("$self->{NAME}:$index")
+                || convertPortFromString("$self->{NAME}:".$self->{IFINDEX}{$index});
+            if (! defined $po) { next; } # Skip if we don't know about it
+	    my $port = $po->getPCPort()->toTripleString();
             
             #
             # Apply the user's processing function
@@ -1677,7 +1710,8 @@ sub listPorts($) {
 	if (! defined ($speed{$id}) ) { $speed{$id} = " "; }
 	if (! defined ($duplex{$id}) ) { $duplex{$id} = " "; }
 	$speed{$id} =~ s/s([10]+)000000/${1}Mbps/;
-	push @rv, [$id,$Able{$id},$Link{$id},$speed{$id},$duplex{$id}];
+	my $pt = Port->LookupByStringForced($id);
+	push @rv, [$pt,$Able{$id},$Link{$id},$speed{$id},$duplex{$id}];
     }
     return @rv;
 }
@@ -1721,7 +1755,7 @@ sub getStats ($) {
 	$i++;
     }
 
-    return map [$_,@{$stats{$_}}], sort {tbsort($a,$b)} keys %stats;
+    return map [convertPortFromString($_),@{$stats{$_}}], sort {tbsort($a,$b)} keys %stats;
 
 }
 
@@ -1844,7 +1878,7 @@ sub enablePortTrunking2($$$$) {
     my ($self,$port,$native_vlan,$equaltrunking) = @_;
     my $trunking_vlan = ($equaltrunking ? 1 : $native_vlan);
     my $id = $self->{NAME}.
-	"::enablePortTrunking2($port,$native_vlan,$equaltrunking)";
+	"::enablePortTrunking2(".Port->toStrings(($port)).",$native_vlan,$equaltrunking)";
     $self->debug("$id\n");
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);

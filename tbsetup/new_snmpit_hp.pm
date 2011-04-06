@@ -1271,7 +1271,7 @@ sub listVlans($) {
 		($modport) = $self->convertPortFormat
 				    ($PORT_FORMAT_MODPORT,$ifIndex);
 		$modport =~ s/\./\//;
-		$node = convertPortFromString($self->{NAME} . ".$modport");
+		$node = Port->LookupByStringForced($self->{NAME} . ".$modport");
 	    }
 	    push @{$Members{$vlan_number}}, $node->getPCPort();
 	    if (!$Names{$vlan_number}) {
@@ -1417,8 +1417,8 @@ sub getStats() {
 
 	    #@@@@: change here:
             if (! defined $self->{IFINDEX}{$ifindex}) { next; }
-            my $po = Port->LookupByTriple("$self->{NAME}:$ifindex")
-            	|| Port->LookupByTriple("$self->{NAME}:".$self->{IFINDEX}{$ifindex});
+            my $po = convertPortFromString("$self->{NAME}:$ifindex")
+            	|| convertPortFromString("$self->{NAME}:".$self->{IFINDEX}{$ifindex});
             if (! defined $po) { next; } # Skip if we don't know about it
             my $port = $po->getPCPort()->toTripleString();         
             
@@ -1427,7 +1427,7 @@ sub getStats() {
 	$i++;
     }
 
-    return map [Port->LookupByTriple($_),@{$stats{$_}}], sort {tbsort($a,$b)} keys %stats;
+    return map [convertPortFromString($_),@{$stats{$_}}], sort {tbsort($a,$b)} keys %stats;
 }
 
 #
