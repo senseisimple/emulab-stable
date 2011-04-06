@@ -179,15 +179,22 @@ sub GetCredential($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Who are you?");
 	}
-
-	my $credential =
-	    GeniCredential->CreateSigned($authority,
-					 $caller_authority,
-					 $GeniCredential::LOCALMA_FLAG);
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+	my $credential = GeniCredential->Create($authority, $caller_authority);
+	if (!defined($credential)) {
+	    print STDERR "Could not create credential for $caller_authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	#
+	# We want this credential to be valid for a long time;
+	#
+	$credential->SetExpiration(time() + 24 * 60 * 60 * 120);
+	
+	if ($credential->Sign($GeniCredential::LOCALMA_FLAG) != 0) {
+	    $credential->Delete();
+	    print STDERR "Could not sign credential for $caller_authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create signed credential")
-	    if (!defined($credential));
-
+	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $credential->asString());
     }
