@@ -84,6 +84,7 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  snmpit_foundry.pm snmpit_stack.pm snmpit_remote.pm \
 		  snmpit_nortel.pm snmpit_hp.pm snmpit_apcon.pm\
 		  new_snmpit_lib.pm new_snmpit_stack.pm new_snmpit_apcon.pm \
+		  new_snmpit_hp.pm new_snmpit_cisco.pm \
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
