@@ -329,10 +329,10 @@ sub LookupByStringForced($$)
 		$card = $iface;
 	    }
 	} else {
-	    $iface = Prot->fake_CardPort2Iface($card, $port);
+	    $iface = Port->fake_CardPort2Iface($card, $port);
 	}
     } else {
-	$iface = Prot->fake_CardPort2Iface($card, $port);
+	$iface = Port->fake_CardPort2Iface($card, $port);
     }
     
     if (defined($port)) {
@@ -382,7 +382,7 @@ sub LookupByIface($$;$)
 	$striface = Tokens2IfaceString($class, $nodeid, $iface);	
     }
     
-    if (!defined($striface)) {
+    if (!defined($striface) || !defined($nodeid)) {
         return undef;
     }
 
@@ -459,7 +459,7 @@ sub LookupByTriple($$;$$)
 	$strtriple = Tokens2TripleString($class, $nodeid, $card, $port);
     }
     
-    if (!defined($strtriple)) {
+    if (!defined($strtriple) || !defined($nodeid) || !defined($card)) {
         return undef;
     }
 
@@ -568,7 +568,7 @@ sub LookupByWireType($$)
 	return @ports;
 }
 
-sub field($$)  { return (((! ref($_[0])) || ($_[0]->{'HAS_FIELDS'} == 1)) ? 
+sub field($$)  { return (((! ref($_[0])) || ($_[0]->{'HAS_FIELDS'} == 0)) ? 
     -1 : $_[0]->{'INTERFACES_ROW'}->{$_[1]}); }
 sub node_id($) { return field($_[0], 'node_id'); }
 sub card($)    { return field($_[0], 'card'); }

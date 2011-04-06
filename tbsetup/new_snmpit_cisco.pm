@@ -397,7 +397,7 @@ sub convertPortFormat($$@) {
 	    return @mps;
 	}
 	
-	my @pos = map Port->LookupByStringForced($self->{NAME}.":".$_), @mps;
+	my @pos = map Port->LookupByStringForced($self->{NAME}.":".(defined($_)? $_:"")), @mps;
 	
 	if ($output == $PORT_FORMAT_NODEPORT) {
 	    $self->debug("Converting ifindex to nodeport\n",2);

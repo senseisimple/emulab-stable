@@ -3180,17 +3180,21 @@ sub FindVlanByPort_OLD($$$) #@@@@ deprecated
 sub FindVlanByPort($$$)
 {
     my ($class, $experiment, $port) = @_;
+    my $clause = "";
+    
     if (!ref($port)) {
 	    return $class->FindVlanByPort_OLD($experiment, $port);
     }
  
     my $ifacestr = $port->toIfaceString();
-    my $exptidx = $experiment->idx();
+    if (defined($experiment)) {
+	my $exptidx = $experiment->idx();
+	$clause = "exptidx='$exptidx' and";
+    }
 
     my $query_result =
 	DBQueryWarn("select id from vlans  ".
-		    "where exptidx='$exptidx' and ".
-		    "      members like '%$ifacestr%'");
+		    "where $clause members like '%${ifacestr}%'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);
