@@ -34,25 +34,12 @@
   <xs:complexType name="InstallServiceContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
-    <xs:attribute name="file_type" use="required">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="tar.gz"/>
-          <xs:enumeration value="tar.bz2"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="file_type" use="required"/>
   </xs:complexType>
   <xs:complexType name="ExecuteServiceContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
-    <xs:attribute name="shell" use="required">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="sh"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="shell" use="required"/>
   </xs:complexType>
   <xs:complexType name="TypeRelationContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
@@ -64,10 +51,9 @@
           <xs:attributeGroup ref="rspec:SliverTypeContents"/>
         </xs:complexType>
       </xs:element>
-      <xs:element ref="rspec:disk_image"/>
+      <xs:element name="disk_image" type="rspec:DiskImageContents"/>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
   </xs:complexType>
   <xs:element name="hardware_type" type="rspec:HardwareTypeContents"/>
-  <xs:element name="disk_image" type="rspec:DiskImageContents"/>
 </xs:schema>

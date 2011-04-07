@@ -24,7 +24,7 @@
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="generated" type="xs:dateTime"/>
     <xs:attribute name="generated_by"/>
-    <xs:attribute name="valid_until" type="xs:dateTime"/>
+    <xs:attribute name="expires" type="xs:dateTime"/>
     <xs:attribute name="type" use="required">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -89,13 +89,7 @@
   <xs:complexType name="LoginServiceContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
-    <xs:attribute name="authentication" use="required">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="ssh-keys"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="authentication" use="required"/>
     <xs:attribute name="hostname"/>
     <xs:attribute name="port"/>
   </xs:complexType>
@@ -103,6 +97,7 @@
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="type" use="required"/>
+    <xs:attribute name="client_id" use="required"/>
   </xs:complexType>
   <xs:complexType name="LocationContents">
     <xs:group ref="rspec:AnyExtension"/>
@@ -112,10 +107,21 @@
     <xs:attribute name="latitude"/>
   </xs:complexType>
   <xs:complexType name="InterfaceContents">
-    <xs:group ref="rspec:AnyExtension"/>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:element ref="rspec:ip"/>
+    </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="component_id"/>
     <xs:attribute name="client_id" use="required"/>
+  </xs:complexType>
+  <xs:element name="ip" type="rspec:IpContents"/>
+  <xs:complexType name="IpContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="address" use="required"/>
+    <xs:attribute name="netmask"/>
+    <xs:attribute name="type"/>
   </xs:complexType>
   <xs:complexType name="LinkContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
@@ -134,11 +140,6 @@
     <xs:attribute name="client_id" use="required"/>
   </xs:complexType>
   <xs:element name="property" type="rspec:LinkPropertyContents"/>
-  <xs:element name="component_manager">
-    <xs:complexType>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
   <xs:element name="component_hop" type="rspec:ComponentHopContents"/>
   <xs:complexType name="InterfaceRefContents">
     <xs:group ref="rspec:AnyExtension"/>

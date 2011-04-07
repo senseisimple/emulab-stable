@@ -93,11 +93,11 @@ InterfaceContents =
   element ip { IpContents }*
 
 IpContents =
-  AnyExtention &
+  AnyExtension &
   attribute address { text } &
   attribute netmask { text }? &
   # type should usually be 'ipv4' or 'ipv6'. If absent, defaults to ipv4.
-  attribute type { text }? &
+  attribute type { text }?
 
 LinkContents =
     AnyExtension &

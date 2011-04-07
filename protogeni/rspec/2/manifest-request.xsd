@@ -39,12 +39,17 @@
   <xs:complexType name="ComponentHopContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:group ref="rspec:AnyExtension"/>
+      <xs:element ref="rspec:component_manager"/>
       <xs:group ref="rspec:InterfaceMapping"/>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
-    <xs:attribute name="component_id" use="required"/>
-    <xs:attribute name="component_manager_id" use="required"/>
+    <xs:attribute name="component_id"/>
   </xs:complexType>
+  <xs:element name="component_manager">
+    <xs:complexType>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
   <!--
     Each interface represents a particular physical interface. If that
     interface is one of the link end points, it is also mapped to that
