@@ -2708,7 +2708,10 @@ sub SliverWorkAux($$$$$$$)
 		$sliverName = "sliver_id";
 		$macName = "mac_address";
 		if (defined($ipAddress) && $ipAddress ne "") {
-		    my $child = GeniXML::AddElement("ip", $outref);
+		    my $child = GeniXML::FindFirst("n:ip", $outref);
+		    if (! defined($child)) {
+			$child = GeniXML::AddElement("ip", $outref);
+		    }
 		    GeniXML::SetText("address", $child, $ipAddress);
 		    GeniXML::SetText("type", $child, "ipv4");
 		}
