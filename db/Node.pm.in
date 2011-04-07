@@ -55,13 +55,14 @@ sub checknodeid($$)
     my ($nid,$msg) = @_;
 
     if ($nid =~ /^(.*)\x0/) {
+	my $onid = $nid;
 	$nid = $1;
 	if (!exists($carped{$nid}) && open(MAIL, "| /usr/sbin/sendmail -t")) {
 	    $carped{$nid} = 1;
 	    require Carp;
 	    my $TBOPS = "@TBOPSEMAIL@";
 	    print MAIL "To: $TBOPS\n";
-	    print MAIL "Subject: NUL in node_id '$nid'\n";
+	    print MAIL "Subject: NUL in node_id '$nid' ('$onid')\n";
 	    print MAIL "$msg\n";
 	    print MAIL "\n";
 	    print MAIL Carp::longmess();
