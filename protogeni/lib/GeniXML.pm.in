@@ -15,7 +15,7 @@ use vars qw(@ISA @EXPORT);
 FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
 IsLanNode IsLocalNode IsTunnel GetExpires
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
-GetManagerId GetColocate GetSubnodeOf
+GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
 GetVirtualizationType SetVirtualizationType GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
 CreateDocument AddElement RemoveChild PolicyExists);
@@ -360,6 +360,48 @@ sub GetSubnodeOf($)
 		$result = GetText("client_id", $current);
 		last;
 	    }
+	}
+    }
+    return $result;
+}
+
+sub GetStartupCommand($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+        $result = GetText("startup_command", $node);
+    } else {
+	my $execute = FindFirst("n:services/n:execute", $node);
+	$result = GetText("command", $execute);
+    }
+    return $result;
+}
+
+sub GetTarball($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+        $result = GetText("tarfiles", $node);
+    } else {
+	$result = "";
+	my @tarlist = FindNodes("n:services/n:install",
+				$node)->get_nodelist();
+	foreach my $current (@tarlist) {
+	    my $url = GetText("url", $current);
+	    my $install = GetText("install_path", $current);
+	    if (defined($url) && defined($install)) {
+		# TODO: Make sure url/install don't have semicolons or spaces
+		# TODO: Flag an error if either one is not defined
+		if ($result ne "") {
+		    $result .= ";";
+		}
+		$result .= $install . " " . $url;
+	    }
+	}
+	if ($result eq "") {
+	    $result = undef;
 	}
     }
     return $result;

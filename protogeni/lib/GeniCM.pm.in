@@ -966,7 +966,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 			};
 
 	# Tarball and startup command.
-	my $startupcmd = GeniXML::GetText("startup_command", $ref);
+	my $startupcmd = GeniXML::GetStartupCommand($ref);
 	if (defined($startupcmd)) {
 	    if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
@@ -977,7 +977,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	    $nodeblob->{'startupcmd'} = $startupcmd;
 	}
-	my $tarfiles = GeniXML::GetText("tarfiles", $ref);
+	my $tarfiles = GeniXML::GetTarball($ref);
 	if (defined($tarfiles)) {
 	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarfiles",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
