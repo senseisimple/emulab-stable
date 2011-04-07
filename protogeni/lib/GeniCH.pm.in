@@ -144,7 +144,14 @@ sub GetCredential($)
 				    "Malformed URN in the certificate")
 	    if (!GeniHRN::IsValid($urn));
 	my ($auth, $type, $id) = GeniHRN::Parse($urn);
-
+	
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Not an authority certificate")
+	    if ($type ne "authority");
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Not an am/cm/sa/ses certificate")
+	    if (! ($id =~ /^(am|cm|ses|sa)$/i));
+	
 	#
 	# Check for an existing authority. 
 	#
