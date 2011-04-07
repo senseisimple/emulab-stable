@@ -304,8 +304,12 @@ sub SetExpires($$)
 sub GetNodeId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_urn", "component_id",
-			"component_uuid", "uuid");
+    my $result = GetFirstText($node, "component_urn", "component_id",
+			      "component_uuid", "uuid");
+    if ($result eq "") {
+	$result = undef;
+    }
+    return $result;
 }
 
 sub GetVirtualId($)
@@ -336,8 +340,13 @@ sub GetSliverId($)
 sub GetManagerId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_manager_urn",
-			"component_manager_id", "component_manager_uuid");
+    my $result = GetFirstText($node, "component_manager_urn",
+			      "component_manager_id",
+			      "component_manager_uuid");
+    if ($result eq "") {
+	$result = undef;
+    }
+    return $result;
 }
 
 sub GetColocate($)
