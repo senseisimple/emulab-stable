@@ -904,10 +904,17 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	    # If the node still isn't bound and doesn't have a pctype,
 	    # use the user-specified one.
-	    if (! defined($node) && ! defined($pctype)) {
-		my $usertype = GeniXML::FindFirst("n:node_type", $ref);
+	    if (GeniXML::IsVersion0($ref)) {
+		if (! defined($node) && ! defined($pctype)) {
+		    my $usertype = GeniXML::FindFirst("n:node_type", $ref);
+		    if (defined($usertype)) {
+			$pctype = GeniXML::GetText("type_name", $usertype);
+		    }
+		}
+	    } else {
+		my $usertype = GeniXML::FindFirst("n:hardware_type", $ref);
 		if (defined($usertype)) {
-		    $pctype = GeniXML::GetText("type_name", $usertype);
+		    $pctype = GeniXML::GetText("name", $usertype);
 		}
 	    }
 	}
