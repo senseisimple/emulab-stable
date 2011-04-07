@@ -40,7 +40,7 @@ NodeContents &=
 
 ServiceContents &=
   element install { InstallServiceContents }* &
-  element execute { ExecuteServiceContents }*
+  element execute { ExecuteServiceContents }?
 
 RelationContents &=
   attribute client_id { text }

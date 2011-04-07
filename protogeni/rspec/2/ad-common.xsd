@@ -30,7 +30,7 @@
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="generated" type="xs:dateTime"/>
     <xs:attribute name="generated_by"/>
-    <xs:attribute name="valid_until" type="xs:dateTime"/>
+    <xs:attribute name="expires" type="xs:dateTime"/>
     <xs:attribute name="type" use="required">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -111,13 +111,7 @@
   <xs:complexType name="LoginServiceContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
-    <xs:attribute name="authentication" use="required">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="ssh-keys"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="authentication" use="required"/>
     <xs:attribute name="hostname"/>
     <xs:attribute name="port"/>
   </xs:complexType>
@@ -136,24 +130,27 @@
   </xs:complexType>
   <xs:complexType name="InterfaceContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:group ref="rspec:AnyExtension"/>
+      <xs:choice>
+        <xs:group ref="rspec:AnyExtension"/>
+        <xs:element ref="rspec:ip"/>
+      </xs:choice>
       <xs:element ref="rspec:monitoring"/>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="component_id" use="required"/>
     <xs:attribute name="component_name"/>
-    <xs:attribute name="role">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="control"/>
-          <xs:enumeration value="experimental"/>
-          <xs:enumeration value="mixed"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="role"/>
     <xs:attribute name="public_ipv4"/>
   </xs:complexType>
+  <xs:element name="ip" type="rspec:IpContents"/>
   <xs:element name="monitoring" type="rspec:MonitoringContents"/>
+  <xs:complexType name="IpContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="address" use="required"/>
+    <xs:attribute name="netmask"/>
+    <xs:attribute name="type"/>
+  </xs:complexType>
   <xs:complexType name="LinkContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:group ref="rspec:AnyExtension"/>
@@ -200,14 +197,28 @@
   </xs:element>
   <xs:group name="SliverType">
     <xs:sequence>
-      <xs:element name="sliver_type">
-        <xs:complexType>
-          <xs:group ref="rspec:SliverTypeContents"/>
-          <xs:attributeGroup ref="rspec:SliverTypeContents"/>
-        </xs:complexType>
-      </xs:element>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="sliver_type">
+          <xs:complexType>
+            <xs:group ref="rspec:SliverTypeContents"/>
+            <xs:attributeGroup ref="rspec:SliverTypeContents"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="disk_image">
+          <xs:complexType>
+            <xs:complexContent>
+              <xs:extension base="rspec:DiskImageContents">
+                <xs:attribute name="default"/>
+              </xs:extension>
+            </xs:complexContent>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
     </xs:sequence>
   </xs:group>
+  <xs:attributeGroup name="SliverType">
+    <xs:attribute name="default"/>
+  </xs:attributeGroup>
   <xs:group name="SliverTypeContents">
     <xs:sequence>
       <xs:group ref="rspec:AnyExtension"/>
