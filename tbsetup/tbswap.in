@@ -1110,11 +1110,11 @@ sub doSwapin($) {
     # Handle virt blobs.
     #
     if ($type >= RETRY) {
-	print "Creating virt blobs.\n";
+	print "Creating dynamic blobs.\n";
 	$experiment->UploadBlobs(0);
     }
     elsif ($type == MODIFY) {
-	print "Updating virt blobs.\n";
+	print "Updating dynamic blobs.\n";
 	$experiment->UploadBlobs(1);
     }
 
