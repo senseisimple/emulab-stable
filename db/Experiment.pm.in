@@ -3590,7 +3590,7 @@ sub UploadBlobs($$)
 
 	    if (!$found) {
 		# need to add this blob fresh!
-		my $swapperuid = $experiment->swapper();
+		my $swapperuid = $self->swapper();
 		DBQueryFatal("insert into blobs" . 
 			     " (uuid,filename,owner_uid,vblob_id,exptidx)" . 
 			     " values (UUID(),'$vfilename','$swapperuid'," . 
@@ -3627,7 +3627,7 @@ sub RemoveBlobs($$)
 
     my $idx = $self->idx();
 
-    my $qres = DBQueryFatal("delete from blobs" . 
+    my $qres = DBQueryFatal("delete from blobs using blobs" . 
 			    " left join virt_blobs as vblobs" . 
 			    "  on blobs.vblob_id=vblobs.vblob_id" . 
 			    " where blobs.exptidx=$idx" . 
