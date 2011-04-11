@@ -1052,6 +1052,33 @@ REPLACE INTO table_regex VALUES ('images','decryption_key','text','regex','^[0-9
 REPLACE INTO table_regex VALUES ('experiment_blobs','path','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiment_blobs','action','text','redirect','default:text',0,0,NULL);
 
+REPLACE INTO table_regex VALUES ('virt_blobs','filename','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('virt_blobs','vblob_id','text','regex','^[-\\d\\w]+$',0,40,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','alt_vblob_id','text','regex','^[-\\d\\w]+$',0,40,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','enable','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','enable_hooks','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','env','text','regex','^(boot|load)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','fatal','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','service_idx','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','whence','text','regex','^(first|every)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','argv','text','regex','^[-ws\\\"]*$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','env','text','regex','^(boot|load)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','fatal','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','hook_op','text','regex','^(boot|shutdown|reconfig|reset)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','hook_point','text','regex','^(pre|post)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','hook_vblob_id','text','regex','^[-\\d\\w]+$',0,40,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','op','text','regex','^(boot|shutdown|reconfig|reset)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','point','text','regex','^(pre|post)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','service_idx','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','whence','text','regex','^(first|every)$',0,0,NULL);
+
+
 REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,256,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','fulltext_utf8','text','regex','^(?:[\\x09\\x0A\\x0D\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
