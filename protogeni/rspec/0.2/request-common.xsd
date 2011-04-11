@@ -93,6 +93,10 @@
     </xs:simpleType>
   </xs:element>
   <xs:element name="packet_loss">
+    <xs:annotation>
+      <xs:documentation>Static packet loss probability of the link as a fraction
+(ie. 0.01 == 1%)</xs:documentation>
+    </xs:annotation>
     <xs:simpleType>
       <xs:restriction base="xs:float">
         <xs:minInclusive value="0.0"/>

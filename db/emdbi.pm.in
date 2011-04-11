@@ -753,6 +753,17 @@ sub DBKeyExistsN($$$)
 }
 sub DBKeyExists($$) { return DBKeyExistsN(0,$_[0],$_[1]); }
 
+sub DBHandleN($)
+{
+    my ($dbnum) = @_;
+    
+    my $dbw = $DB[$dbnum];
+    my $db  = $dbw->dbh();
+
+    return $db;
+}
+sub DBHandle()	    { return DBHandleN(0); }
+
 END {
     # Call it here otherwise may get:
     #   (in cleanup) Can't call method "FETCH" on an undefined value at 

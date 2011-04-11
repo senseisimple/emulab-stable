@@ -904,10 +904,17 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	    # If the node still isn't bound and doesn't have a pctype,
 	    # use the user-specified one.
-	    if (! defined($node) && ! defined($pctype)) {
-		my $usertype = GeniXML::FindFirst("n:node_type", $ref);
+	    if (GeniXML::IsVersion0($ref)) {
+		if (! defined($node) && ! defined($pctype)) {
+		    my $usertype = GeniXML::FindFirst("n:node_type", $ref);
+		    if (defined($usertype)) {
+			$pctype = GeniXML::GetText("type_name", $usertype);
+		    }
+		}
+	    } else {
+		my $usertype = GeniXML::FindFirst("n:hardware_type", $ref);
 		if (defined($usertype)) {
-		    $pctype = GeniXML::GetText("type_name", $usertype);
+		    $pctype = GeniXML::GetText("name", $usertype);
 		}
 	    }
 	}
@@ -966,7 +973,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 			};
 
 	# Tarball and startup command.
-	my $startupcmd = GeniXML::GetText("startup_command", $ref);
+	my $startupcmd = GeniXML::GetStartupCommand($ref);
 	if (defined($startupcmd)) {
 	    if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
@@ -977,7 +984,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	    $nodeblob->{'startupcmd'} = $startupcmd;
 	}
-	my $tarfiles = GeniXML::GetText("tarfiles", $ref);
+	my $tarfiles = GeniXML::GetTarball($ref);
 	if (defined($tarfiles)) {
 	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarfiles",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
@@ -2322,6 +2329,7 @@ sub SliverWorkAux($$$$$$$)
     my %slivers   = ();
     my @plabnodes = ();
     my %ifacemap  = ();
+    my %ifacexml = ();
     my %rspecmap  = ();
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
 	my $resource_id   = GeniXML::GetNodeId($ref);
@@ -2417,7 +2425,17 @@ sub SliverWorkAux($$$$$$$)
 
 	# And store into the new manifest.
 	my $oldnode = GeniXML::GetNodeByVirtualId($virtual_id, $manifest);
-	GeniXML::ReplaceNode($oldnode, $ref);
+	my $newnode = GeniXML::ReplaceNode($oldnode, $ref);
+
+	# If using rspec v2, save the interface xml node for later
+	# annotation when iterating through links.
+	if (! GeniXML::IsVersion0($newnode)) {
+	    foreach my $linkref (GeniXML::FindNodes("n:interface",
+						   $newnode)->get_nodelist()) {
+		my $virtual_iface_id = GeniXML::GetInterfaceId($linkref);
+		$ifacexml{$virtual_iface_id} = $linkref;
+	    }
+	}
     }
 
     #
@@ -2675,28 +2693,44 @@ sub SliverWorkAux($$$$$$$)
 		    "$iface_name in $linkname";
 		goto bad;
 	    }
+	    my $outref;
+	    my $sliverName = "sliver_urn";
+	    my $macName = "MAC";
+	    my $ipAddress;
+	    if (defined($vinterface)) {
+		$ipAddress = $vinterface->IP();
+	    } else {
+		$ipAddress = $interface->IP();
+	    }
 	    # Manifest goes back to the user.
 	    if (GeniXML::IsVersion0($ifaceref)) {
-		GeniXML::SetText("sliver_urn", $ifaceref,
-				 $sliver->sliver_urn());
-		GeniXML::SetText("MAC", $ifaceref, $interface->mac())
-		    if (defined($interface));
+		$outref = $ifaceref;
 		GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
 		    if (defined($vinterface));
-		if (defined($vinterface)) {
-		    GeniXML::SetText("IP", $ifaceref, $vinterface->IP())
-			if (defined($vinterface->IP())
-			    && $vinterface->IP() ne "");
+		if (defined($ipAddress) && $ipAddress ne "") {
+		    GeniXML::SetText("IP", $outref, $ipAddress);
 		}
-		else {
-		    GeniXML::SetText("IP", $ifaceref, $interface->IP())
-			if (defined($interface) &&
-			    defined($interface->IP())
-			    && $interface->IP() ne "");
+	    } elsif (exists($ifacexml{$iface_id})) {
+		$outref = $ifacexml{$iface_id};
+		$sliverName = "sliver_id";
+		$macName = "mac_address";
+		if (defined($ipAddress) && $ipAddress ne "") {
+		    my $child = GeniXML::FindFirst("n:ip", $outref);
+		    if (! defined($child)) {
+			$child = GeniXML::AddElement("ip", $outref);
+		    }
+		    GeniXML::SetText("address", $child, $ipAddress);
+		    GeniXML::SetText("type", $child, "ipv4");
 		}
-	    } else {
-		GeniXML::SetText("sliver_id", $ifaceref,
+		GeniXML::SetText($sliverName, $ifaceref,
 				 $sliver->sliver_urn());
+	    }
+
+	    if (defined($outref)) {
+		GeniXML::SetText($sliverName, $outref,
+				 $sliver->sliver_urn());
+		GeniXML::SetText($macName, $outref, $interface->mac())
+		    if (defined($interface));
 	    }
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {

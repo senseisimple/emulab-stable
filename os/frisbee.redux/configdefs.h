@@ -12,6 +12,8 @@ struct config_imageinfo {
 	int flags;		/* */
 	char *get_options;	/* options for GET operation */
 	int get_methods;	/* allowed GET transfer mechanisms */
+	int get_uid;		/* UID to run frisbee server as */
+	int get_gid;		/* GID to run frisbee server as */
 	char *put_options;	/* options for PUT operation */
 	void *extra;		/* config-type specific info */
 };
