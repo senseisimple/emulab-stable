@@ -194,6 +194,7 @@ REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
 REPLACE INTO exported_tables VALUES ('emulab_pubs_month_map');
 REPLACE INTO exported_tables VALUES ('event_triggertypes');
+REPLACE INTO exported_tables VALUES ('client_services');
 
 --
 -- Dumping data for table `foreign_keys`
@@ -1109,7 +1110,7 @@ REPLACE INTO table_regex VALUES ('virt_client_service_ctl','pid','text','redirec
 REPLACE INTO table_regex VALUES ('virt_client_service_ctl','service_idx','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_client_service_ctl','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_client_service_ctl','whence','text','regex','^(first|every)$',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_client_service_hooks','argv','text','regex','^[-ws\\\"]*$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','argv','text','regex','^[-\\w\\s\"]*$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_client_service_hooks','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_client_service_hooks','env','text','regex','^(boot|load)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_client_service_hooks','fatal','int','redirect','default:boolean',0,0,NULL);

@@ -37,7 +37,7 @@ sub DoUpdate($$$)
     DBQueryFatal("REPLACE INTO table_regex VALUES ('virt_blobs','filename',".
 		 " 'text','redirect','default:tinytext',0,256,NULL)");
     DBQueryFatal("REPLACE INTO table_regex VALUES ('virt_blobs','vblob_id',".
-		 " 'text','regex','^[-\\d\\w]+\$',0,40,NULL)");
+		 " 'text','regex','^[-\\\\d\\\\w]+\$',0,40,NULL)");
 
     return 0;
 }

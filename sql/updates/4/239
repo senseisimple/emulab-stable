@@ -97,6 +97,8 @@ sub DoUpdate($$$)
     }
 
     # db fill stuff
+    DBQueryFatal("replace into exported_tables values ('client_services')");
+
     my @sa = ("REPLACE INTO `client_services` VALUES ",
 	      "(10,'rc.tbsetup','boot','every',1),",
 	      "(20,'rc.ipod','boot','every',0),",
@@ -135,7 +137,7 @@ sub DoUpdate($$$)
 	      "(1050,'rc.subnodes','boot','every',1)");
     DBQueryFatal(join('',@sa));
 
-    my @ra = ("('virt_client_service_ctl','alt_vblob_id','text','regex','^[-\\d\\w]+\$',0,40,NULL)",
+    my @ra = ("('virt_client_service_ctl','alt_vblob_id','text','regex','^[-\\\\d\\\\w]+\$',0,40,NULL)",
 	      "('virt_client_service_ctl','eid','text','redirect','experiments:eid',0,0,NULL)",
 	      "('virt_client_service_ctl','enable','int','redirect','default:boolean',0,0,NULL)",
 	      "('virt_client_service_ctl','enable_hooks','int','redirect','default:boolean',0,0,NULL)",
@@ -145,13 +147,13 @@ sub DoUpdate($$$)
 	      "('virt_client_service_ctl','service_idx','int','redirect','default:int',0,0,NULL)",
 	      "('virt_client_service_ctl','vnode','text','redirect','virt_nodes:vname',0,0,NULL)",
 	      "('virt_client_service_ctl','whence','text','regex','^(first|every)\$',0,0,NULL)",
-	      "('virt_client_service_hooks','argv','text','regex','^[-\\w\\s\\\"]*\$',0,0,NULL)",
+	      "('virt_client_service_hooks','argv','text','regex','^[-\\\\w\\\\s\"]*\$',0,0,NULL)",
 	      "('virt_client_service_hooks','eid','text','redirect','experiments:eid',0,0,NULL)",
 	      "('virt_client_service_hooks','env','text','regex','^(boot|load)\$',0,0,NULL)",
 	      "('virt_client_service_hooks','fatal','int','redirect','default:boolean',0,0,NULL)",
 	      "('virt_client_service_hooks','hook_op','text','regex','^(boot|shutdown|reconfig|reset)\$',0,0,NULL)",
 	      "('virt_client_service_hooks','hook_point','text','regex','^(pre|post)\$',0,0,NULL)",
-	      "('virt_client_service_hooks','hook_vblob_id','text','regex','^[-\\d\\w]+\$',0,40,NULL)",
+	      "('virt_client_service_hooks','hook_vblob_id','text','regex','^[-\\\\d\\\\w]+\$',0,40,NULL)",
 	      "('virt_client_service_hooks','op','text','regex','^(boot|shutdown|reconfig|reset)\$',0,0,NULL)",
 	      "('virt_client_service_hooks','pid','text','redirect','projects:pid',0,0,NULL)",
 	      "('virt_client_service_hooks','point','text','regex','^(pre|post)\$',0,0,NULL)",
