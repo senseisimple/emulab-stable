@@ -90,14 +90,11 @@ REPLACE INTO `client_services` VALUES (100,'rc.mounts','boot','every',0);
 REPLACE INTO `client_services` VALUES (110,'rc.blobs','boot','every',0);
 REPLACE INTO `client_services` VALUES (120,'rc.topomap','boot','every',0);
 REPLACE INTO `client_services` VALUES (130,'rc.accounts','boot','every',0);
-REPLACE INTO `client_services` VALUES (130,'rc.accounts','load','first',0);
 REPLACE INTO `client_services` VALUES (140,'rc.route','boot','every',0);
 REPLACE INTO `client_services` VALUES (150,'rc.tunnels','boot','every',0);
 REPLACE INTO `client_services` VALUES (160,'rc.ifconfig','boot','every',0);
-REPLACE INTO `client_services` VALUES (160,'rc.ifconfig','load','first',0);
 REPLACE INTO `client_services` VALUES (170,'rc.delays','boot','every',0);
 REPLACE INTO `client_services` VALUES (180,'rc.hostnames','boot','every',0);
-REPLACE INTO `client_services` VALUES (180,'rc.hostnames','load','first',0);
 REPLACE INTO `client_services` VALUES (190,'rc.lmhosts','boot','every',0);
 REPLACE INTO `client_services` VALUES (200,'rc.trace','boot','every',0);
 REPLACE INTO `client_services` VALUES (210,'rc.syncserver','boot','every',0);
@@ -115,7 +112,6 @@ REPLACE INTO `client_services` VALUES (1020,'rc.isup','boot','every',1);
 REPLACE INTO `client_services` VALUES (1030,'rc.startcmd','boot','every',0);
 REPLACE INTO `client_services` VALUES (1040,'rc.vnodes','boot','every',1);
 REPLACE INTO `client_services` VALUES (1050,'rc.subnodes','boot','every',1);
-REPLACE INTO `client_services` VALUES (80,'rc.localize','load','first',0);
 
 --
 -- Dumping data for table `event_eventtypes`
