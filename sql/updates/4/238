@@ -25,11 +25,11 @@ sub DoUpdate($$$)
     }
 
     if (!DBSlotExists("blobs","vblob_id")) {
-	DBQueryFatal("alter table blobs add ".
+	DBQueryFatal("alter table blobs add vblob_id ".
 		     "varchar(40) NOT NULL default '' after `owner_uid`");
     }
     if (!DBSlotExists("blobs","exptidx")) {
-	DBQueryFatal("alter table blobs add ".
+	DBQueryFatal("alter table blobs add exptidx ".
 		     "int(11) NOT NULL default '0' after `vblob_id`");
     }
 
