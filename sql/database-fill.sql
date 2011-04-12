@@ -73,6 +73,51 @@ REPLACE INTO comments VALUES ('widearea_delays','','Delay and bandwidth metrics 
 REPLACE INTO comments VALUES ('virt_nodes','','Experiment virtual nodes');
 
 --
+-- Dumping data for table `client_services`
+--
+
+
+REPLACE INTO `client_services` VALUES (10,'rc.tbsetup','boot','every',1);
+REPLACE INTO `client_services` VALUES (20,'rc.ipod','boot','every',0);
+REPLACE INTO `client_services` VALUES (30,'rc.healthd','boot','every',0);
+REPLACE INTO `client_services` VALUES (40,'rc.slothd','boot','every',0);
+REPLACE INTO `client_services` VALUES (50,'rc.firewall','boot','every',0);
+REPLACE INTO `client_services` VALUES (60,'rc.tpmsetup','boot','every',0);
+REPLACE INTO `client_services` VALUES (70,'rc.misc','boot','every',0);
+REPLACE INTO `client_services` VALUES (80,'rc.localize','boot','every',0);
+REPLACE INTO `client_services` VALUES (90,'rc.keys','boot','every',0);
+REPLACE INTO `client_services` VALUES (100,'rc.mounts','boot','every',0);
+REPLACE INTO `client_services` VALUES (110,'rc.blobs','boot','every',0);
+REPLACE INTO `client_services` VALUES (120,'rc.topomap','boot','every',0);
+REPLACE INTO `client_services` VALUES (130,'rc.accounts','boot','every',0);
+REPLACE INTO `client_services` VALUES (130,'rc.accounts','load','first',0);
+REPLACE INTO `client_services` VALUES (140,'rc.route','boot','every',0);
+REPLACE INTO `client_services` VALUES (150,'rc.tunnels','boot','every',0);
+REPLACE INTO `client_services` VALUES (160,'rc.ifconfig','boot','every',0);
+REPLACE INTO `client_services` VALUES (160,'rc.ifconfig','load','first',0);
+REPLACE INTO `client_services` VALUES (170,'rc.delays','boot','every',0);
+REPLACE INTO `client_services` VALUES (180,'rc.hostnames','boot','every',0);
+REPLACE INTO `client_services` VALUES (180,'rc.hostnames','load','first',0);
+REPLACE INTO `client_services` VALUES (190,'rc.lmhosts','boot','every',0);
+REPLACE INTO `client_services` VALUES (200,'rc.trace','boot','every',0);
+REPLACE INTO `client_services` VALUES (210,'rc.syncserver','boot','every',0);
+REPLACE INTO `client_services` VALUES (220,'rc.trafgen','boot','every',0);
+REPLACE INTO `client_services` VALUES (230,'rc.tarfiles','boot','every',0);
+REPLACE INTO `client_services` VALUES (240,'rc.rpms','boot','every',0);
+REPLACE INTO `client_services` VALUES (250,'rc.progagent','boot','every',0);
+REPLACE INTO `client_services` VALUES (260,'rc.linkagent','boot','every',0);
+REPLACE INTO `client_services` VALUES (270,'rc.tiptunnels','boot','every',0);
+REPLACE INTO `client_services` VALUES (280,'rc.motelog','boot','every',0);
+REPLACE INTO `client_services` VALUES (290,'rc.simulator','boot','every',0);
+REPLACE INTO `client_services` VALUES (1000,'rc.canaryd','boot','every',1);
+REPLACE INTO `client_services` VALUES (1010,'rc.linktest','boot','every',1);
+REPLACE INTO `client_services` VALUES (1020,'rc.isup','boot','every',1);
+REPLACE INTO `client_services` VALUES (1030,'rc.startcmd','boot','every',0);
+REPLACE INTO `client_services` VALUES (1040,'rc.vnodes','boot','every',1);
+REPLACE INTO `client_services` VALUES (1050,'rc.subnodes','boot','every',1);
+REPLACE INTO `client_services` VALUES (80,'rc.localize','load','first',0);
+
+--
 -- Dumping data for table `event_eventtypes`
 --
 
