@@ -3605,8 +3605,10 @@ sub UploadBlobs($$)
     if ($update) {
 	foreach my $vblob_id (keys(%blobs)) {
 	    my ($keep,$uuid,$filename) = @{$blobs{$vblob_id}};
-	    DBQueryFatal("delete from blobs" . 
-			 "  where exptidx=$idx and vblob_id='${vblob_id}'");
+	    if (!$keep) {
+		DBQueryFatal("delete from blobs" . 
+			     "  where exptidx=$idx and vblob_id='${vblob_id}'");
+	    }
 	}
     }
 
