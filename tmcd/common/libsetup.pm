@@ -46,7 +46,7 @@ use Exporter;
 # Must come after package declaration!
 use English;
 
-my $debug = 1;
+my $debug = 0;
 
 # The tmcc library.
 use libtmcc;
@@ -973,12 +973,12 @@ sub runhooks($$$$)
 
 	    # If this is a first-only hook, skip if we've already done it!
 	    if ($hook->{'WHENCE'} eq 'first' && -e $hookrunfile) {
-		print "  Not running $which hook $blobid (first config only)\n";
+		print "  Not running $which hook $blobid (first config only)\n" 
+		    if ($debug);
 		next;
 	    }
 
-	    print "  Running $script $which hook $blobid\n"
-		if ($debug);
+	    print "  Running $script $which hook $blobid\n";
 
 	    # NOTE: the last arg is always $what (boot,shutdown,reconfig,reset)
 	    system("$blobpath $argv $what");
@@ -1029,8 +1029,7 @@ sub runbootscript($$$$;@)
     #
     if ($havemanifest && $manifest->{$script}{'ENABLED'} != 1
 	&& $manifest->{$script}{'HOOKS_ENABLED'} != 1) {
-	print "Not running $script or hooks (disabled)\n"
-	    if ($debug);
+	print "Not running $script or hooks (disabled)\n";
 	return 0;
     }
 
@@ -1067,8 +1066,7 @@ sub runbootscript($$$$;@)
 	}
 	if ($havemanifest && $manifest->{$script}{'BLOBID'} ne '') {
 	    my $blobpath = $manifest->{$script}{'BLOBPATH'};
-	    print "  Running $blobpath (instead of $path/$script)\n"
-		if ($debug);
+	    print "  Running $blobpath (instead of $path/$script)\n";
 	    system("$blobpath $argv");
 	}
 	else {
