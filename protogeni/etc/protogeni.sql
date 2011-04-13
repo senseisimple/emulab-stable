@@ -218,7 +218,7 @@ CREATE TABLE `geni_rspecs` (
   `idx` int(10) unsigned NOT NULL auto_increment,
   `created` datetime default NULL,
   `rspec` text,
-  PRIMARY KEY  (`idx`),
+  PRIMARY KEY  (`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `geni_bindings`;
