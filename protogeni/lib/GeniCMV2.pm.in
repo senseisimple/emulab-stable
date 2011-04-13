@@ -299,7 +299,7 @@ sub DiscoverResources($)
             if(!GeniResponse::IsResponse($cred));
     }
     return GeniCM::DiscoverResourcesAux($available, $compress,
-        $credential_objects);
+        $version, $credential_objects);
 }
 
 #

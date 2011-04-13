@@ -192,18 +192,19 @@ sub DiscoverResources($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    return DiscoverResourcesAux($available, $compress, [$credential]);
+    return DiscoverResourcesAux($available,
+				$compress, $version, [$credential]);
 }
 # Helper function for V2.
-sub DiscoverResourcesAux($$$;$)
+sub DiscoverResourcesAux($$$$)
 {
-    my ($available, $compress, $credentials, $version) = @_;
+    my ($available, $compress, $version, $credentials) = @_;
     my $user_urn  = $ENV{'GENIRN'};
     $version   = "0.2"
 	if (!defined($version));
 
     # Sanity check since this can come from client.
-    if (! ($version eq "0.1" || $version eq "0.2" ||$version eq "2.0")) {
+    if (! ($version eq "0.1" || $version eq "0.2" ||$version eq "2")) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Improper version request");
     }
