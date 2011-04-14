@@ -114,6 +114,8 @@ sub Create($$$$)
     $self->{'NORECOVER'}   = 0;	
     
     bless($self, $class);
+    $virtexperiment->Dump()
+	if (0 && $self->verbose());
 
     return $self;
 }
@@ -7422,8 +7424,12 @@ sub UpLoadInterfaceSettings($)
 	    foreach my $lan_setting ($self->virt_lan_settings()->Rows()) {
 		my $capkey = DBQuoteSpecial($lan_setting->capkey());
 		my $capval = DBQuoteSpecial($lan_setting->capval());
+		my $vname  = $lan_setting->vname();
 
-		$self->printdb("interface_setting: ".
+		next
+		    if ($vname ne $vlanname);
+
+		$self->printdb("interface_setting: $vname: ".
 			       "$pnodename $iface $capkey $capval\n");
 	    
 		DBQueryWarn("insert into interface_settings ".
@@ -7444,7 +7450,7 @@ sub UpLoadInterfaceSettings($)
 		my $capkey = DBQuoteSpecial($setting->capkey());
 		my $capval = DBQuoteSpecial($setting->capval());
 
-		$self->printdb("interface_setting: ".
+		$self->printdb("interface_setting (member): ".
 			       "$pnodename $iface $capkey $capval\n");
 	    
 		DBQueryWarn("replace into interface_settings ".

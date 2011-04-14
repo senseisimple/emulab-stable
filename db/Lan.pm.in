@@ -3095,6 +3095,7 @@ sub RecordVLanDeletion($$)
 sub RecordVLanModification($$$$)
 {
     my ($class, $lanid, $added, $removed) = @_;
+    my %current = ();
 
     my $query_result =
 	DBQueryWarn("select members from vlans where id='$lanid'");
@@ -3102,7 +3103,9 @@ sub RecordVLanModification($$$$)
     return -1
 	if (!$query_result);
     my ($current) = $query_result->fetchrow_array();
-    my %current   = map { $_ => $_ } split(/\s+/, $current);
+    if (defined($current) && $current ne "") {
+	%current = map { $_ => $_ } split(/\s+/, $current);
+    }
 
     if ($added) {
 	foreach my $port (@$added) {

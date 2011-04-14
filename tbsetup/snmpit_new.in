@@ -814,20 +814,13 @@ COMMAND: foreach my $command (@commands) {
 	    my @newvlans = getExperimentVlans($pid,$eid,@optvlanids);
 	    my @oldvlans;
 	    VLan->StaleVlanList($experiment,\@oldvlans);
-	    @vlans = uniq(@newvlans, @oldvlans);
 
             if ($supplied_switches) {
-                debug("Sync: using supplied switches\n");
-                @devicenames = @supplied_switches;
-		@vlans = filterVlansBySwitches(\@supplied_switches, @vlans);
-		if (!@vlans) {
-		    print "snmpit: $pid/$eid has no VLANs to sync ".
-			"on supplied devices, skipping\n"
-			if (!$quiet);
-		    next COMMAND;
-		}
-            } else {
-                @devicenames = mapVlansToSwitches(@vlans);
+		die("-X and -i cannot be used together\n");
+            }
+	    else {
+                @devicenames = uniq(mapVlansToSwitches(@newvlans),
+				    mapStaleVlansToSwitches(@oldvlans));
                 debug("Sync: list from database: " . join(",",@devicenames) .
 		      "\n");
             }
@@ -1546,7 +1539,8 @@ sub doRestorePortStatus($@) {
 	    print "Could not yank $port from $source_vlan\n";
 	    $errors++;
 	}
-	VLan->RecordVLanModification($source_vlan->id(), undef, $port);
+	my @tmp = ($port);
+	VLan->RecordVLanModification($source_vlan->id(), undef, \@tmp);
     }
     if (defined($target_vlan) && $target_vlan->KeepInSync()) {
 	if ($target_vlan->AddPort($port)) {

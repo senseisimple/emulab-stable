@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -48,6 +48,7 @@ $GENI_DBNAME = "geni-cm";
 use lib '@prefix@/lib';
 use libdb qw(DBQueryFatal);
 use Node;
+use User;
 require GeniDB;
 require GeniCertificate;
 require GeniComponent;

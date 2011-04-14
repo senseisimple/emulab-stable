@@ -42,6 +42,7 @@ sub InstallUpdate($$)
 	    PhaseSucceed();
 	};
     }
+    return 0;
 }
 
 1;

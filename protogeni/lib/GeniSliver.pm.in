@@ -680,8 +680,14 @@ sub Create($$$$$$)
 	    if (defined($sshdport));
     }
 
-    my $services = GeniXML::AddElement("services", $rspec);
-    my $login = GeniXML::AddElement("login", $services);
+    my $services = GeniXML::FindFirst("n:services", $rspec);
+    if (! defined($services)) {
+	$services = GeniXML::AddElement("services", $rspec);
+    }
+    my $login = GeniXML::FindFirst("n:login", $services);
+    if (! defined($login)) {
+	$login = GeniXML::AddElement("login", $services);
+    }
     GeniXML::SetText("authentication", $login, "ssh-keys");
     GeniXML::SetText("hostname", $login, $phostname);
     GeniXML::SetText("port", $login, $sshdport);

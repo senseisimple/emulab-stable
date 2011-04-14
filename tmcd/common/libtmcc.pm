@@ -34,7 +34,7 @@ use Exporter;
              TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
 	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT TMCCCMD_ROOTPSWD
 	     TMCCCMD_LTMAP TMCCCMD_LTPMAP TMCCCMD_TOPOMAP TMCCCMD_LOADINFO
-	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB TMCCCMD_DHCPDCONF
+	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB TMCCCMD_DHCPDCONF TMCCCMD_MANIFEST
 	     );
 
 # Must come after package declaration!
@@ -195,6 +195,7 @@ my %commandset =
       "tpmpubkey"       => {TAG => "tpmpubkey"},
       "loadinfo"        => {TAG => "loadinfo"},
       "dhcpdconf"       => {TAG => "dhcpdconf"},
+      "manifest"        => {TAG => "manifest"},
     );
 
 #
@@ -264,6 +265,7 @@ sub TMCCCMD_TPMBLOB()  { $commandset{"tpmblob"}->{TAG}; }
 sub TMCCCMD_TPMPUB()  { $commandset{"tpmpubkey"}->{TAG}; }
 sub TMCCCMD_LOADINFO()  { $commandset{"loadinfo"}->{TAG}; }
 sub TMCCCMD_DHCPDCONF()  { $commandset{"dhcpdconf"}->{TAG}; }
+sub TMCCCMD_MANIFEST()  { $commandset{"manifest"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
@@ -666,7 +668,50 @@ package libtmcc::blob;
 my $SERVERFILE = "$VARDIR/boot/bossip";
     # tmcc.c jumps through hoops to get it... do we have to, too?
 my $NICKNAMEFILE = "$BOOTDIR/nickname";
-my $KEYHASHFILE = "$BOOTDIR/tmcc/keyhash";
+my $KEYHASHFILE = "$BOOTDIR/keyhash";
+
+##
+## This method returns the keyhash that other things (i.e., fetching blobs after
+## a call to getmanifest returns) depend on.  And since getmanifest is called
+## first, we need the keyhash quick.  So we steal this method from rc.keys.
+##
+
+#
+# Get the hashkey
+# 
+sub dokeyhash()
+{
+    my $keyhash;
+    my @tmccresults;
+
+    if (libtmcc::tmcc(libtmcc::TMCCCMD_KEYHASH, undef, \@tmccresults) < 0) {
+	fatal("Could not get keyhash from server!");
+    }
+    unlink $KEYHASHFILE;
+    return 0
+	if (! @tmccresults);
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults[0] =~ /KEYHASH HASH=\'([\w]*)\'/) {
+	$keyhash = $1;
+    }
+    else {
+	fatal("Bad keyhash line: $tmccresults[0]");
+    }
+
+    #
+    # Write a file so the node knows the key.
+    #
+    my $oldumask = umask(0222);
+    
+    if (system("echo '$keyhash' > ". $KEYHASHFILE)) {
+	fatal("Could not write " . $KEYHASHFILE);
+    }
+    umask($oldumask);
+    return 0;
+}
 
 # Load up the paths. Done like this in case init code is needed.
 BEGIN
@@ -781,8 +826,14 @@ sub getblob($$;\@$) {
     $struct{'project'} = $project;
     close NICKNAME;
     
+    #
+    # We need the keyhash for any blobs we grab!
+    #
+    if (! -e $KEYHASHFILE) {
+	dokeyhash();
+    }
     open KEYHASH, $KEYHASHFILE or die "$KEYHASHFILE: $!";
-    <KEYHASH> =~ /HASH='(.+)'/;
+    <KEYHASH> =~ /^([-\w\d]+)$/;
     my $key = $1;
     $struct{'key'} = $key;
     close KEYHASH;

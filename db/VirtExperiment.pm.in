@@ -73,6 +73,11 @@ my $debug	      = 0;
      "virt_parameters"          => [ "name", "value" ],
      "virt_paths"		=> [ "pathname", "segmentname"],
      "experiment_blobs"         => [ "path", "action" ],
+     "virt_blobs"               => [ "vblob_id", "filename" ],
+     "virt_client_service_ctl"  => [ "vnode", "service_idx", "env", "whence" ],
+     "virt_client_service_hooks"=> [ "vnode", "service_idx", "env", "whence",
+				     "hook_vblob_id" ],
+     "virt_client_service_opts" => [ "vnode", "opt_name", "opt_value" ],
 );
 
 # 
@@ -1195,6 +1200,27 @@ use vars qw(@ISA);
 use VirtExperiment;
 
 package VirtExperiment::VirtTableRow::experiment_blobs;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_blobs;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_client_service_ctl;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_client_service_hooks;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_client_service_opts;
 use vars qw(@ISA);
 @ISA = "VirtExperiment::VirtTableRow";
 use VirtExperiment;

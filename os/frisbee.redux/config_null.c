@@ -105,8 +105,13 @@ set_get_options(struct config_host_authinfo *ai, int ix)
 	/*
 	 * We use a small server inactive timeout since we no longer have
 	 * to start up a frisbeed well in advance of the client(s).
+	 *
+	 * XXX we cranked this from 60 to 180 seconds to account for clients
+	 * with lots of write buffer memory but slow disks, giving them time
+	 * to flush all their buffers and report their stats before we give
+	 * up on them.
 	 */
-	strcat(str, " -T 60");
+	strcat(str, " -T 180");
 
 	ai->imageinfo[ix].get_options = mystrdup(str);
 }

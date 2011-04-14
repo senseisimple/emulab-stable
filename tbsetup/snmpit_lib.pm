@@ -35,7 +35,7 @@ use Exporter;
 	        getExperimentVlanPorts
                 uniq isSwitchPort getPathVlanIfaces
 		reserveVlanTag getReservedVlanTag clearReservedVlanTag
-		mapVlansToSwitches
+		mapVlansToSwitches mapStaleVlansToSwitches
 );
 
 use English;
@@ -1156,49 +1156,85 @@ sub mapVlansToSwitches(@)
 {
     my @vlan_ids = @_;
     my %switches = ();
-    my %trunks   = getTrunks();
 
     #
     # This code is lifted from setPortVlan() in snmpit_stack.pm
     #
     foreach my $vlan_id (@vlan_ids) {
-	my %devices = ();
-	my @ports   = getVlanPorts($vlan_id);
-	my %map     = mapPortsToDevices(@ports);
-
-	foreach my $device (keys %map) {
-	    $devices{$device} = 1;
-	}
-
-	#
-	# Add in the ports that we think are already in the vlan, since
-	# this might be a remove/modify operation. Can probably optimize
-	# this. 
-	#
-	@ports = getExperimentVlanPorts($vlan_id);
-	%map   = mapPortsToDevices(@ports);
-
-	foreach my $device (keys %map) {
-	    $devices{$device} = 1;
-	}
-
-	#
-	# Find out every switch which might have to transit this VLAN through
-	# its trunks.
-	#
-	my @trunks = getTrunksFromSwitches(\%trunks, keys %devices);
-	foreach my $trunk (@trunks) {
-	    my ($src,$dst) = @$trunk;
-	    $devices{$src} = $devices{$dst} = 1;
-	}
+	my @ports   = uniq(getVlanPorts($vlan_id),
+			   getExperimentVlanPorts($vlan_id));
+	my @devices = mapPortsToSwitches(@ports);
 
 	# And update the total set of switches.
-	foreach my $device (keys(%devices)) {
+	foreach my $device (@devices) {
 	    $switches{$device} = 1;
 	}
     }
     my @sorted = sort {tbsort($a,$b)} keys %switches;
     print "mapVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# An alternate version for a "stale" vlan; one that is destroyed cause of
+# a swapmod (syncVlansFromTables). 
+#
+sub mapStaleVlansToSwitches(@)
+{
+    my @vlan_ids = @_;
+    my %switches = ();
+
+    foreach my $vlan_id (@vlan_ids) {
+	#
+	# Get the ports that we think are already in the vlan, since
+	# this might be a remove/modify operation. Can probably optimize
+	# this. 
+	#
+	my @ports   = getExperimentVlanPorts($vlan_id);
+	my @devices = mapPortsToSwitches(@ports);
+
+	# And update the total set of switches.
+	foreach my $device (@devices) {
+	    $switches{$device} = 1;
+	}
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    print "mapStaleVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# Map a set of ports to the devices they are on plus the trunks.
+# See above.
+#
+sub mapPortsToSwitches(@)
+{
+    my @ports    = @_;
+    my %switches = ();
+    my %trunks   = getTrunks();
+    my %map      = mapPortsToDevices(@ports);
+    my %devices  = ();
+    
+    foreach my $device (keys %map) {
+	$devices{$device} = 1;
+    }
+
+    #
+    # This code is lifted from setPortVlan() in snmpit_stack.pm
+    #
+    # Find every switch which might have to transit this VLAN through
+    # its trunks.
+    #
+    my @trunks = getTrunksFromSwitches(\%trunks, keys %devices);
+    foreach my $trunk (@trunks) {
+	my ($src,$dst) = @$trunk;
+	$devices{$src} = $devices{$dst} = 1;
+    }
+    # And update the total set of switches.
+    foreach my $device (keys(%devices)) {
+	$switches{$device} = 1;
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
     return @sorted;
 }
 

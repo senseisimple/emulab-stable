@@ -38,6 +38,7 @@ my $CMCERT	  = "$TB/etc/genicm.pem";
 my $geniuserid    = "geniuser";
 my $geniprojid    = "GeniSlices";
 my $SUDO	  = "/usr/local/bin/sudo";
+my $MYSQLSHOW	  = "/usr/X11R6/bin/mysqlshow";
 my $BATCHEXP      = "$TB/bin/batchexp";
 
 # un-taint path
@@ -68,8 +69,6 @@ BEGIN
 use libtestbed;
 use libdb qw(TBSetSiteVar TBSiteVarExists TBGetSiteVar);
 use Experiment;
-use GeniDB;
-use GeniCertificate;	  
 
 #
 # Check args.
@@ -97,16 +96,25 @@ if (defined($options{"p"})) {
 usage()
     if (@ARGV);
 
-OneShot()
-    if (!$verify);
-
 if (!$verify && $UID != 0) {
     fatal("Must be root to run this script\n");
 }
 
 #
-# Apply the dbupdates using the Emulab utility, to all three DBs.
+# If the DBs are not built yet (initsite not run) just exit.
+# We will be back here later.
 #
+system("$MYSQLSHOW geni >/dev/null 2>&1");
+if ($?) {
+    print "Protogeni DB does not exist yet. Skipping ...\n";
+    exit(0);
+}
+require GeniDB;
+require GeniCertificate;	  
+
+OneShot()
+    if (!$verify);
+
 #
 # Apply the dbupdates using the Emulab utility, to all three DBs.
 #
