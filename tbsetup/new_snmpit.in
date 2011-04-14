@@ -1605,7 +1605,7 @@ sub doRestorePortStatus($@) {
 	    print "Could not yank $port from $source_vlan\n";
 	    $errors++;
 	}
-	VLan->RecordVLanModification($source_vlan->id(), undef, $port);
+	VLan->RecordVLanModification($source_vlan->id(), undef, [$port->toIfaceString()]);
     }
     if (defined($target_vlan) && $target_vlan->KeepInSync()) {
 	if ($target_vlan->AddPort($port)) {
@@ -1887,8 +1887,7 @@ sub CreateOneVlan($$$@)
 	}
 	else {
 	    # Convert the ports to node:iface for the next call.
-	    my @conports = map {$_->toIfaceString()} @ports; #map { portiface($_) } @ports;
-
+	    my @conports = map {$_->toIfaceString()} @ports; 
 	    VLan->RecordVLanModification($vlanid, \@conports, undef);
 	}
     }
@@ -2080,8 +2079,6 @@ sub syncVlansFromTables($$) {
 
 			# Convert the ports to node:iface for the next call.
 			@trunkports = map {$_->toIfaceString()} @trunkports; 
-			#map { portiface($_) } @trunkports;
-
 			VLan->RecordVLanModification($vlanid,
 						     undef, \@trunkports)
 			    == 0 or goto bad;
@@ -2138,8 +2135,6 @@ sub syncVlansFromTables($$) {
 
 		# Convert the ports to node:iface for the next call.
 		@staleports = map {$_->toIfaceString()} @staleports; 
-		#map { portiface($_) } @staleports;
-
 		VLan->RecordVLanModification($vlanid, undef, \@staleports) == 0
 		    or goto bad;
 	    }
@@ -2154,8 +2149,6 @@ sub syncVlansFromTables($$) {
 
 		# Convert the ports to node:iface for the next call.
 		@staletrunks = map {$_->toIfaceString()} @staletrunks; 
-		#map { portiface($_) } @staletrunks;
-
 		VLan->RecordVLanModification($vlanid, undef, \@staletrunks) == 0
 		    or goto bad;
 	    }
@@ -2949,6 +2942,7 @@ sub doMakeVlan($$@) {
 		    $errors++;
 		}
 	    }
+	    my @tports = map {$_->toIfaceString()} @ports;
 	    VLan->RecordVLanModification($source_vlan->id(), undef, @ports);
 	}
 	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
