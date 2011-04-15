@@ -110,6 +110,7 @@ if ($?) {
     exit(0);
 }
 require GeniDB;
+import GeniDB;
 require GeniCertificate;	  
 
 OneShot()
