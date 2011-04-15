@@ -1399,7 +1399,7 @@ COMMAND_PROTOTYPE(domanifest)
 	MYSQL_RES	*res = NULL;
 	MYSQL_ROW	row;
 	char		buf[2*MYBUFSIZE];
-	int		nrows;
+	int		nrows = 0;
 	int		disable_type = 0, disable_osid = 0, disable_node = 0;
 
 	res = mydb_query("select opt_name,opt_value"
@@ -1481,7 +1481,9 @@ COMMAND_PROTOTYPE(domanifest)
 			 /* 23 */
 			 "  cstype.alt_blob_id,cstype.enable,cstype.enable_hooks,"
 			 /* 26 */
-			 "  cstype.fatal,cstype.user_can_override"
+			 "  cstype.fatal,cstype.user_can_override,"
+			 /* 28 */
+			 "  cs.hooks_only"
 			 " from reserved as r"
 			 " left join nodes as n on r.node_id=n.node_id"
 			 " straight_join client_services as cs"
@@ -1523,7 +1525,7 @@ COMMAND_PROTOTYPE(domanifest)
 			 "        or csnode.enable is not NULL"
 			 "        or csos.enable is not NULL"
 			 "        or cstype.enable is not NULL)",
-			 28, reqp->exptidx, reqp->nodeid);
+			 29, reqp->exptidx, reqp->nodeid);
 	if (!res) {
 		error("MANIFEST: %s: DB Error getting manifest info!\n",
 		      reqp->nodeid);
@@ -1540,12 +1542,15 @@ COMMAND_PROTOTYPE(domanifest)
 		char *blobid = NULL;
 		int admin_service_not_overrideable = 0;
 		int admin_idx = 0;
+		int hooks_only;
+		int disable_admin = 0;
 
 		row = mysql_fetch_row(res);
+		hooks_only = (strcmp(row[28],"1") == 0) ? 1 : 0;
 
 		/* figure out which service control entry to use! */
 		/* start by choosing the per-node or per-experiment stuff */
-		if (row[5] != NULL) {
+		if (row[5] != NULL && !hooks_only) {
 		    enabled = row[5];
 		    hooks_enabled = row[6];
 		    fatal = row[7];
@@ -1558,7 +1563,7 @@ COMMAND_PROTOTYPE(domanifest)
 		    if (blobid == NULL)
 			blobid = row[4];
 		}
-		else if (row[9] != NULL) {
+		else if (row[9] != NULL && !hooks_only) {
 		    enabled = row[10];
 		    hooks_enabled = row[11];
 		    fatal = row[12];
@@ -1567,23 +1572,45 @@ COMMAND_PROTOTYPE(domanifest)
 			blobid = row[8];
 		}
 
-		if (row[17] != NULL && !disable_node) {
+		if (row[17] != NULL) {
 		    admin_idx = 13;
 		    if (strcmp(row[17],"0") == 0) {
 			admin_service_not_overrideable = 1;
 		    }
+		    if (disable_node) 
+			disable_admin = 1;
 		}
-		else if (row[22] != NULL && !disable_osid) {
+		else if (row[22] != NULL) {
 		    admin_idx = 18;
 		    if (strcmp(row[22],"0") == 0) {
 			admin_service_not_overrideable = 1;
 		    }
+		    if (disable_osid) 
+			disable_admin = 1;
 		}
-		else if (row[27] != NULL && !disable_type) {
-		    admin_idx = 22;
+		else if (row[27] != NULL) {
+		    admin_idx = 23;
 		    if (strcmp(row[27],"0") == 0) {
 			admin_service_not_overrideable = 1;
 		    }
+		    if (disable_type) 
+			disable_admin = 1;
+		}
+
+		/* If the user wants to ignore the admin setting, and
+		 * the admin allows it to be overridden, AND the user
+		 * didn't specify a control for this service... skip! */
+		if (disable_admin && !admin_service_not_overrideable 
+		    && enabled == NULL) {
+		    --nrows;
+		    continue;
+		}
+
+		/* If the admin set hooks_only on a service, and didn't
+		 * specify a service entry, bail! */
+		if (hooks_only && admin_idx == 0) {
+		    --nrows;
+		    continue;
 		}
 
 		/* If the admin seting can't be overridden, or if the
