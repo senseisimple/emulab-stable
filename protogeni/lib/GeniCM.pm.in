@@ -872,7 +872,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		$exclusive = 1;
-		if (! GeniXML::SetVirtualizationType($ref, "raw")) {
+		if (! GeniXML::SetVirtualizationSubtype($ref, "raw")) {
 		    $response = GeniResponse->Create(GENIRESPONSE_BADARGS,
 						     undef,
 			"Malformed rspec: Cannot set virtualization_type to raw");
@@ -1318,8 +1318,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    my $member = "$node_nickname:$iface_vport";
 	    my $bandwidth = 100000;
 
+	    # TODO: Allow asymmetric bandwidths
 	    # Let user override.
-	    my $user_bandwidth = GeniXML::GetText("bandwidth", $linkref);
+	    my $user_bandwidth = GeniXML::GetBandwidth($linkref);
 	    if (defined($user_bandwidth)) {
 		$bandwidth = $user_bandwidth;
 	    }
@@ -2530,10 +2531,25 @@ sub SliverWorkAux($$$$$$$)
 					       $iface1ref);
 	    my $node2_id    = GeniXML::GetText("virtual_node_id",
 					       $iface2ref);
-	    my $node1sliver = $nodemap{$node1_id};
-	    my $node2sliver = $nodemap{$node2_id};
-	    my $node1rspec  = $rspecmap{$node1_id};
-	    my $node2rspec  = $rspecmap{$node2_id};
+	    if (! GeniXML::IsVersion0($linkref)) {
+		my $iface1_id = GeniXML::GetInterfaceId($iface1ref);
+		$node1_id = $iface2node{$iface1_id}
+		  if (defined($iface1_id));
+		my $iface2_id = GeniXML::GetInterfaceId($iface2ref);
+		$node2_id = $iface2node{$iface2_id}
+		  if (defined($iface2_id));
+	    }
+
+	    my $node1sliver;
+	    my $node2sliver;
+	    my $node1rspec;
+	    my $node2rspec;
+	    if (defined($node1_id) && defined($node2_id)) {
+		$node1sliver = $nodemap{$node1_id};
+		$node2sliver = $nodemap{$node2_id};
+		$node1rspec  = $rspecmap{$node1_id};
+		$node2rspec  = $rspecmap{$node2_id};
+	    }
 
 	    if (! (defined($node1sliver) || (defined($node2sliver)))) {
 		$message = "$linkname: No local nodes for tunnel";

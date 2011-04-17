@@ -13,10 +13,10 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
 FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
-IsLanNode IsLocalNode IsTunnel GetExpires
+IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
-GetVirtualizationType SetVirtualizationType GetVirtualizationSubtype
+GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
 CreateDocument AddElement RemoveChild PolicyExists);
 
@@ -300,6 +300,42 @@ sub SetExpires($$)
     }
 }
 
+sub GetBandwidth($)
+{
+    my ($link) = @_;
+    my $result = undef;
+    if (IsVersion0($link)) {
+	$result = GeniXML::GetText("bandwidth", $link);
+    } else {
+	my $prop = FindFirst("n:property", $link);
+	$result = GeniXML::GetText("capacity", $prop);
+    }
+    return $result;
+}
+
+sub GetIp($$)
+{
+    my ($ifaceref, $node) = @_;
+    my $result = undef;
+    if (IsVersion0($ifaceref)) {
+	$result = GetText("tunnel_ip", $ifaceref);
+    } else {
+	my $id = GetInterfaceId($ifaceref);
+	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
+	foreach my $iface (@ifaces) {
+	    my $testid = GetInterfaceId($iface);
+	    if (defined($id) && defined($testid) && $testid eq $id) {
+		my $ip = FindFirst("n:ip", $iface);
+		if (defined($ip)) {
+		    $result = GetText("address", $ip);
+		}
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
 # Returns the uuid or urn of an RSpec node or undef if it is not a node.
 sub GetNodeId($)
 {
@@ -426,12 +462,18 @@ sub GetVirtualizationType($)
     return $result;
 }
 
-sub SetVirtualizationType($$)
+sub SetVirtualizationSubtype($$)
 {
     my ($node, $arg) = @_;
     my $result = 1;
     if (IsVersion0($node)) {
-	$result = SetText("virtualization_type", $node, $arg);
+	$result = SetText("virtualization_subtype", $node, $arg);
+    } else {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (! defined($type)) {
+	    $type = AddElement("sliver_type", $node);
+	}
+	SetText("name", $type, $arg);
     }
     return $result;
 }
