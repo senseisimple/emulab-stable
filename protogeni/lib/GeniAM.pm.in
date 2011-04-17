@@ -106,6 +106,7 @@ sub ListResources()
     my $available = $options->{'geni_available'};
     my $compress = $options->{'geni_compressed'};
     my $slice_urn = $options->{'geni_slice_urn'};
+    my $version    = $options->{'rspec_version'} || undef;
 
     my $xml = undef;
     if ($slice_urn) {
@@ -138,7 +139,8 @@ sub ListResources()
         # No slice was specified, so get the advertisement RSpec.
         my $discover_args = {
             'credentials' => $credentials,
-            'available' => $available
+            'available' => $available,
+	    'rspec_version' => $version,
         };
         my $response = GeniCMV2::DiscoverResources($discover_args);
         if (GeniResponse::IsError($response)) {

@@ -6,6 +6,9 @@
 #
 
 use strict;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 use libtmcc;
 
 my $blobid = undef;
