@@ -746,6 +746,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $osname;
 	my $node;
 
+	# Always populate iface2node mapping, even if we let the node
+	# pass through.
+	foreach my $linkref (GeniXML::FindNodes("n:interface",
+						$ref)->get_nodelist()) {
+	    my $virtual_id   = GeniXML::GetInterfaceId($linkref);
+	    $iface2node{$virtual_id} = $node_nickname;
+	}
+
 	# Let remote nodes pass through.
 	if (! GeniXML::IsLocalNode($ref)) {
 	    $external_nodemap{$node_nickname} = $ref;
@@ -1023,7 +1031,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
-	    my $virtual_id   = GeniXML::GetVirtualId($linkref);
+	    my $virtual_id   = GeniXML::GetInterfaceId($linkref);
 
 	    if (!defined($virtual_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -1031,8 +1039,6 @@ sub GetTicketAuxAux($$$$$$$$$)
 		goto bad;
 	    }
 
-	    $iface2node{$virtual_id} = $node_nickname;
-	    
 	    $ifacemap{$node_nickname} = {}
 	        if (!exists($ifacemap{$node_nickname}));
 
@@ -1112,8 +1118,15 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (!$istunnel) {
 	    foreach my $ref (@interfaces) {
 		my $node_nickname = GeniXML::GetInterfaceNodeId($ref);
+		if (! GeniXML::IsVersion0($ref)) {
+		    my $iface_id = GeniXML::GetInterfaceId($ref);
+		    if (defined($iface_id)) {
+			$node_nickname = $iface2node{$iface_id};
+		    }
+		}
 
-		if (exists($lannodes{$node_nickname})) {
+		if (defined($node_nickname)
+		    && exists($lannodes{$node_nickname})) {
 		    $lanname = $node_nickname;
 		}
 	    }
@@ -1135,7 +1148,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		goto bad;
 	    }
 
-	    if (! GeniXML::IsVersion0($ref)) {
+	    if (! GeniXML::IsVersion0($ref) && defined($iface_id)) {
 		$node_nickname = $iface2node{$iface_id};
 	    }
 
@@ -2070,6 +2083,16 @@ sub SliverWorkAux($$$$$$$)
 	my $node_nickname = GeniXML::GetVirtualId($ref);
 	my $manager_id    = GeniXML::GetManagerId($ref);
 	
+	# Always populate iface2node mapping, even if we let the node
+	# pass through.
+	foreach my $iface (GeniXML::FindNodes("n:interface",
+					     $ref)->get_nodelist()) {
+	    my $iface_id = GeniXML::GetInterfaceId($iface);
+	    if (defined($iface_id)) {
+		$iface2node{$iface_id} = $node_nickname;
+	    }
+	}
+
 	# Let remote nodes pass through.
 	if (! GeniXML::IsLocalNode($ref)) {
 	    $external_nodemap{$node_nickname} = $ref;
@@ -2117,13 +2140,6 @@ sub SliverWorkAux($$$$$$$)
 	else {
 	    $message = "$resource_id ($node) is not available";
 	    goto bad;
-	}
-	foreach my $iface (GeniXML::FindNodes("n:interface",
-					     $ref)->get_nodelist()) {
-	    my $iface_id = GeniXML::GetVirtualId($iface);
-	    if (defined($iface_id)) {
-		$iface2node{$iface_id} = $node_nickname;
-	    }
 	}
 	# Unincorporated nodes have no genisliver_idx.
 	my $restable = $node->ReservedTableEntry();
