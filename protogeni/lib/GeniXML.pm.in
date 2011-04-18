@@ -275,7 +275,7 @@ sub IsTunnel($)
 	my @types = FindNodes("n:link_type", $link)->get_nodelist();
 	foreach my $current (@types) {
 	    my $name = GetText("name", $current);
-	    if ($name eq "gre-tunnel") {
+	    if (defined($name) && $name eq "gre-tunnel") {
 		$result = 1;
 		last;
 	    }
@@ -342,7 +342,7 @@ sub GetNodeId($)
     my ($node) = @_;
     my $result = GetFirstText($node, "component_urn", "component_id",
 			      "component_uuid", "uuid");
-    if ($result eq "") {
+    if (defined($result) && $result eq "") {
 	$result = undef;
     }
     return $result;
@@ -379,7 +379,7 @@ sub GetManagerId($)
     my $result = GetFirstText($node, "component_manager_urn",
 			      "component_manager_id",
 			      "component_manager_uuid");
-    if ($result eq "") {
+    if (defined($result) && $result eq "") {
 	$result = undef;
     }
     return $result;
@@ -445,7 +445,7 @@ sub GetTarball($)
 		$result .= $install . " " . $url;
 	    }
 	}
-	if ($result eq "") {
+	if (defined($result) && $result eq "") {
 	    $result = undef;
 	}
     }
