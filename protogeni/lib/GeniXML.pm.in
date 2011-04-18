@@ -308,7 +308,9 @@ sub GetBandwidth($)
 	$result = GeniXML::GetText("bandwidth", $link);
     } else {
 	my $prop = FindFirst("n:property", $link);
-	$result = GeniXML::GetText("capacity", $prop);
+	if (defined($prop)) {
+	    $result = GeniXML::GetText("capacity", $prop);
+	}
     }
     return $result;
 }
@@ -418,7 +420,9 @@ sub GetStartupCommand($)
         $result = GetText("startup_command", $node);
     } else {
 	my $execute = FindFirst("n:services/n:execute", $node);
-	$result = GetText("command", $execute);
+	if (defined($execute)) {
+	    $result = GetText("command", $execute);
+	}
     }
     return $result;
 }
@@ -486,7 +490,9 @@ sub GetVirtualizationSubtype($)
 	$result = GetText("virtualization_subtype", $node);
     } else {
 	my $type = FindFirst("n:sliver_type", $node);
-	$result = GetText("name", $type);
+	if (defined($type)) {
+	    $result = GetText("name", $type);
+	}
     }
     return $result;
 }
