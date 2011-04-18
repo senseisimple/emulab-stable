@@ -1476,8 +1476,8 @@ sub Create($$$$$$)
     # These are the ips of the tunnel.
     my $ip1      = GeniXML::GetIp($iface1ref, $node1rspec);
     my $ip2      = GeniXML::GetIp($iface2ref, $node2rspec);
-    my $virtid1  = GeniXML::GetInterfaceNodeId($iface1ref);
-    my $virtid2  = GeniXML::GetInterfaceNodeId($iface2ref);
+    my $virtid1  = GeniXML::GetVirtualId($node1rspec);
+    my $virtid2  = GeniXML::GetVirtualId($node2rspec);
     my $ctrlip1;
     my $ctrlip2;
     my $iface1;
