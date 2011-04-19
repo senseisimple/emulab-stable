@@ -13,10 +13,10 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
 FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
-IsLanNode IsLocalNode IsTunnel GetExpires
+IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
-GetVirtualizationType SetVirtualizationType GetVirtualizationSubtype
+GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
 CreateDocument AddElement RemoveChild PolicyExists);
 
@@ -275,7 +275,7 @@ sub IsTunnel($)
 	my @types = FindNodes("n:link_type", $link)->get_nodelist();
 	foreach my $current (@types) {
 	    my $name = GetText("name", $current);
-	    if ($name eq "gre-tunnel") {
+	    if (defined($name) && $name eq "gre-tunnel") {
 		$result = 1;
 		last;
 	    }
@@ -300,13 +300,51 @@ sub SetExpires($$)
     }
 }
 
+sub GetBandwidth($)
+{
+    my ($link) = @_;
+    my $result = undef;
+    if (IsVersion0($link)) {
+	$result = GeniXML::GetText("bandwidth", $link);
+    } else {
+	my $prop = FindFirst("n:property", $link);
+	if (defined($prop)) {
+	    $result = GeniXML::GetText("capacity", $prop);
+	}
+    }
+    return $result;
+}
+
+sub GetIp($$)
+{
+    my ($ifaceref, $node) = @_;
+    my $result = undef;
+    if (IsVersion0($ifaceref)) {
+	$result = GetText("tunnel_ip", $ifaceref);
+    } else {
+	my $id = GetInterfaceId($ifaceref);
+	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
+	foreach my $iface (@ifaces) {
+	    my $testid = GetInterfaceId($iface);
+	    if (defined($id) && defined($testid) && $testid eq $id) {
+		my $ip = FindFirst("n:ip", $iface);
+		if (defined($ip)) {
+		    $result = GetText("address", $ip);
+		}
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
 # Returns the uuid or urn of an RSpec node or undef if it is not a node.
 sub GetNodeId($)
 {
     my ($node) = @_;
     my $result = GetFirstText($node, "component_urn", "component_id",
 			      "component_uuid", "uuid");
-    if ($result eq "") {
+    if (defined($result) && $result eq "") {
 	$result = undef;
     }
     return $result;
@@ -343,7 +381,7 @@ sub GetManagerId($)
     my $result = GetFirstText($node, "component_manager_urn",
 			      "component_manager_id",
 			      "component_manager_uuid");
-    if ($result eq "") {
+    if (defined($result) && $result eq "") {
 	$result = undef;
     }
     return $result;
@@ -382,7 +420,9 @@ sub GetStartupCommand($)
         $result = GetText("startup_command", $node);
     } else {
 	my $execute = FindFirst("n:services/n:execute", $node);
-	$result = GetText("command", $execute);
+	if (defined($execute)) {
+	    $result = GetText("command", $execute);
+	}
     }
     return $result;
 }
@@ -409,7 +449,7 @@ sub GetTarball($)
 		$result .= $install . " " . $url;
 	    }
 	}
-	if ($result eq "") {
+	if (defined($result) && $result eq "") {
 	    $result = undef;
 	}
     }
@@ -426,12 +466,18 @@ sub GetVirtualizationType($)
     return $result;
 }
 
-sub SetVirtualizationType($$)
+sub SetVirtualizationSubtype($$)
 {
     my ($node, $arg) = @_;
     my $result = 1;
     if (IsVersion0($node)) {
-	$result = SetText("virtualization_type", $node, $arg);
+	$result = SetText("virtualization_subtype", $node, $arg);
+    } else {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (! defined($type)) {
+	    $type = AddElement("sliver_type", $node);
+	}
+	SetText("name", $type, $arg);
     }
     return $result;
 }
@@ -444,7 +490,9 @@ sub GetVirtualizationSubtype($)
 	$result = GetText("virtualization_subtype", $node);
     } else {
 	my $type = FindFirst("n:sliver_type", $node);
-	$result = GetText("name", $type);
+	if (defined($type)) {
+	    $result = GetText("name", $type);
+	}
     }
     return $result;
 }

@@ -940,7 +940,7 @@ sub ProcessManifest($$)
 	    my $sliver_urn = GeniXML::GetSliverId($ref);
 	    if (defined($sliver_urn) && $sliver_urn eq $self->sliver_urn()) {
 		# startup command.
-		my $startupcmd = GeniXML::GetText("startup_command", $ref);
+		my $startupcmd = GeniXML::GetStartupCommand($ref);
 		if (defined($startupcmd)) {
 		    if (! TBcheck_dbslot($startupcmd, "virt_nodes",
 					 "startupcmd",

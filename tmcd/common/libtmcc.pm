@@ -665,8 +665,6 @@ sub tmccgetconfig()
 # 
 package libtmcc::blob;
 
-my $SERVERFILE = "$VARDIR/boot/bossip";
-    # tmcc.c jumps through hoops to get it... do we have to, too?
 my $NICKNAMEFILE = "$BOOTDIR/nickname";
 my $KEYHASHFILE = "$BOOTDIR/keyhash";
 
@@ -838,10 +836,7 @@ sub getblob($$;\@$) {
     $struct{'key'} = $key;
     close KEYHASH;
     
-    open BOSSIP, $SERVERFILE or die "$SERVERFILE: $!";
-    <BOSSIP> =~ /^(\d+\.\d+\.\d+\.\d++)$/;
-    $struct{'server'} = $1;
-    close BOSSIP;
+    (undef,$struct{'server'}) = libtmcc::tmccbossinfo();
     
     if( $debug ) {
         $, = " ";
