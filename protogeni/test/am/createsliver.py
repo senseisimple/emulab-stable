@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -60,6 +60,7 @@ print "Got my SA credential"
 #
 params = {}
 params["credential"] = mycredential
+params["version"]    = "am"
 rval,response = do_method("sa", "GetKeys", params)
 if rval:
     Fatal("Could not get my keys")
@@ -105,7 +106,7 @@ else:
 # Create the sliver.
 #
 print "Creating the Sliver ..."
-params = [SLICEURN, [myslice], rspec]
+params = [SLICEURN, [myslice], rspec, mykeys]
 
 try:
     response = do_method("am", "CreateSliver", params,
