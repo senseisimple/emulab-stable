@@ -1197,7 +1197,7 @@ sub mapVlansToSwitches(@)
     # This code is lifted from setPortVlan() in snmpit_stack.pm
     #
     foreach my $vlan_id (@vlan_ids) {
-	my @ports   = uniq(getVlanPorts($vlan_id),
+	my @ports   = uniq_ports(getVlanPorts($vlan_id),
 			   getExperimentVlanPorts($vlan_id));
 	my @devices = mapPortsToSwitches(@ports);
 
@@ -1738,6 +1738,22 @@ sub uniq(@) {
     foreach my $elt (@_) { $elts{$elt} = 1; }
     return keys %elts;
 }
+
+#                                                                                                                                                                                                                  
+# uniq for ports
+#                                                                                                                                                                                                                  
+sub uniq_ports(@) {
+    my %elts;
+    my @pts;
+    foreach my $p (@_) {
+        if (!exists($elts{$p->toString()})) {
+            $elts{$p->toString()} = 1;
+            push @pts, $p;
+	}
+    }
+    return @pts;
+}
+
 
 # End with true
 1;
