@@ -40,6 +40,7 @@ use emutil;
 use EmulabConstants;
 use libEmulab;
 use Lan;
+use Experiment;
 use English;
 use Data::Dumper;
 use XML::Simple;
@@ -49,6 +50,7 @@ use Time::Local;
 use Compress::Zlib;
 use File::Temp qw(tempfile);
 use MIME::Base64;
+use Digest::SHA1 qw(sha1_hex);
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -1945,21 +1947,6 @@ sub SliverWorkAux($$$$$$$)
 				    "Slice has expired");
     }
 
-    #
-    # Create the user.
-    #
-    my $owner = CreateUserFromCertificate($owner_cert);
-    return $owner
-	if (GeniResponse::IsResponse($owner));
-
-    if (defined($keys)) {
-	$response = CheckKeys($keys);
-	return $response
-	    if (GeniResponse::IsResponse($response));
-	
-	$owner->Modify(undef, undef, $keys);
-    }
-
     my $experiment = GeniExperiment($slice);
     if (!defined($experiment)) {
 	$slice->UnLock();
@@ -1970,6 +1957,23 @@ sub SliverWorkAux($$$$$$$)
     }
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
+
+    #
+    # Create the user.
+    #
+    my $owner = CreateUserFromCertificate($owner_cert);
+    return $owner
+	if (GeniResponse::IsResponse($owner));
+
+    if (defined($keys)) {
+	$response = AddKeys($slice, $owner, $keys);
+	if (GeniResponse::IsResponse($response)) {
+	    $slice->UnLock();
+	    $ticket->UnLock()
+		if (defined($ticket));
+	    return $response;
+	}
+    }
 
     #
     # Figure out what nodes to allocate or free. 
@@ -2183,16 +2187,6 @@ sub SliverWorkAux($$$$$$$)
 	    push(@freenodes, $sliver);
 	}
     }
-
-    #
-    # Create an emulab nonlocal user for tmcd.
-    #
-    if ($owner->BindToSlice($slice)) {
-	$message = "Error binding user to slice";
-	print STDERR "$message\n";
-	goto bad;
-    }
-			
 
     #
     # We are actually an Aggregate, so return an aggregate of slivers,
@@ -3564,13 +3558,7 @@ sub BindToSlice($)
     my $user = CreateUserFromCertificate($credential->owner_cert());
     return $user
 	if (GeniResponse::IsResponse($user));
-    if (defined($keys)) {
-	my $response = CheckKeys($keys);
-	return $response
-	    if (GeniResponse::IsResponse($response));
-	
-	$user->Modify(undef, undef, $keys);
-    }
+
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
@@ -3580,11 +3568,12 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Error binding slice to user");
     }
-    # Bind for existing slivers. 
-    if ($user->BindToSlice($slice) != 0) {
-	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Error binding user to slice");
+    if (defined($keys)) {
+	my $response = AddKeys($slice, $user, $keys);
+	if (GeniResponse::IsResponse($response)) {
+	    $slice->UnLock();
+	    return $response;
+	}
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
@@ -4229,7 +4218,7 @@ sub CreateUserFromCertificate($)
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Could not create user from your certificate")
 	if (!defined($user));
-
+    
     return $user;
 }
 
@@ -4562,7 +4551,6 @@ sub GeniExperiment($)
     my $gid  = $pid;
     my $hrn  = $slice->hrn();
     my $urn  = $slice->urn();
-    require Experiment;
 
     my $experiment = Experiment->Lookup($uuid);
     return $experiment
@@ -4799,27 +4787,120 @@ sub CheckTicket($)
     return $ticket;
 }
 
-sub CheckKeys($)
+sub AddKeys($$$)
 {
-    my ($keys) = @_;
+    my ($slice, $owner, $keys) = @_;
 
     goto bad
-	if (!ref($keys));
-    
-    foreach my $keyref (@{ $keys }) {
-	goto bad
-	    if (!ref($keyref));
-	
-	my $key  = $keyref->{'key'};
-	my $type = $keyref->{'type'};
+	if (! (ref($keys) && ref($keys) eq "ARRAY"));
 
-	goto bad
-	    if (! (defined($key) && defined($type) &&
+    my $slice_experiment = $slice->GetExperiment();
+    if (!$slice_experiment) {
+	print STDERR "AddKeys: No experiment for $slice\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+
+    my $keychecker = sub {
+	my ($arg) = @_;
+
+	return -1
+	    if (! (ref($arg) && ref($arg) eq "HASH"));
+
+	my $key  = $arg->{'key'};
+	my $type = $arg->{'type'};
+
+	return -1
+	    if (! (defined($arg) && defined($arg) &&
 		   $key ne "" && $type ne ""));
-    }		
+	
+	return 0;
+    };
+
+    #
+    # The old format (which we still want to support) was
+    # a single list of keys for the user redeeming a ticket.
+    #
+    # The new format is a list of users, each with sshkeys. 
+    # The hash key is the urn of the user. 
+    #
+    if (exists($keys->[0]->{'urn'}) || exists($keys->[0]->{'login'})) {
+	foreach my $ref (@{ $keys }) {
+	    goto bad
+		if (! (exists($ref->{'urn'}) || exists($ref->{'login'})));
+
+	    my @keylist = ();
+	    
+	    foreach my $keyref (@{ $ref->{'keys'} }) {
+		goto bad
+		    if (&$keychecker($keyref) != 0);
+
+		push(@keylist, $keyref->{'key'});
+	    }
+	    my $urn = $ref->{'urn'} if (exists($ref->{'urn'}));
+	    # Allow user to override urn token.
+	    my $uid = $ref->{'login'} if (exists($ref->{'login'}));
+	    my $name;
+	    my $email;
+	    
+	    # The slice owner is easy.
+	    if (defined($urn) && $urn eq $owner->urn()) {
+		$name  = $owner->name();
+		$email = $owner->email();
+		$uid   = $owner->uid()
+		    if (!defined($uid));
+	    }
+	    else {
+		#
+		# Trickier, since we have no email and no name, and
+		# we might have to derive the login uid from the urn, which
+		# might not even be a valid uid for Emulab. 
+		#
+		if (!defined($uid)) {
+		    my (undef,$type,$id) = GeniHRN::Parse($urn);
+		    if (!defined($id) || $type ne "user") {
+			goto bad;
+		    }
+		    $uid = $id;
+		}
+		$name = $uid;
+		$email = "root\@localhost";
+	    }
+	    if (! GeniUser->ValidUserID($uid)) {
+		my $digest = sha1_hex($uid);
+		$digest = substr($digest, 0, 7);
+		$uid = lc("u${digest}");
+		if (GeniUser->ValidUserID($uid)) {
+		    print STDERR "Cannot form a uid for $name\n";
+		    goto bad;
+		}
+	    }
+	    $slice_experiment->BindNonLocalUser(\@keylist,
+						$uid, $urn,
+						$name, $email)
+		== 0 or goto error;
+	}
+    }
+    else {
+	my @keylist = ();
+	
+	foreach my $keyref (@{ $keys }) {
+	    goto bad
+		if (&$keychecker($keyref) != 0);
+
+	    push(@keylist, $keyref->{'key'});
+	}
+	$slice_experiment->BindNonLocalUser(\@keylist,
+					    $owner->uid(),
+					    $owner->urn(),
+					    $owner->name(),
+					    $owner->email()) == 0
+	    or goto error;
+    }
     return 0;
   bad:
-    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys")
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys");
+  error:
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, "Internal Error");
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

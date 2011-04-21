@@ -28,6 +28,7 @@ use emutil;
 use Compress::Zlib;
 use MIME::Base64;
 use XML::LibXML;
+use Data::Dumper;
 
 # Disable UUID checks in GeniCredential.
 $GeniCredential::CHECK_UUID = 0;
@@ -240,35 +241,25 @@ sub CreateSliver()
         auto_add_sa($cred);
     }
 
-    # circulate through the users and bind them to the slice
-    my $caller_urn = $ENV{'GENIURN'};
-    my $caller_keys = undef;
-    foreach my $user (@$users) {
-        my $user_urn = $user->{'urn'};
-        # Skip if it is not the caller
-        next if ($user_urn ne $caller_urn);
-        $caller_keys = $user->{keys};
-    }
-
     # Package the caller_keys in a list of hashes the way the CM wants
     # it. Each hash has two keys ('type' and 'key'). 'type' is always
     # 'ssh' for us, and 'key' is the key.
-
     my $sliver_keys = undef;
-    if (defined($caller_keys)) {
-        $sliver_keys = [];
-        foreach my $key (@$caller_keys) {
-            # The CMV2 does not like newlines at the end of the keys.
-            chomp($key);
-            push(@$sliver_keys, {'type' => 'ssh', 'key' => $key});
-        }
+    if (@$users) {
+	$sliver_keys = [];
+	foreach my $user (@$users) {
+	    my $user_urn  = $user->{'urn'};
+	    my @user_keys = ();
+
+	    foreach my $key (@{ $user->{keys} }) {
+		# The CMV2 does not like newlines at the end of the keys.
+		chomp($key);
+		push(@user_keys, {'type' => 'ssh', 'key' => $key});
+	    }
+	    push(@{$sliver_keys}, {'urn'  => $user_urn,
+				   'keys' => \@user_keys});
+	}
     }
-
-    # This only gets us part of the way there. For users that are not
-    # *this* user, we need to somehow add their keys, which also
-    # requires adding them as a user *without* their certificate. Not
-    # sure we'll be able to do that.
-
     # Invoke CreateSliver
     my $create_args = {
         'slice_urn' => $slice_urn,
@@ -276,7 +267,6 @@ sub CreateSliver()
         'credentials' => $credentials,
         'keys' => $sliver_keys
     };
-
     my $response = GeniCMV2::CreateSliver($create_args);
     if (!ref($response)) {
 	# This is cause GeniCMV2::CreateSliver does a fork, and the child
