@@ -1220,7 +1220,7 @@ sub doListVlans ($) {
 	    my ($out,$in) = split "#", $pair;
 	    my $vlan = "$in#" . ${$vlans{$out}}[0] . "#";
 	    my $memberref = ${$vlans{$out}}[1];
-	    if (scalar(@$memberref) > 0 && ref(${@$memberref}[0])) {
+	    if (scalar(@$memberref) > 0 && ref(${$memberref}[0])) {
 	    	$vlan = $vlan.Port->toStrings(@$memberref);
 	    } else {
 	    	$vlan = join(' ', @$memberref);
@@ -1325,7 +1325,7 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	#
 	if ($opt{M}) {
 	    # Rather than node:port, print out node:MAC (if we know the MAC)
-	    if (scalar(@$memberref) > 0 && ref(${@$memberref}[0])) { 
+	    if (scalar(@$memberref) > 0 && ref(${$memberref}[0])) { 
 	    	$members = join(" ", map
 		    {
 			$_->mac()? $_->node_id().":".$_->mac():$_->toString()
@@ -1339,7 +1339,7 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 		} @ptobjs);
 	    }
 	} else {
-	    if (scalar(@$memberref) > 0 && ref(${@$memberref}[0])) { 
+	    if (scalar(@$memberref) > 0 && ref(${$memberref}[0])) { 
 	    	$members = Port->toStrings(@$memberref); 
 	    } else {
 	    	$members = join(" ",@$memberref);
