@@ -25,13 +25,7 @@
     <xs:attribute name="generated" type="xs:dateTime"/>
     <xs:attribute name="generated_by"/>
     <xs:attribute name="expires" type="xs:dateTime"/>
-    <xs:attribute name="type" use="required">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="request"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="type" use="required" type="rspec:RspecTypeContents"/>
   </xs:complexType>
   <xs:element name="node" type="rspec:NodeContents"/>
   <xs:element name="link" type="rspec:LinkContents"/>
@@ -56,6 +50,7 @@
           </xs:complexType>
         </xs:element>
       </xs:choice>
+      <xs:element ref="rspec:host"/>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="client_id" use="required"/>
@@ -71,6 +66,11 @@
   <xs:element name="services" type="rspec:ServiceContents"/>
   <xs:element name="interface" type="rspec:InterfaceContents"/>
   <xs:element name="disk_image" type="rspec:DiskImageContents"/>
+  <xs:element name="host">
+    <xs:complexType>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
   <xs:complexType name="ServiceContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:choice>
@@ -88,13 +88,21 @@
   <xs:element name="install" type="rspec:InstallServiceContents"/>
   <xs:element name="execute" type="rspec:ExecuteServiceContents"/>
   <xs:complexType name="LoginServiceContents">
-    <xs:group ref="rspec:AnyExtension"/>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:element ref="rspec:user"/>
+    </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="authentication" use="required"/>
     <xs:attribute name="hostname"/>
     <xs:attribute name="port"/>
     <xs:attribute name="username"/>
   </xs:complexType>
+  <xs:element name="user">
+    <xs:complexType>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
   <xs:complexType name="RelationContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
@@ -110,8 +118,11 @@
   </xs:complexType>
   <xs:complexType name="InterfaceContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:group ref="rspec:AnyExtension"/>
-      <xs:element ref="rspec:ip"/>
+      <xs:choice>
+        <xs:group ref="rspec:AnyExtension"/>
+        <xs:element ref="rspec:ip"/>
+      </xs:choice>
+      <xs:element ref="rspec:host"/>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="component_id"/>
@@ -142,6 +153,7 @@
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="client_id" use="required"/>
     <xs:attribute name="sliver_id" use="required"/>
+    <xs:attribute name="vlantag" use="required"/>
   </xs:complexType>
   <xs:element name="property" type="rspec:LinkPropertyContents"/>
   <xs:element name="component_hop" type="rspec:ComponentHopContents"/>

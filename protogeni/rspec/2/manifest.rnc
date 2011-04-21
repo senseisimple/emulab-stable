@@ -35,3 +35,5 @@ LoginServiceContents &=
   attribute username { text }? &
   # List of all usernames that can be used to log into the node.
   element user { attribute name { text } }*
+
+RspecTypeContents |= "manifest"
