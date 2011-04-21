@@ -660,25 +660,6 @@ if (@ports) {
 	die "Bad format for port ".join(" ", @optports)."\n";
     }
 
-    # foreach my $port (@ports) {
-	# if ($port =~ /^([^:]+):\d+$/) {
-	    # push @nodes, $1;
-	# } elsif ($port =~ /^([^.]+)\.\d+(\/\d+)?$/) {
-	    # push @switchports, $port;
-	# } elsif ($port =~ /^\d+\/\d+?$/) {
-	    # if ($opt{i} && @{$opt{i}} == 1) {
-		# $port = $opt{i}->[0] . "." . $port;
-		# push @switchports, $port;
-	    # } else {
-		# die "The module/port format is only legal if exactly one -i " .
-		    # "argument has been given\n";
-	    # }
-	# } else {
-	    # tbreport(SEV_ERROR, 'bad_data', 'port', $port);
-	    # die "Bad format for port $port\n"
-	# }
-    # }
-
     if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
 	tbreport(SEV_ERROR, 'insufficient_permissions');
 	die "You do not have permission to modify some or all of the nodes\n" .
@@ -855,20 +836,13 @@ COMMAND: foreach my $command (@commands) {
 	    my @newvlans = getExperimentVlans($pid,$eid,@optvlanids);
 	    my @oldvlans;
 	    VLan->StaleVlanList($experiment,\@oldvlans);
-	    @vlans = uniq(@newvlans, @oldvlans);
 
             if ($supplied_switches) {
-                debug("Sync: using supplied switches\n");
-                @devicenames = @supplied_switches;
-		@vlans = filterVlansBySwitches(\@supplied_switches, @vlans);
-		if (!@vlans) {
-		    print "snmpit: $pid/$eid has no VLANs to sync ".
-			"on supplied devices, skipping\n"
-			if (!$quiet);
-		    next COMMAND;
-		}
-            } else {
-                @devicenames = mapVlansToSwitches(@vlans);
+		die("-X and -i cannot be used together\n");
+            }
+	    else {
+                @devicenames = uniq(mapVlansToSwitches(@newvlans),
+				    mapStaleVlansToSwitches(@oldvlans));
                 debug("Sync: list from database: " . join(",",@devicenames) .
 		      "\n");
             }
@@ -945,7 +919,7 @@ COMMAND: foreach my $command (@commands) {
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
-    debug("Ports: " . join(",", map($_->toIfaceString(), @ports)) . "\n"); #@@@@     debug("Ports: " . join(",",@ports) . "\n");
+    debug("Ports: " . join(",", map($_->toIfaceString(), @ports)) . "\n"); 
     if (@vlans) { debug("VLANs: " . join(",",@vlans) . "\n") };
 
     my %stacks = ();
@@ -1244,9 +1218,13 @@ sub doListVlans ($) {
 	my @results;
 	foreach my $pair (split ',', $opt{L}) {
 	    my ($out,$in) = split "#", $pair;
-	    my $vlan = "$in#" . ${$vlans{$out}}[0] . "#" .
-					Port->toStrings(@{${$vlans{$out}}[1]});
-				    # join(' ', @{${$vlans{$out}}[1]});
+	    my $vlan = "$in#" . ${$vlans{$out}}[0] . "#";
+	    my $memberref = ${$vlans{$out}}[1];
+	    if (scalar(@$memberref) > 0 && ref(${@$memberref}[0])) {
+	    	$vlan = $vlan.Port->toStrings(@$memberref);
+	    } else {
+	    	$vlan = join(' ', @$memberref);
+	    }
 	    push @results, $vlan;
 	}
 	print join(',', @results);
@@ -1347,17 +1325,25 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	#
 	if ($opt{M}) {
 	    # Rather than node:port, print out node:MAC (if we know the MAC)
-	    $members = join(" ", map
-		{
+	    if (scalar(@$memberref) > 0 && ref(${@$memberref}[0])) { 
+	    	$members = join(" ", map
+		    {
 			$_->mac()? $_->node_id().":".$_->mac():$_->toString()
-		} @$memberref);
-		
-	    #$members = join(" ", map
-		#{
-		    #macport($_)? (split /:/)[0] . ":" . macport($_) : $_
-		#} @$memberref);
+		    } @$memberref);
+	    } else {		
+	    	my @ptobjs = map {Port->LookupByStringForced($_)} @$memberref;
+	    	 
+	    	$members = join(" ", map
+		{
+		    defined($_)?($_->mac()? $_->node_id().":".$_->mac():$_->toString()):""		    
+		} @ptobjs);
+	    }
 	} else {
-	    $members = Port->toStrings(@$memberref); #join(" ",@$memberref);
+	    if (scalar(@$memberref) > 0 && ref(${@$memberref}[0])) { 
+	    	$members = Port->toStrings(@$memberref); 
+	    } else {
+	    	$members = join(" ",@$memberref);
+	    }
 	}
 	write;
     }
@@ -1605,7 +1591,8 @@ sub doRestorePortStatus($@) {
 	    print "Could not yank $port from $source_vlan\n";
 	    $errors++;
 	}
-	VLan->RecordVLanModification($source_vlan->id(), undef, [$port->toIfaceString()]);
+	my @tmp = ($port->toIfaceString());
+	VLan->RecordVLanModification($source_vlan->id(), undef, \@tmp);
     }
     if (defined($target_vlan) && $target_vlan->KeepInSync()) {
 	if ($target_vlan->AddPort($port)) {
@@ -2506,8 +2493,6 @@ sub doSyncVlansWithDB($) {
 	foreach my $port (@$memberref) {
 	    push(@{ $allports{$vlan_id} }, $port);
 	    # Convert the ports to node:iface for the next call.
-	    # push(@{ $portmap{$vlan_id} }, portiface($port))
-		# if ((!($port =~ /\./)) && portiface($port));
 	    push (@{ $portmap{$vlan_id} }, $port);
 	}
     }
@@ -3128,7 +3113,8 @@ sub doPortControl($$@) {
 	# As below, only one stack.
 	my ($stack) = @$stacks;
 	#@@@@ not sure about the port format:
-	$errors = RemoteDoPortControl($stack,$command, map($_->toIfaceString(), @ports));
+	$errors = RemoteDoPortControl($stack,$command, @optports);
+	#$errors = RemoteDoPortControl($stack,$command, map($_->toIfaceString(), @ports));
 	goto finish;
     }
 
@@ -3240,7 +3226,8 @@ sub doTrunkEnable($$$@) {
 	# As below, only one stack.
 	my ($stack) = @$stacks;
 	# not sure about the port format:
-	$errors = RemoteDoTrunking($stack,$mode,$port->toIfaceString(),@vlans);
+	$errors = RemoteDoTrunking($stack,$mode,$optports[0],@vlans);
+	#$errors = RemoteDoTrunking($stack,$mode,$port->toIfaceString(),@vlans);
 	goto finish;
     }
     #
@@ -3278,7 +3265,8 @@ sub doTrunkDisable($$) {
 	my @vlans=();
 	# As below, only one stack.
 	my ($stack) = @$stacks;
-	$errors = RemoteDoTrunking($stack,"-U",$port,@vlans);
+	$errors = RemoteDoTrunking($stack,"-U",$optports[0],@vlans);
+	#$errors = RemoteDoTrunking($stack,"-U",$port,@vlans);
 	goto finish;
     }
     #

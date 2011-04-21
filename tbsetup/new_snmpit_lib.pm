@@ -36,7 +36,7 @@ use Exporter;
                 uniq isSwitchPort getPathVlanIfaces
 		reserveVlanTag getReservedVlanTag clearReservedVlanTag
                 convertPortFromString convertPortsFromStrings
-                mapVlansToSwitches
+                mapVlansToSwitches mapStaleVlansToSwitches
 );
 
 use English;
@@ -1105,7 +1105,7 @@ sub getDeviceOptions($) {
 # #@@@@ After port refactoring:
 # ( 'src' => { 'dst' => [ port1, port2 ] }, ... )
 #
-sub getTrunks() { #@@@@ OK
+sub getTrunks() {
 
     my %trunks = ();
     
@@ -1114,15 +1114,6 @@ sub getTrunks() { #@@@@ OK
     foreach my $p (@ports) {
 	    push @{ $trunks{$p->node_id()}{$p->other_end_node_id()} }, $p;
     }
-
-    #my $result = DBQueryFatal("SELECT node_id1, card1, port1, " .
-	#"node_id2, card2, port2 FROM wires WHERE type='Trunk'");
-
-    #while (my @row = $result->fetchrow()) {
-	#my ($node_id1, $card1, $port1, $node_id2, $card2, $port2)  = @row;
-	#push @{ $trunks{$node_id1}{$node_id2} }, "$card1.$port1";
-	#push @{ $trunks{$node_id2}{$node_id1} }, "$card2.$port2";
-    #}
 
     return %trunks;
 	
@@ -1135,7 +1126,7 @@ sub getTrunks() { #@@@@ OK
 # A reference to an array of unvisited switches: Use [keys %trunks]
 # Two siwtch names, the source and the destination 
 #
-sub getTrunkPath($$$$) { #@@@@ OK
+sub getTrunkPath($$$$) {
     my ($trunks, $unvisited, $src,$dst) = @_;
     if ($src eq $dst) {
 	#
@@ -1201,49 +1192,85 @@ sub mapVlansToSwitches(@)
 {
     my @vlan_ids = @_;
     my %switches = ();
-    my %trunks   = getTrunks();
 
     #
     # This code is lifted from setPortVlan() in snmpit_stack.pm
     #
     foreach my $vlan_id (@vlan_ids) {
-	my %devices = ();
-	my @ports   = getVlanPorts($vlan_id);
-	my %map     = mapPortsToDevices(@ports);
-
-	foreach my $device (keys %map) {
-	    $devices{$device} = 1;
-	}
-
-	#
-	# Add in the ports that we think are already in the vlan, since
-	# this might be a remove/modify operation. Can probably optimize
-	# this. 
-	#
-	@ports = getExperimentVlanPorts($vlan_id);
-	%map   = mapPortsToDevices(@ports);
-
-	foreach my $device (keys %map) {
-	    $devices{$device} = 1;
-	}
-
-	#
-	# Find out every switch which might have to transit this VLAN through
-	# its trunks.
-	#
-	my @trunks = getTrunksFromSwitches(\%trunks, keys %devices);
-	foreach my $trunk (@trunks) {
-	    my ($src,$dst) = @$trunk;
-	    $devices{$src} = $devices{$dst} = 1;
-	}
+	my @ports   = uniq(getVlanPorts($vlan_id),
+			   getExperimentVlanPorts($vlan_id));
+	my @devices = mapPortsToSwitches(@ports);
 
 	# And update the total set of switches.
-	foreach my $device (keys(%devices)) {
+	foreach my $device (@devices) {
 	    $switches{$device} = 1;
 	}
     }
     my @sorted = sort {tbsort($a,$b)} keys %switches;
     print "mapVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# An alternate version for a "stale" vlan; one that is destroyed cause of
+# a swapmod (syncVlansFromTables). 
+#
+sub mapStaleVlansToSwitches(@)
+{
+    my @vlan_ids = @_;
+    my %switches = ();
+
+    foreach my $vlan_id (@vlan_ids) {
+	#
+	# Get the ports that we think are already in the vlan, since
+	# this might be a remove/modify operation. Can probably optimize
+	# this. 
+	#
+	my @ports   = getExperimentVlanPorts($vlan_id);
+	my @devices = mapPortsToSwitches(@ports);
+
+	# And update the total set of switches.
+	foreach my $device (@devices) {
+	    $switches{$device} = 1;
+	}
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    print "mapStaleVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# Map a set of ports to the devices they are on plus the trunks.
+# See above.
+#
+sub mapPortsToSwitches(@)
+{
+    my @ports    = @_;
+    my %switches = ();
+    my %trunks   = getTrunks();
+    my %map      = mapPortsToDevices(@ports);
+    my %devices  = ();
+    
+    foreach my $device (keys %map) {
+	$devices{$device} = 1;
+    }
+
+    #
+    # This code is lifted from setPortVlan() in snmpit_stack.pm
+    #
+    # Find every switch which might have to transit this VLAN through
+    # its trunks.
+    #
+    my @trunks = getTrunksFromSwitches(\%trunks, keys %devices);
+    foreach my $trunk (@trunks) {
+	my ($src,$dst) = @$trunk;
+	$devices{$src} = $devices{$dst} = 1;
+    }
+    # And update the total set of switches.
+    foreach my $device (keys(%devices)) {
+	$switches{$device} = 1;
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
     return @sorted;
 }
 

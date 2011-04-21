@@ -525,15 +525,24 @@ sub convertPortFormat($$@) {
 	}
     } elsif ($input == $PORT_FORMAT_PORT) { 
     	if ($output == $PORT_FORMAT_IFINDEX) {
-	    $self->debug("Converting nodeport to ifindex\n",3);
-	    return map $self->{IFINDEX}{(split /:/, $_->getSwitchPort()->toTripleString())[1]}, @ports;
-	} elsif ($output == $PORT_FORMAT_MODPORT) {
-	    $self->debug("Converting nodeport to modport\n",3);
-	    return map { (split /:/, $_->getSwitchPort()->toTripleString())[1] } @ports;
-	} elsif ($output == $PORT_FORMAT_NODEPORT) {
-	    $self->debug("Converting modport to nodeport\n",3);
-	    return map $_->getPCPort()->toTripleString(), @ports;
-	}
+            $self->debug("Converting port to ifindex\n",3);
+            return map $self->{IFINDEX}{(split /:/,
+                                         ($_->node_id() eq $self->{NAME})?
+                                         $_->toTripleString():
+                                         $_->getOtherEndTripleString()
+                )[1]}, @ports;
+        } elsif ($output == $PORT_FORMAT_MODPORT) {
+            $self->debug("Converting port to modport\n",3);
+            return map { (split /:/,
+                          ($_->node_id() eq $self->{NAME})?
+                          $_->toTripleString():
+                          $_->getOtherEndTripleString()
+                )[1] } @ports;
+        } elsif ($output == $PORT_FORMAT_NODEPORT) {
+            $self->debug("Converting port to nodeport\n",3);
+            return map $_->getPCPort()->toTripleString(), @ports;
+        }
+
     }
 
     #
