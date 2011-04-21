@@ -3976,6 +3976,15 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSGROUPDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", GROUPDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
 		return 0;
 	}
 	else if (!usesfs) {
@@ -3991,6 +4000,23 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		/*
+		 * If pid!=gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(reqp->pid, reqp->gid)) {
+			bufp = buf;
+			if (!nomounts)
+				bufp += OUTPUT(bufp, ebufp-bufp,
+					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
+					       reqp->pid, reqp->gid);
+			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
+			       GROUPDIR, reqp->pid, reqp->gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			/* Leave this logging on all the time for now. */
+			info("MOUNTS: %s", buf);
+		}
 
 		/*
 		 * Skip all this for a vnode; client does not ask.
@@ -4026,22 +4052,6 @@ COMMAND_PROTOTYPE(domounts)
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		/*
-		 * If pid!=gid, then this is group experiment, and we return
-		 * a mount for the group directory too.
-		 */
-		if (strcmp(reqp->pid, reqp->gid)) {
-			bufp = buf;
-			if (!nomounts)
-				bufp += OUTPUT(bufp, ebufp-bufp,
-					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
-					       reqp->pid, reqp->gid);
-			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
-			       GROUPDIR, reqp->pid, reqp->gid);
-			client_writeback(sock, buf, strlen(buf), tcp);
-			/* Leave this logging on all the time for now. */
-			info("MOUNTS: %s", buf);
-		}
 	}
 	else if (usesfs) {
 		/*
