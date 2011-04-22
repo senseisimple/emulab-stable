@@ -3150,7 +3150,7 @@ sub IsNodeInAVlan($$)
     return $query_result->numrows;
 }
 
-sub FindVlanByPort_OLD($$$) #@@@@ deprecated
+sub FindVlanByPort_OLD($$$) 
 {
     my ($class, $experiment, $port) = @_;
     my ($node_id, $card) = split(":", $port);

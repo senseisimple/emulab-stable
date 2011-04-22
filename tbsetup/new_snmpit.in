@@ -458,8 +458,7 @@ if ($opt{B}) {
             tbdie "No port given in status string";
         }
         if ($args{port}) {
-            push @ports, convertPortsFromStrings($args{port}, $optdev);
-            # @@@@ !!!! #push @ports, convertPortsFromIfaces($args{port});
+            push @ports, convertPortsFromStrings($args{port}, $optdev);            
         }
     }
 }
@@ -612,14 +611,6 @@ if ($opt{y}) {
 		    "argument has been given";
 	    }
 	}
-	# if ($opt{z} =~ /^\d+\/\d+?$/) { #@@@@ whole block refactored
-	    # if ($opt{i} && @{$opt{i}} == 1) {
-		# $opt{z} = $opt{i}->[0] . "." . $opt{z};
-	    # } else {
-		# tbdie "The module/port format is only legal if exactly one -i " .
-		    # "argument has been given";
-	    # }
-	# }
 	push @pvlanArgs,$opt{x},$opt{z};
     }
 }
@@ -637,8 +628,7 @@ if ($opt{y}) {
 #
 # Convert ports into the correct format
 if (@ports) {	
-    @ports = convertPortsFromStrings(@ports, $optdev);
-    # @@@@ #@ports = convertPortsFromIfaces(@ports);
+    @ports = convertPortsFromStrings(@ports, $optdev);    
     if (scalar(@optports) != scalar(@ports)) {
 	die "Bad format for ports: ".join(" ", @optports)."\n";
     }
@@ -650,7 +640,6 @@ if (@ports) {
     # Only admins can do the latter, of course...
     #
 
-    # @@@@ large change
     my @pcports = grep {!$_->is_switch_side()} @ports;
     my @nodes = map {$_->node_id()} @pcports;
     my @switchports = grep {$_->is_switch_side()} @ports;
@@ -888,7 +877,7 @@ COMMAND: foreach my $command (@commands) {
             if (!$args{port}) {
                 tbdie "No port given in status string";
             }
-            @ports = Port->converPortsFromStrings($args{port}); #@@@@  @ports = convertPortsFromIfaces($args{port});
+            @ports = Port->converPortsFromStrings($args{port}); 
             if ($args{vlan}) {
                 @vlans = ($args{vlan});
             }
@@ -1542,7 +1531,6 @@ sub doRestorePortStatus($@) {
         tbdie "No port passed to -B option";
     }
     
-    #@@@@ tentatively add this:
     if (!ref($port)) {
 	    my $tport = convertPortFromString($port);
 	    if ($tport) {
@@ -3112,9 +3100,7 @@ sub doPortControl($$@) {
     if ($ELABINELAB) {
 	# As below, only one stack.
 	my ($stack) = @$stacks;
-	#@@@@ not sure about the port format:
 	$errors = RemoteDoPortControl($stack,$command, @optports);
-	#$errors = RemoteDoPortControl($stack,$command, map($_->toIfaceString(), @ports));
 	goto finish;
     }
 
@@ -3224,10 +3210,8 @@ sub doTrunkEnable($$$@) {
     if ($ELABINELAB) {
 	my $mode = $equaltrunking ? "-E" : "-T";
 	# As below, only one stack.
-	my ($stack) = @$stacks;
-	# not sure about the port format:
+	my ($stack) = @$stacks;	
 	$errors = RemoteDoTrunking($stack,$mode,$optports[0],@vlans);
-	#$errors = RemoteDoTrunking($stack,$mode,$port->toIfaceString(),@vlans);
 	goto finish;
     }
     #

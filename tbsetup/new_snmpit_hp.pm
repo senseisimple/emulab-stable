@@ -354,7 +354,7 @@ sub portControl ($$@) {
     my $cmd = shift;
     my @ports = @_;
 
-    #$self->debug("portControl: $cmd -> (@ports)\n");
+    $self->debug("portControl: $cmd -> (".Port->toStrings(@ports).")\n");
 
     #
     # Find the command in the %cmdOIDs hash (defined at the top of this file).
@@ -877,7 +877,6 @@ sub setPortVlan($$@) {
 
     return 0 unless(@ports);
     my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX, @ports);
-    #@@@@$self->debug("ports: " . join(",",@ports) . "\n");
     $self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
 
     #
@@ -960,7 +959,6 @@ sub setPortVlan($$@) {
     }
 
     my $onoroff = ($vlan_number ne "1") ? "enable" : "disable";
-    #@@@@$self->debug("$id; will $onoroff"  . join(',',@ports) . "...\n");
     if ( $rv = $self->portControl($onoroff, @ports) ) {
 	warn "$id: Port enable had $rv failures.\n";
 	$errors += $rv;
@@ -1006,7 +1004,6 @@ sub updateOneVlan($$$$$@)
 
     $self->lock();
     my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX, @ports);
-    #$self->debug("ports: " . join(",",@ports) . "\n");
     $self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
 
     my $vlist = $self->getVlanLists($vlan_number);
@@ -1152,7 +1149,6 @@ sub removeVlan($@) {
 sub UpdateField($$$@) {
     my ($self, $OID, $val, @ports)= @_;
     my $id = $self->{NAME} . "::UpdateField OID $OID value $val";
-    #@@@@$self->debug("$id: ports @ports\n");
 
     my $result = 0;
     my $oidval = $val;
@@ -1164,10 +1160,10 @@ sub UpdateField($$$@) {
 	$self->debug("checking row $row for $val ...\n");
 	$Status = $self->get1($OID,$row);
 	if (!defined($Status)) {
-	    print STDERR "id: Port $portname No answer from device\n"; #!@@@@
+	    print STDERR "id: Port $portname No answer from device\n"; 
 	    next;
 	}
-	$self->debug("Port $portname, row $row was $Status\n"); #!@@@@
+	$self->debug("Port $portname, row $row was $Status\n");
 	if ($OID eq "hpSwitchPortFastEtherMode") {
 	    #
 	    # Procurves use the same mib variable to set both
@@ -1202,7 +1198,7 @@ sub UpdateField($$$@) {
 	    }
 	}
 	if ($Status ne $oidval) {
-	    $self->debug("Setting $portname (r $row) to $oidval..."); #!@@@@
+	    $self->debug("Setting $portname (r $row) to $oidval...");
 	    $Status = $self->set([[$OID,$row,$oidval,"INTEGER"]]);
 	    $result =  (defined($Status)) ? 0 : -1;
 	    $self->debug($result ? "failed.\n" : "succeeded.\n");
@@ -1274,7 +1270,7 @@ sub listVlans($) {
 	@portlist = $self->portSetToList($value);
 	$self->debug("Got $oid $vlan_number @portlist\n",3);
 
-	foreach $ifIndex (@portlist) { #@@@@
+	foreach $ifIndex (@portlist) {
 	    ($node) = $self->convertPortFormat($PORT_FORMAT_PORT,$ifIndex);
 	    if (!$node) {
 		($modport) = $self->convertPortFormat
@@ -1298,7 +1294,6 @@ sub listVlans($) {
 	push @list, [$Names{$vlan_id},$vlan_id,$Members{$vlan_id}];
     }
 
-    #$self->debug($self->{NAME} .":". join("\n",(map {join ",", @$_} @list))."\n");
     return @list;
 }
 
@@ -1365,10 +1360,9 @@ sub listPorts($) {
     #
     my @rv = ();
     foreach my $id ( keys %Able ) {
-    	#@@@@ change here:
 	$modport = $self->{IFINDEX}{$id};
 	$portname = $self->{NAME} . ":$modport";
-	my $port = Port->LookupByTriple($portname); #@@@@ portnum($portname);
+	my $port = Port->LookupByTriple($portname); 
 	if (defined($port)) {
 		$port = $port->getPCPort();
 	}
@@ -1424,7 +1418,6 @@ sub getStats() {
 
             # See comments in walkTable above.
 
-	    #@@@@: change here:
             if (! defined $self->{IFINDEX}{$ifindex}) { next; }
             my $po = convertPortFromString("$self->{NAME}:$ifindex")
             	|| convertPortFromString("$self->{NAME}:".$self->{IFINDEX}{$ifindex});
@@ -1444,11 +1437,9 @@ sub getStats() {
 #
 # usage: resetVlanIfOnTrunk(self, modport, vlan)
 #
-sub resetVlanIfOnTrunk($$$) {#@@@done
+sub resetVlanIfOnTrunk($$$) {
     my ($self, $modport, $vlan) = @_;
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
-    #@@@@ $self->debug($self->{NAME} . "::resetVlanIfOnTrunk m $modport "
-    #@@@@ 		    . "vlan $vlan ifIndex $ifIndex\n",1);
     my $vlan_ports = $self->get1($egressOID, $vlan);
     if (testPortSet($vlan_ports, $ifIndex - 1)) {
 	$self->setVlansOnTrunk($modport,0,$vlan);
@@ -1521,7 +1512,7 @@ sub setVlansOnTrunk($$$$) {
 	warn "VLAN 1 passed to setVlansOnTrunk\n";
 	return 0;
     }
-    #@@@@$self->debug("$id: m $modport v $value nums @vlan_numbers\n");
+
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
 
     #

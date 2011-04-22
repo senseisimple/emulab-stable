@@ -16,7 +16,7 @@ use Exporter;
 @EXPORT = qw( macport portnum portiface Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
                 getSwitchesInStacks getVlanIfaces
-		getVlanPorts convertPortsFromIfaces convertPortFromIface
+		getVlanPorts
 		getExperimentTrunks setVlanTag setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
@@ -60,7 +60,7 @@ my $SNMPIT_SET = 1;
 my $SNMPIT_BULKWALK = 2;
 
 ##################################################
-#@@@@ deprecated:
+# deprecated:
 
 my %Devices=();
 # Devices maps device names to device IPs
@@ -77,7 +77,6 @@ my %IfaceModPorts=();
 my %Ports=();
 # Ports maps pcX:Y<==>switch:port
 
-#@@@@ deprecated!
 ##################################################
 
 my %vlanmembers=();
@@ -95,8 +94,7 @@ sub getTrunkPath($$$$);
 # Initialize the library
 #
 sub init($) {
-    $debug = shift || $debug;
-    &ReadTranslationTable;
+    $debug = shift || $debug;    
     return 0;
 }
 
@@ -141,125 +139,43 @@ sub convertPortsFromStrings(@;$)
 }
 
 #
+# Deprecated
 # Map between interfaces and mac addresses
 #
-sub macport { #@@@@ deprecated
-    #my $val = shift || "";
-    #return $Interfaces{$val};
+sub macport { 
     return undef;
 }
 
 #
+# Deprecated
 # Map between node:iface and port numbers
 #
-sub portiface { #@@@@ deprecated
-    #my $val = shift || "";
-    #return $PortIface{$val};
+sub portiface { 
     return undef;
 }
 
 
 #
+# Deprecated
 # Map between switch interfaces and port numbers
 #
-sub portnum { #@@@@ deprecated
-    #my $val = shift || "";
-    #return $Ports{$val};
+sub portnum {
     return undef;
 }
 
 #
+# Deprecated
 # Map between interfaces and the devices they are attached to
 #
-sub Dev { #@@@@ deprecated
-    #my $val = shift || "";
-    #return $Devices{$val};
+sub Dev { 
     return undef;
 }
 
 #
+# Deprecated
 # Map between ifaces and switch port
 #
-sub ifacemodport { #@@@@ deprecated
-    #my $val = shift || "";
-    #return $IfaceModPorts{$val};
-    return undef;
-}
-
-#
-# This function fills in %Interfaces and %Ports
-# They hold pcX:Y<==>MAC and pcX:Y<==>switch:port respectively
-#
-sub ReadTranslationTable { #@@@@ deprecated
-    #my $name="";
-    #my $mac="";
-    #my $iface="";
-    #my $switchport="";
-
-    #print "FILLING %Interfaces\n" if $debug;
-    #my $result =
-	#DBQueryFatal("select node_id,card,port,mac,iface from interfaces");
-    #while ( @_ = $result->fetchrow_array()) {
-	#$name = "$_[0]:$_[1]";
-	#$iface = "$_[0]:$_[4]";
-	#if ($_[2] != 1) {$name .=$_[2]; }
-	#$mac = "$_[3]";
-	#$Interfaces{$name} = $mac;
-	#$Interfaces{$mac} = $name;
-	#$PortIface{$name} = $iface;
-	#$PortIface{$iface} = $name;
-	#$IfaceModPorts{$iface} = $name.".$_[2]";
-	#$IfaceModPorts{$name.".$_[2]"} = $iface;
-	#print "Interfaces: $mac <==> $name\n" if $debug > 1;
-    #}
-
-    #print "FILLING %Ports\n" if $debug;
-    #$result = DBQueryFatal("select node_id1,card1,port1,node_id2,card2,port2 ".
-	    #"from wires;");
-    #while ( my @row = $result->fetchrow_array()) {
-        #my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
-	#$name = "$node_id1:$card1";
-	#print "Name='$name'\t" if $debug > 2;
-	#print "Dev='$node_id2'\t" if $debug > 2;
-	#$switchport = "$node_id2:$card2.$port2";
-	#print "switchport='$switchport'\n" if $debug > 2;
-	#$Ports{$name} = $switchport;
-	#$Ports{$switchport} = $name;
-	#print "Ports: '$name' <==> '$switchport'\n" if $debug > 1;
-    #}
-
-}
-
-#
-# Return an array of ifaces belonging to the VLAN
-#
-sub getVlanIfaces($) { #@@@@ deprecated
-    #my $vlanid = shift;
-    #my @ports = ();
-
-    #my $vlan = VLan->Lookup($vlanid);
-    #if (!defined($vlan)) {
-        #die("*** $0:\n".
-	    #"    No vlanid $vlanid in the DB!\n");
-    #}
-    #my @members;
-    #if ($vlan->MemberList(\@members) != 0) {
-        #die("*** $0:\n".
-	    #"    Unable to load members for $vlan\n");
-	#}
-    #foreach my $member (@members) {
-	#my $nodeid;
-	#my $iface;
-	
-	#if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
-	    #$member->GetAttribute("iface", \$iface) != 0) {
-	    #die("*** $0:\n".
-		#"    Missing attributes for $member in $vlan\n");
-	#}
-	#push(@ports, "$nodeid:$iface");
-    #}
-
-    #return @ports;
+sub ifacemodport { 
     return undef;
 }
 
@@ -268,7 +184,7 @@ sub getVlanIfaces($) { #@@@@ deprecated
 # that consists of two layer 1 connections and also has a switch as
 # the middle node.
 #
-sub getPathVlanIfaces($$) { #@@@@ OK
+sub getPathVlanIfaces($$) {
     my $vlanid = shift;
     my $ifaces = shift;
 
@@ -336,8 +252,7 @@ sub getPathVlanIfaces($$) { #@@@@ OK
 			    warn "Vlan ".$myvlan->id()." doesnot have exact two ports.\n";
 			    return -1;
 			}
-			
-			# #@@@@ should use Port's class functions: 
+				       
 			if ($pref[0] eq "$node:$iface") {
 			    $ifacesonswitchnode{"$node:$iface"} = $pref[1];
 			} else {
@@ -357,7 +272,7 @@ sub getPathVlanIfaces($$) { #@@@@ OK
 #
 # Returns an array of ports (in node:card form) used by the given VLANs
 #
-sub getVlanPorts (@) { #@@@@ large change
+sub getVlanPorts (@) { 
     my @vlans = @_;
     # Silently exit if they passed us no VLANs
     if (!@vlans) {
@@ -396,11 +311,10 @@ sub getVlanPorts (@) { #@@@@ large change
 # Returns an an array of trunked ports (in node:card form) used by an
 # experiment
 #
-sub getExperimentTrunks($$) { #@@@@ OK
+sub getExperimentTrunks($$) {
     my ($pid, $eid) = @_;
     my @ports;
 
-    #@@@@ this function should not be aware of the seperated fields of a port
     my $query_result =
 	DBQueryFatal("select distinct r.node_id,i.iface from reserved as r " .
 		     "left join interfaces as i on i.node_id=r.node_id " .
@@ -409,11 +323,9 @@ sub getExperimentTrunks($$) { #@@@@ OK
 
     while (my ($node, $iface) = $query_result->fetchrow()) {
 	$node = Port->LookupByIface($node, $iface);
-	#$node = $node . ":" . $iface;
 	push @ports, $node;
     }
     return @ports;
-    #return convertPortsFromIfaces(@ports);
 }
 
 #
@@ -421,11 +333,10 @@ sub getExperimentTrunks($$) { #@@@@ OK
 # experiment. These are the ports that are actually in trunk mode,
 # rather then the ports we want to be in trunk mode (above function).
 #
-sub getExperimentCurrentTrunks($$) { #@@@@ OK
+sub getExperimentCurrentTrunks($$) {
     my ($pid, $eid) = @_;
     my @ports;
 
-    #@@@@ this function should not be aware of the seperated fields of a port
     my $query_result =
 	DBQueryFatal("select distinct r.node_id,i.iface from reserved as r " .
 		     "left join interface_state as i on i.node_id=r.node_id " .
@@ -434,18 +345,16 @@ sub getExperimentCurrentTrunks($$) { #@@@@ OK
 
     while (my ($node, $iface) = $query_result->fetchrow()) {
 	$node = Port->LookupByIface($node, $iface);
-	#$node = $node . ":" . $iface;
 	push @ports, $node;
     }
     return @ports;
-    #return convertPortsFromIfaces(@ports);
 }
 
 #
-# Returns an an array of ports (in node:card form) that currently in
+# Returns an an array of ports that currently in
 # the given vlan.
 #
-sub getExperimentVlanPorts($) { #@@@@ OK
+sub getExperimentVlanPorts($) { 
     my ($vlanid) = @_;
 
     my $query_result =
@@ -457,14 +366,14 @@ sub getExperimentVlanPorts($) { #@@@@ OK
     my ($members) = $query_result->fetchrow_array();
     my @members   = split(/\s+/, $members);
 
-    return Port->LookupByIfaces(@members); #convertPortsFromIfaces(@members);
+    return Port->LookupByIfaces(@members); 
 }
 
 #
 # Get the list of stacks that the given set of VLANs *will* or *should* exist
 # on
 #
-sub getPlannedStacksForVlans(@) { #@@@@ OK
+sub getPlannedStacksForVlans(@) { 
     my @vlans = @_;
 
     # Get VLAN members, then go from there to devices, then from there to
@@ -627,7 +536,7 @@ sub filterPlannedVlans(@) {
 #
 # Update database to mark port as enabled or disabled.
 #
-sub setPortEnabled($$) { #@@@@ OK
+sub setPortEnabled($$) { 
     my ($port, $enabled) = @_;
 
     my ($node, $card) = ($port->node_id(), $port->card());
@@ -638,8 +547,9 @@ sub setPortEnabled($$) { #@@@@ OK
     
     return 0;
 }
+
 # Ditto for trunked.
-sub setPortTagged($$) { #@@@@ OK
+sub setPortTagged($$) { 
     my ($port, $tagged) = @_;
 
     my ($node, $card) = ($port->node_id(), $port->card());
@@ -649,71 +559,11 @@ sub setPortTagged($$) { #@@@@ OK
 		 "where node_id='$node' and card='$card'");
 }
 
-#
-# Convert an entire list of ports in port:iface format to into port:card -
-# returns other port forms unchanged.
-#
-sub convertPortsFromIfaces(@) { #@@@@ deprecated
-    my @ports = @_;
-    return map {
-        if (/(.+):([A-Za-z].*)/) {
-            # Seems to be a node:iface line
-            convertPortFromIface($_);
-        } else {
-            $_;
-        }
-    } @ports;
-
-}
-
-#
-# Convert a port in port:iface format to port:card
-#
-sub convertPortFromIface($) { #@@@@ deprecated
-    my ($port) = $_;
-    if ($port =~ /(.+):(.+)/) {
-	my ($node,$iface) =  ($1,$2);
-        my $result = DBQueryFatal("SELECT card, port FROM interfaces " .
-				  "WHERE node_id='$node' AND iface='$iface'");
-        if (!$result->num_rows()) {
-            warn "WARNING: convertPortFromIface($port) - Unable to get card\n";
-            return $port;
-        }
-        my @row = $result->fetchrow();
-        my $card = $row[0];
-        my $cport = $row[1];
-
-        $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
-                               "(SELECT type FROM nodes WHERE node_id='$node')");
-
-        if (!$result->num_rows()) {
-            warn "WARNING: convertPortFromIface($port) -".
-                " Uable to decide if $node is a switch or not\n";
-            return $port;
-        }
-
-        if (($result->fetchrow())[0] == 1) {
-	    #
-	    # Should return the later one, but many places in snmpit
-	    # and this file depend on the old format...
-	    #
-            return "$node:$card";
-            #return "$node:$card.$cport";                                            
-        }
-
-        return "$node:$card";
-
-    } else {
-        warn "WARNING: convertPortFromIface($port) - Bad port format\n";
-        return $port;
-    }
-}
-
 #                                                                                    
 # If a port is on switch, some port ops in snmpit                                    
 # should be avoided.                                                                 
 #                                                                                    
-sub isSwitchPort($) { #@@@@ OK
+sub isSwitchPort($) {
 	my $port = shift;
 
 	my $node = $port->node_id();	
@@ -770,7 +620,7 @@ sub getExperimentPorts ($$) {
 #
 # Returns an array of control net ports used by a given experiment
 #
-sub getExperimentControlPorts ($$) { #@@@@ OK
+sub getExperimentControlPorts ($$) {
     my ($pid, $eid) = @_;
 
     # 
@@ -784,13 +634,12 @@ sub getExperimentControlPorts ($$) { #@@@@ OK
     #
     # Get control net interfaces
     #
-    #my @ports =  map { $_->node_id() . ":" . $_->control_iface() } @nodes;
     my @ports = map { Port->LookupByIface($_->node_id(), $_->control_iface()) } @nodes;
 
     #
     # Convert from iface to port number when we return
     #
-    return @ports; #@@@@ return convertPortsFromIfaces(@ports);
+    return @ports; 
 }
 
 #
@@ -798,7 +647,7 @@ sub getExperimentControlPorts ($$) { #@@@@ OK
 #
 # Returns an array of the names of all devices used in the given ports
 #
-sub getDeviceNames(@) { # @@@@ refactored to use Port class
+sub getDeviceNames(@) { 
     my @ports = @_;
     my %devices = ();
     foreach my $port (@ports) {
@@ -817,7 +666,7 @@ sub getDeviceNames(@) { # @@@@ refactored to use Port class
 # Returns a hash, keyed by device, of all ports in the given list that are
 # on that device
 #
-sub mapPortsToDevices(@) { #@@@@ OK
+sub mapPortsToDevices(@) { 
     my @ports = @_;
     my %map = ();
     foreach my $port (@ports) {
@@ -851,7 +700,7 @@ sub getDeviceType ($) {
 #
 # Returns (current_speed,duplex) for the given interface (in node:port form)
 #
-sub getInterfaceSettings ($) { #@@@@ OK
+sub getInterfaceSettings ($) { 
 
     my ($interface) = @_;
 
@@ -861,12 +710,6 @@ sub getInterfaceSettings ($) { #@@@@ OK
     if (isSwitchPort($interface)) {
 	return ();
     }
-
-    #$interface =~ /^(.+):(\d+)$/;
-    #my ($node, $port) = ($1, $2);
-    #if ((!defined $node) || (!defined $port)) {
-	#die "getInterfaceSettings: Bad interface ($interface) given\n";
-    #}
     
     my $node = $interface->node_id();
     my $port = $interface->port();
@@ -1102,7 +945,7 @@ sub getDeviceOptions($) {
 # ('cisco1' => { 'cisco3' => ['1.1','1.2'] },
 #  'cisco3' => { 'cisco1' => ['2.1','2.2'] } )
 #
-# #@@@@ After port refactoring:
+# After port refactoring:
 # ( 'src' => { 'dst' => [ port1, port2 ] }, ... )
 #
 sub getTrunks() {
@@ -1280,7 +1123,7 @@ sub mapPortsToSwitches(@)
 # (cisco1, cisco3, cisco4), the return value is:
 # ([cisco1, cisco3], [cisco3, cisco4])
 #
-sub getTrunksFromPath(@) { #@@@@ OK
+sub getTrunksFromPath(@) { 
     my @path = @_;
     my @trunks = ();
     my $lastswitch = "";
@@ -1298,7 +1141,7 @@ sub getTrunksFromPath(@) { #@@@@ OK
 # Given a list of lists of trunks (returned by multiple getTrunksFromPath() 
 # calls), return a list of the unique trunks found in this list
 #
-sub getUniqueTrunks(@) { #@@@@ OK
+sub getUniqueTrunks(@) { 
     my @trunkLists = @_;
     my @unique = ();
     foreach my $trunkref (@trunkLists) {
@@ -1329,7 +1172,7 @@ sub getUniqueTrunks(@) { #@@@@ OK
 # return a list of all trunks (in the [src, dest] form) that are needed to span
 # all the switches (ie. which trunks the VLAN must be allowed on)
 #
-sub getTrunksFromSwitches($@) { #@@@@ OK
+sub getTrunksFromSwitches($@) { 
     my $trunks = shift;
     my @switches = @_;
 
@@ -1369,7 +1212,7 @@ sub getTrunksFromSwitches($@) { #@@@@ OK
 # ('cisco1' => { 'cisco3' => ['1.1','1.2'] },
 #  'cisco3' => { 'cisco1' => ['2.1','2.2'] } )
 #
-sub getTrunkHash() { #@@@@! used by other module, not in Apcon's chain.
+sub getTrunkHash() { 
     my %trunks = getTrunks();
     my %trunkhash = ();
     foreach my $switch1 (keys %trunks) {

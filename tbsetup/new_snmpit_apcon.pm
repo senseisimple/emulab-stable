@@ -224,16 +224,6 @@ sub createExpectObject($)
     return $exp;
 }
 
-#
-# Convert port format between switch format and db format
-# the original format is auto-detected.
-# simply, a switch port starts with A-Z, or A-I on Apcon 2000 series
-# while a db port is totally number: card.port.
-#
-sub convertPortFormat($$) #@@@@ deprecated
-{
-    return undef;
-}
 
 sub toApconPort($$)
 {
@@ -264,21 +254,6 @@ sub fromApconPort($$)
         return $ap;
 }
 
-
-#
-# More robust version of convertPortFromNode2Dev
-#
-sub getRealSwitchPortFromPCPort($$) { #@@@@ deprecated    
-    return undef;    
-}
-
-#
-# Try to guess if the given ports contains switch ports
-# and refine it to be full port format.
-#
-sub refineVlanPorts($$@) { #@@@@ deprecated
-    return undef;
-}
 
 ##############################################################################
 
@@ -835,14 +810,6 @@ sub setPortRate($$$)
 }
 
 #
-# Internal
-# convert port format from pcxx:card to [A-I][0-9]{2}
-#
-sub convertPortFromNode2Dev($$) { #@@@@ deprecated
-        return undef;
-}
-
-#
 # Set a variable associated with a port. The commands to execute are given
 # in the apcon_clilib::portCMDs hash
 #
@@ -1252,15 +1219,6 @@ sub vlanHasPorts($$) {
     }
 
     return 0;
-}
-
-
-#
-# Internal
-# Convert from switch device port to pc node port
-#
-sub convertPortFromDev2Node($$) { #@@@@ deprecated
-        return undef;
 }
 
 

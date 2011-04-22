@@ -1575,12 +1575,6 @@ sub listVlans($) {
         # XXX: This should really print out something more useful, like the
         # other end of the trunk
         my $node = $self->{NAME} . ".trunk$ifIndex";
-        #my ($node) = $self->convertPortFormat($PORT_FORMAT_NODEPORT,$ifIndex);
-        #if (!$node) {
-        #    my ($modport) = $self->convertPortFormat($PORT_FORMAT_MODPORT,$ifIndex);
-        #    $modport =~ s/\./\//;
-        #    $node = $self->{NAME} . ".$modport";
-        #}
 
 	# Get the allowed VLANs on this trunk
 	my @trunklans = $self->vlanTrunkUtil($VOP_CHECK, $ifIndex, keys %Names);

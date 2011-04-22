@@ -382,7 +382,7 @@ sub setPortVlan($$@) {
 
     #
     # When making firewalls, may have to flush FDB entries from trunks
-    # #@@@@ fine here
+    # 
     foreach my $vlan (keys %BumpedVlans) {
 	foreach my $devicename ($self->switchesWithPortsInVlan($vlan)) {
 	    my $dev = $self->{DEVICES}{$devicename};
@@ -1178,8 +1178,6 @@ sub setVlanOnTrunks2($$$$@) {
 		     "for $src-$dst EtherChannel\n";
                 $errors += 1;
             } else { 
-		#@@@@ Port doesn't matter here. But device::setVlansOnTrunk 
-		#@@@@ needs special care of trunkIndex
 		if (!$self->{DEVICES}{$src}->
                         setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
                     warn "ERROR - unable to set trunk on switch $src\n";
@@ -1201,8 +1199,6 @@ sub setVlanOnTrunks2($$$$@) {
 		     "for $src-$dst EtherChannel\n";
                 $errors += 1;
             } else {
-		#@@@@ Port doesn't matter here. But device::setVlansOnTrunk 
-		#@@@@ needs special care of trunkIndex
 		if (!$self->{DEVICES}{$dst}->
                         setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
                     warn "ERROR - unable to set trunk on switch $dst\n";
