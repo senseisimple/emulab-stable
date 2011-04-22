@@ -142,9 +142,6 @@ $SIG{HUP} = \&handler
 
 GeniUtil::FlipToGeniUser();
 
-# Do not wait long.
-Genixmlrpc->SetTimeout(10);
-
 #
 # Probe CMs
 #
@@ -185,21 +182,23 @@ sub ProbeCMs()
 	# Returns a string of xml.
 	#
 	my $resources = $authority->DiscoverResources(undef, 0);
-	# Errors will go to the log.
-	next
-	    if (!defined($resources));
+	if (defined($resources)) {
+	    if (open(OUT, "> $ADDIR/$urn")) {
+		print OUT $resources;
+		print OUT "\n";
+		close(OUT);
 
-	if (open(OUT, "> $ADDIR/$urn")) {
-	    print OUT $resources;
-	    print OUT "\n";
-	    close(OUT);
-
-	    # Save the name so we can write the text file at the end.
-	    $ads{$urn} = $urn;
+		# Save the name so we can write the text file at the end.
+		$ads{$urn} = $urn;
+	    }
+	    else {
+		notify("Could not open $ADDIR/$urn for output\n");
+		next;
+	    }
 	}
-	else {
-	    notify("Could not open $ADDIR/$urn for output\n");
-	    next;
+	elsif (-e "$ADDIR/$urn" && -s "$ADDIR/$urn") {
+	    # Reuse the old one.
+	    $ads{$urn} = $urn;
 	}
     }
     if (open(MAP, "> $ADDIR/list.txt")) {

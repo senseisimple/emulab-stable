@@ -2811,15 +2811,18 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Need a list of keys for this user.
 		 */
-		pubkeys_res = mydb_query("select idx,pubkey "
-					 " from %s "
-					 "where uid_idx='%s'",
-					 2,
-					 (didnonlocal ?
-					  "nonlocal_user_pubkeys" :
-					  "user_pubkeys"),
-					 row[17]);
-
+		if (didnonlocal) {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from nonlocal_user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
+		else {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
 		if (!pubkeys_res) {
 			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
 			goto skipkeys;
@@ -2958,22 +2961,30 @@ COMMAND_PROTOTYPE(doaccounts)
 	if (reqp->genisliver_idx && !didnonlocal &&
 	    (reqp->isvnode || !reqp->sharing_mode[0])) {
 	        didnonlocal = 1;
-
+		
+		/*
+		 * Within the nonlocal_user_accounts table, we do not
+		 * maintain globally unique unix_uid numbers, since these
+		 * accounts are per slice (experiment). Instead, just
+		 * use an auto_increment field, which always starts at
+		 * 1, and so to create a unix_gid, we just bump the
+		 * number into a typically unused area of the space.
+		 */
 		res = mydb_query("select distinct "
-				 "  u.uid,'*',u.uid_idx,u.name, "
+				 "  u.uid,'*', "
+				 "  u.unix_uid+20000,"
+				 "  u.name, "
 				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
 				 "  NULL,NULL, "
 				 "  UNIX_TIMESTAMP(now()), "
 				 "  u.email,'csh', "
 				 "  0,0, "
 				 "  NULL,u.uid_idx "
-				 "from nonlocal_user_bindings as b "
-				 "join nonlocal_users as u on "
-				 "     b.uid_idx=u.uid_idx "
+				 "from nonlocal_user_accounts as u "
 				 "join groups as g on "
 				 "     g.pid='%s' and "
 				 "     (g.pid=g.gid or g.gid='%s') "
-				 "where (b.exptidx='%d') "
+				 "where (u.exptidx='%d') "
 				 "order by u.uid",
 				 18, reqp->pid, reqp->gid,
 				 reqp->exptidx);
@@ -3976,6 +3987,15 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSGROUPDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", GROUPDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
 		return 0;
 	}
 	else if (!usesfs) {
@@ -3991,6 +4011,23 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		/*
+		 * If pid!=gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(reqp->pid, reqp->gid)) {
+			bufp = buf;
+			if (!nomounts)
+				bufp += OUTPUT(bufp, ebufp-bufp,
+					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
+					       reqp->pid, reqp->gid);
+			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
+			       GROUPDIR, reqp->pid, reqp->gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			/* Leave this logging on all the time for now. */
+			info("MOUNTS: %s", buf);
+		}
 
 		/*
 		 * Skip all this for a vnode; client does not ask.
@@ -4026,22 +4063,6 @@ COMMAND_PROTOTYPE(domounts)
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		/*
-		 * If pid!=gid, then this is group experiment, and we return
-		 * a mount for the group directory too.
-		 */
-		if (strcmp(reqp->pid, reqp->gid)) {
-			bufp = buf;
-			if (!nomounts)
-				bufp += OUTPUT(bufp, ebufp-bufp,
-					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
-					       reqp->pid, reqp->gid);
-			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
-			       GROUPDIR, reqp->pid, reqp->gid);
-			client_writeback(sock, buf, strlen(buf), tcp);
-			/* Leave this logging on all the time for now. */
-			info("MOUNTS: %s", buf);
-		}
 	}
 	else if (usesfs) {
 		/*
