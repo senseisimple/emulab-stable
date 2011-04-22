@@ -25,13 +25,7 @@
     <xs:attribute name="generated" type="xs:dateTime"/>
     <xs:attribute name="generated_by"/>
     <xs:attribute name="expires" type="xs:dateTime"/>
-    <xs:attribute name="type" use="required">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="request"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="type" use="required" type="rspec:RspecTypeContents"/>
   </xs:complexType>
   <xs:element name="node" type="rspec:NodeContents"/>
   <xs:element name="link" type="rspec:LinkContents"/>

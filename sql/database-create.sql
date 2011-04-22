@@ -2574,6 +2574,27 @@ CREATE TABLE `nonces` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `nonlocal_user_accounts`
+--
+
+DROP TABLE IF EXISTS `nonlocal_user_accounts`;
+CREATE TABLE `nonlocal_user_accounts` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `uid_uuid` varchar(40) NOT NULL default '',
+  `unix_uid` smallint(5) unsigned NOT NULL auto_increment,
+  `created` datetime default NULL,
+  `urn` tinytext,
+  `name` tinytext,
+  `email` tinytext,
+  `exptidx` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`unix_uid`),
+  KEY `uid` (`uid`),
+  KEY `urn` (`urn`(255)),
+  KEY `uid_uuid` (`uid_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `nonlocal_user_bindings`
 --
 

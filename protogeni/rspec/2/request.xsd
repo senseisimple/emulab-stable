@@ -30,6 +30,11 @@
   <!-- The LinkMapping will only be available after an assignment -->
   <!-- The ComponentInterfaceDeclName will only be available after an assignment -->
   <!-- The ComponentInterfaceRefName will only be available after an assignment -->
+  <xs:simpleType name="RspecTypeContents">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="request"/>
+    </xs:restriction>
+  </xs:simpleType>
   <!--
     A request link is mapped to an arbitrary topology which represents
     the virtual LAN/link which embodies it. Note that nodes do not

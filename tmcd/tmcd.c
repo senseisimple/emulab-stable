@@ -1399,7 +1399,7 @@ COMMAND_PROTOTYPE(domanifest)
 	MYSQL_RES	*res = NULL;
 	MYSQL_ROW	row;
 	char		buf[2*MYBUFSIZE];
-	int		nrows;
+	int		nrows = 0;
 	int		disable_type = 0, disable_osid = 0, disable_node = 0;
 
 	res = mydb_query("select opt_name,opt_value"
@@ -1481,7 +1481,9 @@ COMMAND_PROTOTYPE(domanifest)
 			 /* 23 */
 			 "  cstype.alt_blob_id,cstype.enable,cstype.enable_hooks,"
 			 /* 26 */
-			 "  cstype.fatal,cstype.user_can_override"
+			 "  cstype.fatal,cstype.user_can_override,"
+			 /* 28 */
+			 "  cs.hooks_only"
 			 " from reserved as r"
 			 " left join nodes as n on r.node_id=n.node_id"
 			 " straight_join client_services as cs"
@@ -1523,7 +1525,7 @@ COMMAND_PROTOTYPE(domanifest)
 			 "        or csnode.enable is not NULL"
 			 "        or csos.enable is not NULL"
 			 "        or cstype.enable is not NULL)",
-			 28, reqp->exptidx, reqp->nodeid);
+			 29, reqp->exptidx, reqp->nodeid);
 	if (!res) {
 		error("MANIFEST: %s: DB Error getting manifest info!\n",
 		      reqp->nodeid);
@@ -1540,12 +1542,15 @@ COMMAND_PROTOTYPE(domanifest)
 		char *blobid = NULL;
 		int admin_service_not_overrideable = 0;
 		int admin_idx = 0;
+		int hooks_only;
+		int disable_admin = 0;
 
 		row = mysql_fetch_row(res);
+		hooks_only = (strcmp(row[28],"1") == 0) ? 1 : 0;
 
 		/* figure out which service control entry to use! */
 		/* start by choosing the per-node or per-experiment stuff */
-		if (row[5] != NULL) {
+		if (row[5] != NULL && !hooks_only) {
 		    enabled = row[5];
 		    hooks_enabled = row[6];
 		    fatal = row[7];
@@ -1558,7 +1563,7 @@ COMMAND_PROTOTYPE(domanifest)
 		    if (blobid == NULL)
 			blobid = row[4];
 		}
-		else if (row[9] != NULL) {
+		else if (row[9] != NULL && !hooks_only) {
 		    enabled = row[10];
 		    hooks_enabled = row[11];
 		    fatal = row[12];
@@ -1567,23 +1572,45 @@ COMMAND_PROTOTYPE(domanifest)
 			blobid = row[8];
 		}
 
-		if (row[17] != NULL && !disable_node) {
+		if (row[17] != NULL) {
 		    admin_idx = 13;
 		    if (strcmp(row[17],"0") == 0) {
 			admin_service_not_overrideable = 1;
 		    }
+		    if (disable_node) 
+			disable_admin = 1;
 		}
-		else if (row[22] != NULL && !disable_osid) {
+		else if (row[22] != NULL) {
 		    admin_idx = 18;
 		    if (strcmp(row[22],"0") == 0) {
 			admin_service_not_overrideable = 1;
 		    }
+		    if (disable_osid) 
+			disable_admin = 1;
 		}
-		else if (row[27] != NULL && !disable_type) {
-		    admin_idx = 22;
+		else if (row[27] != NULL) {
+		    admin_idx = 23;
 		    if (strcmp(row[27],"0") == 0) {
 			admin_service_not_overrideable = 1;
 		    }
+		    if (disable_type) 
+			disable_admin = 1;
+		}
+
+		/* If the user wants to ignore the admin setting, and
+		 * the admin allows it to be overridden, AND the user
+		 * didn't specify a control for this service... skip! */
+		if (disable_admin && !admin_service_not_overrideable 
+		    && enabled == NULL) {
+		    --nrows;
+		    continue;
+		}
+
+		/* If the admin set hooks_only on a service, and didn't
+		 * specify a service entry, bail! */
+		if (hooks_only && admin_idx == 0) {
+		    --nrows;
+		    continue;
 		}
 
 		/* If the admin seting can't be overridden, or if the
@@ -2784,15 +2811,18 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Need a list of keys for this user.
 		 */
-		pubkeys_res = mydb_query("select idx,pubkey "
-					 " from %s "
-					 "where uid_idx='%s'",
-					 2,
-					 (didnonlocal ?
-					  "nonlocal_user_pubkeys" :
-					  "user_pubkeys"),
-					 row[17]);
-
+		if (didnonlocal) {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from nonlocal_user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
+		else {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
 		if (!pubkeys_res) {
 			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
 			goto skipkeys;
@@ -2931,22 +2961,30 @@ COMMAND_PROTOTYPE(doaccounts)
 	if (reqp->genisliver_idx && !didnonlocal &&
 	    (reqp->isvnode || !reqp->sharing_mode[0])) {
 	        didnonlocal = 1;
-
+		
+		/*
+		 * Within the nonlocal_user_accounts table, we do not
+		 * maintain globally unique unix_uid numbers, since these
+		 * accounts are per slice (experiment). Instead, just
+		 * use an auto_increment field, which always starts at
+		 * 1, and so to create a unix_gid, we just bump the
+		 * number into a typically unused area of the space.
+		 */
 		res = mydb_query("select distinct "
-				 "  u.uid,'*',u.uid_idx,u.name, "
+				 "  u.uid,'*', "
+				 "  u.unix_uid+20000,"
+				 "  u.name, "
 				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
 				 "  NULL,NULL, "
 				 "  UNIX_TIMESTAMP(now()), "
 				 "  u.email,'csh', "
 				 "  0,0, "
 				 "  NULL,u.uid_idx "
-				 "from nonlocal_user_bindings as b "
-				 "join nonlocal_users as u on "
-				 "     b.uid_idx=u.uid_idx "
+				 "from nonlocal_user_accounts as u "
 				 "join groups as g on "
 				 "     g.pid='%s' and "
 				 "     (g.pid=g.gid or g.gid='%s') "
-				 "where (b.exptidx='%d') "
+				 "where (u.exptidx='%d') "
 				 "order by u.uid",
 				 18, reqp->pid, reqp->gid,
 				 reqp->exptidx);
@@ -3949,6 +3987,15 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSGROUPDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", GROUPDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
 		return 0;
 	}
 	else if (!usesfs) {
@@ -3964,6 +4011,23 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		/*
+		 * If pid!=gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(reqp->pid, reqp->gid)) {
+			bufp = buf;
+			if (!nomounts)
+				bufp += OUTPUT(bufp, ebufp-bufp,
+					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
+					       reqp->pid, reqp->gid);
+			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
+			       GROUPDIR, reqp->pid, reqp->gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			/* Leave this logging on all the time for now. */
+			info("MOUNTS: %s", buf);
+		}
 
 		/*
 		 * Skip all this for a vnode; client does not ask.
@@ -3999,22 +4063,6 @@ COMMAND_PROTOTYPE(domounts)
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		/*
-		 * If pid!=gid, then this is group experiment, and we return
-		 * a mount for the group directory too.
-		 */
-		if (strcmp(reqp->pid, reqp->gid)) {
-			bufp = buf;
-			if (!nomounts)
-				bufp += OUTPUT(bufp, ebufp-bufp,
-					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
-					       reqp->pid, reqp->gid);
-			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
-			       GROUPDIR, reqp->pid, reqp->gid);
-			client_writeback(sock, buf, strlen(buf), tcp);
-			/* Leave this logging on all the time for now. */
-			info("MOUNTS: %s", buf);
-		}
 	}
 	else if (usesfs) {
 		/*

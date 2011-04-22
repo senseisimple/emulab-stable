@@ -1,0 +1,22 @@
+#
+# Add perl Digest-SHA1 port.
+#
+use strict;
+use libinstall;
+use emdbi;
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    if ($phase eq "pre") {
+	Phase "p5-Digest-SHA1", "Checking for port p5-Digest-SHA1", sub {
+	    DoneIfPackageInstalled("p5-Digest-SHA1");
+	    ExecQuietFatal("cd $PORTSDIR/security/p5-Digest-SHA1; ".
+			   "make MASTER_SITE_FREEBSD=1 -DBATCH install");
+	};
+    }
+    return 0;
+}
+
+1;

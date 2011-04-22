@@ -1427,9 +1427,6 @@ sub BindToSlice($)
     return $user
 	if (GeniResponse::IsResponse($user));
     
-    if (!$user->IsLocal() && defined($keys)) {
-	$user->Modify(undef, undef, $keys);
-    }
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
@@ -1439,11 +1436,12 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Error binding slice to user");
     }
-    # Bind for existing slivers. 
-    if ($user->BindToSlice($slice) != 0) {
-	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Error binding user to slice");
+    if (defined($keys)) {
+	my $response = GeniCM::AddKeys($slice, $user, $keys);
+	if (GeniResponse::IsResponse($response)) {
+	    $slice->UnLock();
+	    return $response;
+	}
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);

@@ -40,6 +40,7 @@ use emutil;
 use EmulabConstants;
 use libEmulab;
 use Lan;
+use Experiment;
 use English;
 use Data::Dumper;
 use XML::Simple;
@@ -49,6 +50,7 @@ use Time::Local;
 use Compress::Zlib;
 use File::Temp qw(tempfile);
 use MIME::Base64;
+use Digest::SHA1 qw(sha1_hex);
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -746,6 +748,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $osname;
 	my $node;
 
+	# Always populate iface2node mapping, even if we let the node
+	# pass through.
+	foreach my $linkref (GeniXML::FindNodes("n:interface",
+						$ref)->get_nodelist()) {
+	    my $virtual_id   = GeniXML::GetInterfaceId($linkref);
+	    $iface2node{$virtual_id} = $node_nickname;
+	}
+
 	# Let remote nodes pass through.
 	if (! GeniXML::IsLocalNode($ref)) {
 	    $external_nodemap{$node_nickname} = $ref;
@@ -873,7 +883,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		$exclusive = 1;
-		if (! GeniXML::SetVirtualizationType($ref, "raw")) {
+		if (! GeniXML::SetVirtualizationSubtype($ref, "raw")) {
 		    $response = GeniResponse->Create(GENIRESPONSE_BADARGS,
 						     undef,
 			"Malformed rspec: Cannot set virtualization_type to raw");
@@ -1023,7 +1033,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
-	    my $virtual_id   = GeniXML::GetVirtualId($linkref);
+	    my $virtual_id   = GeniXML::GetInterfaceId($linkref);
 
 	    if (!defined($virtual_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -1031,8 +1041,6 @@ sub GetTicketAuxAux($$$$$$$$$)
 		goto bad;
 	    }
 
-	    $iface2node{$virtual_id} = $node_nickname;
-	    
 	    $ifacemap{$node_nickname} = {}
 	        if (!exists($ifacemap{$node_nickname}));
 
@@ -1112,8 +1120,15 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (!$istunnel) {
 	    foreach my $ref (@interfaces) {
 		my $node_nickname = GeniXML::GetInterfaceNodeId($ref);
+		if (! GeniXML::IsVersion0($ref)) {
+		    my $iface_id = GeniXML::GetInterfaceId($ref);
+		    if (defined($iface_id)) {
+			$node_nickname = $iface2node{$iface_id};
+		    }
+		}
 
-		if (exists($lannodes{$node_nickname})) {
+		if (defined($node_nickname)
+		    && exists($lannodes{$node_nickname})) {
 		    $lanname = $node_nickname;
 		}
 	    }
@@ -1135,7 +1150,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		goto bad;
 	    }
 
-	    if (! GeniXML::IsVersion0($ref)) {
+	    if (! GeniXML::IsVersion0($ref) && defined($iface_id)) {
 		$node_nickname = $iface2node{$iface_id};
 	    }
 
@@ -1319,8 +1334,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    my $member = "$node_nickname:$iface_vport";
 	    my $bandwidth = 100000;
 
+	    # TODO: Allow asymmetric bandwidths
 	    # Let user override.
-	    my $user_bandwidth = GeniXML::GetText("bandwidth", $linkref);
+	    my $user_bandwidth = GeniXML::GetBandwidth($linkref);
 	    if (defined($user_bandwidth)) {
 		$bandwidth = $user_bandwidth;
 	    }
@@ -1931,21 +1947,6 @@ sub SliverWorkAux($$$$$$$)
 				    "Slice has expired");
     }
 
-    #
-    # Create the user.
-    #
-    my $owner = CreateUserFromCertificate($owner_cert);
-    return $owner
-	if (GeniResponse::IsResponse($owner));
-
-    if (defined($keys)) {
-	$response = CheckKeys($keys);
-	return $response
-	    if (GeniResponse::IsResponse($response));
-	
-	$owner->Modify(undef, undef, $keys);
-    }
-
     my $experiment = GeniExperiment($slice);
     if (!defined($experiment)) {
 	$slice->UnLock();
@@ -1956,6 +1957,23 @@ sub SliverWorkAux($$$$$$$)
     }
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
+
+    #
+    # Create the user.
+    #
+    my $owner = CreateUserFromCertificate($owner_cert);
+    return $owner
+	if (GeniResponse::IsResponse($owner));
+
+    if (defined($keys)) {
+	$response = AddKeys($slice, $owner, $keys);
+	if (GeniResponse::IsResponse($response)) {
+	    $slice->UnLock();
+	    $ticket->UnLock()
+		if (defined($ticket));
+	    return $response;
+	}
+    }
 
     #
     # Figure out what nodes to allocate or free. 
@@ -2069,6 +2087,16 @@ sub SliverWorkAux($$$$$$$)
 	my $node_nickname = GeniXML::GetVirtualId($ref);
 	my $manager_id    = GeniXML::GetManagerId($ref);
 	
+	# Always populate iface2node mapping, even if we let the node
+	# pass through.
+	foreach my $iface (GeniXML::FindNodes("n:interface",
+					     $ref)->get_nodelist()) {
+	    my $iface_id = GeniXML::GetInterfaceId($iface);
+	    if (defined($iface_id)) {
+		$iface2node{$iface_id} = $node_nickname;
+	    }
+	}
+
 	# Let remote nodes pass through.
 	if (! GeniXML::IsLocalNode($ref)) {
 	    $external_nodemap{$node_nickname} = $ref;
@@ -2117,13 +2145,6 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "$resource_id ($node) is not available";
 	    goto bad;
 	}
-	foreach my $iface (GeniXML::FindNodes("n:interface",
-					     $ref)->get_nodelist()) {
-	    my $iface_id = GeniXML::GetVirtualId($iface);
-	    if (defined($iface_id)) {
-		$iface2node{$iface_id} = $node_nickname;
-	    }
-	}
 	# Unincorporated nodes have no genisliver_idx.
 	my $restable = $node->ReservedTableEntry();
 	if (defined($restable) &&
@@ -2166,16 +2187,6 @@ sub SliverWorkAux($$$$$$$)
 	    push(@freenodes, $sliver);
 	}
     }
-
-    #
-    # Create an emulab nonlocal user for tmcd.
-    #
-    if ($owner->BindToSlice($slice)) {
-	$message = "Error binding user to slice";
-	print STDERR "$message\n";
-	goto bad;
-    }
-			
 
     #
     # We are actually an Aggregate, so return an aggregate of slivers,
@@ -2531,10 +2542,25 @@ sub SliverWorkAux($$$$$$$)
 					       $iface1ref);
 	    my $node2_id    = GeniXML::GetText("virtual_node_id",
 					       $iface2ref);
-	    my $node1sliver = $nodemap{$node1_id};
-	    my $node2sliver = $nodemap{$node2_id};
-	    my $node1rspec  = $rspecmap{$node1_id};
-	    my $node2rspec  = $rspecmap{$node2_id};
+	    if (! GeniXML::IsVersion0($linkref)) {
+		my $iface1_id = GeniXML::GetInterfaceId($iface1ref);
+		$node1_id = $iface2node{$iface1_id}
+		  if (defined($iface1_id));
+		my $iface2_id = GeniXML::GetInterfaceId($iface2ref);
+		$node2_id = $iface2node{$iface2_id}
+		  if (defined($iface2_id));
+	    }
+
+	    my $node1sliver;
+	    my $node2sliver;
+	    my $node1rspec;
+	    my $node2rspec;
+	    if (defined($node1_id) && defined($node2_id)) {
+		$node1sliver = $nodemap{$node1_id};
+		$node2sliver = $nodemap{$node2_id};
+		$node1rspec  = $rspecmap{$node1_id};
+		$node2rspec  = $rspecmap{$node2_id};
+	    }
 
 	    if (! (defined($node1sliver) || (defined($node2sliver)))) {
 		$message = "$linkname: No local nodes for tunnel";
@@ -3532,13 +3558,7 @@ sub BindToSlice($)
     my $user = CreateUserFromCertificate($credential->owner_cert());
     return $user
 	if (GeniResponse::IsResponse($user));
-    if (defined($keys)) {
-	my $response = CheckKeys($keys);
-	return $response
-	    if (GeniResponse::IsResponse($response));
-	
-	$user->Modify(undef, undef, $keys);
-    }
+
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
@@ -3548,11 +3568,12 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Error binding slice to user");
     }
-    # Bind for existing slivers. 
-    if ($user->BindToSlice($slice) != 0) {
-	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Error binding user to slice");
+    if (defined($keys)) {
+	my $response = AddKeys($slice, $user, $keys);
+	if (GeniResponse::IsResponse($response)) {
+	    $slice->UnLock();
+	    return $response;
+	}
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
@@ -4197,7 +4218,7 @@ sub CreateUserFromCertificate($)
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Could not create user from your certificate")
 	if (!defined($user));
-
+    
     return $user;
 }
 
@@ -4530,7 +4551,6 @@ sub GeniExperiment($)
     my $gid  = $pid;
     my $hrn  = $slice->hrn();
     my $urn  = $slice->urn();
-    require Experiment;
 
     my $experiment = Experiment->Lookup($uuid);
     return $experiment
@@ -4767,27 +4787,120 @@ sub CheckTicket($)
     return $ticket;
 }
 
-sub CheckKeys($)
+sub AddKeys($$$)
 {
-    my ($keys) = @_;
+    my ($slice, $owner, $keys) = @_;
 
     goto bad
-	if (!ref($keys));
-    
-    foreach my $keyref (@{ $keys }) {
-	goto bad
-	    if (!ref($keyref));
-	
-	my $key  = $keyref->{'key'};
-	my $type = $keyref->{'type'};
+	if (! (ref($keys) && ref($keys) eq "ARRAY"));
 
-	goto bad
-	    if (! (defined($key) && defined($type) &&
+    my $slice_experiment = $slice->GetExperiment();
+    if (!$slice_experiment) {
+	print STDERR "AddKeys: No experiment for $slice\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+
+    my $keychecker = sub {
+	my ($arg) = @_;
+
+	return -1
+	    if (! (ref($arg) && ref($arg) eq "HASH"));
+
+	my $key  = $arg->{'key'};
+	my $type = $arg->{'type'};
+
+	return -1
+	    if (! (defined($arg) && defined($arg) &&
 		   $key ne "" && $type ne ""));
-    }		
+	
+	return 0;
+    };
+
+    #
+    # The old format (which we still want to support) was
+    # a single list of keys for the user redeeming a ticket.
+    #
+    # The new format is a list of users, each with sshkeys. 
+    # The hash key is the urn of the user. 
+    #
+    if (exists($keys->[0]->{'urn'}) || exists($keys->[0]->{'login'})) {
+	foreach my $ref (@{ $keys }) {
+	    goto bad
+		if (! (exists($ref->{'urn'}) || exists($ref->{'login'})));
+
+	    my @keylist = ();
+	    
+	    foreach my $keyref (@{ $ref->{'keys'} }) {
+		goto bad
+		    if (&$keychecker($keyref) != 0);
+
+		push(@keylist, $keyref->{'key'});
+	    }
+	    my $urn = $ref->{'urn'} if (exists($ref->{'urn'}));
+	    # Allow user to override urn token.
+	    my $uid = $ref->{'login'} if (exists($ref->{'login'}));
+	    my $name;
+	    my $email;
+	    
+	    # The slice owner is easy.
+	    if (defined($urn) && $urn eq $owner->urn()) {
+		$name  = $owner->name();
+		$email = $owner->email();
+		$uid   = $owner->uid()
+		    if (!defined($uid));
+	    }
+	    else {
+		#
+		# Trickier, since we have no email and no name, and
+		# we might have to derive the login uid from the urn, which
+		# might not even be a valid uid for Emulab. 
+		#
+		if (!defined($uid)) {
+		    my (undef,$type,$id) = GeniHRN::Parse($urn);
+		    if (!defined($id) || $type ne "user") {
+			goto bad;
+		    }
+		    $uid = $id;
+		}
+		$name = $uid;
+		$email = "root\@localhost";
+	    }
+	    if (! GeniUser->ValidUserID($uid)) {
+		my $digest = sha1_hex($uid);
+		$digest = substr($digest, 0, 7);
+		$uid = lc("u${digest}");
+		if (GeniUser->ValidUserID($uid)) {
+		    print STDERR "Cannot form a uid for $name\n";
+		    goto bad;
+		}
+	    }
+	    $slice_experiment->BindNonLocalUser(\@keylist,
+						$uid, $urn,
+						$name, $email)
+		== 0 or goto error;
+	}
+    }
+    else {
+	my @keylist = ();
+	
+	foreach my $keyref (@{ $keys }) {
+	    goto bad
+		if (&$keychecker($keyref) != 0);
+
+	    push(@keylist, $keyref->{'key'});
+	}
+	$slice_experiment->BindNonLocalUser(\@keylist,
+					    $owner->uid(),
+					    $owner->urn(),
+					    $owner->name(),
+					    $owner->email()) == 0
+	    or goto error;
+    }
     return 0;
   bad:
-    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys")
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys");
+  error:
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, "Internal Error");
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
