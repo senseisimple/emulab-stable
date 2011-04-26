@@ -215,17 +215,25 @@ sub getVlanIfaces($) {
     if ($vlan->MemberList(\@members) != 0) {
         die("*** $0:\n".
 	    "    Unable to load members for $vlan\n");
+    }
+    my %pathifaces = ();
+    if (!getPathVlanIfaces($vlanid, \%pathifaces)) {
+	foreach my $k (keys %pathifaces) {
+	    push(@ports, $pathifaces{$k});
 	}
-    foreach my $member (@members) {
-	my $nodeid;
-	my $iface;
-	
-	if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
-	    $member->GetAttribute("iface", \$iface) != 0) {
-	    die("*** $0:\n".
-		"    Missing attributes for $member in $vlan\n");
+    }
+    else {
+	foreach my $member (@members) {
+	    my $nodeid;
+	    my $iface;
+	    
+	    if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
+		$member->GetAttribute("iface", \$iface) != 0) {
+		die("*** $0:\n".
+		    "    Missing attributes for $member in $vlan\n");
+	    }
+	    push(@ports, "$nodeid:$iface");
 	}
-	push(@ports, "$nodeid:$iface");
     }
 
     return @ports;
