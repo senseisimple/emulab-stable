@@ -1,5 +1,28 @@
-
-#!/usr/bin/perl -wT
+#
+# This is the Port class that represent a port in VLAN.
+# It aims at providing all avaialble information of a
+# port rather than just a string representation consisting
+# of node and card or port only, which is used by most snmpit
+# code.
+#
+# Previous string representation only has node and card for
+# a PC port, which can not be unique when representing a port
+# on a test node switch, such as our hp5406 nodes.
+# A Port class instance uniquely identifies a port with
+# all of its properties, such as node_id, card, port and iface.
+#
+# Some important terms used:
+# - Tokens: seperated fields of a port, e.g. "node1", "card2", "iface3", etc.
+# - Iface:  interface on a node, or a full representation of
+#   an interface, say "iface2", "node1:iface4".
+# - Triple: a port representation that uses three fields:
+#   node, card and port, like "node1:card2.port1".
+# - String: a string representation of a port, ususally a
+#   combination of tokens, e.g. "node1:iface3", "node1:card3.port4".
+#
+# All code that needs to convert between different representations
+# or merely parse tokens from string and vice-verse must
+# use the converters provided in this class.
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2011 University of Utah and the Flux Group.
@@ -18,16 +41,8 @@ use libdb;
 use English;
 use Data::Dumper;
 
-# Some important terms used:
-# - Tokens: seperated fields of a port, e.g. "node1", "card2", "iface3", etc.
-# - Iface:  interface on a node, or a full representation of an interface, say "iface2", "node1:iface4".
-# - Triple: a port representation that uses three fields: node, card and port, like "node1:card2.port1".
-# - String: a string representation of a port, ususally a combination of tokens, e.g. "node1:iface3", "node1:card3.port4".
-#
-# All code that needs to convert between different representations or merely parse tokens from string and vice-verse must
-# use the converters provided in this class.
-
-# Cache of port instances, node:iface OR node:card.port => Port Instance
+# Cache of port instances
+# node:iface OR node:card.port => Port Instance
 my %allports = ();
 
 # Ends of wires, node:iface OR node:card.port => Port Instance

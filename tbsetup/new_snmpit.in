@@ -1703,6 +1703,10 @@ sub doVlansFromTables($$@) {
     }
 
     my ($stack) = @$stacks;
+
+#    $debug = 1;
+#    $stack->FlipDebug(1);   
+
     my @trunkedPorts = getExperimentTrunks($experiment->pid(),
 					   $experiment->eid());
     my %trunkedPorts = map { $_->toString() => $_ } @trunkedPorts;
@@ -1941,11 +1945,15 @@ sub doReset($@) {
     # In case of error, do not clear the DB state.
     my %notdeleted = ();
 
+    $debug = 1;
+    
     #
     # Just remove the VLAN from every stack on which it exists. We keep a
     # list and do them all at once for efficiency.
     #
     foreach my $stack (@$stacks) {
+#	$stack->FlipDebug(1);
+
 	my @existant_vlans = $stack->existantVlans(@vlans);
 	if (!$stack->removeVlan(@existant_vlans)) {
 	    #
@@ -1984,13 +1992,15 @@ sub syncVlansFromTables($$) {
     my $errors     = 0;
     my $vlan_number;
 
-    $debug = 1;
-
     if (@$stacks > 1) {
 	die "VLAN creation across multiple stacks is not yet supported\n" .
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
+
+    $debug = 1;
+    $stack->FlipDebug(1);
+
     my @needTrunking = getExperimentTrunks($pid,$eid);
     my %needTrunking = map { $_->toString() => $_ } @needTrunking;
 
