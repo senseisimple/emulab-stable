@@ -326,9 +326,9 @@ sub getPathVlanIfaces($$) {
 			}
 				       
 			if ($pref[0] eq "$node:$iface") {
-			    $ifacesonswitchnode{"$node:$iface"} = $pref[1];
+			    $ifacesonswitchnode{"$node:$iface"} = convertPortFromIface($pref[1], 1);
 			} else {
-			    $ifacesonswitchnode{"$node:$iface"} = $pref[0];
+			    $ifacesonswitchnode{"$node:$iface"} = convertPortFromIface($pref[0], 1);
 			}
 		    }
 		}
@@ -337,6 +337,14 @@ sub getPathVlanIfaces($$) {
     }
 
     %$ifaces = %ifacesonswitchnode;
+    if ($debug) {
+	print "mapped ports: ";
+	foreach my $k (keys %ifacesonswitchnode) {
+	    print "$k ==> $ifacesonswitchnode{$k}, ";
+	}
+	print "\n";
+    }
+
     return 0;
 }
 
@@ -633,8 +641,8 @@ sub convertPortsFromIfaces(@) {
 #
 # Convert a port in port:iface format to port:card
 #
-sub convertPortFromIface($) {
-    my ($port) = $_;
+sub convertPortFromIface($;$) {
+    my ($port, $keepswitchformat) = @_;
     if ($port =~ /(.+):(.+)/) {
 	my ($node,$iface) =  ($1,$2);
         my $result = DBQueryFatal("SELECT card, port FROM interfaces " .
@@ -661,8 +669,8 @@ sub convertPortFromIface($) {
 	    # Should return the later one, but many places in snmpit
 	    # and this file depend on the old format...
 	    #
-            return "$node:$card";
-            #return "$node:$card.$cport";                                            
+            #return "$node:$card";
+            return defined($keepswitchformat)?"$node.$card/$cport":"$node:$card.$cport";                                            
         }
 
         return "$node:$card";
@@ -776,8 +784,17 @@ sub getDeviceNames(@) {
 	    my $result = DBQueryFatal("SELECT node_id2 FROM wires " .
 		"WHERE node_id1='$node' AND card1=$card");
 	    if (!$result->num_rows()) {
-		warn "No database entry found for port $port - Skipping\n";
-		next;
+	    	if ($port =~ /^(.+):(.+)\.(.+)$/) {
+	    	    my $cport = $3;
+	    	    $card = $2;
+	    	    
+	    	    $result = DBQueryFatal("SELECT node_id2 FROM wires " .
+		        "WHERE node_id1='$node' AND card1=$card AND port1=$cport");
+		    if (!$result->num_rows()) {
+			warn "No database entry found for port $port - Skipping\n";
+			next;
+		    }
+		}
 	    }
 	    # This is a loop, on the off chance chance that a single port on a
 	    # node can be connected to multiple ports on the switch.
