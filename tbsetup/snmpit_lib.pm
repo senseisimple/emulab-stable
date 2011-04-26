@@ -154,8 +154,8 @@ sub ReadTranslationTable {
 	$Interfaces{$mac} = $name;
 	$PortIface{$name} = $iface;
 	$PortIface{$iface} = $name;
-	$IfaceModPorts{$iface} = $name.".$_[2]";
-	$IfaceModPorts{$name.".$_[2]"} = $iface;
+	$IfaceModPorts{$iface} = "$_[0]:$_[1].$_[2]";
+	$IfaceModPorts{"$_[0]:$_[1].$_[2]"} = $iface;
 	print "Interfaces: $mac <==> $name\n" if $debug > 1;
     }
 
