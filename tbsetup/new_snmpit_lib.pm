@@ -213,23 +213,35 @@ sub getPathVlanIfaces($$) {
     }
 
     # find the segments of the path
-    $query_result = DBQueryWarn("select segmentname, segmentindex from virt_paths ".
+    $query_result = DBQueryWarn("select segmentname, segmentindex, layer from virt_paths ".
 				"where pid='$pid' and eid='$eid' and pathname='$path';");
     if (!$query_result || !$query_result->numrows) {
 	warn "Can't find path $path definition in DB.";
 	return -1;
     }
-
+    
     if ($query_result->numrows > 2) {
-	warn "We can't handle the path with more than two segments.";
+	my ($segname, $segindex, $layer) = $query_result->fetchrow();
+
+	# only print warning msg when we are dealing with layer 1 links
+	if ($layer == 1) {
+	    warn "We can't handle the path with more than two segments.";
+	}
 	return -1;
     }
     
     my @vlans = ();
     VLan->ExperimentVLans($experiment, \@vlans);
     
-    while (my ($segname, $segindex) = $query_result->fetchrow())
+    while (my ($segname, $segindex, $layer) = $query_result->fetchrow())
     {
+	#
+	# we only deal with layer 1 links
+	#
+	if ($layer != 1) {
+	    return -1;
+	}
+	
 	foreach my $myvlan (@vlans)
 	{	    
 	    if ($myvlan->vname eq $segname) {
@@ -292,9 +304,16 @@ sub getVlanPorts (@) {
         	die("*** $0:\n".
 		    "    Unable to load members for $vlan\n");
 	}
-    	foreach my $member (@members) {
-		my $nodeid;
-		my $iface;
+	my %pathifaces = ();
+	if (!getPathVlanIfaces($vlanid, \%pathifaces)) {
+	    foreach my $k (keys %pathifaces) {
+		push(@ports, Port->LookupByIface($pathifaces{$k}));
+	    }
+	}
+	else {
+	    foreach my $member (@members) {
+	 	my $nodeid;
+	 	my $iface;
 	
 		if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
 		    $member->GetAttribute("iface", \$iface) != 0) {
@@ -302,7 +321,8 @@ sub getVlanPorts (@) {
 			"    Missing attributes for $member in $vlan\n");
 		}
 		push(@ports, Port->LookupByIface($nodeid, $iface));
-    	}
+	    }
+	}
     }
     return @ports;
 }

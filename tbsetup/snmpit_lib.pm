@@ -273,23 +273,35 @@ sub getPathVlanIfaces($$) {
     }
 
     # find the segments of the path
-    $query_result = DBQueryWarn("select segmentname, segmentindex from virt_paths ".
+    $query_result = DBQueryWarn("select segmentname, segmentindex, layer from virt_paths ".
 				"where pid='$pid' and eid='$eid' and pathname='$path';");
     if (!$query_result || !$query_result->numrows) {
 	warn "Can't find path $path definition in DB.";
 	return -1;
     }
-
+    
     if ($query_result->numrows > 2) {
-	warn "We can't handle the path with more than two segments.";
+	my ($segname, $segindex, $layer) = $query_result->fetchrow();
+
+	# only print warning msg when we are dealing with layer 1 links
+	if ($layer == 1) {
+	    warn "We can't handle the path with more than two segments.";
+	}
 	return -1;
     }
     
     my @vlans = ();
     VLan->ExperimentVLans($experiment, \@vlans);
     
-    while (my ($segname, $segindex) = $query_result->fetchrow())
+    while (my ($segname, $segindex, $layer) = $query_result->fetchrow())
     {
+	#
+	# we only deal with layer 1 links
+	#
+	if ($layer != 1) {
+	    return -1;
+	}
+	
 	foreach my $myvlan (@vlans)
 	{	    
 	    if ($myvlan->vname eq $segname) {
@@ -312,7 +324,7 @@ sub getPathVlanIfaces($$) {
 			    warn "Vlan ".$myvlan->id()." doesnot have exact two ports.\n";
 			    return -1;
 			}
-
+				       
 			if ($pref[0] eq "$node:$iface") {
 			    $ifacesonswitchnode{"$node:$iface"} = $pref[1];
 			} else {
