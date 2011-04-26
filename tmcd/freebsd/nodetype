@@ -1,10 +1,20 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
+
+# Why am I trying to fix this script!?
+if [ -r $BOOTDIR/nodeid -a -r $BOOTDIR/ltpmap ]; then
+    nid=`cat $BOOTDIR/nodeid`
+    nt=`grep $nid $BOOTDIR/ltpmap 2>/dev/null | awk "/^H/ { if (\\$3 == \"$nid\") print \\$5 }" 2>/dev/null`
+    if [ -n "$nt" ]; then
+	echo $nt
+	exit 0
+    fi
+fi
 
 # XXX for FreeBSD 5.x
 if [ ! -r /var/run/dmesg.boot ]; then
@@ -56,3 +66,5 @@ elif [ $cpuspeed = "2500" ]; then
 else
 	echo pc$cpuspeed;
 fi
+
+exit 0
