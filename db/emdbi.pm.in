@@ -192,6 +192,11 @@ sub fetchhash($)
     my $ref    = $self->fetchrow_hashref();
     return ($ref ? %$ref : ());
 }
+sub as_string($)
+{
+    my ($self) = @_;
+    $self->dump_results();
+}
 
 # Not supported so generate an error.
 sub dataseek($$)
