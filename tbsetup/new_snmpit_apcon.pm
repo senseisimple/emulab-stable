@@ -229,12 +229,13 @@ sub toApconPort($$)
 {
         my ($self, $p) = @_;
         
-        if ($p->node_id() ne $self->{NAME}) {
-                return $p;
+        my $apcport = $p->getEndByNode($self->{NAME});
+        if (!defined($apcport)) {
+        	return $p;
         }
         
-        my $card = chr(ord('A')+int($p->card()) - 1);
-        my $port = sprintf("%02d", int($p->port()));
+        my $card = chr(ord('A')+int($apcport->card()) - 1);
+        my $port = sprintf("%02d", int($apcport->port()));
         
         return "$card"."$port";
 }

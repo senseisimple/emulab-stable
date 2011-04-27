@@ -797,6 +797,17 @@ sub toNodeCardString($) {
     return Tokens2IfaceString($_[0]->node_id(), $_[0]->card());
 }
 
+sub getEndByNode($$) {
+	my ($self, $n) = @_;
+	if ($n eq $self->node_id()) {
+		return $self;
+	} elsif ($n eq $self->other_end_node_id()) { 
+		return $self->getOtherEndPort();
+	} else {
+		return undef;
+	}
+}
+
 sub getOtherEndTripleString($) {
     return Tokens2TripleString($_[0]->other_end_node_id(), $_[0]->other_end_card(), $_[0]->other_end_port());
 }

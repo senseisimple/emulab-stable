@@ -688,7 +688,7 @@ sub convertPortFromIface($;$) {
 sub isSwitchPort($) {
     my $port = shift;
 
-    if ($port =~ /^(.+):(.+)/) {
+    if ($port =~ /^(.+):(.+)/ || $port =~ /^(.+)\.(.+)\/(.+)$/) {
         my $node = $1;
 
         my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
