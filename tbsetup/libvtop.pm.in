@@ -1,0 +1,82 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libvtop;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT @EXPORT_OK
+	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_QUIET
+	    $VTOP_FLAGS_FIXNODES $VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_ALLOCONLY
+	    $VTOP_FLAGS_REGRESSION);
+
+@ISA    = "Exporter";
+@EXPORT = qw( );
+
+# Configure variables
+my $TB		  = "@prefix@";
+my $libvtoptest;
+
+use EmulabFeatures;
+
+# Flags.
+$VTOP_FLAGS_VERBOSE	= 0x0;
+$VTOP_FLAGS_UPDATE	= 0x0;
+$VTOP_FLAGS_FIXNODES	= 0x0;
+$VTOP_FLAGS_IMPOTENT	= 0x0;
+$VTOP_FLAGS_REGRESSION  = 0x0;
+$VTOP_FLAGS_QUIET       = 0x0;
+$VTOP_FLAGS_ALLOCONLY	= 0x0;
+
+@EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES
+		$VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_REGRESSION $VTOP_FLAGS_QUIET
+		$VTOP_FLAGS_ALLOCONLY);
+
+sub Init($$$)
+{
+    my ($this_user, $group, $experiment) = @_;
+
+    $libvtoptest = EmulabFeatures->FeatureEnabled("LibVtopTest",
+						  $this_user,
+						  $group, $experiment);
+
+    if ($libvtoptest) {
+	print "Using test version of libvtop ...\n";
+	require libvtop_test;
+
+	$VTOP_FLAGS_VERBOSE	= $libvtop_test::VTOP_FLAGS_VERBOSE;
+	$VTOP_FLAGS_UPDATE	= $libvtop_test::VTOP_FLAGS_UPDATE;
+	$VTOP_FLAGS_FIXNODES	= $libvtop_test::VTOP_FLAGS_FIXNODES;
+	$VTOP_FLAGS_IMPOTENT	= $libvtop_test::VTOP_FLAGS_IMPOTENT;
+	$VTOP_FLAGS_REGRESSION  = $libvtop_test::VTOP_FLAGS_REGRESSION;
+	$VTOP_FLAGS_QUIET       = $libvtop_test::VTOP_FLAGS_QUIET;
+	$VTOP_FLAGS_ALLOCONLY	= $libvtop_test::VTOP_FLAGS_ALLOCONLY;
+    }
+    else {
+	require libvtop_stable;
+
+	$VTOP_FLAGS_VERBOSE	= $libvtop_stable::VTOP_FLAGS_VERBOSE;
+	$VTOP_FLAGS_UPDATE	= $libvtop_stable::VTOP_FLAGS_UPDATE;
+	$VTOP_FLAGS_FIXNODES	= $libvtop_stable::VTOP_FLAGS_FIXNODES;
+	$VTOP_FLAGS_IMPOTENT	= $libvtop_stable::VTOP_FLAGS_IMPOTENT;
+	$VTOP_FLAGS_REGRESSION  = $libvtop_stable::VTOP_FLAGS_REGRESSION;
+	$VTOP_FLAGS_QUIET       = $libvtop_stable::VTOP_FLAGS_QUIET;
+	$VTOP_FLAGS_ALLOCONLY	= $libvtop_stable::VTOP_FLAGS_ALLOCONLY;
+    }
+    return 0;
+}
+
+sub Create
+{
+    return undef
+	if (!defined($libvtoptest));
+    
+    shift();
+    return ($libvtoptest ?
+	    libvtop_test->Create(@_) : libvtop_stable->Create(@_));
+}
+
+1;
