@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -61,6 +61,12 @@ while (my $arg = shift @ARGV) {
 	&debug("Node is $node");
 	&debug("Card is $card") if (defined $card);
 
+	printf("\n%9s %5s%s%s %9s %5s %5s %5s %3s %7s %7s\n",
+	       "nodeid1", "card1",
+	       $opt{I} ? "              IP" : "",
+	       $opt{m} ? "          MAC" : "",
+	       "nodeid2", "card2", "port2", "cable", "len", "wtype", "ntype");
+
 	my $query;
 	if ($opt{m} || $opt{I}) {
 	    $query = "SELECT w.node_id1,w.card1,";
@@ -96,7 +102,17 @@ while (my $arg = shift @ARGV) {
 				"$row[5] (length $row[6], color $wireinfo)\n";
 		}
 	} else {
-		print $result->as_string;
+	    while (my @row = $result->fetchrow) {
+		my $i = 0;
+		printf("%9s %5d", $row[$i++], $row[$i++]);
+		printf("%16s", $row[$i++])
+		    if ($opt{I});
+		printf(" %12s", $row[$i++])
+		    if ($opt{m});
+		printf(" %9s %5d %5d %5d %3d %7s %7s\n",
+		       $row[$i++], $row[$i++], $row[$i++], $row[$i++],
+		       $row[$i++],$row[$i++],$row[$i++]);
+	    }
 	}
 }
 

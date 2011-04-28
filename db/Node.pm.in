@@ -2607,6 +2607,22 @@ sub OSSelect($$$$)
 		"where node_id='$nodeid'")
 	or return -1;
 
+    return -1 
+	if ($self->ResetNextOpMode($debug) < 0);
+
+    return Refresh($self);
+}
+
+sub ResetNextOpMode($$)
+{
+    my ($self,$debug) = @_;
+    my $nodeid  = $self->node_id();
+    my $curmode = $self->op_mode();
+
+    # Why? When will this happen?
+    return 0
+	if (!$curmode);
+
     #
     # Determine what osid the node will now boot. We need to know this so we
     # can set the next opmode. This call has to return *something* or we are
@@ -2633,7 +2649,7 @@ sub OSSelect($$$$)
 		 "where node_id='$nodeid'")
 	or return -1;
 
-    return Refresh($self);
+    return 0;
 }
 
 #

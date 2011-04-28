@@ -102,8 +102,8 @@ my @PIDONLYTABLES = ("os_info");
 my $q = DBQueryFatal("select pid_idx from projects ".
 		     "where pid='$TBOPSPID'");
 my ($npid) = $q->fetchrow_array();
-my $q = DBQueryFatal("select gid_idx from groups ".
-		     "where pid='$TBOPSPID' and gid=pid");
+$q = DBQueryFatal("select gid_idx from groups ".
+		  "where pid='$TBOPSPID' and gid=pid");
 my ($ngid) = $q->fetchrow_array();
 
 foreach my $table (@PIDGIDTABLES) {

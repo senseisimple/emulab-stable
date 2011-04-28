@@ -71,7 +71,9 @@ InterfaceRefContents &=
   attribute client_id { text }
 
 RSpecContents &=
-  attribute type { "request" }
+  attribute type { RspecTypeContents }
+
+RspecTypeContents = "request"
 
 # A request link is mapped to an arbitrary topology which represents
 # the virtual LAN/link which embodies it. Note that nodes do not

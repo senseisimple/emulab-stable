@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -13,20 +13,22 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: node_traffic [-C] [node...]\n";
-    print STDOUT "-h         This message\n";
-    print STDOUT "-a         Show all nodes regardless of node state\n";
-    print STDOUT "-r	     Show only traffic received by each node\n";
-    print STDOUT "-s	     Show only traffic sent by each node\n";
-    print STDOUT "-i seconds Show stats over a <seconds>-period interval\n";
-    print STDOUT "-E	     Aggregate by experiment\n";
-#    print STDOUT "-C	     Show control net traffic\n";
+    print STDERR "Usage: node_traffic [-aArsE] [-i seconds] [node...]\n";
+    print STDERR "Reports traffic from nodes on the control network.\n";
+    print STDERR "-h         This message\n";
+    print STDERR "-a         Show all nodes regardless of node state\n";
+    print STDERR "-A         Really all; includes free nodes as well\n";
+    print STDERR "-r	     Show only traffic received by each node\n";
+    print STDERR "-s	     Show only traffic sent by each node\n";
+    print STDERR "-i seconds Show stats over a <seconds>-period interval\n";
+    print STDERR "-E	     Aggregate by experiment\n";
+#    print STDERR "-C	     Show control net traffic\n";
     exit(-1);
 }
 
 sub gather($$);
 
-my $optlist  = "CEi:ars";
+my $optlist  = "CEi:aArs";
 my $debug = 0;
 my $interval = 0;
 my $doall = 0;
@@ -83,6 +85,9 @@ if (defined($options{"h"})) {
 if (defined($options{"a"})) {
     $doall = 1;
 }
+if (defined($options{"A"})) {
+    $doall = 2;
+}
 if (defined($options{"r"})) {
     $recv = 1;
     $send = 0;
@@ -103,9 +108,8 @@ if (defined($options{"E"})) {
 if (defined($options{"C"})) {
     $controlnet = 1;
 }
-else {
-    @nodes = @ARGV;
-}
+
+@nodes = @ARGV;
 
 #
 # No nodes specified, get stats for all nodes that are in an experiment.
@@ -115,21 +119,42 @@ if (@nodes > 0) {
 	$nclause = "and n.node_id in (" . join(",", map("'$_'", @nodes)) . ")";
 }
 
-my $query_result =
-    DBQueryWarn("select r.pid,r.eid,node_id1,eventstate,card1,node_id2".
-		" from wires as w,nodes as n,reserved as r".
-		" where w.node_id1=n.node_id and w.node_id1=r.node_id".
-		"  and node_id2 like 'cisco%' and w.type='Control'".
-		"  and n.role='testnode' $nclause".
-		" order by node_id2,card2,port2");
+my $query_result;
+
+if ($doall == 2) {
+    $query_result =
+	DBQueryWarn("select r.pid,r.eid,node_id1,eventstate,card1,node_id2".
+		    " from wires as w,nodes as n".
+		    " left join reserved as r on n.node_id=r.node_id".
+		    " where w.node_id1=n.node_id".
+		    "  and (node_id2 like 'cisco%' or node_id2 like 'procurve%')".
+		    "  and w.type='Control'".
+		    "  and n.role='testnode' $nclause".
+		    " order by node_id2,card2,port2");
+} else {
+    $query_result =
+	DBQueryWarn("select r.pid,r.eid,node_id1,eventstate,card1,node_id2".
+		    " from wires as w,nodes as n,reserved as r".
+		    " where w.node_id1=n.node_id and w.node_id1=r.node_id".
+		    "  and (node_id2 like 'cisco%' or node_id2 like 'procurve%')".
+		    "  and w.type='Control'".
+		    "  and n.role='testnode' $nclause".
+		    " order by node_id2,card2,port2");
+}
 if (! $query_result || $query_result->numrows == 0) {
+    print STDERR "Node(s) not found.\n";
     exit(0);
 }
 while (my %row = $query_result->fetchhash()) {
     my $switch = $row{'node_id2'};
     my $pc = $row{'node_id1'};
     my $pceth = $row{'card1'};
-    my $exp = $row{'pid'} . "/" . $row{'eid'};
+    my $exp;
+    if (defined($row{'pid'})) {
+	$exp = $row{'pid'} . "/" . $row{'eid'};
+    } else {
+	$exp = "<NONE>";
+    }
     my $cnet = "$pc:$pceth";
 
     push(@{$switches{$switch}}, $cnet);
@@ -167,6 +192,10 @@ foreach my $node (keys %pcs) {
     }
     my $total = $after{$node}{'totals'}->[3] - $before{$node}{'totals'}->[3];
     if ($total <= 0) {
+	print STDERR "*** $node: negative packet count (",
+	             $before{$node}{'totals'}->[3], " to ",
+		     $after{$node}{'totals'}->[3], " ($total)\n"
+			 if ($total < 0);
 	next;
     }
     $pcs{$node}{'total'} = $total;
@@ -247,7 +276,10 @@ sub gather($$)
 		print STDERR "*** $node: invalid portstats!?\n"; 
 		next;
 	    }
-	    next if (!exists($pcref->{$node}));
+	    if (!exists($pcref->{$node})) {
+		print STDERR "*** $node: no stats returned!?\n"; 
+		next;
+	    }
 	    $resref->{$node}{'counts'} = @counts;
 	    my $oct = 0;
 	    my $upkts = 0;
