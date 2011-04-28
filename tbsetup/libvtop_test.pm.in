@@ -4,7 +4,7 @@
 # Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-package libvtop;
+package libvtop_test;
 
 use strict;
 use Exporter;
@@ -480,7 +480,7 @@ sub usevirtiface($)
     my ($self) = @_;
     my $encap  = $self->_encapstyle();
 
-    return ($encap eq "veth" || $encap eq "veth-ne" || $encap eq "vlan");
+    return ($encap eq "veth-ne" || $encap eq "vlan");
 }
 sub membershaped($$) {
     my ($self, $member) = @_;
@@ -562,6 +562,14 @@ sub Stringify($)
     my $vport  = $self->vport();
 
     return "$vnode:$vport";
+}
+
+sub usevirtiface($)
+{
+    my ($self) = @_;
+    my $encap  = $self->_encapstyle();
+
+    return ($encap eq "veth-ne" || $encap eq "vlan");
 }
 
 ###############################################################################
@@ -705,7 +713,7 @@ sub doesimplement($$)
 #############################################################################
 # Back to the main package.
 #
-package libvtop;
+package libvtop_test;
 
 #
 # Load some physical info (for types, interfaces, speeds).
@@ -2071,8 +2079,11 @@ sub GenVirtLans($)
 	my $mustdelay    = $vlan->_mustdelay();
 	my $nobwshaping  = $vlan->_nobwshaping();
 	my $protocol     = $vlan->_protocol();
-	my $encap        = $vlan->_encapstyle();
+	my $linkencap    = $vlan->_encapstyle();
 	my $layer        = $vlan->_layer();
+
+	# For mixing pnodes and vnodes.
+	$vlan->_mixedencap(0);
 
 	#
 	# Count the types of nodes (simulated, virtual, real, etc.) in this
@@ -2198,6 +2209,10 @@ sub GenVirtLans($)
 		if ($osdoesvlan{$osid});
 	    $nodesdo{"ldelay"}++
 		if ($osdoeslinkdelays{$osid});
+
+	    # Remember since we went to the trouble of determining the osid.
+	    $member->_osdoesvethNE($osdoesvethNE{$osid});
+	    $member->_osdoesvlan($osdoesvlan{$osid});
 	}
 
 	#
@@ -2274,31 +2289,22 @@ sub GenVirtLans($)
 	# "encapsulation style" (virtlanencapstyle).  That value is
 	# one of:
 	#
-	# "alias"	emulation is done with IP aliases on a physical
-	#               interface; there is no packet encapsulation. Works on
-	#		FreeBSD or Linux.
-	#
-	# "veth"	emulation is done with "veth" virtual devices;
-	#		encapsulation is standard veth style.
-	#		Works on FreeBSD only.
-	#
 	# "veth-ne"	emulation is done with "veth" devices;
 	#		no encapsulation is used (uses made-up MAC addresses
 	#		instead).
-	#		Works on FreeBSD only.
+	#		Works on FreeBSD only and OpenVZ. 
 	#
 	# "vlan"	emulation is done with "vlan" devices;
 	#		uses 802.1q VLAN tagging.
 	#		Works on FreeBSD or Linux.
 	#
 	# "default"	emulation style was not explicitly set by the users;
-	#		encap style depends on context ("veth" for vnode,
-	#		"alias" ow)
+	#		encap style depends on context ("veth-ne" for vnode)
 	#
 	# Note that the encapsulation style for "default" depends on
-	# the node type.  For non-vnodes the default is "alias".  For
-	# vnodes the default is "veth" since they must always have
-	# some pseudo-device on which to hang a route table ID; i.e.,
+	# the node type.  For non-vnodes the default is "vlan".  For
+	# vnodes the default is "veth-ne" since they must always have
+	# some pseudo-device on which to hang a route table ID; i.e:
 	# we cannot just do IP aliasing.
 	#
 	#
@@ -2307,64 +2313,95 @@ sub GenVirtLans($)
         # setting.  At the moment, only the latter (global) is
         # implemented.
         #
-	my $encapstyle = $experiment->encap_style();
+	my $globalencap = $experiment->encap_style();
 
 	#
-	# Historic case O: if simulated nodes are involved, use veth
-	# as necessary.  XXX don't know if this is correct in all cases!
+	# No longer support veth or alias encap; catch it now. 
 	#
-	if ($simnodes > 0) {
-	    $encapval = "veth";
+	if (! ($globalencap =~ /^(default|veth-ne|vlan)$/)) {
+	    tberror("unknown global encapsulation style '$globalencap'\n");
+	    $errors++;
+	    next;
 	}
-	#
-	# Historic case I: non-vnode emulated links use IP aliases 
-	# unless per-link value is 'veth', in which case veths are used.
-	# This is currently the only place where we care about the
-	# per-link value.
-	#
-	elsif ($encapstyle eq "default" && $virtnodes == 0) {
-	    if ($encap eq "veth") {
-		$encapval = "veth";
-	    } else {
-		$encapval = "alias";
-	    }
+	if (! ($linkencap =~ /^(default|veth-ne|vlan)$/)) {
+	    tberror("$vname: unknown link encapsulation style '$linkencap'\n");
+	    $errors++;
+	    next;
 	}
-	#e
-	# Historic case II: vnode emulated links use veth devices with
-	# encapsulation unless global encap is set to 'veth-ne'.
-	#
-	elsif ($encap eq "default" && $virtnodes > 0) {
-	    if ($encapstyle eq "default" || $encapstyle eq "veth") {
-		$encapval = "veth";
-	    } elsif ($encapstyle eq "veth-ne") {
+	if ($linkencap ne "default" && $linkencap ne $globalencap) {
+	    tbwarn("$vname: per-link encapsulation type not supported\n");
+	    $errors++;
+	    next;
+	}
+
+	if ($virtnodes) {
+	    #
+	    # At the present time, links with virtnodes require that we 
+	    # multiplex (and use encapsulation). If emulated is not set,
+	    # just turn it on (we can do this silently since there is no
+	    # other choice for the user). 
+	    #
+	    $emulated = 1;
+	    
+	    #
+	    # For virtual nodes, we prefer veth-ne cause vlans are a scarce
+	    # resource, and most VM implementations should support them in
+	    # some manner (eg: openvz veth device). 
+	    #
+	    if ($globalencap eq "default") {
 		$encapval = "veth-ne";
 	    }
-	}
-
-	if (!defined($encapval)) {
-	    if ($encapstyle eq "default") {
-		# must involve vnodes, non-vnodes handled in "case I" above
-		$encapval = "veth";
-	    } elsif ($encapstyle =~ /^(alias|veth|veth-ne|vlan)$/) {
-		$encapval = $encapstyle;
-	    } else {
-		tberror("unknown encapsulation style '$encapstyle'\n");
-		$errors++;
-	    }
-	    if ($encap ne "default" && $encap ne $encapval) {
-		tbwarn("per-link emulation style not supported right now".
-		       "'$encap' overridden by global '$encapval'");
+	    else {
+		$encapval = $globalencap;
 	    }
 	}
-
+	else {
+	    #
+	    # No virtual nodes. We allow links to use encapsulation and to
+	    # be multiplexed (emulated). This allows the experimentor to
+	    # have more links then just the number of physical interfaces.
+	    # Encapsulation without multiplexing is okay, although useful
+	    # mostly for testing purposes. If the link is emulated but not
+	    # encapsulated, an encapsulation method must be chosen. We
+	    # prefer vlan these days cause it runs everywhere. Might want
+	    # to look at the nodesdo info at some point.
+	    #
+	    if ($emulated) {
+		if ($globalencap eq "default") {
+		    $encapval = "vlan";
+		}
+		else {
+		    $encapval = $globalencap;
+		}
+	    }
+	    elsif ($globalencap ne "default") {
+		$encapval = $globalencap;
+	    }
+	    if (defined($encapval)) {
+		if ($nodesdo{$encapval} != $nonvirtnodes) {
+		    tberror("Not all nodes in link $vname support $encapval ".
+			    "encapsulation\n");
+		    $errors++;
+		    next;
+		}
+	    }
+	    else {
+		$encapval = "none";
+	    }
+	}
 	$self->printdb("$vname: global/link = ".
-		       "$encapstyle/$encap => $encapval\n");
+		       "$globalencap/$linkencap => $encapval\n");
 
 	#
-	# Ensure the per-link value is set correctly for emulated links.
+	# Update the per-link values for emulated and encapsulation style.
+	# Also init the per-member flags, since this might be a mixed
+	# pnode/vnode link, where the pnode links use a different setting.
 	#
-	if ($emulated) {
-	    $vlan->_encapstyle($encapval);
+	$vlan->_encapstyle($encapval);
+	$vlan->_emulated($emulated);
+	foreach my $member (@members) {
+	    $member->_encapstyle($encapval);
+	    $member->_emulated($emulated);
 	}
 
 	#
@@ -2423,52 +2460,58 @@ sub GenVirtLans($)
 		#
 		# All members support the encapsulation style, use it.
 		#
-		$emulated = 1;
-		$vlan->_emulated(1);
-		$vlan->_encapstyle($encapval);
-	    } else {
-		$vlan->_encapstyle($encapval);
+		;
+	    }
+	    elsif ($nonvirtnodes && $encapval eq "veth-ne") {
+		#
+		# One way of mixing vnodes and pnodes is to require that all
+		# nodes support the same style of encapsulation. The most
+		# common is vlan encap.  But that is really inefficient
+		# since it burns up scarce vlan ids. On the other hand, if
+		# vnode links are veth-ne, and the user does not need/want
+		# multiplexing on the pnodes, then a plain
+		# non-encapsulating physical interface on the pnode is just
+		# fine since all the pnode sees is ethernet frames with
+		# fake mac addressess generated by the veth device on the
+		# vnodes.
+		#
+		# At the moment, we have no NS syntax for the user to ask
+		# for this, but if the pnodes do not support veth-ne, we
+		# will just turn off the emulate bit for the pnode members
+		# of the lan. Assign will not try to multiplex those, and
+		# if the user asked for more links then interfaces, it will
+		# fail to map.
+		#
+		$vlan->_mixedencap(1);
 		
-		#
-		# Not all members support the desired encapsulation.
-		# This means we have to turn off emulation options
-		# even if the user explicitly asked for them.
-		# If the user had explicitly asked for these, we
-		# print a warning.
-		#
-		if ($emulated) {
-		    tbwarn "tb-set-multiplexed not supported on ".
-			"$vname since at least one of the nodes in $vname ".
-			"does not support multiplexed links.";
+		foreach my $member (@members) {
+		    my $virtnode = $member->virt_node();
+
+		    next
+			if ($virtnode->_isvirtnode());
+
+		    if (! $member->_osdoesvethNE()) {
+			tbwarn("$vname: changing $member to non-encapsulating ".
+			       "since physical host does not support veth-ne\n");
+			$member->_emulated(0);
+			$member->_encapstyle("none");
+		    }
 		}
-		if ($vlan->usevirtiface()) {
-		    tbwarn "tb-set-vlink-emulation not supported on ".
+	    }
+	    else {
+		#
+		# Not all members support the desired encapsulation. We used to
+		# reset emulated and encapsulation style, but now we just throw
+		# an error so that user knows the topology is not going to be
+		# what was expected.
+		#
+		tberror("Encapsulation not supported on ".
 			"$vname since at least one of the nodes in $vname ".
-			"does not support '$encapval' link emulation\n";
-		}
-		$emulated = 0;
-		$vlan->_emulated(0);
-		$vlan->_encapstyle("none");
-	
-		# cannot do colocated vnode trivial links without veths
-		$trivial_ok = 0;
+			"does not support '$encapval' link emulation\n");
+		$errors++;
+		next;
 	    }
 	}
-	elsif ($simnodes > 0 && $realnodes == 0) {
-	    #
-	    # If all nodes in a lan/link are simulated, the lan/link
-	    # could certainly be hosted on the same physical
-	    # node. Also, if the lan/link is cut and members mapped to
-	    # different physical nodes, we will use emulated links
-	    # i.e. veth devices.
-	    #
-	    $trivial_ok = 1;
-	    $emulated = 1;
-	    $vlan->_emulated(1);
-	    $vlan->_encapstyle("veth");
-	    $vlan->_allsim(1);
-	}
-	
 	if ($protocol !~ /^ethernet/) {
 	    #
 	    # This arrangement is temporary. For now, if its not a
@@ -2668,7 +2711,8 @@ sub GenVirtLans($)
 		    my $plink = "linksimple/$vname/$member0,$member1";
 		    my $others = {};
 		    if ($emulated) {
-			$others->{'emulated'} = 1;
+			$others->{'emulated'} = 1
+			    if ($member0->_emulated() && $member1->_emulated());
 			$others->{'virtualization_type'} =
 			    $vlan->_encapstyle();
 		    }
@@ -2783,7 +2827,8 @@ sub GenVirtLans($)
 		    $bw = ($top_bw == 0 ? "*" : $top_bw);
 		}
 		if ($emulated) {
-		    $others->{'emulated'} = 1;
+		    $others->{'emulated'} = 1
+			if ($member0->_emulated() && $member1->_emulated());
 		    $others->{'virtualization_type'} = $vlan->_encapstyle();
 		}
 		if ($layer == 1) {
@@ -2952,7 +2997,7 @@ sub GenVirtLans($)
 			
 			my $others = {};
 			if ($emulated) {
-			    $others->{'emulated'} = 1;
+			    $others->{'emulated'} = 1 if ($member->_emulated());
 			    $others->{'virtualization_type'} =
 				$vlan->_encapstyle();
 			}
@@ -3046,9 +3091,9 @@ sub GenVirtLans($)
 		    my $plink = "linklan/$vname/$member";
 		    my $others = {'isgeninode' => $vlan->_geninodes()};
 		    if ($emulated) {
-			$others->{'emulated'} = 1;
+			$others->{'emulated'} = 1 if ($member->_emulated());
 			$others->{'virtualization_type'} =
-			    $vlan->_encapstyle();
+			    $member->_encapstyle();
 		    }
 		    if ($trivial_ok) {
 			$others->{'trivial_ok'} = 1;
@@ -5431,14 +5476,20 @@ sub InterpLinksAux($)
 		    #
 		    # Create some new virtual devices.
 		    #
-		    my $virtifaceA = $self->NewVirtIface($virtlan, $member0,
-							 $nodeA, $portA);
-		    return -1
-			if (!defined($virtifaceA));
-		    my $virtifaceB = $self->NewVirtIface($virtlan, $member1,
-							 $nodeB, $portB);
-		    return -1
-			if (!defined($virtifaceB));
+		    my ($virtifaceA, $virtifaceB);
+
+		    if ($member0->usevirtiface()) {
+			$virtifaceA = $self->NewVirtIface($virtlan, $member0,
+							  $nodeA, $portA);
+			return -1
+			    if (!defined($virtifaceA));
+		    }
+		    if ($member1->usevirtiface()) {
+			$virtifaceB = $self->NewVirtIface($virtlan, $member1,
+							  $nodeB, $portB);
+			return -1
+			    if (!defined($virtifaceB));
+		    }
 
 		    #
 		    # We need to reserve the shared bandwidth.
@@ -5528,16 +5579,20 @@ sub InterpLinksAux($)
 		    $protolink->SetRole($vlan_role);
 
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA,
-					     $virtifaceA->viface(),
+					     (defined($virtifaceA) ?
+					      $virtifaceA->viface() : $portA),
 					     (defined($protovlan) ?
 					      undef : $portA));
  		    $protolink->AddInterface($nodeB, $vnodeB, $vportB,
-					     $virtifaceB->viface(),
+					     (defined($virtifaceB) ?
+					      $virtifaceB->viface() : $portB),
 					     (defined($protovlan) ?
 					      undef : $portB));
 		    # For portmap below
-		    $portA = $virtifaceA->viface();
-		    $portB = $virtifaceB->viface();
+		    $portA = $virtifaceA->viface()
+			if (defined($virtifaceA));
+		    $portB = $virtifaceB->viface()
+			if (defined($virtifaceB));
 		}
 		else {
 		    $protolink = ProtoLan->Create($experiment, $lan,
@@ -5660,17 +5715,23 @@ sub InterpLinksAux($)
 		    }
 		
 		    #
-		    # Create new veth device.
+		    # Create new veth device. Watch for a mixed pnode/vnode
+		    # lan where the pnode is not using encapsulation.
 		    #
-		    my $virtiface = $self->NewVirtIface($virtlan, $member0,
-							$nodeA, $portA);
-		    return -1
-			if (!defined($virtiface));
+		    my $virtiface;
+		    if ($member0->usevirtiface()) {
+			$virtiface = $self->NewVirtIface($virtlan, $member0,
+							 $nodeA, $portA);
+			return -1
+			    if (!defined($virtiface));
+
+			$portA = $virtiface->viface();
+		    }
 		    #
-		    # We need to reserve the shared bandwidth.
+		    # We need to reserve the shared bandwidth. 
 		    #
 		    if (exists($self->delaylinks()->{$plink}) ||
-			$member0->_reservebw()) {
+			 $member0->_reservebw()) {
 			my ($bandwidth,$rbandwidth) = 0;
 			
 			if (exists($self->delaylinks()->{$plink})) {
@@ -5682,7 +5743,8 @@ sub InterpLinksAux($)
 			    $bandwidth = $rbandwidth = $member0->_reservebw();
 			}
 			my $maxbw = max($bandwidth, $rbandwidth);
-			if ($virtnodeA->_onsharednode() &&
+			if (($virtnodeA->_onsharednode() ||
+			     $member0->_reservebw()) &&
 			    $self->printdb("  Reserving shared BW: ".
 					   "$member0,$maxbw,$virtiface\n") &&
 			    !($self->impotent() || $self->alloconly) && 
@@ -5692,7 +5754,6 @@ sub InterpLinksAux($)
 			    return -1;
 			}
 		    }
-		    $portA = $virtiface->viface();
 
 		    $protolan = ProtoLan->Lookup($experiment, $lan);
 		    if (defined($protolan)) {
@@ -5713,9 +5774,7 @@ sub InterpLinksAux($)
 						     $self->alloconly(),
 						     $protovlan);
 		    }
-		    $protolan->SetType((defined($protovlan) ?
-				       "emulated" : "emulated-shared"));
-
+		    $protolan->SetType("emulated");
 		    $protolan->SetRole("link/lan");
 		    $protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		
@@ -7128,7 +7187,7 @@ sub UpLoadIPAddresses($)
 	    my $iface = $self->solution_portmap()->{$member};
 	    my $vnodename = $member->vnode();
 
-	    if ($virtlan->usevirtiface()) {
+	    if ($member->usevirtiface()) {
 		#
 		# Emulated links on local virtual nodes use the new
 		# veth device.
