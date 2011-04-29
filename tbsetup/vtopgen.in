@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -43,6 +43,7 @@ use libtestbed;
 use User;
 use libtblog;
 use libvtop;
+use Experiment;
 
 # Protos
 sub fatal($);
@@ -94,6 +95,8 @@ my $this_user = User->ThisUser();
 if (! defined($this_user)) {
     tbdie("You ($UID) do not exist!");
 }
+
+libvtop::Init($this_user, $experiment->GetGroup(), $experiment);
 
 my $flags = 0;
 $flags |= $libvtop::VTOP_FLAGS_VERBOSE
