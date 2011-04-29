@@ -96,7 +96,7 @@ if (! defined($this_user)) {
     tbdie("You ($UID) do not exist!");
 }
 
-libvtop::Init($this_user, $experiment->GetGroup(), $experiment);
+libvtop::Init($this_user, $experiment->GetGroup(), $experiment);
 
 my $flags = 0;
 $flags |= $libvtop::VTOP_FLAGS_VERBOSE
