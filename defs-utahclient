@@ -1,0 +1,8 @@
+#
+# For building the client-side at Utah.
+# Make sure we do not use ELVIN_COMPAT, we should never build images that
+# way any more.
+#
+. defs-default
+
+ELVIN_COMPAT=0
