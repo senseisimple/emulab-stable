@@ -15,12 +15,11 @@ $| = 1; # Turn off line buffering on output
 use English;
 use SNMP;
 use snmpit_lib;
-use Data::Dumper;
 
 use libdb;
 use libtestbed;
+use Port;
 use overload ('""' => 'Stringify');
-
 our %devices;
 our $parallelized = 1;
 
@@ -166,25 +165,6 @@ sub Stringify($)
     return "[Stack ${stack_id}]";
 }
 
-sub FlipDebug($$)
-{
-    my $self = shift;
-    my $debug = shift;
-
-    $self->{'DEBUG'} = $debug;
-    $snmpit_stack_child::child_debug = $debug;
-
-    foreach my $devicename (keys %{$self->{DEVICES}}) {
-	my $device = $self->{DEVICES}{$devicename};
-	$device->{'DEBUG'} = $debug;
-    }
-    foreach my $device (values(%devices)) {
-	$device->{'DEBUG'} = $debug;
-#	print Dumper($device);
-    }
-    return 0;
-}
-
 #
 # List all VLANs on all switches in the stack
 #
@@ -253,11 +233,11 @@ sub listPorts($) {
     foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
 	foreach my $line ($device->listPorts()) {
-	    my $port = $$line[0];
-	    if (defined $portinfo{$port}) {
-		warn "WARNING: Two ports found for $port\n";
+	    my $port = $$line[0]; 
+	    if (defined $portinfo{$port->toString()}) {
+		warn "WARNING: Two ports found for ".$port->toString()."\n";
 	    }
-	    $portinfo{$port} = $line;
+	    $portinfo{$port->toString()} = $line;
 	}
     }
 
@@ -402,7 +382,7 @@ sub setPortVlan($$@) {
 
     #
     # When making firewalls, may have to flush FDB entries from trunks
-    #
+    # 
     foreach my $vlan (keys %BumpedVlans) {
 	foreach my $devicename ($self->switchesWithPortsInVlan($vlan)) {
 	    my $dev = $self->{DEVICES}{$devicename};
@@ -565,7 +545,7 @@ sub createVlan($$$$;$$$) {
 	#
 	# We need to populate each VLAN on each switch.
 	#
-	$self->debug( "adding ports @ports to VLAN $vlan_id \n");
+	$self->debug( "adding ports ".Port->toStrings(@ports)." to VLAN $vlan_id \n");
 	if (@ports) {
 	    if ($self->setPortVlan($vlan_id,@ports)) {
 		$errortype = "Adding Ports to";
@@ -597,7 +577,7 @@ sub createVlan($$$$;$$$) {
 sub findDeviceVlans($@) {
     my $self = shift;
     my @vlan_ids = @_;
-    my ($device, $devicename);
+    my ($count, $device, $devicename) = (scalar(@vlan_ids));
     my %mapping = ();
     #
     # Each value in the mapping is:
@@ -866,7 +846,6 @@ sub removeSomePortsFromVlan($$@) {
 	warn "ERROR: VLAN $vlan_id not found on switch!";
 	return 0;
     }
-    my %map = mapPortsToDevices(@ports);
 
     #
     # Now, we go through each device and remove all ports from the VLAN
@@ -876,7 +855,7 @@ sub removeSomePortsFromVlan($$@) {
     # first, so the other snmpit will not see it free until it's been
     # removed from all switches)
     #
-    foreach my $devicename (sort {tbsort($b,$a)} keys %map) {
+    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
 	my %vlan_numbers = $device->findVlans($vlan_id);
 
@@ -891,9 +870,9 @@ sub removeSomePortsFromVlan($$@) {
 	print "Removing ports on $devicename from VLAN $vlan_id ($vlan_number)\n"
 	    if $self->{DEBUG};
 
-	$errors += $device->removeSomePortsFromVlan($vlan_number,
-						    @{$map{$devicename}});
+	$errors += $device->removeSomePortsFromVlan($vlan_number, @ports);
     }
+
     return ($errors == 0);
 }
 
@@ -920,7 +899,6 @@ sub removeSomePortsFromTrunk($$@) {
 	warn "ERROR: VLAN $vlan_id not found on switch!";
 	return 0;
     }
-    my %map = mapPortsToDevices(@ports);
 
     #
     # Now, we go through each device and remove all ports from the trunk
@@ -930,7 +908,7 @@ sub removeSomePortsFromTrunk($$@) {
     # first, so the other snmpit will not see it free until it's been
     # removed from all switches)
     #
-    foreach my $devicename (sort {tbsort($b,$a)} keys %map) {
+    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
 	my %vlan_numbers = $device->findVlans($vlan_id);
 
@@ -942,11 +920,10 @@ sub removeSomePortsFromTrunk($$@) {
 
 	my $vlan_number = $vlan_numbers{$vlan_id};
 	    
-	print "Removing trunk ports on $devicename from VLAN ".
-	    "$vlan_id ($vlan_number)\n"
+	print "Removing ports on $devicename from VLAN $vlan_id ($vlan_number)\n"
 	    if $self->{DEBUG};
 
-	foreach my $port (@{$map{$devicename}}) {
+	foreach my $port (@ports) {
 	    return 0
 		if (! $device->setVlansOnTrunk($port, 0, $vlan_number));
 	}
@@ -987,10 +964,12 @@ sub getStats($) {
 	my $device = $self->{DEVICES}{$devicename};
 	foreach my $line ($device->getStats()) {
 	    my $port = $$line[0];
-	    if (defined $stats{$port}) {
-		warn "WARNING: Two ports found for $port\n";
+	    if (defined($port)) {
+	        if (defined $stats{$port->toString()}) {
+		    warn "WARNING: Two ports found for ".$port->toString()."\n";
+	        }
+	        $stats{$port->toString()} = $line;
 	    }
-	    $stats{$port} = $line;
 	}
     }
     return map $stats{$_}, sort {tbsort($a,$b)} keys %stats;
@@ -1051,7 +1030,7 @@ sub enableTrunking2($$$@) {
     #
     # Simply make the appropriate call on the device
     #
-    print "Enable trunking: Port is $port, native VLAN is $native_vlan_id\n"
+    print "Enable trunking: Port is ".$port->toString().", native VLAN is $native_vlan_id\n"
 	if ($self->{DEBUG});
     my $rv = $device->enablePortTrunking2($port, $vlan_number, $equaltrunking);
 
@@ -1068,7 +1047,7 @@ sub enableTrunking2($$$@) {
 	    #
 	    my $error = $self->setPortVlan($vlan_id,$port);
 	    if ($error) {
-		warn "ERROR: could not add VLAN $vlan_id to trunk $port\n";
+		warn "ERROR: could not add VLAN $vlan_id to trunk ".$port->toString()."\n";
 		next;
 	    }
 	    push @vlan_numbers, $vlan_number;
@@ -1198,7 +1177,7 @@ sub setVlanOnTrunks2($$$$@) {
                 warn "ERROR - unable to find channel information on $src ".
 		     "for $src-$dst EtherChannel\n";
                 $errors += 1;
-            } else {
+            } else { 
 		if (!$self->{DEVICES}{$src}->
                         setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
                     warn "ERROR - unable to set trunk on switch $src\n";
