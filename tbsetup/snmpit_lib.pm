@@ -17,7 +17,7 @@ use Exporter;
 		getTestSwitches getControlSwitches getSwitchesInStack
                 getSwitchesInStacks
 		getVlanPorts
-		getExperimentTrunks setVlanTag setVlanStack
+		getExperimentTrunks setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks getStacksForSwitches

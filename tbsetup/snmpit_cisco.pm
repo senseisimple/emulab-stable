@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009, 2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -110,7 +110,11 @@ sub new($$$;$) {
     $self->{MIN_VLAN}         = $options->{'min_vlan'};
     $self->{MAX_VLAN}         = $options->{'max_vlan'};
 
-    if (($self->{MAX_VLAN} > 1024) && ($self->{MIN_VLAN} < 1000)) {
+    #
+    # Temporary removal by Leigh.
+    #
+    if (0 &&
+	($self->{MAX_VLAN} > 1024) && ($self->{MIN_VLAN} < 1000)) {
 	warn "ERROR: Some Cisco switches forbid creation of user vlans ".
 	     "with 1000 < vlan number <= 1024\n";
 	return undef;

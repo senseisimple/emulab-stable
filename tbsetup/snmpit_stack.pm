@@ -597,7 +597,7 @@ sub createVlan($$$$;$$$) {
 sub findDeviceVlans($@) {
     my $self = shift;
     my @vlan_ids = @_;
-    my ($count, $device, $devicename) = (scalar(@vlan_ids));
+    my ($device, $devicename);
     my %mapping = ();
     #
     # Each value in the mapping is:
