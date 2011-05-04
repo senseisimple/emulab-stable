@@ -271,6 +271,10 @@ sub Tokens2IfaceString($$;$)
     return "$nodeid:$iface";
 }
 
+
+# functions started with fake_ are used to handle
+# a special 'node:card/port' representation.
+
 sub fake_CardPort2Iface($$;$)
 {
     my ($cn, $c, $p) = @_;
@@ -315,6 +319,14 @@ sub fake_IfaceString2TripleTokens($;$)
     return (undef, undef, undef);
 }
 
+#
+# Class method
+# Find the port instance by a given string, if no port found from DB, 
+# make a fake one.
+#
+# This is useful when a port string is derived from the switch, but
+# it is not stored in DB. (eg. listing all ports on a switch)
+#
 sub LookupByStringForced($$)
 {
     my ($class, $str) = @_;
@@ -385,6 +397,10 @@ sub LookupByStringForced($$)
     return $inst;
 }
 
+#
+# Class method
+# get the port instance according to its iface-string representation
+#
 sub LookupByIface($$;$)
 {
     my ($class, $nodeid, $iface, $force) = @_;
@@ -461,6 +477,10 @@ sub LookupByIface($$;$)
     return $inst;
 }
 
+#
+# Class method
+# get the port instance according to its triple-string representation
+#
 sub LookupByTriple($$;$$)
 {
     my ($class, $nodeid, $card, $port) = @_;
@@ -558,6 +578,10 @@ sub LookupByTriples($@)
     return map(Port->LookupByTriple($_), @ifs);
 }
 
+#
+# Class method
+# Get all ports by their wire type
+#
 sub LookupByWireType($$)
 {
 	my ($c, $wt) = @_;
@@ -685,6 +709,9 @@ sub pc_iface($)
     }
 }
 
+#
+# get node_id field of the other end Port instance
+#
 sub other_end_node_id($)   
 { 
     my $self = $_[0];
@@ -704,6 +731,9 @@ sub other_end_node_id($)
     }
 }
 
+#
+# get card field of the other end Port instance
+#
 sub other_end_card($) 
 {
     my $self = $_[0];
@@ -723,6 +753,9 @@ sub other_end_card($)
     }
 }
 
+#
+# get port field of the other end Port instance
+#
 sub other_end_port($) 
 {
     my $self = $_[0];
@@ -742,6 +775,9 @@ sub other_end_port($)
     }
 }
 
+#
+# get iface field of the other end Port instance
+#
 sub other_end_iface($)
 {
     my $self = $_[0];
@@ -767,6 +803,9 @@ sub other_end_iface($)
     }
 }
 
+#
+# to the 'iface' string representation
+#
 sub toIfaceString($) {
     my $self = shift;
     if (!$self->has_fields()) {
@@ -775,6 +814,9 @@ sub toIfaceString($) {
     return Tokens2IfaceString($self->node_id(), $self->iface());
 }
     
+#
+# to the 'triple' string representation
+# 
 sub toTripleString($) {
     my $self = shift;
     if (!$self->has_fields()) {
@@ -783,6 +825,9 @@ sub toTripleString($) {
     return Tokens2TripleString($self->node_id(), $self->card(), $self->port());
 }
 
+#
+# to default string representation, which default is 'triple'
+# 
 sub toString($) {
     my $self = shift;
     if (!$self->has_fields()) {
@@ -790,13 +835,17 @@ sub toString($) {
     }
     return $self->toTripleString();
 }
+
 #
-# Should not support.
+# convert to the old "node:card" string
 #
 sub toNodeCardString($) {
     return Tokens2IfaceString($_[0]->node_id(), $_[0]->card());
 }
 
+#
+# get port instance according to the given node_id
+# 
 sub getEndByNode($$) {
 	my ($self, $n) = @_;
 	if ($n eq $self->node_id()) {
@@ -808,18 +857,30 @@ sub getEndByNode($$) {
 	}
 }
 
+#
+# get the other side's triple string representation
+#
 sub getOtherEndTripleString($) {
     return Tokens2TripleString($_[0]->other_end_node_id(), $_[0]->other_end_card(), $_[0]->other_end_port());
 }
 
+#
+# get the other side's iface string representation
+#
 sub getOtherEndIfaceString($) {
     return Tokens2IfaceString($_[0]->other_end_node_id(), $_[0]->other_end_iface());
 }
 
+#
+# get the other side of a port instance, according to 'wires' DB table
+#
 sub getOtherEndPort($) {
     return Port->LookupByTriple($_[0]->getOtherEndTripleString());
 }
 
+#
+# get the PC side of a port instance
+#
 sub getPCPort($) {
     my $self = $_[0];
     
@@ -834,6 +895,9 @@ sub getPCPort($) {
     }
 }
 
+#
+# get the switch side of a port instance
+#
 sub getSwitchPort($) {
     my $self = $_[0];
     
@@ -848,6 +912,9 @@ sub getSwitchPort($) {
     }
 }
 
+#
+# convert an array of ports into string, in iface representation
+#
 sub toIfaceStrings($@)
 {
 	my ($c, @pts) = @_;
@@ -859,6 +926,9 @@ sub toIfaceStrings($@)
 	return join(" ", @pts);
 }
 
+#
+# convert an array of ports into string, in triple-filed representation
+#
 sub toTripleStrings($@)
 {
 	my ($c, @pts) = @_;
@@ -870,6 +940,9 @@ sub toTripleStrings($@)
 	return join(" ", @pts);
 }
 
+#
+# convert an array of ports into string, in default string representation
+#
 sub toStrings($@)
 {
 	my ($c, @pts) = @_;
