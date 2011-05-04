@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1738,7 +1738,11 @@ sub print_switch
     if (!(defined($MAINSITE) && $MAINSITE && $name eq "procurve1")) {
 	push(@$types, "*lan:*");
     }
-    print_node($name, $types, [], [], $uuid, $interfaces,
+    # This is for mixing real nodes with pnodes in a lan. The goal is to
+    # prevent assign from putting the lan node on a pc; always prefer a
+    # real switch. See corresponding change in libvtop. 
+    my $features = ["real-switch:0"];
+    print_node($name, $types, $features, [], $uuid, $interfaces,
         $country, $latitude, $longitude, undef);
 }
 
