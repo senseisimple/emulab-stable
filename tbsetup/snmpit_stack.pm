@@ -15,6 +15,7 @@ $| = 1; # Turn off line buffering on output
 use English;
 use SNMP;
 use snmpit_lib;
+use Data::Dumper;
 
 use libdb;
 use libtestbed;
@@ -163,6 +164,25 @@ sub Stringify($)
     my $stack_id = $self->{STACKID};
 
     return "[Stack ${stack_id}]";
+}
+
+sub FlipDebug($$)
+{
+    my $self = shift;
+    my $debug = shift;
+
+    $self->{'DEBUG'} = $debug;
+    $snmpit_stack_child::child_debug = $debug;
+
+    foreach my $devicename (keys %{$self->{DEVICES}}) {
+	my $device = $self->{DEVICES}{$devicename};
+	$device->{'DEBUG'} = $debug;
+    }
+    foreach my $device (values(%devices)) {
+	$device->{'DEBUG'} = $debug;
+#	print Dumper($device);
+    }
+    return 0;
 }
 
 #
@@ -846,6 +866,7 @@ sub removeSomePortsFromVlan($$@) {
 	warn "ERROR: VLAN $vlan_id not found on switch!";
 	return 0;
     }
+    my %map = mapPortsToDevices(@ports);
 
     #
     # Now, we go through each device and remove all ports from the VLAN
@@ -855,7 +876,7 @@ sub removeSomePortsFromVlan($$@) {
     # first, so the other snmpit will not see it free until it's been
     # removed from all switches)
     #
-    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
+    foreach my $devicename (sort {tbsort($b,$a)} keys %map) {
 	my $device = $self->{DEVICES}{$devicename};
 	my %vlan_numbers = $device->findVlans($vlan_id);
 
@@ -870,9 +891,9 @@ sub removeSomePortsFromVlan($$@) {
 	print "Removing ports on $devicename from VLAN $vlan_id ($vlan_number)\n"
 	    if $self->{DEBUG};
 
-	$errors += $device->removeSomePortsFromVlan($vlan_number, @ports);
+	$errors += $device->removeSomePortsFromVlan($vlan_number, 
+						    @{$map{$devicename}});
     }
-
     return ($errors == 0);
 }
 
@@ -899,6 +920,7 @@ sub removeSomePortsFromTrunk($$@) {
 	warn "ERROR: VLAN $vlan_id not found on switch!";
 	return 0;
     }
+    my %map = mapPortsToDevices(@ports);
 
     #
     # Now, we go through each device and remove all ports from the trunk
@@ -908,7 +930,7 @@ sub removeSomePortsFromTrunk($$@) {
     # first, so the other snmpit will not see it free until it's been
     # removed from all switches)
     #
-    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
+    foreach my $devicename (sort {tbsort($b,$a)} keys %map) {
 	my $device = $self->{DEVICES}{$devicename};
 	my %vlan_numbers = $device->findVlans($vlan_id);
 
@@ -920,10 +942,11 @@ sub removeSomePortsFromTrunk($$@) {
 
 	my $vlan_number = $vlan_numbers{$vlan_id};
 	    
-	print "Removing ports on $devicename from VLAN $vlan_id ($vlan_number)\n"
+	print "Removing trunk ports on $devicename from VLAN ".
+	    "$vlan_id ($vlan_number)\n"
 	    if $self->{DEBUG};
 
-	foreach my $port (@ports) {
+	foreach my $port (@{$map{$devicename}}) {
 	    return 0
 		if (! $device->setVlansOnTrunk($port, 0, $vlan_number));
 	}

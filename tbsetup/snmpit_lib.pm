@@ -15,7 +15,7 @@ use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum portiface Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
-                getSwitchesInStacks getVlanIfaces
+                getSwitchesInStacks
 		getVlanPorts
 		getExperimentTrunks setVlanTag setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
