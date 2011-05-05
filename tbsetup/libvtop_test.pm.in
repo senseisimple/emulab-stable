@@ -5006,6 +5006,8 @@ sub InterpLinks($)
 	my $firstmember = $vpath->firstmember();
 	my $lastmember  = $vpath->lastmember();
 
+	$self->printdb("Adding link $virtlan, implemented by $vpath\n");
+
 	$self->AddLinkToSolution($vlink, 0, 0,
 				 $firstmember->_pnode(),
 				 $firstmember->_pport(),
@@ -5391,26 +5393,54 @@ sub InterpLinksAux($)
 
 		if ($virtlan->_layer() == 1) {
 		    #
-		    # Just a wire.
+		    # A layer one link is a "wire" between two interfaces
+		    # attached to a layer one switch; snmpit deals with
+		    # wires by creating the links on the layer one switch.
 		    #
 		    $protolink = ProtoLan->Create($experiment, $lan,
 						  $self->impotent() ||
 						  $self->alloconly());
+		    $protovlans{$lan} = $protolink;
+
 		    #
-		    # Hmm, until we have a layer one switch, lets say that
-		    # a layer one link is just a vlan between the nodes, and
-		    # the ports are put into trunk mode so that tagged vlans
-		    # can operate over it. 
-		    # We should generalize this somehow.
+		    # The layer one link when it is in existence, is just like
+		    # a wire between the end points. But of course the wire
+		    # is dynamic, only in existence because the layer one
+		    # switch hooks them up to each other. While this
+		    # connection is in existence, we want to create a
+		    # "logical" wire so that the link at the next layer up
+		    # sees that wire (as for snmpit).
+		    #
+		    my $logicalwire =
+			Interface::LogicalWire->Create($self->impotent(),
+						       $nodeA, $portA,
+						       $nodeB, $portB);
+		    return -1
+			if (!defined($logicalwire));
+
+		    $self->printdb("Created $logicalwire for $virtlan\n");
+
+		    #
+		    # There is no reasonable place to store the association of
+		    # logical interface/wire with the physical interfaces.
+		    # Do it in the member settings.
 		    #
 		    $protolink->SetType("wire");
 		    $protolink->SetRole("link");
-		    my $ifaceA =
-			$protolink->AddInterface($nodeA, $vnodeA,
-						 $vportA, $portA);
-		    my $ifaceB =
-			$protolink->AddInterface($nodeB, $vnodeB,
-						 $vportB, $portB);
+		    $protolink->AddInterface($nodeA, $vnodeA,
+					     $vportA, $portA, undef,
+					     {'logical_iface' =>
+						  $logicalwire->lportA()});
+		    $protolink->AddInterface($nodeB, $vnodeB,
+					     $vportB, $portB, undef,
+					     {'logical_iface' =>
+						  $logicalwire->lportB()});
+
+		    #
+		    # Stash this into segment so we can find it later, as when
+		    # doing the link at the next layer up.
+		    #
+		    $virtlan->_logicalwire($logicalwire);
 		    next;
 		}
 		elsif ($virtlan->_layer() == 2 && $virtlan->_vpath()) {
@@ -5461,14 +5491,39 @@ sub InterpLinksAux($)
 		    next;
 		}
 		#
-		# Okay, now make sure that if the link is layer 2 and
-		# is implemented by a layer 1 link, the layer 1 link
-		# is already done. Otherwise, push the link back on
-		# the list and keep going.
+		# Special handing for layer two links implemented by a path.
 		#
-		if ($virtlan->_implemented_by() && 0) {
+		if ($virtlan->_implemented_by()) {
+		    #
+		    # Make sure the underlying links have been processed.
+		    # Push back on the list if not.
+		    #
+		    my $vpath = $virtlan->_implemented_by();
+		    my @links = $vpath->virtlanlist();
 
-		    next;
+		    foreach my $link (@links) {
+			if (!exists($protovlans{$link->vname()})) {
+			    push(@plinks, $plink);
+			    goto loop;
+			}
+		    }
+		    #
+		    # Find the first and last links (the segments) of the path.
+		    # The logical wires created by those segments are the wires
+		    # we want to use below.
+		    #
+		    # XXX Not sure this makes sense if the path has more then
+		    # 2 segments in it.
+		    #
+		    my $firstlink = shift(@links);
+		    my $lastlink  = pop(@links);
+		    my $firstwire = $firstlink->_logicalwire();
+		    my $lastwire  = $lastlink->_logicalwire();
+
+		    $self->printdb("$virtlan; $firstwire, $lastwire\n");
+
+		    $portA = $firstwire->lportA();
+		    $portB = $lastwire->lportB();
 		}
 		if ($virtlan->usevirtiface()) {
 		    my $protovlan;
@@ -5609,6 +5664,22 @@ sub InterpLinksAux($)
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
 		    $protovlans{$lan} = $protolink;
+		}
+		#
+		# If this link is implemented by a path, link them up so we
+		# encode the ordering in the lans table (for snmpit).
+		#
+		if ($virtlan->_implemented_by()) {
+		    my $vpath = $virtlan->_implemented_by();
+		    my @links = $vpath->virtlanlist();
+
+		    # If the proto link has an underlying proto vlan, that is 
+		    # the actual dependency.
+		    my $protodep = $protolink->link() || $protolink;
+
+		    foreach my $link (@links) {
+			$protovlans{$link->vname()}->SetLink($protodep);
+		    }
 		}
 	    }
 	    else {
