@@ -1882,6 +1882,7 @@ sub Instantiate($)
 	my $vport       = $protomember->{'vport'};
 	my $iface       = $protomember->{'iface'};
 	my $pport       = $protomember->{'pport'};
+	my $attributes  = $protomember->{'attrs'};
 	my $member;
 
 	if (defined($pport)) {
@@ -1898,6 +1899,13 @@ sub Instantiate($)
 	if (!defined($interface)) {
 	    $lan->Destroy();
 	    return -1;
+	}
+	if (defined($attributes)) {
+	    foreach my $attrkey (keys(%{$attributes})) {
+		my $attrvalue = $attributes->{$attrkey};
+
+		$interface->SetAttribute($attrkey, $attrvalue);
+	    }
 	}
     }
     $self->{'INSTANCE'} = $lan;
@@ -2008,9 +2016,9 @@ sub Dump($)
 #
 # Add an interface to a protolan.
 #
-sub AddInterface($$$$$;$)
+sub AddInterface($$$$$;$$)
 {
-    my ($self, $node, $vnode, $vport, $iface, $pport) = @_;
+    my ($self, $node, $vnode, $vport, $iface, $pport, $attributes) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -2029,6 +2037,7 @@ sub AddInterface($$$$$;$)
 					     "vport" => $vport,
 					     "iface" => $iface,
 					     "pport" => $pport,
+					     "attrs" => $attributes,
 					    };
     return 0;
 }
