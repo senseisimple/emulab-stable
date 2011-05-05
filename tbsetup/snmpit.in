@@ -19,6 +19,7 @@ my $ELABINELAB = @ELABINELAB@;
 my $NOSTACKMIB = @NOSTACKMIB@;
 my $MAINSITE   = @TBMAINSITE@;
 my $TB = '@prefix@';
+my $SWITCH_NODE_STACK = "Switch-Node";
 
 use libdb;
 use User;
@@ -649,6 +650,8 @@ if ($TESTMODE) {
 snmpit_lib::init($debug);
 
 my $exitval = 0;
+my @pathlinksbyl1 = ();
+
 COMMAND: foreach my $command (@commands) {
 
     #
@@ -733,6 +736,18 @@ COMMAND: foreach my $command (@commands) {
 		    next COMMAND;
 		}
             } else {
+		for (my $idx = 0; $idx < scalar(@vlans); $idx++)
+		{
+		    my %ifaces = ();
+		    if (getPathVlanIfaces($vlans[$idx], \%ifaces) != -1) {
+			map { print "$_=>$ifaces{$_} " } keys %ifaces;
+			push @pathlinksbyl1, $vlans[$idx];
+			print "path: $vlans[$idx] \n";
+		    }
+		}
+	    
+		@vlans = arraySub(\@vlans, \@pathlinksbyl1);
+	
                 @devicenames =
                     getSwitchesInStacks(getPlannedStacksForVlans(@vlans));
                 debug("Tables: list from database: " . join(",",@devicenames) .
@@ -1594,8 +1609,10 @@ sub doVlansFromTables($$@) {
     my $vlan_number;
 
     if (@$stacks > 1) {
-	die "VLAN creation accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
+	if (!(@$stacks == 2 && @pathlinksbyl1 > 0)) { 
+	    die "VLAN creation accross multiple stacks is not yet supported\n" .
+		"Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
+	}
     }
     
     #
@@ -1743,6 +1760,17 @@ sub doVlansFromTables($$@) {
 	    $vlan->Refresh();	    
 	}
     }
+
+    foreach my $vlanid (@pathlinksbyl1) {
+	my @ports = ();
+	my %ifaces = ();
+
+	if (getPathVlanIfaces($vlanid, \%ifaces) != -1) {
+	    my @ifs = keys %ifaces;
+	    @ports = map { ifacemodport{$_} } @ifs;
+	    $errors += CreateOneVlan($stacks, $vlanid, @ports);
+	}
+    }
     return $errors;
 }
 
@@ -1792,7 +1820,7 @@ sub CreateOneVlan($$$@)
     # Set the speed and duplex of each interface depending on the
     # value in the database
     #
-    if (!$NOSTACKMIB) {
+    if ((!$NOSTACKMIB) && !($stack->{STACKID} eq $SWITCH_NODE_STACK)) {
 	foreach my $port (@ports) {
 	    my ($speed,$duplex) = getInterfaceSettings($port);
 	    #

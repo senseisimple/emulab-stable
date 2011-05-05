@@ -1287,7 +1287,8 @@ sub getifconfig($;$)
     # don't have to force virtual devices onto physical nodes just because
     # some virtual nodes in the same experiment require multiplexed links.
     #
-    if ($hasvirt && !JAILED() && !GENVNODE() && !REMOTE() && !PLAB()) {
+    if ($hasvirt && !JAILED() && !JAILHOST() && !GENVNODE() &&
+	!REMOTE() && !PLAB()) {
 	#
 	# Prelim: find out how many virt interfaces mapped to each phys
 	# interface and locate the entry for each phys interface.

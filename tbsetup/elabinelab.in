@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: ntpinfo table.
@@ -1523,6 +1523,9 @@ sub UpdateEmulab()
 	    if ($role eq TBDB_IFACEROLE_EXPERIMENT() &&
 		defined($ip) && $ip ne "") {
 		$role = TBDB_IFACEROLE_CONTROL();
+		# update the temp_new_nodes table with this IP
+		DBQueryFatal("update temp_new_nodes set IP='$ip' ".
+			     " where node_id='$node'");
 	    }
 	}
 	DBQueryFatal("insert into temp_new_interfaces set ".
@@ -1565,7 +1568,7 @@ sub UpdateEmulab()
     }
     print "Telling inner boss ($bossnode) to incorporate new nodes: @nodes\n";
     system("$SSH -host $bossnode sudo -u $creator /usr/testbed/sbin/wap ".
-	   "     /usr/testbed/sbin/newnode -q -n @nodes");
+	   "     /usr/testbed/sbin/newnode -f -q -n @nodes");
     if ($?) {
 	print STDERR "*** $0:\n".
 	             "    Could not incorporate new nodes on inner boss\n";

@@ -30,7 +30,8 @@ LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
 		  NodeType.pm Interface.pm User.pm Group.pm Project.pm \
 		  Image.pm OSinfo.pm Archive.pm Logfile.pm Lan.pm emdbi.pm \
 		  emdb.pm emutil.pm Firewall.pm VirtExperiment.pm libGeni.pm \
-		  libEmulab.pm EmulabConstants.pm TraceUse.pm EmulabFeatures.pm
+		  libEmulab.pm EmulabConstants.pm TraceUse.pm EmulabFeatures.pm \
+		  Port.pm
 
 # Stuff installed on plastic.
 USERSBINS	= genelists.proxy dumperrorlog.proxy backup

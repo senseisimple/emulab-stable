@@ -27,6 +27,7 @@ use snmpit_lib;
 use snmpit_remote;
 use libtblog;
 use EmulabFeatures;
+use Port;
 use Lan;
 
 use English;
@@ -235,6 +236,21 @@ my $this_user;
 my $ofconnstr; # Openflow connection string, for controller 
 our $next_vlan_tag; # XXX see doMakeVlan for explanation
 my %stack_ids = ();
+my $optdev; # when -i only specify a single device
+
+
+#
+# Move this initialization ahead from its previous location so that
+# the ports converters can be used when parsing command line args.
+#
+# snmpit_lib fills out some hashes for speed of lookup later. Initialize
+# them now
+#
+snmpit_lib::init($debug);
+
+if ($opt{i} && @{$opt{i}} == 1) {
+    $optdev = $opt{i}->[0];
+}
 
 #
 # Verify user and get his DB uid for later. 
@@ -365,6 +381,11 @@ if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X} ||
 }
 
 #
+# Save the ports given in command line for future comparison
+#
+my @optports = @ports;
+
+#
 # Determine which operation we're performing. This is just for convenience,
 # so that we can use switch-like constructs later. While we're at it, we
 # pull out any arguments that were given in the $opt{} values.
@@ -437,7 +458,7 @@ if ($opt{B}) {
             tbdie "No port given in status string";
         }
         if ($args{port}) {
-            push @ports, convertPortsFromIfaces($args{port});
+            push @ports, convertPortsFromStrings($args{port}, $optdev);            
         }
     }
 }
@@ -578,9 +599,13 @@ if ($opt{y}) {
 	# Fix up ports given in the module/port format, like we do below for
 	# ports from @ARGV
 	#
-	if ($opt{z} =~ /^\d+\/\d+?$/) {
-	    if ($opt{i} && @{$opt{i}} == 1) {
-		$opt{z} = $opt{i}->[0] . "." . $opt{z};
+	my ($c, $p) = Port->ParseCardPortString($opt{z});
+	if (defined($c) && defined($p)) {
+	    if (defined($optdev)) {
+		$opt{z} = Port->Triple2Iface(Port->Tokens2TripleString($optdev, $c, $p));
+		if (!defined($opt{z})) {
+		    tbdie "Port $c:$p not found";
+		}
 	    } else {
 		tbdie "The module/port format is only legal if exactly one -i " .
 		    "argument has been given";
@@ -601,10 +626,12 @@ if ($opt{y}) {
 # If their operation involves a set of ports, make sure that the caller has
 # access to the nodes that the ports are on
 #
-
 # Convert ports into the correct format
-if (@ports) {
-    @ports = convertPortsFromIfaces(@ports);
+if (@ports) {	
+    @ports = convertPortsFromStrings(@ports, $optdev);    
+    if (scalar(@optports) != scalar(@ports)) {
+	die "Bad format for ports: ".join(" ", @optports)."\n";
+    }
 }
 
 if (@ports) {
@@ -612,24 +639,14 @@ if (@ports) {
     # Allow ports to be given in one of two forms: node:port, or switch.port.
     # Only admins can do the latter, of course...
     #
-    my (@nodes, @switchports);
-    foreach my $port (@ports) {
-	if ($port =~ /^([^:]+):\d+$/) {
-	    push @nodes, $1;
-	} elsif ($port =~ /^([^.]+)\.\d+(\/\d+)?$/) {
-	    push @switchports, $port;
-	} elsif ($port =~ /^\d+\/\d+?$/) {
-	    if ($opt{i} && @{$opt{i}} == 1) {
-		$port = $opt{i}->[0] . "." . $port;
-		push @switchports, $port;
-	    } else {
-		die "The module/port format is only legal if exactly one -i " .
-		    "argument has been given\n";
-	    }
-	} else {
-	    tbreport(SEV_ERROR, 'bad_data', 'port', $port);
-	    die "Bad format for port $port\n"
-	}
+
+    my @pcports = grep {!$_->is_switch_side()} @ports;
+    my @nodes = map {$_->node_id()} @pcports;
+    my @switchports = grep {$_->is_switch_side()} @ports;
+
+    if (@pcports + @switchports != @ports) {
+	tbreport(SEV_ERROR, 'bad_data', 'port', join(" ", @optports));
+	die "Bad format for port ".join(" ", @optports)."\n";
     }
 
     if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
@@ -647,12 +664,6 @@ if ($TESTMODE) {
     print "Test mode, exiting without touching hardware\n";
     exit(0);
 }
-
-#
-# snmpit_lib fills out some hashes for speed of lookup later. Initialize
-# them now
-#
-snmpit_lib::init($debug);
 
 my $exitval = 0;
 COMMAND: foreach my $command (@commands) {
@@ -866,7 +877,7 @@ COMMAND: foreach my $command (@commands) {
             if (!$args{port}) {
                 tbdie "No port given in status string";
             }
-            @ports = convertPortsFromIfaces($args{port});
+            @ports = Port->converPortsFromStrings($args{port}); 
             if ($args{vlan}) {
                 @vlans = ($args{vlan});
             }
@@ -897,7 +908,7 @@ COMMAND: foreach my $command (@commands) {
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
-    debug("Ports: " . join(",",@ports) . "\n");
+    debug("Ports: " . join(",", map($_->toIfaceString(), @ports)) . "\n"); 
     if (@vlans) { debug("VLANs: " . join(",",@vlans) . "\n") };
 
     my %stacks = ();
@@ -1196,8 +1207,13 @@ sub doListVlans ($) {
 	my @results;
 	foreach my $pair (split ',', $opt{L}) {
 	    my ($out,$in) = split "#", $pair;
-	    my $vlan = "$in#" . ${$vlans{$out}}[0] . "#" .
-				    join(' ', @{${$vlans{$out}}[1]});
+	    my $vlan = "$in#" . ${$vlans{$out}}[0] . "#";
+	    my $memberref = ${$vlans{$out}}[1];
+	    if (scalar(@$memberref) > 0 && ref(${$memberref}[0])) {
+	    	$vlan = $vlan.Port->toStrings(@$memberref);
+	    } else {
+	    	$vlan = join(' ', @$memberref);
+	    }
 	    push @results, $vlan;
 	}
 	print join(',', @results);
@@ -1221,21 +1237,21 @@ VLAN     Project/Experiment VName     Members
 --------------------------------------------------------------------------------
 END
 	format vlanlist =
-@<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+@<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 $vlan_id,$pideid,           $vname,   $members
-~~                                              ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+~~                                    ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                       $members
 .
 	$FORMAT_NAME = 'vlanlist';
     } else {
     	print << "END";
-VLAN     Number Project/Experiment VName     Members
---------------------------------------------------------------------------------
+VLAN     Number   Project/Experiment VName     Members
+----------------------------------------------------------------------------------
 END
 	format vlanlist2 =
-@<<<<<<< @<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+@<<<<<<< @<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 $vlan_id,$ddep, $pideid,           $vname,   $members
-~~                                                     ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+~~                                             ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                              $members
 .
 	$FORMAT_NAME = 'vlanlist2';
@@ -1298,12 +1314,25 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	#
 	if ($opt{M}) {
 	    # Rather than node:port, print out node:MAC (if we know the MAC)
-	    $members = join(" ", map
+	    if (scalar(@$memberref) > 0 && ref(${$memberref}[0])) { 
+	    	$members = join(" ", map
+		    {
+			$_->mac()? $_->node_id().":".$_->mac():$_->toString()
+		    } @$memberref);
+	    } else {		
+	    	my @ptobjs = map {Port->LookupByStringForced($_)} @$memberref;
+	    	 
+	    	$members = join(" ", map
 		{
-		    macport($_)? (split /:/)[0] . ":" . macport($_) : $_
-		} @$memberref);
+		    defined($_)?($_->mac()? $_->node_id().":".$_->mac():$_->toString()):""		    
+		} @ptobjs);
+	    }
 	} else {
-	    $members = join(" ",@$memberref);
+	    if (scalar(@$memberref) > 0 && ref(${$memberref}[0])) { 
+	    	$members = Port->toStrings(@$memberref); 
+	    } else {
+	    	$members = join(" ",@$memberref);
+	    }
 	}
 	write;
     }
@@ -1377,9 +1406,10 @@ sub doListPorts($) {
 Port      Enabled Up   Speed      Duplex
 --------------------------------------------
 END
+# make port field much longer because we use the 'triple' format of port string
     format portlist =
-@<<<<<<<< @<<<<<< @<<< @<<<<<<<<< @<<<<<<<<<
-$port,    $enabled,$up,$speed,$duplex
+@<<<<<<<<<<<<<<<< @<<<<<< @<<< @<<<<<<<<< @<<<<<<<<<
+$port,$enabled,$up,$speed,$duplex
 .
     $FORMAT_NAME = 'portlist';
     foreach my $line (sort {tbsort($$a[0],$$b[0])} @portList) {
@@ -1387,8 +1417,9 @@ $port,    $enabled,$up,$speed,$duplex
 	#
 	# Only let people see information about ports in their experiments
 	#
-	$port =~ /^(.+):/;
-	my $node = $1;
+	#$port =~ /^(.+):/;
+	my $node = $port->node_id();
+	$port = $port->toString();
 
 	&debug("node is $node\n");
 	if (!$node) {
@@ -1431,15 +1462,15 @@ sub doPortStatus($@) {
     #
     my %ports = ();
     foreach my $port (@ports) {
-        $ports{$port} = undef;
+        $ports{$port->toString()} = undef;
     }
     foreach my $portrecord (@portList) {
 	my ($port,$enabled,$up,$speed,$duplex) = @$portrecord;
-        if (exists $ports{$port}) {
-            $ports{$port} = "enabled=$enabled";
-            $ports{$port} .= ";speed=$speed";
+        if (exists $ports{$port->toString()}) {
+            $ports{$port->toString()} = "enabled=$enabled";
+            $ports{$port->toString()} .= ";speed=$speed";
             if ($speed ne "autoDetect") {
-                $ports{$port} .= ";duplex=$duplex";
+                $ports{$port->toString()} .= ";duplex=$duplex";
             }
         }
     }
@@ -1453,8 +1484,8 @@ sub doPortStatus($@) {
 	    my ($id,$ddep,$memberref) = @$vlan;
             # Now we have to look through the memberref for our ports
             foreach my $port (@$memberref) {
-                if ($ports{$port}) {
-                    $ports{$port} .= ";vlan=$id";
+                if ($ports{$port->toString()}) {
+                    $ports{$port->toString()} .= ";vlan=$id";
                 }
             }
 	}
@@ -1499,6 +1530,15 @@ sub doRestorePortStatus($@) {
     if (!$port) {
         tbdie "No port passed to -B option";
     }
+    
+    if (!ref($port)) {
+	    my $tport = convertPortFromString($port);
+	    if ($tport) {
+		    $port = $tport;
+	    } else {
+		    die "Port $port does not exist!\n";
+	    }
+    }
 
     if (@$stacks > 1) {
 	die "Port restoration across multiple stacks is not yet supported\n" .
@@ -1539,7 +1579,7 @@ sub doRestorePortStatus($@) {
 	    print "Could not yank $port from $source_vlan\n";
 	    $errors++;
 	}
-	my @tmp = ($port);
+	my @tmp = ($port->toIfaceString());
 	VLan->RecordVLanModification($source_vlan->id(), undef, \@tmp);
     }
     if (defined($target_vlan) && $target_vlan->KeepInSync()) {
@@ -1576,7 +1616,7 @@ sub doRestorePortStatus($@) {
             if ($speed =~ /(\d+)(Mbps|mbit)/) {
                 $errors = $stack->portControl("${1}mbit",$port);
             } else {
-                tbwarn "Bad speed given for $port: $speed";
+                tbwarn "Bad speed given for ".$port->toString().": $speed";
                 $errors++;
             }
         }
@@ -1588,7 +1628,7 @@ sub doRestorePortStatus($@) {
         } elsif ($duplex eq "full") {
             $errors = $stack->portControl("full",$port);
         } else {
-            tbwarn "Bad duplex given for $port: $duplex";
+            tbwarn "Bad duplex given for ".$port->toString().": $duplex";
             $errors++;
         }
     }
@@ -1630,6 +1670,7 @@ $port,    $inoctets, $inunicast,$innunicast,$indiscards,$inerr,  $inunk,    $out
 	($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr,
 	 $inunk, $outoctets, $outunicast, $outnunicast, $outdiscards,
 	 $outerr, $outq) = @$line;
+	 $port = $port->toString();
 	write;
     }
 
@@ -1664,11 +1705,11 @@ sub doVlansFromTables($$@) {
     my ($stack) = @$stacks;
 
 #    $debug = 1;
-#    $stack->FlipDebug(1);
-    
+#    $stack->FlipDebug(1);   
+
     my @trunkedPorts = getExperimentTrunks($experiment->pid(),
 					   $experiment->eid());
-    my %trunkedPorts = map { $_ => $_ } @trunkedPorts;
+    my %trunkedPorts = map { $_->toString() => $_ } @trunkedPorts;
 
     #
     # Look for a lan that requires dual mode trunking. The ports in that
@@ -1700,9 +1741,9 @@ sub doVlansFromTables($$@) {
 	    # Trunk these ports, removing from list.
 	    foreach my $port (@ports) {
 		if (doTrunkEnable($stacks,$port,0,$vlanid)) {
-		    die("Could not put $port ($vlan) into dual trunk mode\n");
+		    die("Could not put ".$port->toString()." ($vlan) into dual trunk mode\n");
 		}
-		delete($trunkedPorts{$port});
+		delete($trunkedPorts{$port->toString()});
 	    }
 	    
 	    #
@@ -1740,7 +1781,7 @@ sub doVlansFromTables($$@) {
     }
     # Do the rest of the trunked ports in equalmode.
     foreach my $port (keys(%trunkedPorts)) {
-	$errors += doTrunkEnable($stacks,$port,1);
+	$errors += doTrunkEnable($stacks,$trunkedPorts{$port},1);
     }
 
     #
@@ -1825,8 +1866,7 @@ sub CreateOneVlan($$$@)
 	}
 	else {
 	    # Convert the ports to node:iface for the next call.
-	    my @conports = map { portiface($_) } @ports;
-
+	    my @conports = map {$_->toIfaceString()} @ports; 
 	    VLan->RecordVLanModification($vlanid, \@conports, undef);
 	}
     }
@@ -1906,14 +1946,14 @@ sub doReset($@) {
     my %notdeleted = ();
 
     $debug = 1;
-
+    
     #
     # Just remove the VLAN from every stack on which it exists. We keep a
     # list and do them all at once for efficiency.
     #
     foreach my $stack (@$stacks) {
 #	$stack->FlipDebug(1);
-	
+
 	my @existant_vlans = $stack->existantVlans(@vlans);
 	if (!$stack->removeVlan(@existant_vlans)) {
 	    #
@@ -1960,11 +2000,11 @@ sub syncVlansFromTables($$) {
 
     $debug = 1;
     $stack->FlipDebug(1);
-    
-    my @needTrunking = getExperimentTrunks($pid,$eid);
-    my %needTrunking = map { $_ => $_ } @needTrunking;
 
-    debug("Trunk Ports: @needTrunking\n");
+    my @needTrunking = getExperimentTrunks($pid,$eid);
+    my %needTrunking = map { $_->toString() => $_ } @needTrunking;
+
+    debug("Trunk Ports: ".Port->toStrings(@needTrunking)."\n");
 
     #
     # Get list of vlans that should exist.
@@ -1997,7 +2037,7 @@ sub syncVlansFromTables($$) {
     # Get a list of interfaces that are currently trunked.
     #
     my @currentTrunks = getExperimentCurrentTrunks($pid,$eid);
-    my %currentTrunks = map { $_ => $_ } @currentTrunks;
+    my %currentTrunks = map { $_->toString() => $_ } @currentTrunks;
 
     #
     # Okay, kill off stale vlans.
@@ -2014,7 +2054,7 @@ sub syncVlansFromTables($$) {
 		    my @trunkports = ();
 
 		    foreach my $port (@curports) {
-			if (exists($currentTrunks{$port})) {
+			if (exists($currentTrunks{$port->toString()})) {
 			    push(@trunkports, $port);
 			}
 		    }
@@ -2023,8 +2063,7 @@ sub syncVlansFromTables($$) {
 			    or goto bad;
 
 			# Convert the ports to node:iface for the next call.
-			@trunkports = map { portiface($_) } @trunkports;
-
+			@trunkports = map {$_->toIfaceString()} @trunkports; 
 			VLan->RecordVLanModification($vlanid,
 						     undef, \@trunkports)
 			    == 0 or goto bad;
@@ -2060,8 +2099,8 @@ sub syncVlansFromTables($$) {
 	# from regular ports. Better then the backend figuring it out.
 	#
 	foreach my $port (@curports) {
-	    if (! grep {$_ eq $port} @expports) {
-		if (exists($currentTrunks{$port})) {
+	    if (! grep {$_->toString() eq $port->toString()} @expports) {
+		if (exists($currentTrunks{$port->toString()})) {
 		    push(@staletrunks, $port);
 		}
 		else {
@@ -2073,29 +2112,28 @@ sub syncVlansFromTables($$) {
 	    if (! (@staleports || @staletrunks));
 	    
 	if (@staleports) {
-	    debug("Removing stale ports from vlan $vlanid: @staleports\n");
+	    debug("Removing stale ports from vlan $vlanid: ".Port->toStrings(@staleports)."\n");
 
 	    if (!$impotent) {
 		$stack->removeSomePortsFromVlan($vlanid, @staleports)
 		    or goto bad;
 
 		# Convert the ports to node:iface for the next call.
-		@staleports = map { portiface($_) } @staleports;
-
+		@staleports = map {$_->toIfaceString()} @staleports; 
 		VLan->RecordVLanModification($vlanid, undef, \@staleports) == 0
 		    or goto bad;
 	    }
 	}
 	if (@staletrunks) {
-	    debug("Removing stale trunked ports from vlan $vlanid: @staletrunks\n");
+	    debug("Removing stale trunked ports from vlan $vlanid: ".
+	    Port->toStrings(@staletrunks)."\n");
 	    
 	    if (!$impotent) {
 		$stack->removeSomePortsFromTrunk($vlanid, @staletrunks)
 		    or goto bad;
 
 		# Convert the ports to node:iface for the next call.
-		@staletrunks = map { portiface($_) } @staletrunks;
-
+		@staletrunks = map {$_->toIfaceString()} @staletrunks; 
 		VLan->RecordVLanModification($vlanid, undef, \@staletrunks) == 0
 		    or goto bad;
 	    }
@@ -2105,14 +2143,14 @@ sub syncVlansFromTables($$) {
     #
     # Now untrunk the ports that are no longer trunked.
     #
-    foreach my $port (keys(%currentTrunks)) {
+    foreach my $port (keys(%currentTrunks)) { # $port is string here
 	if (!exists($needTrunking{$port})) {
 	    debug("Disabling trunking on $port\n");
 	    
 	    next
 		if ($impotent);
 	
-	    doTrunkDisable($stacks, $port) == 0
+	    doTrunkDisable($stacks, $currentTrunks{$port}) == 0
 		or goto bad;
 
 	    delete($currentTrunks{$port});
@@ -2142,13 +2180,13 @@ sub syncVlansFromTables($$) {
 
 		foreach my $port (@ports) {
 		    push(@newports, $port)
-			if (! grep {$_ eq $port} @curports);
+			if (! grep {$_->toString() eq $port->toString()} @curports);
 		}
 		@ports = @newports;
 	    }
 	    
 	    # Create this vlan now. 
-	    debug("Creating dual mode trunking vlan $vlanid: @ports\n")
+	    debug("Creating dual mode trunking vlan $vlanid: ".Port->toStrings(@ports)."\n")
 		if (@ports);
 		
 	    if (!$impotent && @ports &&
@@ -2161,19 +2199,19 @@ sub syncVlansFromTables($$) {
 	    
 	    # Trunk ports.
 	    foreach my $port (@saveports) {
-		if (!exists($currentTrunks{$port})) {
-		    debug("Enabling dual mode trunking on $port:$vlanid\n");
+		if (!exists($currentTrunks{$port->toString()})) {
+		    debug("Enabling dual mode trunking on ".$port->toString().":$vlanid\n");
 		    
 		    if (!$impotent &&
 			doTrunkEnable($stacks,$port,0,$vlanid)) {
 			print STDERR
-			    "Could not put $port ($vlanid) into ".
+			    "Could not put ".$port->toString()."($vlanid) into ".
 			    "dual trunk mode\n";
 			goto bad;
 		    }
 		}
 		# Mark is as being trunked.
-		$currentTrunks{$port} = $port;
+		$currentTrunks{$port->toString()} = $port;
 	    }
 	}
     }
@@ -2188,11 +2226,11 @@ sub syncVlansFromTables($$) {
 	    next
 		if ($impotent);
 	
-	    doTrunkEnable($stacks, $port, 1) == 0
+	    doTrunkEnable($stacks, $needTrunking{$port}, 1) == 0
 		or goto bad;
 
 	    # Mark is as being trunked.
-	    $currentTrunks{$port} = $port;
+	    $currentTrunks{$port} = $needTrunking{$port};
 	}
     }
 
@@ -2210,12 +2248,12 @@ sub syncVlansFromTables($$) {
 
 	foreach my $port (@expports) {
 	    push(@newports, $port)
-		if (! grep {$_ eq $port} @curports);
+		if (! grep {$_->toString() eq $port->toString()} @curports);
 	}
 	next
 	    if (!@newports);
 	    
-	debug("Adding new ports to vlan $vlanid: @newports\n");
+	debug("Adding new ports to vlan $vlanid: ".Port->toStrings(@newports)."\n");
 
 	next
 	    if ($impotent);
@@ -2234,7 +2272,7 @@ sub syncVlansFromTables($$) {
 	    
 	my @ports  = getVlanPorts($vlanid);
 
-	debug("Creating new vlan $vlanid: @ports\n");
+	debug("Creating new vlan $vlanid: ".Port->toStrings(@ports)."\n");
 
 	next
 	    if ($impotent);
@@ -2453,8 +2491,7 @@ sub doSyncVlansWithDB($) {
 	foreach my $port (@$memberref) {
 	    push(@{ $allports{$vlan_id} }, $port);
 	    # Convert the ports to node:iface for the next call.
-	    push(@{ $portmap{$vlan_id} }, portiface($port))
-		if ((!($port =~ /\./)) && portiface($port));
+	    push (@{ $portmap{$vlan_id} }, $port);
 	}
     }
     #
@@ -2589,7 +2626,7 @@ sub doSyncVlansWithDB($) {
 	    print "$vlan_id is using unreserved tag $tag";
 
 	    if (@swports) {
-		print ": @swports\n";
+		print ": ".join(" ", map($_->toString(), @swports))."\n";
 	    }
 	    else {
 		print " but has no node ports\n";
@@ -2640,6 +2677,7 @@ sub doSyncVlansWithDB($) {
 
 	my @swports = (exists($portmap{$vlan_id}) ?
 		       @{ $portmap{$vlan_id} } : ());
+	@swports = map($_->getPCPort()->toIfaceString(), @swports);
 	my @dbports = ();
 	if ($vlan->PortList(\@dbports)) {
 	    die("Could not get list of ports for $vlan!\n");
@@ -2887,6 +2925,7 @@ sub doMakeVlan($$@) {
 		    $errors++;
 		}
 	    }
+	    my @tports = map {$_->toIfaceString()} @ports;
 	    VLan->RecordVLanModification($source_vlan->id(), undef, @ports);
 	}
 	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
@@ -3071,17 +3110,17 @@ sub doPortControl($$@) {
     if ($ELABINELAB) {
 	# As below, only one stack.
 	my ($stack) = @$stacks;
-	$errors = RemoteDoPortControl($stack,$command,@ports);
+	$errors = RemoteDoPortControl($stack,$command, @optports);
 	goto finish;
     }
 
     if (@$stacks > 1) {
-	die "Port control across multiple stacks is not yet supported\n" .
+	die "Port control accross multiple stacks is not yet supported\n" .
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
-    print "Applying command '$command' to ports " . join(",",@ports) . " ...\n"
+    print "Applying command '$command' to ports " . Port->toStrings(@ports) . " ...\n"
 	if (!$quiet);
     $errors = $stack->portControl($command,@ports);
     if (!$quiet) {
@@ -3181,8 +3220,8 @@ sub doTrunkEnable($$$@) {
     if ($ELABINELAB) {
 	my $mode = $equaltrunking ? "-E" : "-T";
 	# As below, only one stack.
-	my ($stack) = @$stacks;
-	$errors = RemoteDoTrunking($stack,$mode,$port,@vlans);
+	my ($stack) = @$stacks;	
+	$errors = RemoteDoTrunking($stack,$mode,$optports[0],@vlans);
 	goto finish;
     }
     #
@@ -3197,7 +3236,7 @@ sub doTrunkEnable($$$@) {
     # Simple, just call the right function on the stack
     #
     my $stack = $$stacks[0];
-    print "Enabling trunking (tagging) on $port ...\n"
+    print "Enabling trunking (tagging) on ".$port->toString()." ...\n"
 	if (!$quiet);
     if (!$stack->enableTrunking2($port,$equaltrunking,@vlans)) {
 	$errors++;
@@ -3220,7 +3259,8 @@ sub doTrunkDisable($$) {
 	my @vlans=();
 	# As below, only one stack.
 	my ($stack) = @$stacks;
-	$errors = RemoteDoTrunking($stack,"-U",$port,@vlans);
+	$errors = RemoteDoTrunking($stack,"-U",$optports[0],@vlans);
+	#$errors = RemoteDoTrunking($stack,"-U",$port,@vlans);
 	goto finish;
     }
     #
@@ -3235,7 +3275,7 @@ sub doTrunkDisable($$) {
     # Simple, just call the right function on the stack
     #
     my $stack = $$stacks[0];
-    print "Disabling trunking (tagging) on port $port ...\n"
+    print "Disabling trunking (tagging) on port ".$port->toString()." ...\n"
 	if (!$quiet);
     if (!$stack->disableTrunking($port)) {
 	$errors++;

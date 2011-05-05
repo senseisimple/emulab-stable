@@ -2887,9 +2887,16 @@ sub GenVirtLans($)
 	    my $lannode = ($vlan->_geninodes() ? "lan-$vname" : "lan/$vname");
 	    my $cmurn   = ($vlan->_geninodes() ?
 			   $members[0]->virt_nodes()->_cmurn() : $mycmurn);
+
+	    # This is for mixing real nodes with pnodes in a lan. The goal 
+	    # is to prevent assign from putting the lan node on a pc;
+	    # always prefer a real switch. See corresponding change in
+	    # ptopgen.
+	    my $desires = ($virtnodes && $nonvirtnodes ?
+			   {"real-switch" => ['' , "1.0"]} : undef);
 			       
 	    # Lan node for assign.
-	    $self->createNode($lannode, $cmurn, "lan", '1', undef,
+	    $self->createNode($lannode, $cmurn, "lan", '1', $desires,
 			      { 'virtualization_type' => 'raw' ,
 			        'isgeninode' => $vlan->_geninodes() });
 	    

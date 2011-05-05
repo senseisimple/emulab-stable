@@ -19,8 +19,8 @@ use Data::Dumper;
 
 use libdb;
 use libtestbed;
+use Port;
 use overload ('""' => 'Stringify');
-
 our %devices;
 our $parallelized = 1;
 
@@ -253,11 +253,11 @@ sub listPorts($) {
     foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
 	foreach my $line ($device->listPorts()) {
-	    my $port = $$line[0];
-	    if (defined $portinfo{$port}) {
-		warn "WARNING: Two ports found for $port\n";
+	    my $port = $$line[0]; 
+	    if (defined $portinfo{$port->toString()}) {
+		warn "WARNING: Two ports found for ".$port->toString()."\n";
 	    }
-	    $portinfo{$port} = $line;
+	    $portinfo{$port->toString()} = $line;
 	}
     }
 
@@ -402,7 +402,7 @@ sub setPortVlan($$@) {
 
     #
     # When making firewalls, may have to flush FDB entries from trunks
-    #
+    # 
     foreach my $vlan (keys %BumpedVlans) {
 	foreach my $devicename ($self->switchesWithPortsInVlan($vlan)) {
 	    my $dev = $self->{DEVICES}{$devicename};
@@ -565,7 +565,7 @@ sub createVlan($$$$;$$$) {
 	#
 	# We need to populate each VLAN on each switch.
 	#
-	$self->debug( "adding ports @ports to VLAN $vlan_id \n");
+	$self->debug( "adding ports ".Port->toStrings(@ports)." to VLAN $vlan_id \n");
 	if (@ports) {
 	    if ($self->setPortVlan($vlan_id,@ports)) {
 		$errortype = "Adding Ports to";
@@ -891,7 +891,7 @@ sub removeSomePortsFromVlan($$@) {
 	print "Removing ports on $devicename from VLAN $vlan_id ($vlan_number)\n"
 	    if $self->{DEBUG};
 
-	$errors += $device->removeSomePortsFromVlan($vlan_number,
+	$errors += $device->removeSomePortsFromVlan($vlan_number, 
 						    @{$map{$devicename}});
     }
     return ($errors == 0);
@@ -987,10 +987,12 @@ sub getStats($) {
 	my $device = $self->{DEVICES}{$devicename};
 	foreach my $line ($device->getStats()) {
 	    my $port = $$line[0];
-	    if (defined $stats{$port}) {
-		warn "WARNING: Two ports found for $port\n";
+	    if (defined($port)) {
+	        if (defined $stats{$port->toString()}) {
+		    warn "WARNING: Two ports found for ".$port->toString()."\n";
+	        }
+	        $stats{$port->toString()} = $line;
 	    }
-	    $stats{$port} = $line;
 	}
     }
     return map $stats{$_}, sort {tbsort($a,$b)} keys %stats;
@@ -1051,7 +1053,7 @@ sub enableTrunking2($$$@) {
     #
     # Simply make the appropriate call on the device
     #
-    print "Enable trunking: Port is $port, native VLAN is $native_vlan_id\n"
+    print "Enable trunking: Port is ".$port->toString().", native VLAN is $native_vlan_id\n"
 	if ($self->{DEBUG});
     my $rv = $device->enablePortTrunking2($port, $vlan_number, $equaltrunking);
 
@@ -1068,7 +1070,7 @@ sub enableTrunking2($$$@) {
 	    #
 	    my $error = $self->setPortVlan($vlan_id,$port);
 	    if ($error) {
-		warn "ERROR: could not add VLAN $vlan_id to trunk $port\n";
+		warn "ERROR: could not add VLAN $vlan_id to trunk ".$port->toString()."\n";
 		next;
 	    }
 	    push @vlan_numbers, $vlan_number;
@@ -1198,7 +1200,7 @@ sub setVlanOnTrunks2($$$$@) {
                 warn "ERROR - unable to find channel information on $src ".
 		     "for $src-$dst EtherChannel\n";
                 $errors += 1;
-            } else {
+            } else { 
 		if (!$self->{DEVICES}{$src}->
                         setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
                     warn "ERROR - unable to set trunk on switch $src\n";
