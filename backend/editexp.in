@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -381,15 +381,23 @@ if (exists($editexp_args{"noidleswap_reason"})) {
 #
 # AutoSwap
 #
+if (exists($editexp_args{"autoswap"})) {
+    if ($editexp_args{"autoswap"} ne "1") {
+	if (!$this_user->IsAdmin()) {
+	    UserError("Max Duration: ".
+		      "you must ask testbed operations to disable this");
+	}
+	$editexp_args{"autoswap"} = 0;
+    }
+}
 if (exists($editexp_args{"autoswap_timeout"})) {
     if ($editexp_args{"autoswap_timeout"} <= 0) {
 	UserError("Max Duration: Invalid time provided");
     }
-}
-if (exists($editexp_args{"autoswap"})) {
-    if ($editexp_args{"autoswap"} ne "1") {
-	$editexp_args{"autoswap"} = 0;
-	#XXX $editexp_args{"autoswap_timeout"} = 0;
+    if ($editexp_args{"autoswap_timeout"} > (24 * 5) &&
+	!$this_user->IsAdmin()) {
+	UserError("Max Duration: 5 days maximum - ".
+		  "you must ask testbed operations for more");
     }
 }
 

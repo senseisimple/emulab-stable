@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 use libdb;
 use libtestbed;
 use Node;
+use Port;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -2373,7 +2374,7 @@ sub FindMember($$$)
 #
 # Add a member in snmpit port form (node:card).
 #
-sub AddPort($$)
+sub AddPort_OLD($$)
 {
     my ($self, $port) = @_;
     my ($node_id, $card) = split(":", $port);
@@ -2390,9 +2391,26 @@ sub AddPort($$)
 }
 
 #
+# Use Port class
+#
+sub AddPort($$)
+{
+    my ($self, $port) = @_;
+    if (!ref($port)) {
+	    return $self->AddPort_OLD($port);
+    }
+
+    my $member = $self->FindMember($port->node_id(), $port->iface());
+    return $member
+	if (defined($member));
+				   
+    return $self->GetLan()->AddMember($port->node_id(), $port->iface());
+}
+
+#
 # Delete a member in snmpit port form (node:card).
 #
-sub DelPort($$)
+sub DelPort_OLD($$)
 {
     my ($self, $port) = @_;
     my ($node_id, $card) = split(":", $port);
@@ -2407,6 +2425,23 @@ sub DelPort($$)
 				   
     return $self->DelMember($member);
 }
+
+#
+# Delete a member, use Port class
+#
+sub DelPort($$)
+{
+    my ($self, $port) = @_;
+    if (!ref($port)) {
+	    return $self->DelPort_OLD($port);
+    }
+    my $member = $self->FindMember($port->node_id(), $port->iface());
+    return 0
+	if (!defined($member));
+				   
+    return $self->DelMember($member);
+}
+
 
 #
 # Does member already exists in protolan.
@@ -3115,7 +3150,7 @@ sub IsNodeInAVlan($$)
     return $query_result->numrows;
 }
 
-sub FindVlanByPort($$$)
+sub FindVlanByPort_OLD($$$) 
 {
     my ($class, $experiment, $port) = @_;
     my ($node_id, $card) = split(":", $port);
@@ -3133,6 +3168,36 @@ sub FindVlanByPort($$$)
     my $query_result =
 	DBQueryWarn("select id from vlans  ".
 		    "where $clause members like '%${node_id}:${iface}%'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my ($lanid) = $query_result->fetchrow_array();
+
+    return VLan->Lookup($lanid);
+}
+
+#
+# Refactored with Port class
+#
+sub FindVlanByPort($$$)
+{
+    my ($class, $experiment, $port) = @_;
+    my $clause = "";
+    
+    if (!ref($port)) {
+	    return $class->FindVlanByPort_OLD($experiment, $port);
+    }
+ 
+    my $ifacestr = $port->toIfaceString();
+    if (defined($experiment)) {
+	my $exptidx = $experiment->idx();
+	$clause = "exptidx='$exptidx' and";
+    }
+
+    my $query_result =
+	DBQueryWarn("select id from vlans  ".
+		    "where $clause members like '%${ifacestr}%'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);

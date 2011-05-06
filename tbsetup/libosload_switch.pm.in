@@ -685,7 +685,26 @@ sub Reload($$)
     if (!((defined($self->nodeflag($nodeobject,'force'))
 	   && $self->nodeflag($nodeobject,'force'))
 	  || $self->nodeflag($nodeobject,'reconfig'))) {
-	$self->dprint(0,"Reload($node_id): no reload or reconfig to do, exiting!");
+	tbinfo "$self Reload($node_id): no reload or reconfig to do, simulating reloaddone instead!\n";
+
+	#
+	# BUT -- we need to simulate it from stated's perspective so that 
+	# the reloads table is cleared.
+	#
+	TBSetNodeNextOpMode($node_id,TBDB_NODEOPMODE_RELOADPUSH);
+	TBSetNodeEventState($node_id,TBDB_NODESTATE_SHUTDOWN);
+	# give stated time to change op modes
+	sleep(4);
+	TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADSETUP);
+	TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADING);
+	TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADDONE);
+	# reset to teh op mode of the loaded image.
+	$nodeobject->Refresh();
+	$nodeobject->ResetNextOpMode($self->debug());
+	TBSetNodeEventState($node_id,TBDB_NODESTATE_SHUTDOWN);
+	TBSetNodeEventState($node_id,TBDB_NODESTATE_BOOTING);
+	TBSetNodeEventState($node_id,TBDB_NODESTATE_ISUP);
+
 	return 0;
     }
 
@@ -706,7 +725,26 @@ sub Reload($$)
     if (!defined($self->nodeflag($nodeobject,'force'))
 	|| !$self->nodeflag($nodeobject,'force')) {
 	if ($self->nodeflag($nodeobject,'reconfig')) {
-	    $self->dprint(1,"Reload($node_id): jumping straight to Reconfigure");
+	    tbinfo "$self Reload($node_id): jumping straight to Reconfigure after simulating unnecessary reload\n";
+
+	    #
+	    # BUT -- we need to simulate it from stated's perspective so that 
+	    # the reloads table is cleared.
+	    #
+	    TBSetNodeNextOpMode($node_id,TBDB_NODEOPMODE_RELOADPUSH);
+	    TBSetNodeEventState($node_id,TBDB_NODESTATE_SHUTDOWN);
+	    # give stated time to change op modes
+	    sleep(4);
+	    TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADSETUP);
+	    TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADING);
+	    TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADDONE);
+	    # reset to teh op mode of the loaded image.
+	    $nodeobject->Refresh();
+	    $nodeobject->ResetNextOpMode($self->debug());
+	    TBSetNodeEventState($node_id,TBDB_NODESTATE_SHUTDOWN);
+	    TBSetNodeEventState($node_id,TBDB_NODESTATE_BOOTING);
+	    TBSetNodeEventState($node_id,TBDB_NODESTATE_ISUP);
+
 	    $rc = $self->Reconfigure($nodeobject);
 	    goto done;
 	}

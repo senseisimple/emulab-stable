@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -874,6 +874,7 @@ char *usagestr =
  " -h             Print this help message\n"
  " -o             Print progress indicating dots\n"
  " -r             Generate a `raw' image.  No FS compression is attempted\n"
+ " -f             Generate an image from a regular file (implies -r)\n"
  " -s slice       Compress a particular slice (DOS numbering 1-4)\n"
  " image | device The input image or a device special file (ie: /dev/ad0)\n"
  " outputfilename The output file ('-' for stdout)\n"
