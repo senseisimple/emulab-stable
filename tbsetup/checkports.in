@@ -48,6 +48,7 @@ use libtestbed;
 use Experiment;
 use User;
 use snmpit_lib;
+use Port;
 
 # The set of OIDs we care about
 my @oids = ('ifAdminStatus','ifOperStatus');
@@ -150,12 +151,11 @@ foreach my $name (keys %portMap) {
 	#
 	# Try to translate the port name to the node's vname
 	#
-	$port =~ /^(.+):(\d+)/;
 	my $nickname;
-	if ($1) {
-	    my $portnum = $2;
+	if (defined($port->node_id())) {
+	    my $portnum = $port->port();
 	    my ($junk, $vname);
-	    NodeidToExp($1,\$junk,\$junk,\$vname);
+	    NodeidToExp($port->node_id(),\$junk,\$junk,\$vname);
 	    $nickname = "$vname:$portnum";
 	}
 
@@ -173,7 +173,8 @@ my $errors = 0;
 foreach my $line (sort {$$a[0] cmp $$b[0]} @portinfo) {
     my ($nickname,$port,$adminStatus,$operStatus) = @$line;
     if ($adminStatus ne $operStatus) {
-	print "Switch port for $nickname ($port) should be $adminStatus, " .
+	print "Switch port for $nickname (".$port->toString().
+	    ") should be $adminStatus, " .
 	    "but is $operStatus\n";
 	$errors++;
     }

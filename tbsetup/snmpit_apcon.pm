@@ -1271,12 +1271,12 @@ sub listPorts($) {
         # if port is actived, use actual rate, otherwise use desired rate
         #
         if ( $arate[0] eq "00" ) {        
-            push @ports, [$finalport->getPCPort(), "no", "down", $strdrate[2], $strdrate[1]];
+            push @ports, [$finalport->getOtherEndPort(), "no", "down", $strdrate[2], $strdrate[1]];
         } else {
             #
             # Not sure if it is OK to just ignore the desired rate
             #
-            push @ports, [$finalport->getPCPort(), "yes", "up", $arate[3], $arate[2]];
+            push @ports, [$finalport->getOtherEndPort(), "yes", "up", $arate[3], $arate[2]];
         }
     }
     

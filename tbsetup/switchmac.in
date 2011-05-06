@@ -33,6 +33,7 @@ use snmpit_nortel;
 use snmpit_hp;
 use SNMP;
 use Getopt::Long;
+use Port;
 
 use strict;
 
