@@ -588,8 +588,7 @@ sub LookupByWireType($$)
 	my @ports = ();
 	
 	my $result = DBQueryFatal("SELECT node_id1, card1, port1, " .
-		"node_id2, card2, port2 FROM wires ".
-                "WHERE type='$wt' and logical=0");
+		"node_id2, card2, port2 FROM wires WHERE type='$wt'");
 
 	if ($result) {
 		while (my @row = $result->fetchrow()) {
@@ -876,7 +875,13 @@ sub getOtherEndIfaceString($) {
 # get the other side of a port instance, according to 'wires' DB table
 #
 sub getOtherEndPort($) {
-    return Port->LookupByTriple($_[0]->getOtherEndTripleString());
+    my $self = $_[0];
+    my $pt = Port->LookupByTriple($self->getOtherEndTripleString());
+    if (defined($pt)) {
+	return $pt;
+    } else {
+	return $self;
+    }
 }
 
 #
