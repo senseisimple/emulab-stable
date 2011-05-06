@@ -493,7 +493,7 @@ sub convertPortFormat($$@) {
 	
 	if ($output == $PORT_FORMAT_NODEPORT) {
 	    $self->debug("Converting ifindex to nodeport\n",3);
-	    return map $_->getPCPort()->toTripleString(), @pos;
+	    return map $_->getOtherEndPort()->toTripleString(), @pos;
 	} elsif ($output == $PORT_FORMAT_PORT) {
 		return @pos;
 	}
@@ -507,7 +507,7 @@ sub convertPortFormat($$@) {
 	
 	if ($output == $PORT_FORMAT_NODEPORT) {
 	    $self->debug("Converting modport to nodeport\n",3);
-	    return map $_->getPCPort()->toTripleString(), @pos;
+	    return map $_->getOtherEndPort()->toTripleString(), @pos;
 	} elsif ($output == $PORT_FORMAT_PORT) {
 		return @pos;
 	}
@@ -540,7 +540,7 @@ sub convertPortFormat($$@) {
                 )[1] } @ports;
         } elsif ($output == $PORT_FORMAT_NODEPORT) {
             $self->debug("Converting port to nodeport\n",3);
-            return map $_->getPCPort()->toTripleString(), @ports;
+            return map $_->getOtherEndPort()->toTripleString(), @ports;
         }
 
     }
@@ -1364,7 +1364,7 @@ sub listPorts($) {
 	$portname = $self->{NAME} . ":$modport";
 	my $port = Port->LookupByTriple($portname); 
 	if (defined($port)) {
-		$port = $port->getPCPort();
+		$port = $port->getOtherEndPort();
 	}
 
 	#
@@ -1422,7 +1422,7 @@ sub getStats() {
             my $po = convertPortFromString("$self->{NAME}:$ifindex")
             	|| convertPortFromString("$self->{NAME}:".$self->{IFINDEX}{$ifindex});
             if (! defined $po) { next; } # Skip if we don't know about it
-            my $port = $po->getPCPort()->toTripleString();         
+            my $port = $po->getOtherEndPort()->toTripleString();         
             
 	    ${$stats{$port}}[$i] = $value;
 	}
