@@ -59,7 +59,7 @@ sub LookupAll($$$)
 
     my $query_result =
 	DBQueryWarn("select * from interfaces ".
-		    "where node_id='$nodeid'");
+		    "where node_id='$nodeid' and logical=0");
 
     return -1
 	if (!$query_result);
