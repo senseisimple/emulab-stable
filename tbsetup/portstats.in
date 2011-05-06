@@ -31,6 +31,7 @@ use lib '@prefix@/lib';
 use libdb;
 use snmpit_lib;
 use libtblog;
+use Port;
 
 use English;
 use Getopt::Long;
@@ -207,7 +208,7 @@ my @ports;
 if ($opt{s}) {
     foreach my $port (@passedPorts) {
         if ($port =~ /^[^.]+\.\d+\/\d+$/) {
-	    push @ports, $port;
+	    push @ports, convertPortFromString($port);
 	} else {
 	    print "'$port' not in correct switch.port syntax, ignoring\n";
 	}
@@ -227,12 +228,12 @@ elsif ($opt{p}) {
 	$port =~ /^([^:]+)(:(\d+))?$/;
 	my ($hostname,$portnumber) = ($1,$3);
 	if (defined $portnumber) {
-	    push @ports, $port;
+	    push @ports, convertPortFromString($port);
 	} else  {
-	    my $interfaces = DBQueryFatal("select card from interfaces " .
+	    my $interfaces = DBQueryFatal("select card, port from interfaces " .
 		"where node_id = '$hostname'");
-	    while (my ($card) = $interfaces->fetchrow()) {
-		push @ports, "$port:$card";
+	    while (my ($card, $iport) = $interfaces->fetchrow()) {
+		push @ports, convertPortFromString("$port:$card.$iport");
 	    }
 	}
     }
@@ -262,10 +263,10 @@ elsif ($opt{p}) {
 
 	    if (defined($portnumber)) {
 		# They gave us a specific interface
-		push @ports, "$nodeid:$portnumber";
+		push @ports, convertPortFromString("$nodeid:$portnumber");
 	    } else {
 		# We need to find all experimental ports for this node
-		push @ports, grep(/^$nodeid:(\d+)$/,@experimentPorts);
+		push @ports, grep(($nodeid eq $_->node_id()),@experimentPorts);
 	    }
 
 	}
@@ -335,18 +336,15 @@ DEVICE: foreach my $name (keys %portMap) {
 	#
 	# Figure out which port on which switch this corresponds to
 	#
-	my $switchport;
-	if ($opt{s}) {
-	    if ($port =~ /^([^.]+)\.(\d+)\/(\d+)$/) {
-		$switchport = "$1:$2.$3";
-	    }
+	my $switchport = $port->getSwitchPort()?
+	    $port->getSwitchPort()->toString():undef;
+	
+	if (!$switchport) {
+	    warn "WARNING: No switch port found for ".$port->toString()."\n";
 	} else {
-	    $switchport = portnum($port);
-	}
-	if (!($switchport && ($switchport =~ /(.+):(\d+)\.(\d+)/))) {
-	    warn "WARNING: No switch port found for $port\n";
-	} else {
-	    my ($switch_id,$switch_card,$switch_port) = ($1, $2, $3);
+	    my ($switch_id,$switch_card,$switch_port) =
+		($switchport->node_id(), $switchport->card(),
+		 $switchport->port());
 	    my $dbresult = DBQueryFatal("select * from port_counters where ".
 	    		"node_id='$switch_id' and card=$switch_card and ".
 			"port=$switch_port");
@@ -430,11 +428,10 @@ DEVICE: foreach my $name (keys %portMap) {
 	    #
 	    # Try to translate the port name to the node's vname
 	    #
-	    $port =~ /^(.+):(\d+)/;
-	    if ($1) {
-		my $portnum = $2;
+	    if ($port->node_id() && $port->card()) {
+	        my $portnum = $port->card();
 		my ($junk, $vname);
-		NodeidToExp($1,\$junk,\$junk,\$vname);
+		NodeidToExp($port->node_id(),\$junk,\$junk,\$vname);
 		$port = "$vname:$portnum";
 	    }
 	}
@@ -442,7 +439,7 @@ DEVICE: foreach my $name (keys %portMap) {
 	#
 	# Throw this onto a list, so that we can sort it
 	#
-	push @stats, [$port,@$result];
+	push @stats, [Port->isPort($port)?$port->toString():$port,@$result];
     }
 }
 
