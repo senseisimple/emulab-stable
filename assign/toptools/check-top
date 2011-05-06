@@ -36,8 +36,6 @@ if (!getopts($optlist,\%opt)){
     warn " -D   Include debugging output\n";
     warn " -n   Normalize all files by re-writing them. Strips out some\n";
     warn "        private information\n";
-    warn " -N   Normalize all files by re-writing them. Strips out some\n";
-    warn "        private information\n";
     warn " -s   Strict checking - only pass files that would be parsed by\n";
     warn "        latest version of assign\n";
     warn " -a   Enable anonymization\n";
@@ -772,22 +770,9 @@ chomp @dirs;
 my $processed_files = 0;
 my $passed_files = 0;
 foreach my $dir (@dirs) {
-    #my @ptopfiles = `ls -1 $dir/\*.ptop`;
-    #my @ptopfiles = ();
-    #my @topfiles = `ls -1 $dir/\*.top`;
 
-    my @topfiles;
-    my @ptopfiles;
-
-    opendir DIR, "$dir" or die "Unable to open $dir: $!\n";
-    while (my $file = readdir DIR) {
-        if ($file =~ /\.ptop$/) {
-            push @ptopfiles, "$dir/$file";
-        }
-        if ($file =~ /\.v?top$/) {
-            push @topfiles, "$dir/$file";
-        }
-    }
+    my @topfiles = `find $dir/ -name \*.vtop`;
+    my @ptopfiles = `find $dir/ -name \*.ptop`;
 
     chomp @ptopfiles;
     chomp @topfiles;
@@ -797,15 +782,20 @@ foreach my $dir (@dirs) {
         }
         $processed_files++;
         my $ptop_data = eval { parse_ptop($ptop); };
-        #if (eval { parse_ptop($ptop); }) {
         if (!$@) {
             $passed_files++;
             if ($opt{l}) {
                 print "$ptop\n";
             }
             if ($opt{n}) {
+                # Grab timestamps so that we can preserve them
+                my ($atime, $mtime) = (stat($ptop))[8,9];
+
                 normalize_ptop($ptop_data);
                 write_normalized_ptop($ptop,$ptop_data);
+
+                # Restore timestamp
+                utime $atime, $mtime, $ptop;
             }
         } else {
             if ($opt{r}) {
@@ -826,18 +816,22 @@ foreach my $dir (@dirs) {
         if ($opt{D}) {
             print "Checking top file $top\n";
         }
-        #parse_top($top);
         $processed_files++;
         my $top_data = eval { parse_top($top); };
-        #if (eval { parse_top($top); }) {
         if (!$@) {
             $passed_files++;
             if ($opt{l}) {
                 print "$top\n";
             }
             if ($opt{n}) {
+                # Grab timestamps so that we can preserve them
+                my ($atime, $mtime) = (stat($top))[8,9];
+
                 normalize_top($top_data);
                 write_normalized_top($top,$top_data);
+
+                # Restore timestamp
+                utime $atime, $mtime, $top;
             }
         } else {
             if ($opt{r}) {
