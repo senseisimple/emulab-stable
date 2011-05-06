@@ -579,26 +579,25 @@ sub setPortTagged($$) {
 		 "where node_id='$node' and card='$card'");
 }
 
-#                                                                                    
-# If a port is on switch, some port ops in snmpit                                    
-# should be avoided.                                                                 
-#                                                                                    
+#
+# If a port is on switch, some port ops in snmpit should be avoided.
+#
 sub isSwitchPort($) {
-	my $port = shift;
+    my $port = shift;
 
-	my $node = $port->node_id();	
-	my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
-				  "(SELECT type FROM nodes WHERE node_id='$node')");
+    my $node = $port->node_id();	
+    my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+			      "(SELECT type FROM nodes WHERE node_id='$node')");
 				  
-	if ($result->numrows() != 1) {
-	    return 0;
-	}
-	
-	if (($result->fetchrow())[0] == 1) {
-	    return 1;
-	}
-
+    if ($result->numrows() != 1) {
 	return 0;
+    }
+	
+    if (($result->fetchrow())[0] == 1) {
+	return 1;
+    }
+
+    return 0;
 }
 
 #
