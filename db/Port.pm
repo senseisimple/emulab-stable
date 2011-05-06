@@ -588,7 +588,8 @@ sub LookupByWireType($$)
 	my @ports = ();
 	
 	my $result = DBQueryFatal("SELECT node_id1, card1, port1, " .
-		"node_id2, card2, port2 FROM wires WHERE type='$wt'");
+		"node_id2, card2, port2 FROM wires ".
+                "WHERE type='$wt' and logical=0");
 
 	if ($result) {
 		while (my @row = $result->fetchrow()) {
