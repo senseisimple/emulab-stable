@@ -23,10 +23,11 @@ use strict;
 use Getopt::Std;
 
 my %opt;
-my $optlist = "ltL:evDnrsa";
+my $optlist = "ltL:evDnrRsa";
 if (!getopts($optlist,\%opt)){ 
-    warn "Usage: $0 [-r] [-l] [-e] [-t] [-L limit] [-v] [-D] [-n] [-s]\n";
+    warn "Usage: $0 [-r] [-R] [-l] [-e] [-t] [-L limit] [-v] [-D] [-n] [-s]\n";
     warn " -r   Remove any files that fail the check\n";
+    warn " -R   Rename any files that fail the check\n";
     warn " -l   List files that pass the check to stdout\n";
     warn " -e   Print parse errors from failed files to stderr\n";
     warn " -t   When finished, dump information about all types and\n";
@@ -800,6 +801,8 @@ foreach my $dir (@dirs) {
         } else {
             if ($opt{r}) {
                 system "rm $ptop";
+            } elsif ($opt{R}) {
+                system "mv $ptop $ptop.failed";
             }
             if ($opt{e}) {
                 print "*** FAILED: $ptop: $@\n";
@@ -836,6 +839,8 @@ foreach my $dir (@dirs) {
         } else {
             if ($opt{r}) {
                 system "rm $top";
+            } elsif ($opt{R}) {
+                system "mv $top $top.failed";
             }
             if ($opt{e}) {
                 print "*** FAILED: $top: $@\n";
