@@ -250,8 +250,8 @@ my %interfaceips = ();
 # Read interfaces
 my $result =
     DBQueryFatal("SELECT node_id,card,port,iface,interface_type,role,IP" .
-		 " from interfaces " .
-		 ($genimode ne $NO_GENI ? "where role!='gw'" : ""));
+		 " from interfaces where logical=0 " .
+		 ($genimode ne $NO_GENI ? "and role!='gw'" : ""));
 		 
 while (($node,$card,$port,$iface,$type,$role,$ip) = $result->fetchrow_array) {
     push @{ $nodetointerface{"$node"} }, $iface;
@@ -719,7 +719,7 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 # features
 #
 $result = DBQueryFatal("SELECT DISTINCT node_id1, node_id2 " .
-                       "  FROM wires");
+                       "  FROM wires where logical=0");
 my %connections = ();
 while (my ($node_id1, $node_id2) = $result->fetchrow()) {
     foreach my $nodes ([$node_id1, $node_id2], [$node_id2, $node_id1]) {
@@ -1276,7 +1276,8 @@ while (($type,$capkey,$capval) = $result->fetchrow_array) {
 
 # Read interface switches
 $result = DBQueryFatal("SELECT node_id1, iface, node_id2 FROM wires AS w " .
-	"LEFT JOIN interfaces as i ON w.node_id1=i.node_id AND w.card1=i.card");
+	"LEFT JOIN interfaces as i ON w.node_id1=i.node_id AND w.card1=i.card ".
+	"where w.logical=0");
 
 while (($node,$iface,$switch) = $result->fetchrow_array) {
     if ($node && $iface) {
@@ -1286,7 +1287,7 @@ while (($node,$iface,$switch) = $result->fetchrow_array) {
 
 # Read interface cards and ports
 $result = DBQueryFatal("SELECT node_id, iface, card, port, IP ".
-		       "FROM interfaces");
+		       "FROM interfaces where logical=0");
 
 while (($node,$iface,$card,$port,$IP) = $result->fetchrow_array) {
     next
@@ -1344,7 +1345,8 @@ if (defined($experiment)) {
 }
 
 $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
- 		    " from wires where type=\"Node\" or type=\"Trunk\"");
+		       " from wires where logical=0 and ".
+		       "   (type=\"Node\" or type=\"Trunk\")");
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $result->fetchrow_array) {
     if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
