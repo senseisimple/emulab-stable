@@ -1698,7 +1698,12 @@ sub print_header {
 	    printf("generated=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
 		   $times[5] + 1900, $times[4] + 1, $times[3],
 		   $times[2], $times[1], $times[0]);
-	    printf("valid_until=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
+	    if ($genimode eq $V_2) {
+		print "expires=";
+	    } else {
+		print "valid_until=";
+	    }
+	    printf("\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
 		   $times[5] + 1900, $times[4] + 1, $times[3],
 		   $times[2], $times[1], $times[0]);
 	    print ">\n";
