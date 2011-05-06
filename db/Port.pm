@@ -875,7 +875,8 @@ sub getOtherEndIfaceString($) {
 # get the other side of a port instance, according to 'wires' DB table
 #
 sub getOtherEndPort($) {
-    $my pt = Port->LookupByTriple($_[0]->getOtherEndTripleString());
+    my $self = $_[0];
+    my $pt = Port->LookupByTriple($self->getOtherEndTripleString());
     if (defined($pt)) {
 	return $pt;
     } else {
