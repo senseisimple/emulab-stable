@@ -23,7 +23,7 @@ use strict;
 use Getopt::Std;
 
 my %opt;
-my $optlist = "ltL:evDnrs";
+my $optlist = "ltL:evDnrsa";
 if (!getopts($optlist,\%opt)){ 
     warn "Usage: $0 [-r] [-l] [-e] [-t] [-L limit] [-v] [-D] [-n] [-s]\n";
     warn " -r   Remove any files that fail the check\n";
@@ -36,8 +36,11 @@ if (!getopts($optlist,\%opt)){
     warn " -D   Include debugging output\n";
     warn " -n   Normalize all files by re-writing them. Strips out some\n";
     warn "        private information\n";
+    warn " -N   Normalize all files by re-writing them. Strips out some\n";
+    warn "        private information\n";
     warn " -s   Strict checking - only pass files that would be parsed by\n";
     warn "        latest version of assign\n";
+    warn " -a   Enable anonymization\n";
     exit 1;
 }
 
@@ -68,6 +71,14 @@ my %top_linkflags = (
 #
 sub is_feature_okay($) {
     my ($feature) = @_;
+    
+    # If we are not anonymizing, all features are considered okay
+    if (!$opt{a}) {
+        return 1;
+    }
+    
+    # If anyonymizing, don't let through OS features that expose the project
+    # name
     if ($feature =~ /^OS-/) {
         # OSes in the emulab-ops project are okay, as are ones that are just
         # specified with a numeric ID
@@ -160,7 +171,7 @@ sub check_node_type($) {
 #
 sub normalize_ptop($) {
     my ($ptop) = @_;
-    my ($nodes, $links, $limits) = @$ptop;
+    my ($nodes, $links, $limits,$policies) = @$ptop;
     foreach my $node (@$nodes) {
         #print "Normalizing $node->{name}\n";
         if (!$node->{types}) {
@@ -209,12 +220,12 @@ sub normalize_ptop($) {
         }
     }
 
-    # Nothing to do for limits, for now
+    # Nothing to do for limits or policies, for now
 }
 
 sub write_normalized_ptop($$) {
     my ($outfile, $ptop) = @_;
-    my ($nodes, $links, $limits) = @$ptop;
+    my ($nodes, $links, $limits, $policies) = @$ptop;
 
     open (OF,">$outfile") or die "Unable to open $outfile for writing";
     foreach my $node (@$nodes) {
@@ -258,6 +269,10 @@ sub write_normalized_ptop($$) {
         my $count = $limit->{limit};
 
         print OF "set-type-limit $type $count\n";
+    }
+
+    foreach my $policy (@$policies) {
+        print OF "policy " . join(" ",@$policy) . "\n";
     }
 
     close(OF);
@@ -410,7 +425,7 @@ sub parse_ptop($) {
     my %local_seen_link_types;
     my %local_seen_fds;
 
-    my (@nodes, @links, @limits);
+    my (@nodes, @links, @limits, @policies);
 
     my $line_no = 0;
     while (my $line = <PT>) {
@@ -541,6 +556,11 @@ sub parse_ptop($) {
 
             my %limit = (type => $type, limit => $limit);
             push @limits, \%limit;
+        } elsif ($line_type eq "policy") {
+            # For now, we are just going to pass the rest of the string
+            # along rather than parsing it carefully, since we don't support
+            # fancy policies in any ptop version yet
+            push @policies, [@tokens];
         } else {
             die "Unknown line type '$line_type' on $ptop line $line_no\n";
         }
@@ -558,7 +578,7 @@ sub parse_ptop($) {
 
     close PT;
 
-    return [\@nodes, \@links, \@limits];
+    return [\@nodes, \@links, \@limits,\@policies];
 }
 
 sub parse_top($) {
@@ -635,7 +655,14 @@ sub parse_top($) {
             check_type("string",$link{dstiface});
 
             $link{bw} = shift @tokens;
-            check_type("int",$link{bw});
+
+            #
+            # The bandwidth should be either the string '*' (which means
+            # 'native speed') or an int
+            #
+            if ($link{bw} ne "*") {
+                check_type("int",$link{bw});
+            }
             
             # This is a bit tricky - figure out if there are delay and
             # loss present on the line
@@ -757,7 +784,7 @@ foreach my $dir (@dirs) {
         if ($file =~ /\.ptop$/) {
             push @ptopfiles, "$dir/$file";
         }
-        if ($file =~ /\.top$/) {
+        if ($file =~ /\.v?top$/) {
             push @topfiles, "$dir/$file";
         }
     }
