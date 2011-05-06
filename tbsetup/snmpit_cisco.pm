@@ -405,7 +405,7 @@ sub convertPortFormat($$@) {
 	
 	if ($output == $PORT_FORMAT_NODEPORT) {
 	    $self->debug("Converting ifindex to nodeport\n",2);
-	    return map $_->getPCPort()->toTripleString(), @pos;
+	    return map $_->getOtherEndPort()->toTripleString(), @pos;
 	} elsif ($output == $PORT_FORMAT_PORT) {
 		return @pos;
 	} 
@@ -419,7 +419,7 @@ sub convertPortFormat($$@) {
 	
 	if ($output == $PORT_FORMAT_NODEPORT) {
 	    $self->debug("Converting modport to nodeport\n",3);
-	    return map $_->getPCPort()->toTripleString(), @pos;
+	    return map $_->getOtherEndPort()->toTripleString(), @pos;
 	} elsif ($output == $PORT_FORMAT_PORT) {
 		return @pos;
 	}
@@ -452,7 +452,7 @@ sub convertPortFormat($$@) {
                 )[1] } @ports;
         } elsif ($output == $PORT_FORMAT_NODEPORT) {
             $self->debug("Converting port to nodeport\n",3);
-            return map $_->getPCPort()->toTripleString(), @ports;
+            return map $_->getOtherEndPort()->toTripleString(), @ports;
         }
     }
 
@@ -1656,7 +1656,7 @@ sub walkTableIfIndex($$$;$) {
             my $po = convertPortFromString("$self->{NAME}:$index")
                 || convertPortFromString("$self->{NAME}:".$self->{IFINDEX}{$index});
             if (! defined $po) { next; } # Skip if we don't know about it
-	    my $port = $po->getPCPort()->toTripleString();
+	    my $port = $po->getOtherEndPort()->toTripleString();
             
             #
             # Apply the user's processing function
