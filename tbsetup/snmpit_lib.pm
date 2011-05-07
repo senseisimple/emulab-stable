@@ -188,7 +188,8 @@ sub getPathVlanIfaces($$) {
     my $vlanid = shift;
     my $ifaces = shift;
 
-    my $vlan = VLan->Lookup($vlanid);
+    my $vlan  = VLan->Lookup($vlanid);
+    my $vname = $vlan->vname();
     my $experiment = $vlan->GetExperiment();
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
@@ -198,18 +199,20 @@ sub getPathVlanIfaces($$) {
     # find the underline path of the link
     my $query_result =
 	DBQueryWarn("select distinct implemented_by_path from ".
-		    "virt_lans where pid='$pid' and eid='$eid' and vname='".
-		    $vlan->vname()."';");
+		    "virt_lans where pid='$pid' and eid='$eid' ".
+		    "          and vname='$vname'");
     if (!$query_result || !$query_result->numrows) {
-	warn "Can't find VLAN $vlanid definition in DB.";
-	return -1;
+	# Not an error since encapsulation vlans have generated names.
+	%$ifaces = %ifacesonswitchnode;
+	return 1;
     }
 
     # default implemented_by is empty
     my ($path) = $query_result->fetchrow_array();
-    if (!$path || $path eq "") {
-	print "VLAN $vlanid is not implemented by a path\n" if $debug;
-	return -1;
+    if (!defined($path) || $path eq "") {
+	# Also not an error.
+	%$ifaces = %ifacesonswitchnode;
+	return 1;
     }
 
     # find the segments of the path
@@ -305,7 +308,12 @@ sub getVlanPorts (@) {
 		    "    Unable to load members for $vlan\n");
 	}
 	my %pathifaces = ();
-	if (!getPathVlanIfaces($vlanid, \%pathifaces)) {
+	my $error = getPathVlanIfaces($vlanid, \%pathifaces);
+	if ($error < 0) {
+	    die("*** $0:\n".
+		"    Error getting path interfaces for $vlan\n");
+	}
+	if ($error == 0) {
 	    foreach my $k (keys %pathifaces) {
 		push(@ports, Port->LookupByIface($pathifaces{$k}));
 	    }
@@ -314,7 +322,7 @@ sub getVlanPorts (@) {
 	    foreach my $member (@members) {
 	 	my $nodeid;
 	 	my $iface;
-	
+
 		if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
 		    $member->GetAttribute("iface", \$iface) != 0) {
 		    die("*** $0:\n".
