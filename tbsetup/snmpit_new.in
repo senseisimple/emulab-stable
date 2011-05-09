@@ -2698,6 +2698,8 @@ sub doSyncVlansWithDB($) {
 	    if (!@dbports) {
 		print "  Making it consistent\n";
 		foreach my $port (@swports) {
+		    # Flip back to node:card for next call
+		    $port = portiface($port);
 		    if ($vlan->AddPort($port)) {
 			print "Could not add $port to $vlan\n";
 			$errors++;
