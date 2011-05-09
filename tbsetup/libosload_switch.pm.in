@@ -1341,6 +1341,14 @@ sub generateConfig($$) {
     };
 
     my @cnetlines = ();
+    #
+    # We *HAVE* to remove anything that might have snuck into vlan 1
+    # in the control net subnet, before trying to assign one in vlan 999.
+    # This seems to sometimes happen via DHCP...
+    #
+    push @cnetlines, "vlan 1";
+    push @cnetlines, "  no ip address";
+    push @cnetlines, "exit";
     if (defined($cnetport) && $cnetport ne '') {
 	push @cnetlines, "vlan 999";
 	push @cnetlines, "  name \"EmulabControlPort\"";
@@ -1374,6 +1382,25 @@ sub generateConfig($$) {
 	}
     }
 
+    my $community = "private";
+    my $qres = DBQueryFatal("select sst.snmp_community" . 
+			    "  from switch_stacks as ss" .
+			    " left join switch_stack_types as sst" . 
+			    "  on ss.stack_id=sst.stack_id" . 
+			    " where ss.node_id='$node_id'");
+    if (defined($qres) && $qres->numrows()) {
+	my @row = $qres->fetchrow_array();
+	if (!defined($row[0])) {
+	    tbwarn "Could not find snmp_community for experiment switch $node_id, using default of '$community'!\n";
+	}
+	else {
+	    $community = $row[0];
+	}
+    }
+    else {
+	tbwarn "Could not find snmp_community for experiment switch $node_id!\n";
+    }
+
     my @config = (
 	"hostname \"" . $node_id . "\"",
 	@cnetlines,
@@ -1383,6 +1410,10 @@ sub generateConfig($$) {
 	"aaa authentication ssh login local",
 	@keylines,
 	@passwdlines,
+	'snmp-server community "' . $community . '" Unrestricted',
+	'snmp-server contact "testbed-ops@flux.utah.edu"',
+	# try to cover our hind ends and eliminate loops!
+	"spanning-tree",
 	"no web-management",
 	"no telnet-server",
 	"tftp client",
