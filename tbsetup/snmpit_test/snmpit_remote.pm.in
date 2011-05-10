@@ -1,0 +1,519 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Some ElabInElab support for managing vlans via outer boss node.
+#
+package snmpit_remote;
+
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw(RemoteDoVlansFromTables RemoteDoReset RemoteDoPortControl
+	     RemoteDoTrunking RemoteDoList RemoteMakeVlan RemoteDeleteVlan
+             RemoteDoReserveVlanTags RemoteDoUnReserveVlanTags);
+
+
+# Must come after package declaration!
+use English;
+use libdb;
+use libtestbed;
+use libtblog qw(tbdie);
+use snmpit_lib;
+use Lan;
+use libxmlrpc;
+use Data::Dumper;
+use RPC::XML;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $RPCSERVER   = "@OUTERBOSS_NODENAME@";
+my $RPCPORT     = "@OUTERBOSS_XMLRPCPORT@";
+my $RPCCERT     = "@OUTERBOSS_SSLCERTNAME@";
+
+# Locals
+my $didsetup	= 0;
+
+#
+# Configure xmlrpc library to talk to outer boss.
+#
+sub ConfigXMLRPC()
+{
+    return 0
+	if ($didsetup);
+    
+    libxmlrpc::Config({"server"  => $RPCSERVER,
+		       "verbose" => 1,
+		       "cert"    => $RPCCERT,
+		       "portnum" => $RPCPORT});
+
+    $didsetup = 1;
+    return 0;
+}
+#
+# All of these routines end in exactly the same way
+# differing only in what the "op", and "arg" value of the hashes are.
+#
+
+sub commonTail($$)
+{
+    my $op = shift();
+    my $arg = shift();
+
+    ConfigXMLRPC();
+
+    #
+    # Okay, the new approach is to pass an xml doc through the rpc server
+    # into the proxy, and let it get this exact same object. This is a
+    # lot easier then trying to parse this cruft in the python rpc server,
+    # so we can pass it on the command line, just to reinterpret it all
+    # over again.
+    #
+    my $args  = {"op"    => $op, "args"   => $arg};
+    my ($obj) = RPC::XML::smart_encode($args);
+
+    my $response = libxmlrpc::CallMethod0("elabinelab", "vlansv3",
+					  {"xmldoc" => $obj->as_string()});
+
+    # sklower is temporarily going to way violate layering
+    # and reach down into the internals of libxmlrpc to
+    # grab the returned output string, until he can figure out
+    # the proper python for returning a blob.
+
+    if (($config{"verbose"} || $response->{"code"}) &&
+	defined($response->{"output"}) && $response->{"output"} ne "") {
+	print STDERR $response->{"output"};
+    }
+    return $response;
+}
+
+
+#
+# Ask outer boss to setup a bunch of vlans for an experiment.
+#
+sub RemoteDoVlansFromTables($@)
+{
+    my $experiment = shift();
+    my @vlanids    = @_;
+    my $vlantable  = {};
+    my %vlans      = ();
+
+    return 0
+	if (! @vlanids);
+
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+
+    foreach my $vlanid (@vlanids) {
+	my $vlan = VLan->Lookup($vlanid);
+	return -1
+	    if (!defined($vlan));
+	$vlans{"$vlanid"} = $vlan;
+    }
+
+    foreach my $id (keys(%vlans)) {
+	my $vlan  = $vlans{"$id"};
+	my @members;
+	my $trunk_mode;
+	$vlan->GetAttribute("trunk_mode", \$trunk_mode);
+
+	$vlantable->{$id} = {};
+	$vlantable->{$id}->{"virtual"}    = $vlan->vname();
+	$vlantable->{$id}->{"stack"}      = $vlan->GetClass();
+	$vlantable->{$id}->{"trunk_mode"} = $trunk_mode
+	    if (defined($trunk_mode));
+	$vlantable->{$id}->{"members"}    = {};
+
+	if ($vlan->MemberList(\@members) != 0) {
+	    warn "WARNING: Could not get members for $vlan\n";
+	    return -1;
+	}
+	foreach my $member (@members) {
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		warn "WARNING: Could not get nodeport for $member\n";
+		return -1;
+	    }
+	    if (!defined($node) || !defined($iface)) {
+		warn "WARNING: Bad node in VLAN member: $member - skipping\n";
+		next;
+	    }
+	    my $node_id = $node->node_id();
+	    my $port    = "$node_id:$iface";
+	    
+	    my $result =
+		DBQueryFatal("select current_speed,duplex,trunk ".
+			     "  from interfaces " .
+			     "where node_id='$node_id' and iface='$iface'");
+	    if (!$result->num_rows()) {
+		warn "WARNING: Bad node/iface pair in VLAN: ".
+		    "$port - skipping\n";
+		next;
+	    }
+	    my ($speed,$duplex,$trunk) = $result->fetchrow();
+
+	    if ($prefix ne "") {
+		$port =~ s/$prefix// ;
+	    }
+
+	    $vlantable->{$id}->{"members"}->{$port} = {};
+	    $vlantable->{$id}->{"members"}->{$port}->{"speed"}  = $speed;
+	    $vlantable->{$id}->{"members"}->{$port}->{"duplex"} = $duplex;
+	    $vlantable->{$id}->{"members"}->{$port}->{"trunk"}  = $trunk;
+	}
+    }
+    return 0
+	if (! keys(%$vlantable));
+
+    my $errors = 0;
+    my $response = commonTail("setup", $vlantable);
+    return 1
+	if ($response->{"code"});
+    my $xmlback = $response->{"value"};
+
+    if (defined($xmlback) && $xmlback ne "") {
+	foreach my $vlres (split ',', $xmlback) {
+	    my ($vlanid, $tag) = split '#', $vlres;
+	    
+	    if (!exists($vlans{$vlanid})) {
+		print STDERR "Bad vlanid $vlanid in returned vlan map\n";
+		$errors++;
+		next;
+	    }
+	    my $vlan = $vlans{$vlanid};
+
+	    #
+	    # This is should always succeed since we do whatever the
+	    # outer emulab says to do.
+	    #
+	    if (! ($vlan->HasVlanTagReserved($tag) ||
+		   $vlan->ReserveVlanTag($tag))) {
+		print STDERR "could not set vlan tag for $vlan\n";
+		$errors++;
+	    }
+	    VLan->RecordVlanInsertion($vlan->lanid(), $vlan->GetClass());
+	}
+    }
+    else {
+	$errors = 1;
+    }
+    return $errors;
+}
+
+#
+# Create a vlan and put some ports into it. For elabinelab, we are not
+# going to allow arbitrary vlans, so they will always be associated
+# with an experiment and thus a vlan object.
+#
+sub RemoteMakeVlan($$@)
+{
+    my $class     = shift();
+    my $vlan_name = shift();
+    my @ports     = @_;
+
+    $args->{"stack"}     = $class
+	if (defined($class));
+    $args->{"vlan_name"} = $vlan_name;
+    $args->{"ports"}     = [ @ports ];
+    
+    my $response = commonTail("makevlan", $args);
+    return 1
+	if ($response->{"code"});
+
+    return 0;
+}
+
+sub RemoteDeleteVlan($$)
+{
+    my $vlan      = shift();
+    my $cleartags = shift();
+
+    return RemoteDoReset(undef, 0, $cleartags, ($vlan->id()));
+}
+
+#
+# Ask outer boss to tear down a bunch of vlans for an experiment.
+#
+sub RemoteDoReset($$$@)
+{
+    my $experiment  = shift();
+    my $cleartrunks = shift();
+    my $cleartags   = shift();
+    my @vlans = @_;
+    
+    return 0
+	if (! @vlans);
+
+    my $arg = {};
+    $arg->{"cleartrunks"} = ($cleartrunks ? 1 : 0);
+    $arg->{"cleartags"}   = ($cleartags   ? 1 : 0);
+    $arg->{"vlans"}       = [ @vlans ];
+    
+    my $response = commonTail("destroy", $arg);
+    return 1
+	if ($response->{"code"});
+
+    foreach my $vlan (@vlans) {
+	clearReservedVlanTag($vlan)
+	    if ($cleartags);
+	VLan->RecordVLanDeletion($vlan);
+    }
+    return 0;
+}
+
+#
+# Ask outer boss to do portcontrol functions on a list of ports
+#
+sub RemoteDoPortControl($$@)
+{
+    my $class   = shift();
+    my $command = shift();
+    my @ports   = @_;
+
+    my $arg = {};
+    $arg->{"command"} = $command;
+    $arg->{"stack"} = $class
+	if (defined($class));
+
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+    if ($prefix ne "") {
+	my @tmp = ();
+	foreach my $port (@ports) {
+	    $port =~ s/$prefix// ;
+	    push(@tmp, $port);
+	}
+	@ports = @tmp;
+    }
+    $arg->{"ports"} = [ @ports ];
+    my $response = commonTail("portcontrol", $arg);
+    return 1
+	if ($response->{"code"});
+
+    return 0;
+}
+
+#
+# Ask outer boss to set a port into trunk mode (snmpit -T or -E )
+# 1st arg (mode) is "-T" (dual), "-E" (regular i.e. normal or equal)
+# or "-U" to reset to the usual un-trunked mode.
+#
+sub RemoteDoTrunking($$$@)
+{
+    my $class = shift();
+    my $arg = {};
+    $arg->{"mode"} = shift();
+    my $port = shift();
+    my @vlans     = @_;
+    $arg->{"stack"} = $class
+	if (defined($class));
+    $arg->{"vlans"} = [ @vlans ];
+    
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+    if ($prefix ne "") {
+	$port =~ s/$prefix// ;
+    }
+    $arg->{"port"} = $port;
+
+    my $response = commonTail("trunk", $arg);
+    return 1
+	if ($response->{"code"});
+
+    return 0;
+}
+
+#
+# Ask outer boss to send the vlan names , numbers , and members
+# snmpit -l -w (or restrict to a specific list of vlans)
+# Result is returned in the format as if it were from a switch module.
+#
+sub RemoteDoList(@)
+{
+    my @vlans     = @_;
+    my %Names = ();
+    my %Members = ();
+    my @list = ();
+
+    my $arg = {};
+    $arg->{"vlans"} = [ @vlans ];
+
+    my $response = commonTail("list",$arg);
+    tbdie({cause => 'hardware'},
+          "elabinelab::vlansv2 returns '" . $response->{"code"} . "'\n")
+	if ($response->{"code"});
+    my $xmlback = $response->{"value"};
+    if (!defined($xmlback) || $xmlback eq "") { return @list; }
+
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+    #
+    #  Walk the table for the VLAN members
+    #
+    foreach my $vlres (split ',', $xmlback) {
+	my ($name, $num, $mems) = split '#', $vlres;
+	tbdie({cause => 'hardware'},
+	      "elabinelab::vlansv2 returned bogus info: '$xmlback'\n")
+	    if (!defined($num) || !defined($mems));
+	$Names{$num} = $name;
+        @{$Members{$num}} = ();
+	foreach my $mem (split " ", $mems) {
+	    push @{$Members{$num}}, $prefix . $mem;
+	}
+    }
+
+    #
+    # Build a list from the name and membership lists
+    #
+    foreach my $vlan_id (sort keys %Names) {
+	if ($vlan_id !=  1) {
+	    push @list, [$Names{$vlan_id},$vlan_id,$Members{$vlan_id}];
+	}
+    }
+    return @list;
+}
+
+#
+# Ask outer boss to reserve vlan tags
+#
+sub RemoteDoReserveVlanTags($$@)
+{
+    my $experiment = shift();
+    my $optvlantags= shift();
+    my @vlanids    = @_;
+    my $vlantable  = {};
+    my %vlans      = ();
+
+    return 0
+	if (! @vlanids);
+
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+
+    foreach my $vlanid (@vlanids) {
+	my $vlan = VLan->Lookup($vlanid);
+	return -1
+	    if (!defined($vlan));
+	# XXX If we already have a tag reserved, do not bother.
+	next
+	    if ($vlan->GetReservedVlanTags());
+	$vlans{"$vlanid"} = $vlan;
+    }
+    return 0
+	if (! keys(%vlans));
+
+    foreach my $id (keys(%vlans)) {
+	my $vlan  = $vlans{"$id"};
+
+	$vlantable->{$id} = {};
+	$vlantable->{$id}->{"virtual"} = $vlan->vname();
+	$vlantable->{$id}->{"stack"}   = $vlan->GetClass();
+	$vlantable->{$id}->{"tags"}    = $optvlantags->{$id}
+	    if (exists($optvlantags->{$id}));
+    }
+    return 0
+	if (! keys(%$vlantable));
+
+    my $errors = 0;
+    my $response = commonTail("reserve", $vlantable);
+    return 1
+	if ($response->{"code"} != RESPONSE_SUCCESS());
+    my $xmlback = $response->{"value"};
+
+    if (defined($xmlback) && $xmlback ne "") {
+	foreach my $vlres (split ',', $xmlback) {
+	    my ($vlanid, $tagstr) = split '#', $vlres;
+	    my @tags = split(':', $tagstr);
+	    
+	    if (!exists($vlans{$vlanid})) {
+		print STDERR "Bad vlanid $vlanid in returned vlan map\n";
+		$errors++;
+		next;
+	    }
+	    my $vlan = $vlans{$vlanid};
+	    # This should never fail ...
+	    foreach my $tag (@tags) {
+		if (! $vlan->ReserveVlanTag($tag)) {
+		    print STDERR "could not reserve vlan tag $tag for $vlan\n";
+		    $errors++;
+		}
+	    }
+	}
+    }
+    else {
+	$errors = 1;
+    }
+    return $errors;
+}
+
+#
+# Ask outer boss to unreserve vlan tags
+#
+sub RemoteDoUnReserveVlanTags($$@)
+{
+    my $experiment = shift();
+    my $optvlantags= shift();
+    my @vlanids    = @_;
+    my $vlantable  = {};
+    my %vlans      = ();
+
+    return 0
+	if (! @vlanids);
+
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+
+    foreach my $vlanid (@vlanids) {
+	my $vlan = VLan->Lookup($vlanid);
+	return -1
+	    if (!defined($vlan));
+	$vlans{"$vlanid"} = $vlan;
+    }
+
+    foreach my $id (keys(%vlans)) {
+	my $vlan  = $vlans{"$id"};
+
+	$vlantable->{$id} = {};
+	$vlantable->{$id}->{"virtual"}    = $vlan->vname();
+	$vlantable->{$id}->{"stack"}      = $vlan->GetClass();
+	$vlantable->{$id}->{"tags"}       = $optvlantags->{$id}
+	    if (exists($optvlantags->{$id}));
+    }
+    return 0
+	if (! keys(%$vlantable));
+
+    my $errors = 0;
+    my $response = commonTail("unreserve", $vlantable);
+    return 1
+	if ($response->{"code"} != RESPONSE_SUCCESS());
+
+    foreach my $id (keys(%vlans)) {
+	my $vlan  = $vlans{"$id"};
+
+	if (exists($optvlantags->{$id})) {
+	    foreach my $tag (@{ $optvlantags->{$id} }) {
+		if ($vlan->ClearReservedVlanTag($tag) != 0) {
+		    print STDERR
+			"could not clear reserved vlan tag for $vlan\n";
+		    $errors++;
+		}
+	    }
+	}
+	else {
+	    if ($vlan->ClearReservedVlanTag() != 0) {
+		print STDERR "could not clear reserved vlan tag for $vlan\n";
+		$errors++;
+	    }
+	}
+    }
+    return $errors;
+}
+
+# End with true
+1;
