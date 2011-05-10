@@ -2702,7 +2702,6 @@ sub doSyncVlansWithDB($) {
 		    $port = portiface($port);
 		    if ($vlan->AddPort($port)) {
 			print "Could not add $port to $vlan\n";
-			$errors++;
 		    }
 		}
 		VLan->RecordVlanInsertion($vlan->id(), $stackid);
