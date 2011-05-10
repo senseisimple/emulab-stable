@@ -18,7 +18,6 @@ use Exporter;
 
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use English;
 use libdb;
 use libtestbed;
