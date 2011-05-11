@@ -5408,6 +5408,12 @@ sub InterpLinksAux($)
 						  $self->impotent() ||
 						  $self->alloconly());
 		    $protovlans{$lan} = $protolink;
+		    $protolink->SetType("wire");
+		    $protolink->SetRole("link");
+		    $protolink->AddInterface($nodeA, $vnodeA,
+					     $vportA, $portA);
+		    $protolink->AddInterface($nodeB, $vnodeB,
+					     $vportB, $portB);
 
 		    #
 		    # The layer one link when it is in existence, is just like
@@ -5428,26 +5434,19 @@ sub InterpLinksAux($)
 		    $self->printdb("Created $logicalwire for $virtlan\n");
 
 		    #
-		    # There is no reasonable place to store the association of
-		    # logical interface/wire with the physical interfaces.
-		    # Do it in the member settings.
-		    #
-		    $protolink->SetType("wire");
-		    $protolink->SetRole("link");
-		    $protolink->AddInterface($nodeA, $vnodeA,
-					     $vportA, $portA, undef,
-					     {'logical_iface' =>
-						  $logicalwire->lportA()});
-		    $protolink->AddInterface($nodeB, $vnodeB,
-					     $vportB, $portB, undef,
-					     {'logical_iface' =>
-						  $logicalwire->lportB()});
-
-		    #
 		    # Stash this into segment so we can find it later, as when
 		    # doing the link at the next layer up.
 		    #
 		    $virtlan->_logicalwire($logicalwire);
+
+		    #
+		    # And stash into the lan entry for snmpit later, which will
+		    # need to find the wire so it can mark it as active once
+		    # the layer 1 link is created.
+		    #
+		    $protolink->SetAttribute("logicalwireid",
+					     $logicalwire->WireID());
+		    
 		    next;
 		}
 		elsif ($virtlan->_layer() == 2 && $virtlan->_vpath()) {
@@ -5529,8 +5528,8 @@ sub InterpLinksAux($)
 
 		    $self->printdb("$virtlan; $firstwire, $lastwire\n");
 
-		    $portA = $firstwire->lportA();
-		    $portB = $lastwire->lportB();
+		    $portA = $firstwire->ifaceA();
+		    $portB = $lastwire->ifaceB();
 		}
 		if ($virtlan->usevirtiface()) {
 		    my $protovlan;
