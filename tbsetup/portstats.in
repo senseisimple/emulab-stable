@@ -31,7 +31,6 @@ use lib '@prefix@/lib';
 use libdb;
 use snmpit_lib;
 use libtblog;
-use Port;
 
 use English;
 use Getopt::Long;
@@ -336,11 +335,16 @@ DEVICE: foreach my $name (keys %portMap) {
 	#
 	# Figure out which port on which switch this corresponds to
 	#
-	my $switchport = $port->getSwitchPort()?
-	    $port->getSwitchPort():undef;
-	
-	if (!$switchport) {
-	    warn "WARNING: No switch port found for ".$port->toString()."\n";
+	my $switchport;
+	if ($opt{s}) {
+	    if ($port =~ /^([^.]+)\.(\d+)\/(\d+)$/) {
+		$switchport = "$1:$2.$3";
+	    }
+	} else {
+	    $switchport = portnum($port);
+	}
+	if (!($switchport && ($switchport =~ /(.+):(\d+)\.(\d+)/))) {
+	    warn "WARNING: No switch port found for $port\n";
 	} else {
 	    my ($switch_id,$switch_card,$switch_port) = ($1, $2, $3);
 	    my $dbresult = DBQueryFatal("select * from port_counters where ".
