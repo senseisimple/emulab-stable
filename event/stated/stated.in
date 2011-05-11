@@ -1885,22 +1885,35 @@ sub PollEvents($$)
     }
     if ($pollval > 0) {
 	my $buf;
+	my $lastline = "";
 	
 	while (sysread($childpipe, $buf, 8192)) {
 	    #
-	    # It is possible that we will get multiple lines
-	    # of output in one read. Hopefully not so much that we get
-	    # a partial line. Will need to deal with that at some
-	    # point.
+	    # It is possible that we will get multiple lines of output
+	    # in one read, so we split the input and loop over that.
+	    # It is also possible that we will read a partial line at
+	    # the end. We make a less-than heroic attempt to catch these
+	    # by remembering any unrecognized line that starts with "O"
+	    # and prepending that to the next set of lines read.
 	    #
 	    my @foo = split(/^/m, $buf);
+	    if ($lastline ne "") {
+		$foo[0] = $lastline . $foo[0];
+		debug("reconstruct split line: '" . $foo[0] . "'\n");
+		$lastline = "";
+	    }
 	    foreach my $line (@foo) {
 		if ($line =~
 		    /^OBJTYPE='([^\']*)', OBJNAME='([^\']*)', EVENTTYPE='([^\']*)'$/) {
 		    handleEvent($1, $2, $3);
 		}
+		elsif ($lastline eq "" && $line =~ /^O/) {
+		    # probably an incomplete read
+		    debug("remembering possible split line: '$line'\n");
+		    $lastline = $line;
+		}
 		else {
-		    fatal("unrecognizable line $line from event reader");
+		    fatal("unrecognizable line '$line' from event reader");
 		}
 	    }
 	    #
