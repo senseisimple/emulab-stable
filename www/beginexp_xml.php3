@@ -274,7 +274,7 @@ else {
 	$errors["Max. Duration"] = "No or invalid time provided";
     }
     # The user can override autoswap timeout, but limit unless an admin.
-    if ($formfields["exp_idleswap_timeout"] > 24 * 5 && !ISADMIN()) {
+    if ($formfields["exp_autoswap_timeout"] > 24 * 5 && !ISADMIN()) {
 	$errors["Max. Duration"] = "5 days maximum - ".
 	    "you must ask testbed operations for more";
     }
