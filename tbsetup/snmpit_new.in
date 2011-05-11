@@ -29,8 +29,8 @@ use English;
 use Getopt::Long;
 use strict;
 
-# Alternate version of libraries.
-use lib '@prefix@/lib/snmpit_test';
+# Optional alternate version of libraries.
+#use lib '@prefix@/lib/snmpit_test';
 use snmpit_lib;
 use snmpit_remote;
 
