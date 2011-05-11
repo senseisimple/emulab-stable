@@ -23,6 +23,7 @@ use libdb;
 use libtestbed;
 use Expect;
 use Lan;
+use Port;
 
 
 # CLI constants
@@ -183,7 +184,7 @@ sub new($$$;$) {
     #
     $self->{SESS} = undef;
 
-    $self->readTranslationTable();
+    #$self->readTranslationTable();
 
     return $self;
 }
@@ -223,181 +224,37 @@ sub createExpectObject($)
     return $exp;
 }
 
-#
-# Convert port format between switch format and db format
-# the original format is auto-detected.
-# simply, a switch port starts with A-Z, or A-I on Apcon 2000 series
-# while a db port is totally number: card.port.
-#
-sub convertPortFormat($$)
+
+sub toApconPort($$)
 {
-    my ($self, $srcport) = @_;
-    my $card = "";
-    my $port = "";
-    
-    if ($srcport =~ /([A-Z])([0-9]{2})/) {
-        # froms switch to db
-        $card = ord($1) - ord('A') + 1;
-        $port = int($2);
+        my ($self, $p) = @_;
         
-        return "$card.$port";
-    } elsif ($srcport =~ /(\d+)\.(\d+)/) {
-        # from db to switch
-        $card = chr(ord('A') + $1 - 1);
-        $port = sprintf("%02d", $2);
+        my $apcport = $p->getEndByNode($self->{NAME});
+        if (!defined($apcport)) {
+        	return $p;
+        }
+        
+        my $card = chr(ord('A')+int($apcport->card()) - 1);
+        my $port = sprintf("%02d", int($apcport->port()));
         
         return "$card"."$port";
-    } else {
-        # unknown format, return itself
-        return $srcport;
-    }
 }
 
-
-##############################################################################
-
-my %Interfaces=();
-# Interfaces maps pcX:Y<==>MAC
-
-my %PortIface=();
-# Maps pcX:Y<==>pcX:iface
-
-my %Ports=();
-# Ports maps pcX:Y.port<==>switch:port
-
-my %OldPorts=();
-# Ports maps pcX:Y<==>switch:port
-
-my %MorePortIface=();
-# Maps node:card.port <==> node:iface
-
-#
-# This function fills in %Interfaces and %Ports
-# They hold pcX:Y<==>MAC and pcX:Y.port<==>switch:port respectively
-#
-# XXX: Temp workround for portnum
-#
-sub readTranslationTable($) {
-    my $self = shift;
-    my $name="";
-    my $mac="";
-    my $iface="";
-    my $switchport="";
-
-    print "FILLING %Interfaces\n" if $self->{DEBUG};
-    my $result =
-	DBQueryFatal("select node_id,card,port,mac,iface from interfaces");
-    while ( @_ = $result->fetchrow_array()) {
-        $name = "$_[0]:$_[1]";
-        $iface = "$_[0]:$_[4]";
-        if ($_[2] != 1) {$name .=$_[2]; }
-        $mac = "$_[3]";
-        $Interfaces{$name} = $mac;
-        $Interfaces{$mac} = $name;
-        $PortIface{$name} = $iface;
-        $PortIface{$iface} = $name;
+sub fromApconPort($$)
+{
+	my ($self, $ap) = @_;
+	
+	if ($ap =~ /([A-Z])([0-9]{2})/) {
+                # froms switch to db
+                my $card = ord($1) - ord('A') + 1;
+                my $port = int($2);
         
-        $MorePortIface{"$_[0]:$_[1].$_[2]"} = $iface;
-        $MorePortIface{$iface} = "$_[0]:$_[1].$_[2]";
-        
-        print "Interfaces: $mac <==> $name\n" if $self->{DEBUG} > 1;
-    }
-
-    print "FILLING %Ports\n" if $self->{DEBUG};
-    $result = DBQueryFatal("select node_id1,card1,port1,node_id2,card2,port2 ".
-	    "from wires;");
-    while ( my @row = $result->fetchrow_array()) {
-        my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
-        my $oldname = "$node_id1:$card1";
-        
-        $name = "$node_id1:$card1.$port1";
-        print "Name='$name'\t" if $self->{DEBUG} > 2;
-        print "Dev='$node_id2'\t" if $self->{DEBUG} > 2;
-        $switchport = "$node_id2:$card2.$port2";
-        print "switchport='$switchport'\n" if $self->{DEBUG} > 2;
-        $Ports{$name} = $switchport;
-        $Ports{$switchport} = $name;
-        
-        if (exists($OldPorts{$oldname})) {
-            if ($OldPorts{$oldname} ne "") {
-                delete $OldPorts{$OldPorts{$oldname}};
-            }
-            $OldPorts{$oldname} = "";
-        } else {
-            $OldPorts{$oldname} = $switchport;
-            $OldPorts{$switchport} = $oldname;
+                return Port->LookupByTriple($self->{NAME}, $card, $port);
         }
         
-        print "Ports: '$name' <==> '$switchport'\n" if $self->{DEBUG} > 1;
-    }
-
+        return $ap;
 }
 
-#
-# More robust version of convertPortFromNode2Dev
-#
-sub getRealSwitchPortFromPCPort($$) {
-    my $self = shift;
-    my $port = shift;
-    my $realport = "";
-    
-    $self->debug("get real port on switch from PC port: $port\n");
-    
-    if (exists($OldPorts{$port})) {
-        $realport = $OldPorts{$port};
-        if ($realport ne "") {
-            return $realport;
-        }
-    }
-
-    if (exists($Ports{$port})) {
-        $realport = $Ports{$port};
-	return $realport;
-    }
-    
-    my $fullport = $port.".1";
-    if (exists($Ports{$fullport})) {
-        return $Ports{$fullport};
-    }
-    
-    return undef;    
-}
-
-#
-# Try to guess if the given ports contains switch ports
-# and refine it to be full port format.
-#
-sub refineVlanPorts($$@) {
-    my ($self, $vlanid, @givenports) = @_;
-    
-    my @ifaces = getVlanIfaces($vlanid);
-
-    # Now we have to guess...
-    if ($#givenports == $#ifaces) {
-	# 
-	# seems like all ports are here
-	#
-	my @fullports = ();
-	foreach my $iface (@ifaces) {
-	    if (exists($MorePortIface{$iface})) {
-		push @fullports, $MorePortIface{$iface};
-	    } else {
-		#
-		# iface doesn't exist, may God bless the givenports
-		# be new... new enough to be not in DB.
-		#
-		$self->debug("refine failed: Iface $iface not found\n");
-		return @givenports;
-	    }
-	}
-
-	return @fullports;
-    }
-
-    $self->debug("refine failed: ports numbers not equal @givenports, @ifaces\n");
-
-    return @givenports;
-}
 
 ##############################################################################
 
@@ -954,28 +811,6 @@ sub setPortRate($$$)
 }
 
 #
-# Internal
-# convert port format from pcxx:card to [A-I][0-9]{2}
-#
-sub convertPortFromNode2Dev($$) {
-    my $self = shift;
-    my $pcport = shift;
-    my $modport;
-
-    if ($pcport =~ /(.+):(.+)\.(.+)/) {
-	$modport = $Ports{"$pcport"};
-    } else {
-	$modport = $Ports{"$pcport.1"};
-    }
-
-    if (defined($modport)) {
-        return $self->convertPortFormat($modport);
-    }
-    
-    return $pcport;
-}
-
-#
 # Set a variable associated with a port. The commands to execute are given
 # in the apcon_clilib::portCMDs hash
 #
@@ -990,26 +825,13 @@ sub portControl ($$@) {
     my $cmd = shift;
     my @pcports = @_;
 
-    $self->debug("portControl: $cmd -> (@pcports)\n");
-
-    #my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
-    #my @ports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
-
     my $errors = 0;
-    foreach my $port (@pcports) { 
-        my $swport = $self->getRealSwitchPortFromPCPort($port);
-	if (!defined($swport)) {
-	    if (isSwitchPort($port)) {
-		next;
-	    } else {
-		$self->debug("No such port: $port\n");
-		$errors++;
-		next;
-	    }
-	}
+    foreach my $port (@pcports) { 	
+	if (isSwitchPort($port) || ref($self->toApconPort($port->getSwitchPort()))) {
+                next;
+        }
 
-	$swport = $self->convertPortFormat($swport);
-        my $rt = $self->setPortRate($swport, $cmd);
+        my $rt = $self->setPortRate($self->toApconPort($port->getSwitchPort()), $cmd);
         if ($rt) {
             if ($rt =~ /^ERROR: port rate unsupported/) {
                 #
@@ -1109,7 +931,7 @@ sub findVlan($$;$) {
     if (@$ports) {
         return $vlan_id;
     } elsif (exists($emptyVlans{$vlan_id})) {
-        return $vlan_id; #return $emptyVlans{$vlan_id};
+        return $vlan_id;
     }
 
     return undef;
@@ -1169,20 +991,14 @@ sub setPortVlan($$@) {
 
     my $id = $self->{NAME} . "::setPortVlan";
     $self->debug("$id: $vlan_id ");
-    $self->debug("ports: " . join(",",@pcports) . "\n");
+    $self->debug("ports: " . Port->toStrings(@pcports). "\n");
 
     if (@pcports != 2) {
         warn "$id: supports only two ports in one VLAN.\n";
         return 1;
     }
 
-    #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
-    my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
-    my @swports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
-
-    $self->debug("$id: set ports in vlan: ".join(", ",@swports)."\n");
-
-    my @ports = map {$self->convertPortFormat($_)} @swports;
+    my @ports = grep(!ref($_), map( $self->toApconPort($_->getSwitchPort()), @pcports));
     $self->lock();
 
     # Check if ports are free
@@ -1248,15 +1064,9 @@ sub delPortVlan($$@) {
     my @pcports = @_;
 
     $self->debug($self->{NAME} . "::delPortVlan $vlan_id ");
-    $self->debug("ports: " . join(",",@pcports) . "\n");
+    $self->debug("ports: " . Port->toStrings(@pcports) . "\n");
 
-    #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
-    my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
-    my @swports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
-
-    $self->debug("snmpit_apcon:delPortVlan: set ports in vlan: ".join(", ",@swports)."\n");
-
-    my @ports = map {$self->convertPortFormat($_)} @swports;
+    my @ports = grep(!ref($_), map($self->toApconPort($_->getSwitchPort()), @pcports));
 
     $self->lock();
 
@@ -1414,22 +1224,6 @@ sub vlanHasPorts($$) {
 
 
 #
-# Internal
-# Convert from switch device port to pc node port
-#
-sub convertPortFromDev2Node($$) {
-    my ($self, $devport) = @_;
-    
-    my $pnum = $self->{NAME}.":".$self->convertPortFormat($devport);
-    if (!exists $Ports{$pnum}) {
-        return undef;
-    }
-    
-    return $Ports{$pnum};
-}
-
-
-#
 # List all VLANs on the device
 #
 # usage: listVlans($self)
@@ -1442,17 +1236,10 @@ sub listVlans($) {
     my $vlans = $self->getAllNamedPorts();
     foreach my $vlan_id (keys %$vlans) {
         my @swports = @{$vlans->{$vlan_id}};
-        my @pcports = ();
-
-        foreach my $p (@swports) {
-            my $pcp = $self->convertPortFromDev2Node($p);
-            if ($pcp) {
-                push @pcports, $pcp;
-            } else {
-                push @pcports, $p;
-            }
-        }
-
+        my @pcports = map($_->getPCPort(), 
+                        grep(ref($_), 
+                        map($self->fromApconPort($_), @swports)));
+        
         push @list, [$vlan_id, $vlan_id, \@pcports];
     }
     
@@ -1475,24 +1262,21 @@ sub listPorts($) {
         my @arate = @$arateref;         
         my @strdrate = @{$portRates{$drate}};        
 
-        my $pnum = $self->{NAME}.":".$self->convertPortFormat($port);
-        
-        if (!exists $Ports{$pnum}) {
-            next;
-        }
-        
-        my $finalport = $Ports{$pnum};      
+        my $finalport = $self->fromApconPort($port);
+        if (!ref($finalport)) {
+		next;
+        }          
 
         #
         # if port is actived, use actual rate, otherwise use desired rate
         #
         if ( $arate[0] eq "00" ) {        
-            push @ports, [$finalport, "no", "down", $strdrate[2], $strdrate[1]];
+            push @ports, [$finalport->getPCPort(), "no", "down", $strdrate[2], $strdrate[1]];
         } else {
             #
             # Not sure if it is OK to just ignore the desired rate
             #
-            push @ports, [$finalport, "yes", "up", $arate[3], $arate[2]];
+            push @ports, [$finalport->getPCPort(), "yes", "up", $arate[3], $arate[2]];
         }
     }
     
