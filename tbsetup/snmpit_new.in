@@ -917,7 +917,9 @@ COMMAND: foreach my $command (@commands) {
 	    foreach my $vlanid (@vlans) {
 		my $vlan = $vlans{$vlanid};
 
-		if (!$vlan->link() || exists($newvlans{$vlan->link()})) {
+		if (!$vlan->link() ||
+		    exists($newvlans{$vlan->link()}) ||
+		    !exists($vlans{$vlan->link()})) {
 		    push(@newvlans, $vlanid);
 		    $newvlans{$vlanid} = $vlanid;
 		}
