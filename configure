@@ -2672,6 +2672,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	backend/editnodetype backend/editsitevars backend/newimageid \
 	backend/editgroup backend/newimageid_ez \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
+	tbsetup/snmpit_test/GNUmakefile  \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/power_mail.pm tbsetup/power_whol.pm \

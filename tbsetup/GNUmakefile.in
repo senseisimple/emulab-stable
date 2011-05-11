@@ -16,7 +16,7 @@ SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir nseparse checkup template_cvsroot
+SUBDIRS		= checkpass ns2ir nseparse checkup template_cvsroot snmpit_test
 ifeq ($(NSVERIFY),1)
 SUBDIRS		+= nsverify
 endif
