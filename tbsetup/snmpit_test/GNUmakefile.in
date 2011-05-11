@@ -15,6 +15,7 @@ include $(OBJDIR)/Makeconf
 
 SUBDIRS		= 
 
+BIN_STUFF	= snmpit_test
 LIB_STUFF       = snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm \
 		  snmpit_cisco_stack.pm snmpit_intel_stack.pm \
@@ -25,13 +26,14 @@ LIB_STUFF       = snmpit_intel.pm \
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(LIB_STUFF)
+all:	$(LIB_STUFF) $(BIN_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: all script-install
 
-script-install:	 $(addprefix $(INSTALL_LIBDIR)/snmpit_test/, $(LIB_STUFF))
+script-install:	 $(addprefix $(INSTALL_LIBDIR)/snmpit_test/, $(LIB_STUFF)) \
+		$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF))
 
 control-install:
 
