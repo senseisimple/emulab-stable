@@ -1825,9 +1825,12 @@ sub StartEvents()
 	print STDERR "Caught a USR2 in child\n";
 	# Only STDERR can be redirected to the newfile. STDOUT is writing
 	# to the parent process.
+	close(STDERR);
 	open(STDERR, ">> $LOGFILE") or fatal("reopening $LOGFILE: $!");	
 	select STDERR;
 	$OUTPUT_AUTOFLUSH = 1;
+	# restore default output.
+	select STDOUT;
 	print STDERR "Opened new logfile in child\n";
     };
 

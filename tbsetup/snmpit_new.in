@@ -12,26 +12,27 @@
 #
 # Configure variables
 #
-
-use lib '@prefix@/lib';
 my $TESTMODE   = @TESTMODE@;
 my $ELABINELAB = @ELABINELAB@;
 my $NOSTACKMIB = @NOSTACKMIB@;
 my $MAINSITE   = @TBMAINSITE@;
 my $TB = '@prefix@';
 
+use lib '@prefix@/lib';
 use libdb;
 use User;
 use Experiment;
-use snmpit_lib;
-use snmpit_remote;
 use libtblog;
 use EmulabFeatures;
 use Lan;
-
 use English;
 use Getopt::Long;
 use strict;
+
+# Alternate version of libraries.
+use lib '@prefix@/lib/snmpit_test';
+use snmpit_lib;
+use snmpit_remote;
 
 # Protos
 sub parseStatusString($);
@@ -2799,9 +2800,10 @@ sub doSyncVlansWithDB($) {
 	    if (!@dbports) {
 		print "  Making it consistent\n";
 		foreach my $port (@swports) {
+		    # Flip back to node:card for next call
+		    $port = portiface($port);
 		    if ($vlan->AddPort($port)) {
 			print "Could not add $port to $vlan\n";
-			$errors++;
 		    }
 		}
 		VLan->RecordVlanInsertion($vlan->id(), $stackid);
