@@ -908,8 +908,38 @@ COMMAND: foreach my $command (@commands) {
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
-    debug("Ports: " . join(",", map($_->toIfaceString(), @ports)) . "\n"); 
-    if (@vlans) { debug("VLANs: " . join(",",@vlans) . "\n") };
+    debug("Ports: " . join(",", map($_->toIfaceString(), @ports)) . "\n");
+
+    #
+    # Order the vlans using the dependency information in the link field.
+    #
+    if (@vlans) {
+	my %vlans    = map { $_ => VLan->Lookup($_) } @vlans;
+ 	my @newvlans = ();
+ 	my %newvlans = ();
+ 	#
+ 	# The "link" field in the vlan points to the vlan it is dependent
+ 	# on. So, we actually build up the list in reverse order, and then
+ 	# flip it around at the end. 
+ 	#
+ 	while (@vlans) {
+ 	    my @tmp = ();
+ 	    foreach my $vlanid (@vlans) {
+ 		my $vlan = $vlans{$vlanid};
+
+ 		if (!$vlan->link() || exists($newvlans{$vlan->link()})) {
+ 		    push(@newvlans, $vlanid);
+ 		    $newvlans{$vlanid} = $vlanid;
+ 		}
+ 		else {
+ 		    push(@tmp, $vlanid);
+ 		}
+ 	    }
+ 	    @vlans = @tmp
+ 	}
+ 	@vlans = reverse(@newvlans);
+ 	debug("VLANs: " . join(",",@vlans) . "\n");
+    }
 
     my %stacks = ();
     if (! $ELABINELAB) {
@@ -1917,6 +1947,28 @@ sub CreateOneVlan($$$@)
 	    }
 	}
     }
+    #
+    # Look for a layer 1 link; There is a logical wire that needs to be
+    # activated once it is created. 
+    #
+    my $vlan = VLan->Lookup($vlanid);
+    if ($vlan->type() eq "wire") {
+	my $wireid;
+	
+	if ($vlan->GetAttribute("logicalwireid", \$wireid) == 0) {
+	    my $wire = Interface::Wire->Lookup($wireid);
+	    if (!defined($wire)) {
+		print STDERR "Could not logical wire for $vlan ($wireid)\n";
+		$errors++;
+	    }
+	    else {
+		if ($wire->Activate() != 0) {
+		    print STDERR "Could not activate $wire for $vlan\n";
+		    $errors++;
+		}
+	    }
+	}
+    }
     return $errors;
 }
 
@@ -1928,6 +1980,7 @@ sub CreateOneVlan($$$@)
 sub doReset($@) {
     my $stacks = shift;
     my @vlans = @_;
+    my %wires = ();
 
     #
     # Hand over to outer boss.
@@ -1947,6 +2000,41 @@ sub doReset($@) {
 
     $debug = 1;
     
+    #
+    # Look for a layer 1 link; There is a logical wire that needs to be
+    # deactivated once it is created, but must ensure that the logical
+    # wire is not actually in use.
+    #
+    foreach my $vlan_id (@vlans) {
+	my $vlan = VLan->Lookup($vlan_id);
+	my $wireid;
+
+	next
+	    if (! $vlan->type() eq "wire");
+	
+	if ($vlan->GetAttribute("logicalwireid", \$wireid) == 0) {
+	    my $wire = Interface::Wire->Lookup($wireid);
+	    if (!defined($wire)) {
+		print STDERR "Could not logical wire for $vlan ($wireid)\n";
+		return -1;
+	    }
+	    # need the interfaces.
+	    my ($interface1, $interface2) = $wire->Interfaces();
+	    if (!defined($interface1)) {
+		print STDERR "No interface for logical wire $wire\n";
+		return -1;
+	    }
+	    # Find the vlan that uses this interface.
+	    my $vlanusing = Lan->FindVlanByInterface($experiment, $interface1);
+	    if (defined($vlanusing) && $vlanusing->CreatedOnSwitches()) {
+		print STDERR "Logical wire $wire is in use by $vlanusing; ".
+		    "not allowed to remove $vlan\n";
+		return -1;
+	    }
+	    $wires{$vlan->lanid()} = $wire;
+	}
+    }
+
     #
     # Just remove the VLAN from every stack on which it exists. We keep a
     # list and do them all at once for efficiency.
@@ -1975,6 +2063,17 @@ sub doReset($@) {
 	clearReservedVlanTag($vlan_id)
 	    if ($opt{C});
 	VLan->RecordVLanDeletion($vlan_id);
+
+	# Deactivate the logical wire.
+	if (exists($wires{$vlan_id})) {
+	    my $wire = $wires{$vlan_id};
+	    
+	    print "Deactivating logical wire $wire\n";
+	    if ($wire->DeActivate() != 0) {
+		print STDERR "Could not deactivate $wire for vlan $vlan_id\n";
+		$errors++;
+	    }
+	}
     }
     return $errors;
 }
