@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2010 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -13,7 +13,7 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: emulabfeature <action> <feature>\n";
+    print STDERR "Usage: emulabfeature <action> <feature> <other args>\n";
     print STDERR "  -h       This message\n";
     print STDERR "  create   Create a feature. Provide pithy description.\n";
     print STDERR "  delete   Delete existing feature.\n";

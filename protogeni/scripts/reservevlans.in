@@ -37,6 +37,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Protos
 sub fatal($);
+sub busy();
 sub ReserveLocalTags(@);
 sub ReserveRemoteTags($$@);
 
@@ -221,8 +222,9 @@ exit(0);
 sub ReserveRemoteTags($$@)
 {
     my ($authority, $othertags, @tags) = @_;
-    # Lets avoid terminal retry.
-    my $retries = 10;
+    # Lets avoid terminal retry. Try a couple of times, and
+    # return to caller so it can decide what to do.
+    my $retries = 2;
 
     my $method_args = {};
     $method_args->{'credentials'}   = [$credential->asString()];
@@ -247,7 +249,8 @@ again:
 	$response->code() != GENIRESPONSE_SEARCHFAILED) {
 	print STDERR "Could not reserve tags at $authority - Error: ";
 	print STDERR "  " . $response->output() . "\n";
-	fatal("");
+	# This does not return.
+	busy();
     }
     if ($response->code() == GENIRESPONSE_BUSY) {
 	if ($retries) {
@@ -366,6 +369,16 @@ sub fatal($)
 
     print STDERR "*** $0:\n".
 	         "    $msg\n";
-    # exit value important.
+    # Exit value important. negative value indicates fatal error to caller.
     exit(-1);
+}
+sub busy()
+{
+    if (defined($vlan)) {
+	# Clears all the tags.
+	$vlan->ClearReservedVlanTag();
+	$vlan->Destroy();
+    }
+    # Exit value important; positive integer indicate BUSY to caller.
+    exit(1);
 }

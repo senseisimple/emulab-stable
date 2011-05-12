@@ -54,6 +54,7 @@ CREATE TABLE `geni_slices` (
   `expires` datetime default NULL,
   `shutdown` datetime default NULL,
   `locked` datetime default NULL,
+  `stitch_locked` datetime default NULL,
   `creator_uuid` varchar(40) NOT NULL default '',
   `creator_urn` tinytext,
   `name` tinytext,
@@ -217,7 +218,7 @@ CREATE TABLE `geni_rspecs` (
   `idx` int(10) unsigned NOT NULL auto_increment,
   `created` datetime default NULL,
   `rspec` text,
-  PRIMARY KEY  (`idx`),
+  PRIMARY KEY  (`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `geni_bindings`;

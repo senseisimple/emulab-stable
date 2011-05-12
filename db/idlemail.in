@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -151,8 +151,6 @@ EOT
 
     $q = DBQueryFatal($sql);
 
-    if ($d) { print $q->as_string; $q->dataseek(0); }
-
     my @stillidle=();
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
@@ -220,7 +218,6 @@ group by pid,eid having idlemin >= idleswap_timeout and staleness < 600
 order by pid,eid
 EOT
     $q = DBQueryFatal($sql);
-    if ($d) { print $q->as_string; $q->dataseek(0); }
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
@@ -236,7 +233,6 @@ and paniced=0
 having activemin>=autoswap_timeout order by pid,eid
 EOT
     $q = DBQueryFatal($sql);
-    if ($d) { print $q->as_string; $q->dataseek(0); }
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
@@ -267,14 +263,6 @@ idlemin+$idle_warnmin<=idleswap_timeout+$window and
 idlemin >= $window order by pid,eid
 EOT
         $q = DBQueryFatal($sql);
-	if ($d) { print $sql,";\n",$q->as_string; $q->dataseek(0); }
-	# enable for extra debugging
-	if (0 && $q->numrows()>0) {
-	    # SENDMAIL(To, Subject, Message, [From], [More Headers],...)
-	    SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
-		     $q->as_string);
-	    $q->dataseek(0);
-	}
 	while (%r = $q->fetchhash()) {
 	    # These get an idlewarn message
 	    $pid = $r{'pid'};
@@ -300,14 +288,6 @@ having activemin+$auto_warnmin>=autoswap_timeout and
 activemin+$auto_warnmin<=autoswap_timeout+$window order by pid,eid
 EOT
         $q = DBQueryFatal($sql);
-	if ($d) { print $q->as_string; $q->dataseek(0); }
-	# enable for extra debugging
-	if (0 && $q->numrows()>0) {
-	    # SENDMAIL(To, Subject, Message, [From], [More Headers],...)
-	    SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
-		     $q->as_string);
-	    $q->dataseek(0);
-	}
 	while (%r = $q->fetchhash()) {
 	    # These get an autowarn message
 	    $pid = $r{'pid'};
@@ -348,8 +328,6 @@ group by pid,eid having nodes > 0
 EOT
 
     my $q = DBQueryFatal($sql);
-
-    if ($d) { print $q->as_string; $q->dataseek(0); }
 
     if (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};

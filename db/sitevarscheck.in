@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -37,30 +37,6 @@ my $extraopts = ($isvers5 ? "--skip-opt" : "");
 # assumption, but maybe not always
 #
 my $mysqldump = "mysqldump $extraopts -t $DBNAME sitevariables";
-
-#
-# We use Mysql module instead of the testbed libraries, so that we can get
-# a more precise feel for what the error is.
-#
-use Mysql;
-
-#
-# Check to see if the mysqld is running by trying to connect to it.
-#
-my $dbh = Mysql->connect(undef,undef,undef,undef);
-if (!$dbh) {
-    fatal("Unable to connect to mysqld - Either it's not running or \n" .
-    	  "permission was denied.\n");
-}
-
-#
-# Check to see if the database exists
-#
-my @dbs = $dbh->listdbs();
-if (! grep (/^$DBNAME$/,@dbs)) {
-    fatal("Database $DBNAME does not exist in the running database\n");
-}
-undef $dbh;
 
 #
 # Make sure we can write the temporary file

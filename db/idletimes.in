@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -97,8 +97,6 @@ order by pid,eid,n.node_id";
 }
 
 my $q = DBQueryFatal($sql);
-
-if ($d) { print $q->as_string; $q->dataseek(0); }
 
 if ($s && $experiment) {
     # No output; For a single experiment, there should be a single row.

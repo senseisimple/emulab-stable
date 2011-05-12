@@ -17,20 +17,22 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniCMV2;
 use GeniResponse;
 use GeniCredential;
+use GeniRegistry;
+use emutil;
 
 use Compress::Zlib;
 use MIME::Base64;
 use XML::LibXML;
+use Data::Dumper;
 
 # Disable UUID checks in GeniCredential.
 $GeniCredential::CHECK_UUID = 0;
 
 my $API_VERSION = 1;
+my $MAINSITE    = @TBMAINSITE@;
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -39,11 +41,60 @@ my $API_VERSION = 1;
 #
 sub GetVersion()
 {
-    my $blob = {
-	"geni_api" => $API_VERSION
-    };
+    my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($me)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    my $commithash = VersionInfo("commithash") || "";
+    my $hostname   = `hostname`;
+    chomp($hostname);
+    my $peers      = {};
 
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
+    #
+    # Ask the Clearinghouse for the peers info.
+    #
+    if ($MAINSITE) {
+	my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+	if (!defined($clearinghouse)) {
+	    print STDERR "Could not create clearinghouse object.\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	my $versioninfo;
+	if ($clearinghouse->GetVersion(\$versioninfo)) {
+	    print STDERR "Could not get peers from clearinghouse.\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	$peers = $versioninfo->{"peers"};
+
+	foreach my $urn (keys(%{ $peers })) {
+	    my $url = $peers->{$urn};
+	    $url =~ s/cm$/am/;
+	    $peers->{$urn} = $url;
+	}
+    }
+
+    #
+    # We have some confusion here. This is the AM interface, and the
+    # URL is different, but the URN and HRN are that of the CM.
+    #
+    my $url = $me->url();
+    $url =~ s/cm$/am/;
+
+    my $blob = {
+	"geni_api"   => $API_VERSION,
+	"urn"        => $me->urn(),
+	"hrn"        => $me->hrn(),
+	"url"        => $url,
+	"interface"  => "aggregate",
+	"code_tag"   => $commithash,
+	# XXX
+	"hostname"   => $hostname,
+    };
+    $blob->{"peers"} = $peers
+	if ($MAINSITE);
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
 # List this aggregates resources. Invokes GeniCMV2::Resolve or
@@ -54,6 +105,7 @@ sub ListResources()
     my $available = $options->{'geni_available'};
     my $compress = $options->{'geni_compressed'};
     my $slice_urn = $options->{'geni_slice_urn'};
+    my $version    = $options->{'rspec_version'} || undef;
 
     my $xml = undef;
     if ($slice_urn) {
@@ -86,7 +138,8 @@ sub ListResources()
         # No slice was specified, so get the advertisement RSpec.
         my $discover_args = {
             'credentials' => $credentials,
-            'available' => $available
+            'available' => $available,
+	    'rspec_version' => $version,
         };
         my $response = GeniCMV2::DiscoverResources($discover_args);
         if (GeniResponse::IsError($response)) {
@@ -186,35 +239,25 @@ sub CreateSliver()
         auto_add_sa($cred);
     }
 
-    # circulate through the users and bind them to the slice
-    my $caller_urn = $ENV{'GENIURN'};
-    my $caller_keys = undef;
-    foreach my $user (@$users) {
-        my $user_urn = $user->{'urn'};
-        # Skip if it is not the caller
-        next if ($user_urn ne $caller_urn);
-        $caller_keys = $user->{keys};
-    }
-
     # Package the caller_keys in a list of hashes the way the CM wants
     # it. Each hash has two keys ('type' and 'key'). 'type' is always
     # 'ssh' for us, and 'key' is the key.
-
     my $sliver_keys = undef;
-    if (defined($caller_keys)) {
-        $sliver_keys = [];
-        foreach my $key (@$caller_keys) {
-            # The CMV2 does not like newlines at the end of the keys.
-            chomp($key);
-            push(@$sliver_keys, {'type' => 'ssh', 'key' => $key});
-        }
+    if (@$users) {
+	$sliver_keys = [];
+	foreach my $user (@$users) {
+	    my $user_urn  = $user->{'urn'};
+	    my @user_keys = ();
+
+	    foreach my $key (@{ $user->{keys} }) {
+		# The CMV2 does not like newlines at the end of the keys.
+		chomp($key);
+		push(@user_keys, {'type' => 'ssh', 'key' => $key});
+	    }
+	    push(@{$sliver_keys}, {'urn'  => $user_urn,
+				   'keys' => \@user_keys});
+	}
     }
-
-    # This only gets us part of the way there. For users that are not
-    # *this* user, we need to somehow add their keys, which also
-    # requires adding them as a user *without* their certificate. Not
-    # sure we'll be able to do that.
-
     # Invoke CreateSliver
     my $create_args = {
         'slice_urn' => $slice_urn,
@@ -222,7 +265,6 @@ sub CreateSliver()
         'credentials' => $credentials,
         'keys' => $sliver_keys
     };
-
     my $response = GeniCMV2::CreateSliver($create_args);
     if (!ref($response)) {
 	# This is cause GeniCMV2::CreateSliver does a fork, and the child

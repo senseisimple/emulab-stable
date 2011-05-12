@@ -411,6 +411,26 @@ sub UnRegisterSliver($$)
     return 0;
 }
 
+sub GetVersion($$)
+{
+    my ($self, $pref) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority()->url(),
+			       $self->context(), "GetVersion",
+			       { "credential" =>
+				     $self->credential()->asString()});
+    return -1
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "UnRegisterSliver: " . $response->Dump() . "\n";
+	return -1;
+    }
+    $$pref = $response->value();
+    return 0;
+}
+
 ##########################################################################
 #
 package GeniRegistry::ClearingHouse;

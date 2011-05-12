@@ -700,6 +700,22 @@ sub GenDefsFile($)
 	print TCL "set physnodes($node_id) \"$type\"\n";
     }
 
+    print TCL "# Client side service names that can be controlled, and when\n";
+    $query_result =
+	DBQueryFatal("select idx,service,env,whence from client_services");
+
+    while (my ($idx,$service,$env,$whence) = $query_result->fetchrow_array()) {
+	print TCL "set servicenames(\"${service}:${env}:${whence}\") \"$idx\"\n";
+    }
+    print TCL "# Client side service control points: whence and env\n";
+    $query_result =
+	DBQueryFatal("select service," . 
+		     " group_concat(concat_ws(' ',whence,env) separator ', ')" .
+		     " from client_services group by service");
+    while (my ($service,$points) = $query_result->fetchrow_array()) {
+	print TCL "set servicepoints($service) \"$points\"\n";
+    }
+
     print TCL "# Location info\n";
     $query_result =
 	DBQueryFatal("select li.node_id,li.building,li.loc_x,li.loc_y,".

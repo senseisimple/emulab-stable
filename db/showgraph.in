@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -27,18 +27,17 @@ if ($#ARGV >= 1 || $#ARGV < 0) {
     print "parameter (like 'myhost:0') on the command line, and it will \n";
     print "attempt to open it.\n";
     die("\n");
-} else  {
-    use Mysql;
-    require "ctime.pl";
 }
+use lib '@prefix@/lib';
+use libtestbed;
+use emdb;
+require "ctime.pl";
 
 my $display = shift;
 
 my $v = 0; # Verbose
 
-my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
-
-my @tbls = $dbh->listtables;
+my @tbls = map { $_ =~ s/.*\.//; $_ } emdb::DBHandle()->tables();
 
 my $date = &ctime(time);
 
@@ -79,7 +78,7 @@ my %forkeys=();
 foreach $tbl ( @tbls ) {
     push(@tablelist,$tbl);
     print "Found $tbl:\n" if $v;
-    if ($sth = $dbh->query("describe $tbl") ) {
+    if ($sth = DBQueryFatal("describe $tbl") ) {
 	while ( @data = $sth->fetchrow()) {
 	    $col = $data[0];
 	    $col =~ s/[0-9\-]+$//;

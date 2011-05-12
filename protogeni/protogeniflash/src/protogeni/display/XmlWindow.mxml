@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns="protogeniflash.*" xmlns:mx="http://www.adobe.com/2006/mxml" layout="horizontal"
+	title="RSpec Viewer" xmlns:display="protogeni.display.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager; 
+
+			public function loadXml(val:XML):void {
+				if(val != null) {
+					txt.text = val.toXMLString();
+				} else {
+					txt.text = "No document found";
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:TextArea id="txt" width="100%" height="100%"  editable="false" wordWrap="true"/>
+	
+</display:DefaultWindow>

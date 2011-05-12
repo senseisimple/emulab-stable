@@ -7,10 +7,10 @@
 package emdbi;
 use strict;
 use File::Basename;
-use Mysql;
 use English;
 use Carp;
 use Exporter;
+use Data::Dumper;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 
@@ -18,9 +18,7 @@ use vars qw(@ISA @EXPORT);
 my $TB		= "@prefix@";
 my $SCRIPTNAME  = "Unknown";
 my $TBOPS       = "@TBOPSEMAIL@";
-
-# Remember the DBname for subsequent reconnects.
-my @DBNAMES       = ();
+my $USEDBI	= @TBUSEDBI@;
 
 # Untainted scriptname for below.
 if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
@@ -30,59 +28,323 @@ else {
     $SCRIPTNAME = "Tainted";
 }
 
+#############################################################################
+#
+# We are going to wrap the DB handle in a wrapper object so that we
+# can attach the current process ID to it. This is needed so that the
+# child process after a fork() 1) set's InactiveDestroy to avoid
+# sending a disconnect message since it will also close the parent's
+# database handle 2) reconnects since two separate processes should not
+# share the same handle.  (1) is handled via overridding the database
+# handle DESTROY method, (2) is handled in the DBQueryN function.
+#
+package emdbi_wrapper::Mysql;
+use vars '@ISA';
+@ISA = ('Mysql');
+
+sub Wrap($$$)
 {
-    #
-    # Create a special class for keeping track of the process the
-    # database handle was created.  This is needed so that the child
-    # process after a fork() 1) set's InactiveDestroy to avoid sending
-    # a disconnect message since it will also close the parent's
-    # database handle 2) reconnects since two separate processes
-    # shouldn't share the same handle.  (1) is handled via overridding
-    # the database handle DESTROY method, (2) is handled in the
-    # DBQueryN function.
-    #
-    package TestbedDBHandle;
-    use vars '@ISA';
-    @ISA = ('Mysql');
-    @TestbedDBHandle::Statement::ISA = ('Mysql::Statement');
-    my %DB_PID; # hash based on db handle
-    sub obj_hash( $ ) {
-	# Return a hex string of the location of the object in memory.
-	# This is slightly better than just converting it to a scalar
-	# as two objects as the scalar also included the class name
-	# the object is "blessed" into which might change over time
-	sprintf("0x%x", $_[0]); 
-    }
-    sub MakeA ( $ ) {
-	my ($obj) = @_;
-	return unless defined $obj;
-	bless ($obj);
-	$DB_PID{obj_hash($obj)} = $$;
-    }
-    sub db_pid () {
-	my ($self) = @_;
-	return $DB_PID{obj_hash($self)};
-    }
-    sub DESTROY {
-	my ($self) = @_;
-	if ($self->db_pid() != $$) {
-	    $self->setInactiveDestroy(1);
-	}
-	delete $DB_PID{obj_hash($self)};
-	$self->SUPER::DESTROY() if $self->can("SUPER::DESTROY");
-    }
+    my ($class, $dbname, $dbuser) = @_;
+
+    require Mysql;
+    $Mysql::QUIET = 1;
+    my $dbh = Mysql->connect("localhost", $dbname, $dbuser, "none");
+    return undef
+	if (!defined($dbh));
+
+    $dbh->{'dbh'}->{'PrintError'} = 0;
+
+    my $self = {};
+    bless($self, $class);
+
+    $self->{'PID'}    = $$;
+    $self->{'DBH'}    = $dbh;
+    $self->{'DBNAME'} = $dbname;
+    return $self;
 }
+sub pid($)	{ return $_[0]->{'PID'}; };
+sub dbh($)	{ return $_[0]->{'DBH'}; };
+sub dbname($)	{ return $_[0]->{'DBNAME'}; };
+
+#
+# Need to wrap the return value. See below.
+#
+sub query($$)
+{
+    my ($self, $query) = @_;
+    my $result = $self->dbh->query($query);
+    return undef
+	if (!defined($result));
+
+    # See below.
+    bless($result, "emdbi_wrapper::Mysql::Statement");
+    return $result;
+}
+
+sub DESTROY
+{
+    my ($self) = @_;
+    # XXX Seems like a problem if parent gets here first.
+    if ($self->pid() != $$) {
+	$self->dbh()->setInactiveDestroy(1);
+    }
+    $self->dbh()->SUPER::DESTROY()
+	if $self->dbh()->can("SUPER::DESTROY");
+}
+
+#############################################################################
+# Trivial wrapper for the Mysql statement so that we can add a method.
+#
+package emdbi_wrapper::Mysql::Statement;
+use vars '@ISA';
+@ISA = ('Mysql::Statement');
+
+# Natively supported, so nothing to worry about.
+sub WrapForSeek($)	{ return $_[0]; }
+
+#############################################################################
+#
+# We are making the transition to DBI so we can stop using the ancient
+# and unmaintained Mysql module.
+#
+package emdbi_wrapper::DBI;
+use vars '@ISA';
+@ISA = ('DBI::db');
+use Data::Dumper;
+
+sub Wrap($$$)
+{
+    my ($class, $dbname, $dbuser) = @_;
+
+    require DBI;
+    my $dbh = DBI->connect("DBI:mysql:database=$dbname;host=localhost",
+			   $dbuser, "none",
+			   {'PrintError' => 0});
+    return undef
+	if (!defined($dbh));
+
+    my $self = {};
+    bless($self, $class);
+
+    $self->{'PID'}    = $$;
+    $self->{'DBH'}    = $dbh;
+    $self->{'DBNAME'} = $dbname;
+    return $self;
+}
+sub pid($)	{ return $_[0]->{'PID'}; };
+sub dbh($)	{ return $_[0]->{'DBH'}; };
+sub dbname($)	{ return $_[0]->{'DBNAME'}; };
+
+#
+# Wrap query for proper DBI syntax.
+#
+sub query($$)
+{
+    my ($self, $query) = @_;
+
+    my $dbh = $self->dbh();;
+    my $sth = $dbh->prepare($query);
+    return undef
+	if (!$sth);
+
+    my $query_result = $sth->execute();
+    return undef
+	if (!$query_result);
+
+    # See below; we add a couple of extra routines.
+    bless($sth, "emdbi_wrapper::DBI::st");
+    return $sth;
+}
+
+sub DESTROY
+{
+    my ($self) = @_;
+    # XXX Seems like a problem if parent gets here first.
+    if ($self->pid() != $$) {
+	$self->dbh()->{'InactiveDestroy'} = 1;
+    }
+    $self->dbh()->SUPER::DESTROY()
+	if $self->dbh()->can("SUPER::DESTROY");
+}
+
+#############################################################################
+# Trivial wrapper for the DBI statement class to avoid a zillion silly
+# changes to the rest of the code. These were defined in the Mysql
+# wrapper we used to use. Pretty simple stuff, no big deal.
+#
+package emdbi_wrapper::DBI::st;
+use vars '@ISA';
+@ISA = ('DBI::st');
+
+sub numrows($)		{ return $_[0]->rows(); };
+sub num_rows($)		{ return $_[0]->rows(); };
+sub affectedrows($)	{ return $_[0]->rows(); };
+sub insertid($)		{ return $_[0]->{'mysql_insertid'}; };
+sub fetchrow($)
+{
+    my ($self) = @_;
+    my @row    = $self->fetchrow_array();
+    return (@row ? (wantarray ? @row : $row[0]) : ());
+}
+sub fetchhash($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_hashref();
+    return ($ref ? %$ref : ());
+}
+sub as_string($)
+{
+    my ($self) = @_;
+    $self->dump_results();
+}
+
+# Not supported so generate an error.
+sub dataseek($$)
+{
+    DBWarn("Attempt to 'seek' not supported. Better fix it!");
+}
+
+# This is how we do it. See below.
+sub WrapForSeek($)	{ return emdbi_wrapper::DBI::WrapForSeek->Wrap($_[0]); }
+
+#############################################################################
+# Another wrapper. DBI does not implement "seek" or "rewind". The only way
+# to do this is suck all the data out and save it. We do not want to do this
+# for every query though, so anyplace we want to seek around, wrap things
+# up with this, and then use it like a normal query result. 
+#
+package emdbi_wrapper::DBI::WrapForSeek;
+
+use Data::Dumper;
+
+sub Wrap($$)
+{
+    my ($class, $sth) = @_;
+    my @data  = ();
+    my @names = ();
+
+    #
+    # This tells us the original select column ordering.
+    #
+    my $names = $sth->{'NAME'};
+    my $numFields = $sth->{'NUM_OF_FIELDS'};
+    for (my $i = 0;  $i < $numFields;  $i++) {
+	push(@names, $$names[$i]);
+    }
+
+    #
+    # Grab all the rows. 90 percent of queries request rows as
+    # arrays, so lets do that. We can construct a hash using the
+    # column names we grabbed above.
+    #
+    while (my $rowref = $sth->fetchrow_arrayref()) {
+	#
+	# This looks weird and pointless, but there is some funky
+	# memory stuff going in underneath; if we do not make a copy
+	# explicitly, each successive row overwrites the previous row.
+	# Not very perl like.
+	#
+	my @row = @$rowref;
+	
+	push(@data, \@row);
+    }
+
+    my $self = {};
+    $self->{'STH'}       = $sth;
+    $self->{'ROWS'}      = $sth->rows();
+    $self->{'COLNAMES'}  = \@names;
+    $self->{'COLCOUNT'}  = scalar(@names);
+    $self->{'DATA'}      = \@data;
+    $self->{'IDX'}       = 0;
+
+    bless($self, $class);
+    return $self;
+}
+sub sth($)		{ return $_[0]->{'STH'}; };
+sub rows($)		{ return $_[0]->{'ROWS'}; };
+sub idx($)		{ return $_[0]->{'IDX'}; };
+sub incridx($)		{ return $_[0]->{'IDX'}++; };
+sub data($)		{ return $_[0]->{'DATA'}; };
+sub colnames($)		{ return $_[0]->{'COLNAMES'}; };
+sub colcount($)		{ return $_[0]->{'COLCOUNT'}; };
+sub numrows($)		{ return $_[0]->{'ROWS'}; };
+sub num_rows($)		{ return $_[0]->{'ROWS'}; };
+sub affectedrows($)	{ return $_[0]->{'ROWS'}; };
+sub insertid($)		{ return $_[0]->sth()->{'mysql_insertid'}; };
+sub dataseek($$)	{ $_[0]->{'IDX'} = $_[1]; };
+
+sub fetchrow_arrayref($)
+{
+    my ($self) = @_;
+    my $data   = $self->data();
+    my $idx    = $self->idx();
+
+    return undef
+	if ($idx >= $self->rows());
+
+    $self->incridx();
+    return $data->[$idx];
+}
+
+sub fetchrow_array($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_arrayref();
+
+    return ()
+	if (!defined($ref));
+
+    return @{ $ref };
+}
+
+sub fetchrow_hashref($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_arrayref();
+
+    return undef
+	if (!defined($ref));
+
+    #
+    # Construct a hash using the column names
+    #
+    my %hash  = ();
+    my $count = $self->colcount();
+    for (my $i = 0; $i < $count; $i++) {
+	$hash{$self->colnames()->[$i]} = $ref->[$i];
+    }
+    return \%hash;
+}
+
+sub fetchrow($)
+{
+    my ($self) = @_;
+    my @row    = $self->fetchrow_array();
+    return (@row ? (wantarray ? @row : $row[0]) : ());
+}
+sub fetchhash($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_hashref();
+    return ($ref ? %$ref : ());
+}
+
+#############################################################################
+# Back to the main package.
+#
+package emdbi;
 
 #
 # Set up for querying the database. Note that fork causes a reconnect
 # to the DB in the child.
 #
-my @DB;
+my @DB = ();
 
-use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES $DBErrorString
+use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES $DBErrorString $DBCONN_USEDBI
 	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG);
 $DBQUERY_MAXTRIES  = 1;
 $DBQUERY_RECONNECT = 1;
+$DBCONN_USEDBI     = $USEDBI;
 $DBCONN_MAXTRIES   = 5;
 $DBCONN_EXITONERR  = 1;
 $DBQUERY_DEBUG     = 0;
@@ -106,16 +368,17 @@ sub TBDBConnect($$)
     # Do nothing if this DB handle is already connected to DB.
     #
     if (defined($DB[$dbnum])) {
+	my $dbhw = $DB[$dbnum];
+	
 	return 0
-	    if ($DBNAMES[$dbnum] eq $dbname);
+	    if ($dbhw->dbname() eq $dbname);
 	
 	print STDERR "DBnum $dbnum already connected to another DB: ".
-	    $DBNAMES[$dbnum] . "!\n";
+	    $dbhw->dbname() . "!\n";
 	return -1
 	    if (! $DBCONN_EXITONERR);
 	exit(-1);
     }
-    $DBNAMES[$dbnum] = $dbname;
 
     #
     # Construct a 'username' from the name of this script and the user who
@@ -129,12 +392,18 @@ sub TBDBConnect($$)
 
     while ($maxtries) {
 	if ($DBQUERY_DEBUG) {
-	    print STDERR "DBConnect:$dbnum $dbname\n";
+	    print STDERR "DBConnect:$dbnum $dbname $$\n";
 	}
-	
-	$DB[$dbnum] = Mysql->connect("localhost", $dbname, $dbuser, "none");
-        TestbedDBHandle::MakeA($DB[$dbnum]);
-	if (defined($DB[$dbnum])) {
+
+	my $dbhw;
+	if ($DBCONN_USEDBI) {
+	    $dbhw = emdbi_wrapper::DBI->Wrap($dbname, $dbuser);
+	}
+	else {
+	    $dbhw = emdbi_wrapper::Mysql->Wrap($dbname, $dbuser);
+	}
+	if (defined($dbhw)) {
+	    $DB[$dbnum] = $dbhw;
 	    last;
 	}
 	$maxtries--;
@@ -150,8 +419,6 @@ sub TBDBConnect($$)
 	    if (! $DBCONN_EXITONERR);
 	exit(-1);
     }
-    $DB[$dbnum]->{'dbh'}->{'PrintError'} = 0;
-    $Mysql::QUIET = 1;
     return 0;
 }
 
@@ -173,10 +440,12 @@ sub TBDBReconnect($)
     for (my $i = 0; $i < @DB; $i++) {
 	next
 	    if (!defined($DB[$i]));
+
+	my $dbname = $DB[$i]->dbname();
 	
 	undef($DB[$i]);
 	return -1
-	    if (TBDBConnect($i, $DBNAMES[$i]) != 0);
+	    if (TBDBConnect($i, $dbname) != 0);
     }
 
     if ($retry) {
@@ -235,7 +504,7 @@ sub DBQueryN($$)
     }
 
     # Reconnect to mysqld in child of fork.
-    if ($DB[$dbnum]->db_pid() != $PID) {
+    if ($DB[$dbnum]->pid() != $PID) {
 	if (TBDBReconnect(1) != 0) {
 	    $DBErrorString =
 		"  Query: $query\n".
@@ -250,9 +519,10 @@ sub DBQueryN($$)
 
     while ($maxtries) {
 	# Get this each time through the loop since we try reconnect below.
-	my $db = $DB[$dbnum];
+	my $dbw = $DB[$dbnum];
+	my $db  = $dbw->dbh();
 
-	$result = $db->query($query);
+	$result = $dbw->query($query);
 
 	if (! defined($result)) {
 	    my $err = $db->err;
@@ -412,14 +682,14 @@ sub DBQuoteSpecial($)
 {
     my ($string) = @_;
 
-    return $DB[0]->quote($string);
+    return $DB[0]->dbh()->quote($string);
 }
 
 sub DBQuoteSpecialN($$)
 {
     my ($dbnum, $string) = @_;
 
-    return $DB[$dbnum]->quote($string);
+    return $DB[$dbnum]->dbh()->quote($string);
 }
 
 #
@@ -427,11 +697,11 @@ sub DBQuoteSpecialN($$)
 #
 sub DBErrN($)
 {
-    return $DB[$_[0]]->err;
+    return $DB[$_[0]]->dbh()->err;
 }
 sub DBErr()
 {
-    return $DB[0]->err;
+    return $DB[0]->dbh()->err;
 }
 
 #
@@ -487,6 +757,17 @@ sub DBKeyExistsN($$$)
     return 0;
 }
 sub DBKeyExists($$) { return DBKeyExistsN(0,$_[0],$_[1]); }
+
+sub DBHandleN($)
+{
+    my ($dbnum) = @_;
+    
+    my $dbw = $DB[$dbnum];
+    my $db  = $dbw->dbh();
+
+    return $db;
+}
+sub DBHandle()	    { return DBHandleN(0); }
 
 END {
     # Call it here otherwise may get:

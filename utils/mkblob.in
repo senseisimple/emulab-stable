@@ -36,15 +36,23 @@ use libtestbed;
 # Handle command-line options.
 #
 sub usage() {
-    print STDERR "Usage: $0 <filename>\n";
+    print STDERR "Usage: $0 <owner-uid> <filename>\n";
     exit( 1 );
 }
 
-usage() unless @ARGV == 1;
-my ( $filename ) = @ARGV;
+usage() unless @ARGV == 2;
+my ( $uid, $filename ) = @ARGV;
 #
 # Must taint check!
 #
+if ($uid =~ /^([-\w #%&*+,.\/:;=?@\[\\\]^{|}]+)$/) {
+    $uid = $1;
+}
+else {
+    print STDERR "Bad character in uid\n";
+    exit( 1 );
+}
+
 if ($filename =~ /^([-\w #%&*+,.\/:;=?@\[\\\]^{|}]+)$/) {
     $filename = $1;
 }
@@ -59,7 +67,7 @@ my $uuid = `@UUIDGEN@`;
 chomp $uuid;
 
 my $result = DBQueryWarn( "INSERT INTO blobs SET uuid='$uuid', " .
-			  "filename='$filename';" );
+			  "filename='$filename', owner_uid='$uid';" );
 unless( $result ) {
     print STDERR "Could not insert record.\n";
     exit( 1 );

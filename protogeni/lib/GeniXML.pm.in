@@ -13,10 +13,10 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
 FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
-IsLanNode IsLocalNode IsTunnel GetExpires
+IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
-GetManagerId GetColocate GetSubnodeOf
-GetVirtualizationType SetVirtualizationType GetVirtualizationSubtype
+GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
+GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
 CreateDocument AddElement RemoveChild PolicyExists);
 
@@ -233,7 +233,7 @@ sub IsLanNode($)
     my ($node) = @_;
     my $result = 0;
     if (defined($node) && $node->localname() eq "node") {
-	foreach my $lan (FindNodes("n:node_type | n:hardware_type",
+	foreach my $lan (FindNodes("n:hardware_type",
 				   $node)->get_nodelist()) {
 	    my $typeName = GetFirstText($lan, "type_name", "name");
 	    if (defined($typeName) && $typeName eq "lan") {
@@ -272,10 +272,10 @@ sub IsTunnel($)
 	my $link_type = GetText("link_type", $link);
 	$result = (defined($link_type) && $link_type eq "tunnel");
     } else {
-	my @types = FindNodes("n:link_type", $link);
+	my @types = FindNodes("n:link_type", $link)->get_nodelist();
 	foreach my $current (@types) {
 	    my $name = GetText("name", $current);
-	    if ($name eq "gre-tunnel") {
+	    if (defined($name) && $name eq "gre-tunnel") {
 		$result = 1;
 		last;
 	    }
@@ -300,12 +300,54 @@ sub SetExpires($$)
     }
 }
 
+sub GetBandwidth($)
+{
+    my ($link) = @_;
+    my $result = undef;
+    if (IsVersion0($link)) {
+	$result = GeniXML::GetText("bandwidth", $link);
+    } else {
+	my $prop = FindFirst("n:property", $link);
+	if (defined($prop)) {
+	    $result = GeniXML::GetText("capacity", $prop);
+	}
+    }
+    return $result;
+}
+
+sub GetIp($$)
+{
+    my ($ifaceref, $node) = @_;
+    my $result = undef;
+    if (IsVersion0($ifaceref)) {
+	$result = GetText("tunnel_ip", $ifaceref);
+    } else {
+	my $id = GetInterfaceId($ifaceref);
+	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
+	foreach my $iface (@ifaces) {
+	    my $testid = GetInterfaceId($iface);
+	    if (defined($id) && defined($testid) && $testid eq $id) {
+		my $ip = FindFirst("n:ip", $iface);
+		if (defined($ip)) {
+		    $result = GetText("address", $ip);
+		}
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
 # Returns the uuid or urn of an RSpec node or undef if it is not a node.
 sub GetNodeId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_urn", "component_id",
-			"component_uuid", "uuid");
+    my $result = GetFirstText($node, "component_urn", "component_id",
+			      "component_uuid", "uuid");
+    if (defined($result) && $result eq "") {
+	$result = undef;
+    }
+    return $result;
 }
 
 sub GetVirtualId($)
@@ -336,8 +378,13 @@ sub GetSliverId($)
 sub GetManagerId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_manager_urn",
-			"component_manager_id", "component_manager_uuid");
+    my $result = GetFirstText($node, "component_manager_urn",
+			      "component_manager_id",
+			      "component_manager_uuid");
+    if (defined($result) && $result eq "") {
+	$result = undef;
+    }
+    return $result;
 }
 
 sub GetColocate($)
@@ -365,6 +412,50 @@ sub GetSubnodeOf($)
     return $result;
 }
 
+sub GetStartupCommand($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+        $result = GetText("startup_command", $node);
+    } else {
+	my $execute = FindFirst("n:services/n:execute", $node);
+	if (defined($execute)) {
+	    $result = GetText("command", $execute);
+	}
+    }
+    return $result;
+}
+
+sub GetTarball($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+        $result = GetText("tarfiles", $node);
+    } else {
+	$result = "";
+	my @tarlist = FindNodes("n:services/n:install",
+				$node)->get_nodelist();
+	foreach my $current (@tarlist) {
+	    my $url = GetText("url", $current);
+	    my $install = GetText("install_path", $current);
+	    if (defined($url) && defined($install)) {
+		# TODO: Make sure url/install don't have semicolons or spaces
+		# TODO: Flag an error if either one is not defined
+		if ($result ne "") {
+		    $result .= ";";
+		}
+		$result .= $install . " " . $url;
+	    }
+	}
+	if (defined($result) && $result eq "") {
+	    $result = undef;
+	}
+    }
+    return $result;
+}
+
 sub GetVirtualizationType($)
 {
     my ($node) = @_;
@@ -375,12 +466,18 @@ sub GetVirtualizationType($)
     return $result;
 }
 
-sub SetVirtualizationType($$)
+sub SetVirtualizationSubtype($$)
 {
     my ($node, $arg) = @_;
     my $result = 1;
     if (IsVersion0($node)) {
-	$result = SetText("virtualization_type", $node, $arg);
+	$result = SetText("virtualization_subtype", $node, $arg);
+    } else {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (! defined($type)) {
+	    $type = AddElement("sliver_type", $node);
+	}
+	SetText("name", $type, $arg);
     }
     return $result;
 }
@@ -390,15 +487,11 @@ sub GetVirtualizationSubtype($)
     my ($node) = @_;
     my $result = undef;
     if (IsVersion0($node)) {
-	$result = GeniXML::GetText("virtualization_subtype", $node);
+	$result = GetText("virtualization_subtype", $node);
     } else {
-	my @types = FindNodes("n:type", $node)->get_nodelist();
-	foreach my $current (@types) {
-	    my $parent = GetText("implemented_by", $current);
-	    if (defined($parent)) {
-		$result = GetText("name", $current);
-		last;
-	    }
+	my $type = FindFirst("n:sliver_type", $node);
+	if (defined($type)) {
+	    $result = GetText("name", $type);
 	}
     }
     return $result;
@@ -434,7 +527,7 @@ sub SetExclusive($$)
 sub GetLinkManager($)
 {
     my ($link) = @_;
-    return GetText("id", $link) || GetText("name", $link);
+    return GetFirstText($link, "id", "name");
 }
 
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets
@@ -570,6 +663,7 @@ sub ReplaceNode($$)
     my ($oldnode, $newnode) = @_;
     my $copy = $newnode->cloneNode(1);
     $oldnode->replaceNode($copy);
+    return $copy;
 }
 
 # checks for the existense of policy in extensions of the given

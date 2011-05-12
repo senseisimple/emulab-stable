@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 use libdb;
 use libtestbed;
 use Node;
+use Port;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -593,6 +594,39 @@ sub GotTrunks($$)
 		    "where r.exptidx='$exptidx' and i.trunk!=0");
 
     return $query_result->numrows;
+}
+
+#
+# Get the set of lans that are linked to this lan. Optionally provide the
+# type, say to look for just vlans.
+#
+sub GetLinkedTo($$;$)
+{
+    my ($class, $lan, $type) = @_;
+
+    if (! ref($lan)) {
+	$lan = Lan->Lookup($lan);
+	return ()
+	    if (!defined($lan));
+    }
+    my $exptidx = $lan->exptidx();
+    my $lanid   = $lan->lanid();
+    my @result  = ();
+
+    my $query_result =
+	DBQueryWarn("select lanid from lans ".
+		    "where link='$lanid' ".
+		    (defined($type) ? "and type='$type'" : ""));
+    return ()
+	if (!$query_result || !$query_result->numrows);
+
+    while (my ($id) = $query_result->fetchrow_array()) {
+	my $vlan = Lan->Lookup($id);
+	return undef
+	    if (!defined($vlan));
+	push(@result, $vlan);
+    }
+    return @result;
 }
 
 #
@@ -1882,6 +1916,7 @@ sub Instantiate($)
 	my $vport       = $protomember->{'vport'};
 	my $iface       = $protomember->{'iface'};
 	my $pport       = $protomember->{'pport'};
+	my $attributes  = $protomember->{'attrs'};
 	my $member;
 
 	if (defined($pport)) {
@@ -1898,6 +1933,13 @@ sub Instantiate($)
 	if (!defined($interface)) {
 	    $lan->Destroy();
 	    return -1;
+	}
+	if (defined($attributes)) {
+	    foreach my $attrkey (keys(%{$attributes})) {
+		my $attrvalue = $attributes->{$attrkey};
+
+		$interface->SetAttribute($attrkey, $attrvalue);
+	    }
 	}
     }
     $self->{'INSTANCE'} = $lan;
@@ -2008,9 +2050,9 @@ sub Dump($)
 #
 # Add an interface to a protolan.
 #
-sub AddInterface($$$$$;$)
+sub AddInterface($$$$$;$$)
 {
-    my ($self, $node, $vnode, $vport, $iface, $pport) = @_;
+    my ($self, $node, $vnode, $vport, $iface, $pport, $attributes) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -2029,6 +2071,7 @@ sub AddInterface($$$$$;$)
 					     "vport" => $vport,
 					     "iface" => $iface,
 					     "pport" => $pport,
+					     "attrs" => $attributes,
 					    };
     return 0;
 }
@@ -2251,6 +2294,7 @@ sub id($)       { return $_[0]->GetLan()->lanid(); }
 sub vname($)	{ return $_[0]->GetLan()->vname(); }
 sub ready($)	{ return $_[0]->GetLan()->ready(); }
 sub type($)	{ return $_[0]->GetLan()->type(); }
+sub link($)	{ return $_[0]->GetLan()->link(); }
 sub GetLan($)   { return $_[0]->{'LAN'}; }
 sub GetExperiment($) { return $_[0]->GetLan()->GetExperiment(); }
 sub vlanid($)   { return $_[0]->lanid(); }
@@ -2312,11 +2356,21 @@ sub Refresh($)
 #
 # Stringify for output.
 #
+#
+# Stringify for output.
+#
 sub Stringify($)
 {
     my ($self) = @_;
+    
+    my $pid   = $self->pid();
+    my $eid   = $self->eid();
+    my $vname = $self->vname();
+    my $id    = $self->lanid();
+    my $tag   = $self->GetTag();
+    $tag = (defined($tag) ? ":${tag}" : "");
 
-    return "V" . $self->GetLan()->Stringify();
+    return "[VLan ${id}${tag}: $pid/$eid/$vname]";
 }
 
 #
@@ -2363,7 +2417,7 @@ sub FindMember($$$)
 #
 # Add a member in snmpit port form (node:card).
 #
-sub AddPort($$)
+sub AddPort_OLD($$)
 {
     my ($self, $port) = @_;
     my ($node_id, $card) = split(":", $port);
@@ -2380,9 +2434,26 @@ sub AddPort($$)
 }
 
 #
+# Use Port class
+#
+sub AddPort($$)
+{
+    my ($self, $port) = @_;
+    if (!ref($port)) {
+	    return $self->AddPort_OLD($port);
+    }
+
+    my $member = $self->FindMember($port->node_id(), $port->iface());
+    return $member
+	if (defined($member));
+				   
+    return $self->GetLan()->AddMember($port->node_id(), $port->iface());
+}
+
+#
 # Delete a member in snmpit port form (node:card).
 #
-sub DelPort($$)
+sub DelPort_OLD($$)
 {
     my ($self, $port) = @_;
     my ($node_id, $card) = split(":", $port);
@@ -2397,6 +2468,23 @@ sub DelPort($$)
 				   
     return $self->DelMember($member);
 }
+
+#
+# Delete a member, use Port class
+#
+sub DelPort($$)
+{
+    my ($self, $port) = @_;
+    if (!ref($port)) {
+	    return $self->DelPort_OLD($port);
+    }
+    my $member = $self->FindMember($port->node_id(), $port->iface());
+    return 0
+	if (!defined($member));
+				   
+    return $self->DelMember($member);
+}
+
 
 #
 # Does member already exists in protolan.
@@ -2805,6 +2893,50 @@ sub IsInternal($)
 }
 
 #
+# Mark/Get the "alias" bit on a vlan. These are vlans that are
+# an alias of another vlan. This happens cause different switch
+# have internal names for the same vlan tag. For example, vlan
+# tag 1 is default and DEFAULT_VLAN. But only one can have an
+# entry in the reserved_vlantags ans vlans table, since they assume
+# that the tag is a unique key (and this is how it should be). 
+#
+sub SetAlias($$)
+{
+    my ($self, $vlan) = @_;
+
+    return $self->GetLan()->SetAttribute("alias", $vlan->lanid());
+}
+sub IsAlias($)
+{
+    my ($self) = @_;
+    my $lanid;
+
+    return $lanid
+	if ($self->GetAttribute("alias", \$lanid) == 0);
+    return 0;
+}
+sub GetAliases($)
+{
+    my ($self) = @_;
+    my $lanid  = $self->lanid();
+    my @aliases = ();
+
+    my $query_result =
+	DBQueryWarn("select lanid from lan_attributes ".
+		    "where attrkey='alias' and attrvalue='$lanid'");
+    return undef
+	if (!$query_result);
+    
+    while (my ($alias) = $query_result->fetchrow_array()) {
+	my $vlan = VLan->Lookup($alias);
+	# What happens if its gone?
+	push(@aliases, $vlan)
+	    if (defined($vlan));
+    }
+    return @aliases;
+}
+
+#
 # Check to see if we think the VLAN actually exists on any switches at the
 # moment (ie. has a vlans table entry). 
 #
@@ -2880,6 +3012,29 @@ sub ExperimentVLans($$$)
 }
 
 #
+# Find a vlan by looking an interface in the vlan.
+#
+sub FindVlanByInterface($$$)
+{
+    my ($class, $experiment, $interface) = @_;
+    my $exptidx = $experiment->idx();
+    my $iface   = $interface->iface();
+    my @vlans   = ();
+
+    #
+    # We do not do this often, so worry about optimizing later.
+    #
+    return undef
+	if (VLan->ExperimentVLans($experiment, \@vlans) != 0);
+
+    foreach my $vlan (@vlans) {
+	return $vlan
+	    if ($vlan->IsMember($interface->node_id(), $interface->iface()));
+    }
+    return undef;
+}
+
+#
 # Utility function to add a vlan to the switch infrastructure. 
 #
 sub Instantiate($;$)
@@ -2907,6 +3062,23 @@ sub Instantiate($;$)
     return -1
 	if ($?);
     return 0;
+}
+
+#
+# Some vlans are not kept sync with the DB; too difficult. Might
+# reexamine this later. For sure, keeping the default vlan and the
+# control vlan in sync would be really hard since these tend to
+# get mucked with on the switch console instead of through snmpit.
+#
+sub KeepInSync($)
+{
+    my ($self) = @_;
+    my $tag    = $self->GetReservedVlanTag();
+
+    return 0
+	if ($self->IsInternal() && $tag <= 10);
+
+    return 1;
 }
 
 #
@@ -2943,19 +3115,19 @@ sub UnInstantiate($;$)
 # Class methods to maintain the backup vlans table, which records what
 # is on the switches. 
 #
-sub RecordVlanInsertion($$$$)
+sub RecordVlanInsertion($$$)
 {
-    my ($class, $experiment, $vlan, $stack) = @_;
+    my ($class, $vlan, $stack) = @_;
 
-    my $pid     = $experiment->pid();
-    my $eid     = $experiment->eid();
-    my $exptidx = $experiment->idx();
     if (!ref($vlan)) {
 	$vlan   = VLan->Lookup($vlan);
     }
     return -1
 	if (!defined($vlan));
 
+    my $pid       = $vlan->pid();
+    my $eid       = $vlan->eid();
+    my $exptidx   = $vlan->exptidx();
     my $lanid     = $vlan->lanid();
     my $vname     = $vlan->vname();
     my $tag       = $vlan->GetReservedVlanTag();
@@ -2989,6 +3161,7 @@ sub RecordVLanDeletion($$)
 sub RecordVLanModification($$$$)
 {
     my ($class, $lanid, $added, $removed) = @_;
+    my %current = ();
 
     my $query_result =
 	DBQueryWarn("select members from vlans where id='$lanid'");
@@ -2996,7 +3169,9 @@ sub RecordVLanModification($$$$)
     return -1
 	if (!$query_result);
     my ($current) = $query_result->fetchrow_array();
-    my %current   = map { $_ => $_ } split(/\s+/, $current);
+    if (defined($current) && $current ne "") {
+	%current = map { $_ => $_ } split(/\s+/, $current);
+    }
 
     if ($added) {
 	foreach my $port (@$added) {
@@ -3041,21 +3216,54 @@ sub IsNodeInAVlan($$)
     return $query_result->numrows;
 }
 
-sub FindVlanByPort($$$)
+sub FindVlanByPort_OLD($$$) 
 {
     my ($class, $experiment, $port) = @_;
     my ($node_id, $card) = split(":", $port);
+    my $clause = "";
 
     my $interface = Interface->Lookup($node_id, $card, 1);
     return undef
 	if (!defined($interface));
     my $iface = $interface->iface();
-    my $exptidx = $experiment->idx();
+    if (defined($experiment)) {
+	my $exptidx = $experiment->idx();
+	$clause = "exptidx='$exptidx' and";
+    }
 
     my $query_result =
 	DBQueryWarn("select id from vlans  ".
-		    "where exptidx='$exptidx' and ".
-		    "      members like '%${node_id}:${iface}%'");
+		    "where $clause members like '%${node_id}:${iface}%'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my ($lanid) = $query_result->fetchrow_array();
+
+    return VLan->Lookup($lanid);
+}
+
+#
+# Refactored with Port class
+#
+sub FindVlanByPort($$$)
+{
+    my ($class, $experiment, $port) = @_;
+    my $clause = "";
+    
+    if (!ref($port)) {
+	    return $class->FindVlanByPort_OLD($experiment, $port);
+    }
+ 
+    my $ifacestr = $port->toIfaceString();
+    if (defined($experiment)) {
+	my $exptidx = $experiment->idx();
+	$clause = "exptidx='$exptidx' and";
+    }
+
+    my $query_result =
+	DBQueryWarn("select id from vlans  ".
+		    "where $clause members like '%${ifacestr}%'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);
@@ -3093,6 +3301,27 @@ sub StaleVlanList($$$)
     }
     @$pref = @result;
     return 0;
+}
+
+#
+# Get the set of lans that are linked to this lan. Optionally provide the
+# type, say to look for just vlans.
+#
+sub GetLinkedTo($$;$)
+{
+    my ($class, $lan, $type) = @_;
+
+    my @result = Lan->GetLinkedTo($lan, $type);
+    return @result
+	if (!@result);
+
+    # Convert to VLan;
+    my @tmp = ();
+    foreach my $lan (@result) {
+	bless($lan, $class);
+	push(@tmp, $lan);
+    }
+    return @tmp;
 }
 
 ############################################################################

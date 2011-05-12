@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -528,7 +528,7 @@ sub dostatus(@) {
 	my %status;
 
 	if ($ctrls{$ctrl} eq 'icebox') {
-  	    my $device = new power_icebox($IPs{$ctrl}, $verbose};
+  	    my $device = new power_icebox($IPs{$ctrl}, $verbose);
 	    if (!defined $device) {
 		warn "Unable to contact controller $ctrl.\n";
 		$errors++;

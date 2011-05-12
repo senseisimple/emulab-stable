@@ -138,7 +138,11 @@ $EXPT_RESOURCESHOSED    = 0;
 		   "firewall_rules",
 		   "elabinelab_attributes",
 		   "virt_tiptunnels",
-		   "ipsubnets");
+		   "ipsubnets",
+		   "virt_blobs",
+		   "virt_client_service_ctl",
+		   "virt_client_service_hooks",
+		   "virt_client_service_opts");
 
 %physicalTables = ("delays"     => ["node_id", "vname", "vnode0", "vnode1"],
 		   "ipport_ranges" => undef,
@@ -3508,6 +3512,135 @@ sub SetupProgramAgents($)
 }
 
 #
+# Convert virt_blobs into real blobs.  We go to some pain to keep the same
+# filenames associated with the same uuid to make sure caching doesn't get
+# needlessly broken on the client (on a modify).
+#
+sub UploadBlobs($$)
+{
+    my ($self,$update) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+    my $virtexp = $self->GetVirtExperiment();
+    return -1
+	if (!defined($virtexp));
+
+    my %blobs = ();
+    my %virt_blobs = ();
+
+    #
+    # Grab the existing blobs tied to our experiment
+    #
+    my $qres = DBQueryFatal("select uuid,filename,vblob_id" . 
+			    " from blobs where exptidx=$idx");
+    if (defined($qres) && $qres->numrows()) {
+	while (my ($uuid,$filename,$vblob_id) = $qres->fetchrow_array()) {
+	    $blobs{$vblob_id} = [ 0,$uuid,$filename ];
+	}
+    }
+
+    #
+    # Now grab our experiment virt blobs
+    #
+    my $virt_blobs_table = $virtexp->Table("virt_blobs");
+    foreach my $row ($virt_blobs_table->Rows()) {
+	my $vblob_id = $row->vblob_id();
+	my $filename = $row->filename();
+
+	$virt_blobs{$vblob_id} = $filename;
+    }
+
+    #
+    # Make sure each virt_blob is in the blobs table!
+    #
+    foreach my $vblob_id (keys(%virt_blobs)) {
+	my $vfilename = $virt_blobs{$vblob_id};
+
+	if (exists($blobs{$vblob_id}) 
+	    && $blobs{$vblob_id}->[2] eq $vfilename) {
+	    # this one is a keeper, so mark it!
+	    $blobs{$vblob_id}->[0] = 1;
+	}
+	else {
+	    my $found = 0;
+	    foreach my $rvblob_id (keys(%blobs)) {
+		# if this one's a keeper, skip it!
+		next 
+		    if ($blobs{$rvblob_id}->[0]);
+
+		# if the filenames match, we adjust the vblob_id field
+		# in the blobs table to match what we have -- this leaves
+		# the uuid<->filename mapping intact
+		if ($blobs{$rvblob_id}->[2] eq $vfilename) {
+		    my $uuid = $blobs{$rvblob_id}->[1];
+		    $blobs{$vblob_id} = [ 1,$blobs{$rvblob_id}->[1],
+					  $blobs{$rvblob_id}->[2] ];
+		    DBQueryFatal("replace into blobs (uuid,vblob_id)" . 
+				 " values ('$uuid','$vblob_id')");
+		    $found = 1;
+		    last;
+		}
+	    }
+
+	    if (!$found) {
+		# need to add this blob fresh!
+		my $swapperuid = $self->swapper();
+		DBQueryFatal("insert into blobs" . 
+			     " (uuid,filename,owner_uid,vblob_id,exptidx)" . 
+			     " values (UUID(),'$vfilename','$swapperuid'," . 
+			     "   '$vblob_id',$idx)");
+	    }
+	}
+    }
+
+    #
+    # Only remove real blobs if we're done using them (i.e., on a modify)
+    #
+    if ($update) {
+	foreach my $vblob_id (keys(%blobs)) {
+	    my ($keep,$uuid,$filename) = @{$blobs{$vblob_id}};
+	    if (!$keep) {
+		DBQueryFatal("delete from blobs" . 
+			     "  where exptidx=$idx and vblob_id='${vblob_id}'");
+	    }
+	}
+    }
+
+    return 0;
+}
+
+#
+# Remove any real blobs that were a result of a virt blob (i.e., those
+# blobs that have our exptidx and a valid vblob_id).
+#
+sub RemoveBlobs($$)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $qres = DBQueryFatal("delete from blobs using blobs" . 
+			    " left join virt_blobs as vblobs" . 
+			    "  on blobs.vblob_id=vblobs.vblob_id" . 
+			    " where blobs.exptidx=$idx" . 
+			    "  and vblobs.vblob_id is not NULL");
+
+    # XXX: probably should clean out blob_files stuff too!
+
+    return 0;
+}
+
+#
 # Seed the virt_agents table.  Each lan/link needs an agent to handle
 # changes to delays or other link parameters, and that agent (might be
 # several) will be running on more than one node. Delay node agent,
@@ -4147,10 +4280,92 @@ sub UnBindNonLocalUsers($)
 
     my $idx = $self->idx();
 
-    DBQueryWarn("delete from nonlocal_user_bindings  ".
-		"where exptidx='$idx'")
+    #
+    # Need to delete the pubkeys, so need a list of current bindings.
+    #
+    my $query_result =
+	DBQueryWarn("select uid,uid_idx from nonlocal_user_accounts ".
+		    "where exptidx='$idx'");
+    return -1
+	if (!$query_result);
+
+    while (my ($uid, $uid_idx) = $query_result->fetchrow_array()) {
+	DBQueryWarn("delete from nonlocal_user_pubkeys  ".
+		    "where uid_idx='$uid_idx'")
+	    or return -1;
+	DBQueryWarn("delete from nonlocal_user_accounts  ".
+		    "where uid_idx='$uid_idx'")
+	    or return -1;
+    }
+    return 0;
+}
+
+#
+# Bind nonlocal user to experiment (slice, in Geni).
+#
+sub BindNonLocalUser($$$$$$)
+{
+    my ($self, $keys, $uid, $urn, $name, $email) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $exptidx    = $self->idx();
+    my $safe_urn   = DBQuoteSpecial($urn)
+	if (defined($urn));
+    my $safe_uid   = DBQuoteSpecial($uid);
+    my $safe_name  = DBQuoteSpecial($name);
+    my $safe_email = DBQuoteSpecial($email);
+    my $uid_idx;
+
+    #
+    # User may already exist, as for updating keys.
+    #
+    my $query_result =
+	DBQueryWarn("select uid_idx from nonlocal_user_accounts ".
+		    "where uid=$safe_uid and exptidx='$exptidx'");
+    return -1
+	if (!$query_result);
+    
+    if ($query_result->numrows) {
+	($uid_idx) = $query_result->fetchrow_array();
+    }
+    else {
+	my @insert_data = ();
+	
+	$uid_idx = User->NextIDX();
+	push(@insert_data, "created=now()");
+	push(@insert_data, "uid_idx='$uid_idx'");
+	push(@insert_data, "unix_uid=NULL");
+	push(@insert_data, "exptidx='$exptidx'");
+	push(@insert_data, "urn=$safe_urn")
+	    if (defined($urn));
+	push(@insert_data, "uid=$safe_uid");
+	push(@insert_data, "name=$safe_name");
+	push(@insert_data, "email=$safe_email");
+	push(@insert_data, "uid_uuid=uuid()");
+
+	# Insert into DB.
+	my $insert_result =
+	    DBQueryWarn("insert into nonlocal_user_accounts set " .
+			join(",", @insert_data));
+    }
+
+    #
+    # Always replace the entire key set; easier to manage.
+    #
+    DBQueryWarn("delete from nonlocal_user_pubkeys  ".
+		"where uid_idx='$uid_idx'")
 	or return -1;
     
+    foreach my $key (@{ $keys }) {
+	my $safe_key = DBQuoteSpecial($key);
+
+	DBQueryWarn("insert into nonlocal_user_pubkeys set ".
+		    "  uid=$safe_uid, uid_idx='$uid_idx', ".
+		    "  idx=NULL, stamp=now(), pubkey=$safe_key")
+	    or return -1;
+    }
     return 0;
 }
 
@@ -4383,6 +4598,10 @@ sub ReserveSharedBandwidth($;$$)
 	$query_result  = $previous_result;
 	$previous_result = $tmp;
     }
+    # Need to do this when we want to seek around inside the results.
+    $previous_result = $previous_result->WrapForSeek()
+	if (defined($previous_result));
+    $query_result = $query_result->WrapForSeek();
 
     #
     # This is how much we need to release.

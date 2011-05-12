@@ -1,0 +1,31 @@
+#
+# Add "logical" wire support, used for layer one switch support.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    my $slottype = DBSlotType("wires", "type");
+    if (!$slottype) {
+	Fatal("No 'type' slot in 'wires' table");
+    }
+    if (! ($slottype =~ /Unused/)) {
+	DBQueryFatal("alter table wires change `type` `type` ".
+		     " enum('Node','Serial','Power','Dnard','Control',".
+		     "      'Trunk','OuterControl','Unused') ".
+		     "    NOT NULL default 'Node'");
+    }
+    if (!DBSlotExists("wires", "logical")) {
+	DBQueryFatal("alter table wires add `logical` ".
+		     "  tinyint(1) unsigned NOT NULL default '0'");
+    }
+    if (!DBSlotExists("interfaces", "logical")) {
+	DBQueryFatal("alter table interfaces add `logical` ".
+		     "  tinyint(1) unsigned NOT NULL default '0'");
+    }
+    return 0;
+}
+1;

@@ -1049,7 +1049,9 @@ sub opPortVlan($$$@) {
 	    # Make sure the port didn't get mangled in conversion
 	    #
 	    if (!defined $index) {
-		print STDERR "Port not found, skipping\n";
+		my $name = $self->{NAME};
+		
+		print STDERR "Port ($port) not found on $name, skipping\n";
 		$errors++;
 		next;
 	    }

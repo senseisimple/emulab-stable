@@ -1,1 +1,0 @@
-"C:\Program Files\Graphviz2.26\bin\neato" -Tsvg -Gepsilon=.001 input.dot -o output.svg

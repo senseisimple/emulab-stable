@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCertificate;
@@ -38,6 +38,7 @@ my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NFREE	   = "$TB/bin/nfree";
 my $OPENSSL	   = "/usr/bin/openssl";
+my $SHA1	   = "/sbin/sha1";
 my $MKCERT         = "$TB/sbin/mksyscert";
 
 # Cache of instances to avoid regenerating them.
@@ -511,7 +512,7 @@ sub PipeTo($$$)
 {
     my ($self, $withkey, $string) = @_;
 
-    print STDERR "PipeTo: $self, '$string'\n";
+#    print STDERR "PipeTo: $self, '$string'\n";
 
     require Socket;
     import Socket qw(:DEFAULT);
@@ -726,6 +727,23 @@ sub asText($)
 	return undef;
     }
     return join("", @certlines);
+}
+
+sub sha1($)
+{
+    my ($self) = @_;
+
+    my @result = $self->PipeTo(0, "$SHA1");
+    if (! @result) {
+	print STDERR "Could not convert $self to sha1 hash\n";
+	return undef;
+    }
+    my $hash = $result[0];
+    if ($hash =~ /^(\w*)$/) {
+	return $1;
+    }
+    print STDERR "Bad sha1 value for $self\n";
+    return undef;
 }
 
 #
