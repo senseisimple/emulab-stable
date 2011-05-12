@@ -2,6 +2,7 @@ package TraceUse;
 
 use Time::HiRes qw( gettimeofday tv_interval );
 use Data::Dumper;
+use English;
 
 BEGIN
 {
@@ -54,6 +55,7 @@ sub trace_use
         'line'   => $line,
         'time'   => $elapsed,
         'module' => $mod_name,
+	'inc'    => "@INC",
     };
 
     return;
@@ -83,6 +85,7 @@ END
         my $indent = '  ' x $pos;
         $message  .= "$indent$mod->{module}, line $mod->{line}";
         $message  .= sprintf(" (%lf)", $mod->{'time'}) if $mod->{time};
+#	$message  .= " " . $mod->{inc};
         warn "$message\n";
     }
 }
