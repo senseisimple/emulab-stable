@@ -1990,7 +1990,7 @@ sub doReset($@) {
 		return -1;
 	    }
 	    # Find the vlan that uses this interface.
-	    my $vlanusing = Lan->FindVlanByInterface($experiment, $interface1);
+	    my $vlanusing = VLan->FindVlanByInterface($experiment, $interface1);
 	    if (defined($vlanusing) && $vlanusing->CreatedOnSwitches()) {
 		print STDERR "Logical wire $wire is in use by $vlanusing; ".
 		    "not allowed to remove $vlan\n";
