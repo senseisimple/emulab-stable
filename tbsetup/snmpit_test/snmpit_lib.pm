@@ -125,7 +125,7 @@ sub convertPortFromString($;$)
 	    $p = Port->LookupByTriple(Port->Tokens2TripleString($dev, $card, $port));
 	    return $p if $p;
 	}
-    } elsif ($str ~= /^(.+):(.+)$/) {
+    } elsif ($str =~ /^(.+):(.+)$/) {
 	my $node = $1;
 	my $card = $2;
 
