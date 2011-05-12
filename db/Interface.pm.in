@@ -398,6 +398,33 @@ sub Create($$$)
 }
 
 #
+# Delete a logical interface.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    if (! $self->logical()) {
+	print STDERR "Refusing to delete real $self\n";
+	return -1;
+    }
+    my $node_id = $self->node_id();
+    my $card    = $self->card();
+    my $port    = $self->port();
+
+    return -1
+	if (!DBQueryWarn("delete from interface_state ".
+			 "where node_id='$node_id' and card='$card' and ".
+			 "      port='$port'"));
+    return -1
+	if (!DBQueryWarn("delete from interfaces ".
+			 "where logical=1 and ".
+			 "      node_id='$node_id' and card='$card' and ".
+			 "      port='$port'"));
+    return 0;
+}
+
+#
 # Create a fake object, as for the mapper (assign_wrapper) during debugging.
 #
 sub MakeFake($$$)
@@ -872,6 +899,38 @@ sub port1($)           { return $_[0]->field('port1'); }
 sub port2($)           { return $_[0]->field('port2'); }
 sub type($)            { return $_[0]->field('type'); }
 sub logical($)         { return $_[0]->field('logical'); }
+sub IsActive($)        { return ($_[0]->type() eq "Unused" ? 0 : 1); }
+
+#
+# Delete a logical wire and its interfaces.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+    my ($interface1, $interface2) = $self->Interfaces();
+
+    if (! $self->logical()) {
+	print STDERR "Refusing to delete real $self\n";
+	return -1;
+    }
+    if (defined($interface1) && $interface1->logical()) {
+	$interface1->Delete() == 0
+	    or return -1;
+    }
+    if (defined($interface2) && $interface2->logical()) {
+	$interface2->Delete() == 0
+	    or return -1;
+    }
+    my $node_id1 = $self->node_id1();
+    my $card1    = $self->card1();
+    my $port1    = $self->port1();
+
+    return -1
+	if (!DBQueryWarn("delete from wires ".
+			 "where logical=1 and node_id1='$node_id1' and ".
+			 "      card1=$card1 and port1=$port1"));
+    return 0;
+}
 
 #
 # A wire has two interfaces, but we do not always create interface
@@ -901,8 +960,9 @@ sub Stringify($)
     my $card2   = $self->card2();
     my $port1   = $self->port1();
     my $port2   = $self->port2();
+    my $type    = ($self->logical() ? "LogicalWire" : "Wire");
 
-    return "[Wire: $node1:$card1:$port1/$node2:$card2:$port2]";
+    return "[$type: $node1:$card1:$port1/$node2:$card2:$port2]";
 }
 
 #
@@ -937,6 +997,77 @@ sub DeActivate($)
 			 "      card1=$card1 and port1=$port1"));
 
     return 0;
+}
+
+#
+# Find all logical wires for an experiment.
+#
+sub ExperimentLogicalWires($$$)
+{
+    my ($class, $experiment, $plist) = @_;
+
+    return -1
+	if (! (ref($plist) && ref($experiment)));
+    
+    my $exptidx = $experiment->idx();
+    my @result  = ();
+
+    # Note that a wire between two pc interfaces will cause this
+    # query to return two results, one of which is bogus, since
+    # the wires table is unique on node_id1,card1,port1. Need to
+    # check for this in the where clause.
+    my $query_result =
+	DBQueryWarn("select r.node_id,w.card1,w.port1 from reserved as r ".
+		    "left join interfaces as i on i.node_id=r.node_id ".
+		    "left join wires as w on w.node_id1=r.node_id and ".
+		    "     w.card1=i.card and w.port1=i.port ".
+		    "where i.logical=1 and r.exptidx='$exptidx' and ".
+		    "      card1 is not null");
+    return -1
+	if (!$query_result);
+
+    while (my ($nodeid,$card,$port) = $query_result->fetchrow_array()) {
+	my $wire = Interface::Wire->Lookup("$nodeid:$card:$port");
+	if (!defined($wire)) {
+	    print STDERR "Could not lookup wire: $nodeid:$card:$port\n";
+	    return -1;
+	}
+	push(@result, $wire);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+#
+# Delete all logical wires for an experiment, as for swapout.
+#
+sub DeleteLogicalWires($$)
+{
+    my ($class, $experiment) = @_;
+    my @wires  = ();
+    my $errors = 0;
+
+    return -1
+	if (! ref($experiment));
+    
+    return -1
+	if (Interface::Wire->ExperimentLogicalWires($experiment, \@wires));
+    return 0
+	if (!@wires);
+
+    foreach my $wire (@wires) {
+	print STDERR "Deleting $wire\n";
+	
+	if ($wire->IsActive()) {
+	    print STDERR "$wire is still active; cannot delete!\n";
+	    $errors++;
+	}
+	if ($wire->Delete()) {
+	    print STDERR "$wire could not be deleted!\n";
+	    $errors++;
+	}
+    }
+    return $errors;
 }
 
 ##############################################################################
