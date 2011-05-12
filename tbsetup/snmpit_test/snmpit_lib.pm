@@ -116,7 +116,6 @@ sub convertPortFromString($;$)
     $p = Port->LookupByTriple($str);
     return $p if $p;
 
-
     if (defined($dev)) {
 	$p = Port->LookupByIface(Port->Tokens2IfaceString($dev, $str));
 	return $p if $p;
@@ -124,6 +123,23 @@ sub convertPortFromString($;$)
 	my ($card, $port) = Port->ParseCardPortString($str);
 	if ($card) {
 	    $p = Port->LookupByTriple(Port->Tokens2TripleString($dev, $card, $port));
+	    return $p if $p;
+	}
+    } elsif ($str ~= /^(.+):(.+)$/) {
+	my $node = $1;
+	my $card = $2;
+
+	my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+				  "(SELECT type FROM nodes WHERE node_id='$node')");
+
+	#
+	# Make sure this is not switch port
+	#
+	if ($result->numrows() != 1 || ($result->fetchrow())[0] != 1) {
+	    #
+	    # deal with old node:card format
+	    #
+	    $p = Port->LookupByTriple(Port->Tokens2TripleString($node, $card, "1"));
 	    return $p if $p;
 	}
     }
@@ -740,6 +756,7 @@ sub getInterfaceSettings ($) {
     }
     
     my $node = $interface->node_id();
+    my $card = $interface->card();
     my $port = $interface->port();
 
     my $result =
@@ -748,7 +765,8 @@ sub getInterfaceSettings ($) {
 		     "left join interface_capabilities as ic on ".
 		     "     ic.type=i.interface_type and ".
 		     "     capkey='noportcontrol' ".
-		     "WHERE i.node_id='$node' and i.card=$port");
+		     "WHERE i.node_id='$node' and i.card=$card ".
+		     "and i.port=$port");
 
     # Sanity check - make sure the interface exists
     if ($result->numrows() != 1) {
