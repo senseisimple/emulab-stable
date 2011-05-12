@@ -5522,7 +5522,7 @@ sub InterpLinksAux($)
 		    # 2 segments in it.
 		    #
 		    my $firstlink = shift(@links);
-		    my $lastlink  = pop(@links);
+		    my $lastlink  = (@links ? pop(@links) : $firstlink);
 		    my $firstwire = $firstlink->_logicalwire();
 		    my $lastwire  = $lastlink->_logicalwire();
 
