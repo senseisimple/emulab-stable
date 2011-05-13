@@ -2269,10 +2269,13 @@ sub _LoadDefaultImages($$)
 {
     return 0;
 }
-sub _LoadCurrentImages($$) 
-{
-    return 0;
-}
+#
+# But we *do* want the user to be able to simply reload the current OS.
+#
+#sub _LoadCurrentImages($$) 
+#{
+#    return 0;
+#}
 
 sub SetupReload($$)
 {

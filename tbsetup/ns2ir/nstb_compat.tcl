@@ -20,6 +20,8 @@ proc tb-set-ip-interface {src dst ip} {}
 proc tb-set-ip-link {src link ip} {}
 proc tb-set-ip-lan {src lan ip} {}
 proc tb-set-netmask {lanlink netmask} {}
+proc tb-set-node-service {service args} {}
+proc tb-add-node-service-hook {service args} {}
 proc tb-set-hardware {node type args} {}
 proc tb-set-node-os {node os {parentos 0}} {}
 proc tb-set-link-loss {src args} {}

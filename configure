@@ -1543,6 +1543,7 @@ CLIENT_VARDIR="/var/emulab"
 CLIENT_MANDIR="/usr/local/man"
 TBSECURECOOKIES=1
 TBMAINSITE=0
+TBUSEDBI=0
 FANCYBANNER=0
 VIRTNODE_NETWORK=172.16.0.0
 VIRTNODE_NETMASK=255.240.0.0
@@ -2671,6 +2672,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	backend/editnodetype backend/editsitevars backend/newimageid \
 	backend/editgroup backend/newimageid_ez \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
+	tbsetup/snmpit_test/GNUmakefile  \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/power_mail.pm tbsetup/power_whol.pm \
@@ -3061,6 +3063,7 @@ s%@TBCOOKIESUFFIX@%$TBCOOKIESUFFIX%g
 s%@TBAUTHDOMAIN@%$TBAUTHDOMAIN%g
 s%@TBAUTHTIMEOUT@%$TBAUTHTIMEOUT%g
 s%@TBMAINSITE@%$TBMAINSITE%g
+s%@TBUSEDBI@%$TBUSEDBI%g
 s%@FANCYBANNER@%$FANCYBANNER%g
 s%@SFSSUPPORT@%$SFSSUPPORT%g
 s%@ELABINELAB@%$ELABINELAB%g

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -63,6 +63,8 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"v"})) {
     $verbose = 1;
 }
+my $osvers = `uname -s -r`;
+chomp($osvers);
 
 my $query_result =
     DBQueryFatal("select * from version_info order by name");
@@ -70,6 +72,8 @@ my $query_result =
 while (my ($name, $value) = $query_result->fetchrow_array()) {
     printf("%-20s %s\n", $name . ":" , $value);
 }
+printf("%-20s %s\n", "OS Version:" , $osvers);
+printf("%-20s %s\n", "Perl Version:" , $]);
 
 exit(0);
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -259,6 +259,10 @@ if (!isset($formfields["exp_idleswap_timeout"]) ||
 
 if (!isset($formfields["exp_autoswap"]) ||
     strcmp($formfields["exp_autoswap"], "1")) {
+    if (!ISADMIN()) {
+	$errors["Max. Duration"] =
+	    "You must ask testbed operations to disable this";
+    }
     $formfields["exp_autoswap"] = 0;
 }
 else {
@@ -268,6 +272,11 @@ else {
 	!preg_match("/^[\d]+$/", $formfields["exp_idleswap_timeout"]) ||
 	($formfields["exp_autoswap_timeout"] + 0) <= 0) {
 	$errors["Max. Duration"] = "No or invalid time provided";
+    }
+    # The user can override autoswap timeout, but limit unless an admin.
+    if ($formfields["exp_autoswap_timeout"] > 24 * 5 && !ISADMIN()) {
+	$errors["Max. Duration"] = "5 days maximum - ".
+	    "you must ask testbed operations for more";
     }
 }
 

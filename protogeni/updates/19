@@ -1,0 +1,19 @@
+#
+# Add secondary lock to geni_slices for stitching.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_slices", "stitch_locked")) {
+	DBQueryFatal("alter table geni_slices ".
+		     "  add `stitch_locked` datetime default NULL");
+    }
+    return 0;
+}
+1;

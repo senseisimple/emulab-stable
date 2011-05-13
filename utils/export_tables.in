@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,24 +28,26 @@ my $extraopts = ($isvers5 ? "--skip-opt" : "");
 my $mysqldump = "mysqldump $extraopts";
 
 #
-# We use the bare Mysql module instead of the testbed libdb, so that this
+# We use the bare module instead of the testbed libdb, so that this
 # script can run from a first-time installation, before the latter is
 # installed.
 #
-use Mysql;
+use DBI;
 
 #
 # Build a list of tables to export
 #
-my $dbh = Mysql->connect('localhost',$DBNAME,undef,undef);
+my $dbh = DBI->connect("DBI:mysql:database=$DBNAME;host=localhost",
+		       undef, "none",
+		       {'PrintError' => 0});
 if (!$dbh) {
     die("Unable to connect to mysqld - Either it's not running or \n" .
     	  "permission was denied.\n");
 }
-
-my $result = $dbh->query("select table_name from exported_tables");
+my $sth = $dbh->prepare("select table_name from exported_tables");
+$sth->execute();
 my $table_names;
-while (my ($table_name) = $result->fetchrow()) {
+while (my ($table_name) = $sth->fetchrow()) {
     $table_names .= "$table_name ";
 }
 

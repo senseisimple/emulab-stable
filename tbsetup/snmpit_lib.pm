@@ -17,7 +17,7 @@ use Exporter;
 		getTestSwitches getControlSwitches getSwitchesInStack
                 getSwitchesInStacks getVlanIfaces
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
-		getExperimentTrunks setVlanTag setVlanStack
+		getExperimentTrunks setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks getStacksForSwitches
@@ -35,6 +35,7 @@ use Exporter;
 	        getExperimentVlanPorts
                 uniq isSwitchPort getPathVlanIfaces
 		reserveVlanTag getReservedVlanTag clearReservedVlanTag
+		mapVlansToSwitches mapStaleVlansToSwitches
 );
 
 use English;
@@ -347,7 +348,7 @@ sub getExperimentCurrentTrunks($$) {
 }
 
 #
-# Returns an an array of ports (in node:card form) that currently in
+# Returns an an array of ports (in node:card form) that are currently in
 # the given vlan.
 #
 sub getExperimentVlanPorts($) {
@@ -453,26 +454,6 @@ sub getActualStacksForVlans(@) {
         }
     }
     return uniq(@stacks);
-}
-
-#
-# Update database to store vlan tag.
-#
-sub setVlanTag ($$) {
-    my ($vlan_id, $tag) = @_;
-    
-    # Silently exit if they passed us no VLANs
-    if (!$vlan_id || !defined($tag)) {
-	return ();
-    }
-
-    my $vlan = VLan->Lookup($vlan_id);
-    return ()
-	if (!defined($vlan));
-    return ()
-	if ($vlan->SetTag($tag) != 0);
-
-    return 0;
 }
 
 #
@@ -653,7 +634,6 @@ sub isSwitchPort($) {
             return 1;
         }
     }
-
     return 0;
 }
 
@@ -1005,7 +985,10 @@ sub getDeviceOptions($) {
     my %options;
 
     my $result = DBQueryFatal("SELECT supports_private, " .
-	"single_domain, snmp_community, min_vlan, max_vlan " .
+	"single_domain, s.snmp_community as device_community, ".
+        "t.min_vlan, t.max_vlan, " .
+	"t.snmp_community as stack_community, ".
+	"s.min_vlan as device_min, s.max_vlan as device_max ".
 	"FROM switch_stacks AS s left join switch_stack_types AS t " .
 	"    ON s.stack_id = t.stack_id ".
 	"WHERE s.node_id='$switch'");
@@ -1015,14 +998,16 @@ sub getDeviceOptions($) {
 	return undef;
     }
 
-    my ($supports_private, $single_domain, $snmp_community, $min_vlan,
-	$max_vlan) = $result->fetchrow();
+    my ($supports_private, $single_domain, $device_community, $min_vlan,
+	$max_vlan, $stack_community, $device_min, $device_max) =
+	    $result->fetchrow();
 
     $options{'supports_private'} = $supports_private;
     $options{'single_domain'} = $single_domain;
-    $options{'snmp_community'} = $snmp_community || "public";
-    $options{'min_vlan'} = $min_vlan || 2;
-    $options{'max_vlan'} = $max_vlan || 1000;
+    $options{'snmp_community'} =
+ 	$device_community || $stack_community || "public";
+    $options{'min_vlan'} = $device_min || $min_vlan || 2;
+    $options{'max_vlan'} = $device_max || $max_vlan || 1000;
 
     $options{'type'} = getDeviceType($switch);
 
@@ -1122,6 +1107,98 @@ sub getTrunkPath($$$$) {
 	    return ();
 	}
     }
+}
+
+#
+# Given a set of vlans, determine *exactly* what devices are needed
+# for the ports and any trunks that need to be crossed. This is done
+# in the stack module, but really want to do this before the stack
+# is created so that we do not add extra devices if not needed.
+#
+sub mapVlansToSwitches(@)
+{
+    my @vlan_ids = @_;
+    my %switches = ();
+
+    #
+    # This code is lifted from setPortVlan() in snmpit_stack.pm
+    #
+    foreach my $vlan_id (@vlan_ids) {
+	my @ports   = uniq(getVlanPorts($vlan_id),
+			   getExperimentVlanPorts($vlan_id));
+	my @devices = mapPortsToSwitches(@ports);
+
+	# And update the total set of switches.
+	foreach my $device (@devices) {
+	    $switches{$device} = 1;
+	}
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    print "mapVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# An alternate version for a "stale" vlan; one that is destroyed cause of
+# a swapmod (syncVlansFromTables). 
+#
+sub mapStaleVlansToSwitches(@)
+{
+    my @vlan_ids = @_;
+    my %switches = ();
+
+    foreach my $vlan_id (@vlan_ids) {
+	#
+	# Get the ports that we think are already in the vlan, since
+	# this might be a remove/modify operation. Can probably optimize
+	# this. 
+	#
+	my @ports   = getExperimentVlanPorts($vlan_id);
+	my @devices = mapPortsToSwitches(@ports);
+
+	# And update the total set of switches.
+	foreach my $device (@devices) {
+	    $switches{$device} = 1;
+	}
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    print "mapStaleVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# Map a set of ports to the devices they are on plus the trunks.
+# See above.
+#
+sub mapPortsToSwitches(@)
+{
+    my @ports    = @_;
+    my %switches = ();
+    my %trunks   = getTrunks();
+    my %map      = mapPortsToDevices(@ports);
+    my %devices  = ();
+    
+    foreach my $device (keys %map) {
+	$devices{$device} = 1;
+    }
+
+    #
+    # This code is lifted from setPortVlan() in snmpit_stack.pm
+    #
+    # Find every switch which might have to transit this VLAN through
+    # its trunks.
+    #
+    my @trunks = getTrunksFromSwitches(\%trunks, keys %devices);
+    foreach my $trunk (@trunks) {
+	my ($src,$dst) = @$trunk;
+	$devices{$src} = $devices{$dst} = 1;
+    }
+    # And update the total set of switches.
+    foreach my $device (keys(%devices)) {
+	$switches{$device} = 1;
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    return @sorted;
 }
 
 #

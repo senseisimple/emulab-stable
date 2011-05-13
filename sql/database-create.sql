@@ -128,6 +128,9 @@ DROP TABLE IF EXISTS `blobs`;
 CREATE TABLE `blobs` (
   `uuid` varchar(40) NOT NULL,
   `filename` tinytext,
+  `owner_uid` varchar(8) NOT NULL default '',
+  `vblob_id` varchar(40) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -249,6 +252,59 @@ CREATE TABLE `checkups_temp` (
   `type` varchar(64) NOT NULL default '',
   `next` datetime default NULL,
   PRIMARY KEY  (`object`,`type`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `client_service_ctl`
+--
+
+DROP TABLE IF EXISTS `client_service_ctl`;
+CREATE TABLE `client_service_ctl` (
+  `obj_type` enum('node_type','node','osid') NOT NULL default 'node_type',
+  `obj_name` varchar(64) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `alt_blob_id` varchar(40) NOT NULL default '',
+  `enable` tinyint(1) NOT NULL default '1',
+  `enable_hooks` tinyint(1) NOT NULL default '1',
+  `fatal` tinyint(1) NOT NULL default '1',
+  `user_can_override` tinyint(1) NOT NULL default '1',
+  PRIMARY KEY  (`obj_type`,`obj_name`,`service_idx`,`env`,`whence`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `client_service_hooks`
+--
+
+DROP TABLE IF EXISTS `client_service_hooks`;
+CREATE TABLE `client_service_hooks` (
+  `obj_type` enum('node_type','node','osid') NOT NULL default 'node_type',
+  `obj_name` varchar(64) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `hook_blob_id` varchar(40) NOT NULL default '',
+  `hook_op` enum('boot','shutdown','reconfig','reset') NOT NULL default 'boot',
+  `hook_point` enum('pre','post') NOT NULL default 'post',
+  `argv` varchar(255) NOT NULL default '',
+  `fatal` tinyint(1) NOT NULL default '0',
+  `user_can_override` tinyint(1) NOT NULL default '1',
+  PRIMARY KEY  (`obj_type`,`obj_name`,`service_idx`,`env`,`whence`,`hook_blob_id`,`hook_op`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `client_services`
+--
+
+DROP TABLE IF EXISTS `client_services`;
+CREATE TABLE `client_services` (
+  `idx` int(10) NOT NULL default '0',
+  `service` varchar(64) NOT NULL default 'isup',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `hooks_only` int(1) NOT NULL default '0',
+  PRIMARY KEY  (`idx`,`service`,`env`,`whence`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1290,7 +1346,7 @@ CREATE TABLE `external_networks` (
   `min_vlan` int(11) NOT NULL default '256',
   `max_vlan` int(11) NOT NULL default '1000',
   PRIMARY KEY  (`network_id`),
-  UNIQUE KEY  (`node_id`)
+  UNIQUE KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
   
 --
@@ -1721,6 +1777,7 @@ CREATE TABLE `interfaces` (
   `whol` tinyint(4) NOT NULL default '0',
   `trunk` tinyint(1) NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
+  `logical` tinyint(1) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`card`,`port`),
   KEY `mac` (`mac`),
   KEY `IP` (`IP`),
@@ -2515,6 +2572,27 @@ CREATE TABLE `nonces` (
   `nonce` mediumtext,
   `expires` int(10) NOT NULL,
   PRIMARY KEY  (`node_id`,`purpose`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `nonlocal_user_accounts`
+--
+
+DROP TABLE IF EXISTS `nonlocal_user_accounts`;
+CREATE TABLE `nonlocal_user_accounts` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `uid_uuid` varchar(40) NOT NULL default '',
+  `unix_uid` smallint(5) unsigned NOT NULL auto_increment,
+  `created` datetime default NULL,
+  `urn` tinytext,
+  `name` tinytext,
+  `email` tinytext,
+  `exptidx` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`unix_uid`),
+  KEY `uid` (`uid`),
+  KEY `urn` (`urn`(255)),
+  KEY `uid_uuid` (`uid_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3472,6 +3550,9 @@ CREATE TABLE `switch_stacks` (
   `node_id` varchar(32) NOT NULL default '',
   `stack_id` varchar(32) NOT NULL default '',
   `is_primary` tinyint(1) NOT NULL default '1',
+  `snmp_community` varchar(32) default NULL,
+  `min_vlan` int(11) default NULL,
+  `max_vlan` int(11) default NULL,
   KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -3528,7 +3609,9 @@ CREATE TABLE `testbed_stats` (
   `log_session` int(10) unsigned default NULL,
   PRIMARY KEY  (`idx`),
   KEY `rsrcidx` (`rsrcidx`),
-  KEY `exptidx` (`exptidx`)
+  KEY `exptidx` (`exptidx`),
+  KEY `uid_idx` (`uid_idx`),
+  KEY `idxdate` (`end_time`,`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3930,6 +4013,76 @@ CREATE TABLE `virt_agents` (
   `objecttype` smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`vname`,`vnode`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_blobs`
+--
+
+DROP TABLE IF EXISTS `virt_blobs`;
+CREATE TABLE `virt_blobs` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vblob_id` varchar(40) NOT NULL default '',
+  `filename` tinytext,
+  PRIMARY KEY  (`exptidx`,`vblob_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_client_service_ctl`
+--
+
+DROP TABLE IF EXISTS `virt_client_service_ctl`;
+CREATE TABLE `virt_client_service_ctl` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vnode` varchar(32) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `alt_vblob_id` varchar(40) NOT NULL default '',
+  `enable` tinyint(1) NOT NULL default '1',
+  `enable_hooks` tinyint(1) NOT NULL default '1',
+  `fatal` tinyint(1) NOT NULL default '1',
+  PRIMARY KEY  (`exptidx`,`vnode`,`service_idx`,`env`,`whence`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_client_service_hooks`
+--
+
+DROP TABLE IF EXISTS `virt_client_service_hooks`;
+CREATE TABLE `virt_client_service_hooks` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vnode` varchar(32) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `hook_vblob_id` varchar(40) NOT NULL default '',
+  `hook_op` enum('boot','shutdown','reconfig','reset') NOT NULL default 'boot',
+  `hook_point` enum('pre','post') NOT NULL default 'post',
+  `argv` varchar(255) NOT NULL default '',
+  `fatal` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`vnode`,`service_idx`,`env`,`whence`,`hook_vblob_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_client_service_opts`
+--
+
+DROP TABLE IF EXISTS `virt_client_service_opts`;
+CREATE TABLE `virt_client_service_opts` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vnode` varchar(32) NOT NULL default '',
+  `opt_name` varchar(32) NOT NULL default '',
+  `opt_value` varchar(64) NOT NULL default '',
+  PRIMARY KEY  (`exptidx`,`vnode`,`opt_name`,`opt_value`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -4578,13 +4731,14 @@ DROP TABLE IF EXISTS `wires`;
 CREATE TABLE `wires` (
   `cable` smallint(3) unsigned default NULL,
   `len` tinyint(3) unsigned NOT NULL default '0',
-  `type` enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl') NOT NULL default 'Node',
+  `type` enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl','Unused') NOT NULL default 'Node',
   `node_id1` char(32) NOT NULL default '',
   `card1` tinyint(3) unsigned NOT NULL default '0',
   `port1` tinyint(3) unsigned NOT NULL default '0',
   `node_id2` char(32) NOT NULL default '',
   `card2` tinyint(3) unsigned NOT NULL default '0',
   `port2` tinyint(3) unsigned NOT NULL default '0',
+  `logical` tinyint(1) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id1`,`card1`,`port1`),
   KEY `node_id2` (`node_id2`,`card2`),
   KEY `dest` (`node_id2`,`card2`,`port2`),

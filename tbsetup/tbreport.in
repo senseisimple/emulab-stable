@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -329,6 +329,8 @@ if ($showlinks) {
 	DBQueryFatal("select v.* from virt_lans as v ".
 		     "where v.pid='$pid' and v.eid='$eid' ".
 		     "order by v.vname,v.member");
+    # Need to do this when we want to seek around inside the results.
+    $vlan_result = $vlan_result->WrapForSeek();
 
     while (my %row = $vlan_result->fetchhash()) {
 	my $ip          = $row{"ip"};
@@ -704,6 +706,10 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 	DBQueryFatal("select * from linkdelays ".
 		     "where pid='$pid' and eid='$eid' ".
 		     "order by vlan,vnode,node_id");
+
+    # Need to do this when we want to seek around inside the results.
+    $result_delays = $result_delays->WrapForSeek();
+    $result_linkdelays = $result_linkdelays->WrapForSeek();
 
     my @data;
 

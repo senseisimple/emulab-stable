@@ -123,14 +123,14 @@ def SimpleNode( d, elem, body ):
     n.appendChild( d.createTextNode( body ) );
     return n;
 
-mycredential = get_self_credential()
-
+mycredential = None
 slice_urn = None
 slice_uuid = None
 
 if is_urn( args[ 0 ] ): slice_urn = args[ 0 ]
 elif is_uuid( args[ 0 ] ): slice_uuid = args[ 0 ]
 elif is_hrn( args[ 0 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "Slice", 
@@ -140,6 +140,7 @@ elif is_hrn( args[ 0 ] ):
 
 if slice_urn:
     # we were given a URN, and can request credentials from the SA
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "GetCredential", 
                                 dict( credential = mycredential, 
                                       type = "Slice", 
@@ -151,6 +152,7 @@ if slice_urn:
 elif slice_uuid:
     # we were given a UUID, or a slice HRN which resolved to one: use
     # that UUID to request credentials from the SA (deprecated)
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "GetCredential", 
                                 dict( credential = mycredential, 
                                       type = "Slice", 
@@ -167,6 +169,7 @@ else:
 delegate = None
 
 if is_urn( args[ 1 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "User", 
@@ -174,6 +177,7 @@ if is_urn( args[ 1 ] ):
     if not rval and "value" in response and "gid" in response[ "value" ]:
         delegate = response[ "value" ][ "gid" ]
 if is_uuid( args[ 1 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "User", 
@@ -181,6 +185,7 @@ if is_uuid( args[ 1 ] ):
     if not rval and "value" in response and "gid" in response[ "value" ]:
         delegate = response[ "value" ][ "gid" ]
 elif is_hrn( args[ 1 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "User", 
@@ -314,7 +319,7 @@ tmpfile.flush()
 
 ret = os.spawnlp( os.P_WAIT, XMLSEC1, XMLSEC1, "--sign", "--node-id",
                   "Sig_" + str( id ), "--privkey-pem",
-                  CERTIFICATE + "," + CERTIFICATE, tmpfile.name )
+                  CERTIFICATE, tmpfile.name )
 if ret == 127:
     print >> sys.stderr, XMLSEC1 + ": invocation error\n"
 

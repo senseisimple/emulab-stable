@@ -1,0 +1,44 @@
+#
+# Add a bunch of tables for client service control.  Add a bunch of initial
+# state for the client_services table -- these are the services and points
+# at which they can be controlled in our current codebase. 
+#
+# Add a virt_blobs table that allows for per-experiment, dynamic blob
+# creation/deletion.  Add some metadata to the blobs table to facilitate that. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("virt_blobs")) {
+	DBQueryFatal("CREATE TABLE `virt_blobs` (".
+		     "  `pid` varchar(12) NOT NULL default '',".
+		     "  `eid` varchar(32) NOT NULL default '',".
+		     "  `exptidx` int(11) NOT NULL default '0',".
+		     "  `vblob_id` varchar(40) NOT NULL default '',".
+		     "  `filename` tinytext,".
+		     " PRIMARY KEY  (`exptidx`,`vblob_id`)".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+
+    if (!DBSlotExists("blobs","vblob_id")) {
+	DBQueryFatal("alter table blobs add vblob_id ".
+		     "varchar(40) NOT NULL default '' after `owner_uid`");
+    }
+    if (!DBSlotExists("blobs","exptidx")) {
+	DBQueryFatal("alter table blobs add exptidx ".
+		     "int(11) NOT NULL default '0' after `vblob_id`");
+    }
+
+    # now the fill stuff
+    DBQueryFatal("REPLACE INTO table_regex VALUES ('virt_blobs','filename',".
+		 " 'text','redirect','default:tinytext',0,256,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES ('virt_blobs','vblob_id',".
+		 " 'text','regex','^[-\\\\d\\\\w]+\$',0,40,NULL)");
+
+    return 0;
+}
+1;

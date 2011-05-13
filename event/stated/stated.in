@@ -328,7 +328,19 @@ while (1) {
 	while ($now >= $deadline && $node ne "") {
 	    qpop($deadline,$node);
 	    info("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
-	    handleCtrlEvent($node,$TBTIMEOUT);
+	    #
+	    # If the node is no longer in the nodes array, it was most
+	    # likely a dynamic virtual node which is now gone. Ignore.
+	    # Need to look at reload() to see if we can catch this earlier. 
+	    #
+	    if (exists($nodes{$node})) {
+		handleCtrlEvent($node,$TBTIMEOUT);
+	    }
+	    else {
+		info("POP: $node is no longer in the nodes array. Skipping\n");
+		delete($timeout_tag{$node})
+		    if (exists($timeout_tag{$node}));
+	    }
 	    if (0) { qshow(); }
 	    if (qhead($deadline,$node)) {
 		$deadline=0; $node="";
@@ -1813,9 +1825,12 @@ sub StartEvents()
 	print STDERR "Caught a USR2 in child\n";
 	# Only STDERR can be redirected to the newfile. STDOUT is writing
 	# to the parent process.
+	close(STDERR);
 	open(STDERR, ">> $LOGFILE") or fatal("reopening $LOGFILE: $!");	
 	select STDERR;
 	$OUTPUT_AUTOFLUSH = 1;
+	# restore default output.
+	select STDOUT;
 	print STDERR "Opened new logfile in child\n";
     };
 
@@ -1870,22 +1885,35 @@ sub PollEvents($$)
     }
     if ($pollval > 0) {
 	my $buf;
+	my $lastline = "";
 	
 	while (sysread($childpipe, $buf, 8192)) {
 	    #
-	    # It is possible that we will get multiple lines
-	    # of output in one read. Hopefully not so much that we get
-	    # a partial line. Will need to deal with that at some
-	    # point.
+	    # It is possible that we will get multiple lines of output
+	    # in one read, so we split the input and loop over that.
+	    # It is also possible that we will read a partial line at
+	    # the end. We make a less-than heroic attempt to catch these
+	    # by remembering any unrecognized line that starts with "O"
+	    # and prepending that to the next set of lines read.
 	    #
 	    my @foo = split(/^/m, $buf);
+	    if ($lastline ne "") {
+		$foo[0] = $lastline . $foo[0];
+		debug("reconstruct split line: '" . $foo[0] . "'\n");
+		$lastline = "";
+	    }
 	    foreach my $line (@foo) {
 		if ($line =~
 		    /^OBJTYPE='([^\']*)', OBJNAME='([^\']*)', EVENTTYPE='([^\']*)'$/) {
 		    handleEvent($1, $2, $3);
 		}
+		elsif ($lastline eq "" && $line =~ /^O/) {
+		    # probably an incomplete read
+		    debug("remembering possible split line: '$line'\n");
+		    $lastline = $line;
+		}
 		else {
-		    fatal("unrecognizable line $line from event reader");
+		    fatal("unrecognizable line '$line' from event reader");
 		}
 	    }
 	    #

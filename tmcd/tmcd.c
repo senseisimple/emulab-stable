@@ -229,6 +229,7 @@ static event_handle_t	event_handle = NULL;
 
 COMMAND_PROTOTYPE(doreboot);
 COMMAND_PROTOTYPE(donodeid);
+COMMAND_PROTOTYPE(domanifest);
 COMMAND_PROTOTYPE(dostatus);
 COMMAND_PROTOTYPE(doifconfig);
 COMMAND_PROTOTYPE(doaccounts);
@@ -336,6 +337,7 @@ struct command {
 } command_array[] = {
 	{ "reboot",	  FULLCONFIG_NONE, 0, doreboot },
 	{ "nodeid",	  FULLCONFIG_ALL,  0, donodeid },
+	{ "manifest",	  FULLCONFIG_ALL,  0, domanifest },
 	{ "status",	  FULLCONFIG_NONE, 0, dostatus },
 	{ "ifconfig",	  FULLCONFIG_ALL,  F_ALLOCATED, doifconfig },
 	{ "accounts",	  FULLCONFIG_ALL,  F_REMREQSSL, doaccounts },
@@ -1390,6 +1392,376 @@ COMMAND_PROTOTYPE(donodeid)
 }
 
 /*
+ * Return a boot manifest for the node's boot scripts.
+ */
+COMMAND_PROTOTYPE(domanifest)
+{
+	MYSQL_RES	*res = NULL;
+	MYSQL_ROW	row;
+	char		buf[2*MYBUFSIZE];
+	int		nrows = 0;
+	int		disable_type = 0, disable_osid = 0, disable_node = 0;
+
+	res = mydb_query("select opt_name,opt_value"
+			 " from virt_client_service_opts"
+			 " where exptidx=%d or vnode='%s'",
+			 2, reqp->exptidx, reqp->nickname);
+	if (!res) {
+		info("MANIFEST: %s: DB Error getting expt client service opts!\n",
+		      reqp->nodeid);
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		if (strcmp(row[0],"disable_type") == 0 
+		    && strcmp(row[1],"1") == 0) {
+			disable_type = 1;
+		}
+		else if (strcmp(row[0],"disable_osid") == 0 
+			 && strcmp(row[1],"1") == 0) {
+			disable_osid = 1;
+		}
+		else if (strcmp(row[0],"disable_node") == 0 
+			 && strcmp(row[1],"1") == 0) {
+			disable_node = 1;
+		}
+		else {
+			info("MANIFEST: %s: unknown expt client service opt %s!\n",
+			     reqp->nodeid,row[0]);
+		}
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
+	/*
+	 * This is a messy query.  The rules for the manifest are
+	 * 0) only service and hook entries whose service (service,env,whence)
+	 *    tuples exist in the client_services table can be returned;
+	 * 1) only one SERVICE line foreach (service,env) tuple can be 
+	 *    returned;
+	 * 2) the user can only override (service,env) tuples that have
+	 *    user_can_override set to 1;
+	 *    (and if there are multiple admin tuples, but the highest-prio
+	 *    one allows override, even if less prio ones don't, we still
+	 *    allow override!)
+	 * 3) multiple HOOK lines can be returned, and the order in
+	 *    which hook lines are generated is by querying the
+	 *    client_service_hooks table for node types matching this node;
+	 *    the client_service_hooks table for osids matching this node;
+	 *    the client_service_hooks table for nodes matching this node;
+	 *    the virt_client_service_hooks table for '' nodes
+	 *      (wildcard, experiment wide);
+	 *    the virt_client_service_hooks table for nodes matching
+	 *      this node.
+	 * 4) the user can disable all admin hooks with
+	 *    user_can_override set to 1
+	 * 5) the virt_client_service_opts table controls which types of 
+	 *    admin hooks are disabled, across the experiment, or per-node.
+	 */
+	res = mydb_query("select cs.service,cs.env,cs.whence,"
+			 /* 3 */
+			 "  vcsnodeblobs.uuid,vcsnode.alt_vblob_id,vcsnode.enable,vcsnode.enable_hooks,vcsnode.fatal,"
+			 /* 8 */
+			 "  vcsexptblobs.uuid,vcsexpt.alt_vblob_id,vcsexpt.enable,vcsexpt.enable_hooks,vcsexpt.fatal,"
+			 /* 13 */
+			 "  csnode.alt_blob_id,csnode.enable,csnode.enable_hooks,"
+			 /* 16 */
+			 "  csnode.fatal,csnode.user_can_override,"
+			 /* 18 */
+			 "  csos.alt_blob_id,csos.enable,csos.enable_hooks,"
+			 /* 21 */
+			 "  csos.fatal,csos.user_can_override,"
+			 /* 23 */
+			 "  cstype.alt_blob_id,cstype.enable,cstype.enable_hooks,"
+			 /* 26 */
+			 "  cstype.fatal,cstype.user_can_override,"
+			 /* 28 */
+			 "  cs.hooks_only"
+			 " from reserved as r"
+			 " left join nodes as n on r.node_id=n.node_id"
+			 " straight_join client_services as cs"
+			 " left join virt_client_service_ctl as vcsexpt on"
+			 "   (r.exptidx=vcsexpt.exptidx and vcsexpt.vnode=''"
+			 "    and cs.idx=vcsexpt.service_idx"
+			 "    and cs.env=vcsexpt.env"
+			 "    and cs.whence=vcsexpt.whence)"
+			 " left join blobs as vcsexptblobs on"
+			 "   (vcsexpt.exptidx=vcsexptblobs.exptidx"
+			 "    and vcsexpt.alt_vblob_id=vcsexptblobs.vblob_id)"
+			 " left join virt_client_service_ctl as vcsnode on"
+			 "   (r.exptidx=vcsnode.exptidx"
+			 "    and r.vname=vcsnode.vnode"
+			 "    and cs.idx=vcsnode.service_idx"
+			 "    and cs.env=vcsnode.env"
+			 "    and cs.whence=vcsnode.whence)"
+			 " left join blobs as vcsnodeblobs on"
+			 "   (vcsnode.exptidx=vcsnodeblobs.exptidx"
+			 "    and vcsnode.alt_vblob_id=vcsnodeblobs.vblob_id)"
+			 " left join client_service_ctl as csnode on"
+			 "   (csnode.obj_type='node'"
+			 "    and r.node_id=csnode.obj_name"
+			 "    and cs.idx=csnode.service_idx"
+			 "    and cs.env=csnode.env"
+			 "    and cs.whence=csnode.whence)"
+			 " left join client_service_ctl as csos on"
+			 "   (csos.obj_type='osid' and n.def_boot_osid=csos.obj_name"
+			 "    and cs.idx=csos.service_idx and cs.env=csos.env"
+			 "    and cs.whence=csos.whence)"
+			 " left join client_service_ctl as cstype on"
+			 "   (cstype.obj_type='node_type'"
+			 "    and n.type=cstype.obj_name"
+			 "    and cs.idx=cstype.service_idx"
+			 "    and cs.env=cstype.env and cs.whence=cstype.whence)"
+			 " where r.exptidx=%d and r.node_id='%s'"
+			 "   and (vcsnode.enable is not NULL"
+			 "        or vcsexpt.enable is not NULL"
+			 "        or csnode.enable is not NULL"
+			 "        or csos.enable is not NULL"
+			 "        or cstype.enable is not NULL)",
+			 29, reqp->exptidx, reqp->nodeid);
+	if (!res) {
+		error("MANIFEST: %s: DB Error getting manifest info!\n",
+		      reqp->nodeid);
+		nrows = 0;
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		char *enabled = NULL;
+		char *hooks_enabled = NULL;
+		char *fatal = NULL;
+		char *blobid = NULL;
+		int admin_service_not_overrideable = 0;
+		int admin_idx = 0;
+		int hooks_only;
+		int disable_admin = 0;
+
+		row = mysql_fetch_row(res);
+		hooks_only = (strcmp(row[28],"1") == 0) ? 1 : 0;
+
+		/* figure out which service control entry to use! */
+		/* start by choosing the per-node or per-experiment stuff */
+		if (row[5] != NULL && !hooks_only) {
+		    enabled = row[5];
+		    hooks_enabled = row[6];
+		    fatal = row[7];
+		    blobid = row[3];
+		    /* 
+		     * If there was nothing in blob_blobs for this blob, 
+		     * just return the vblob and hope it was a real,
+		     * hardcoded blob in the blob store.
+		     */
+		    if (blobid == NULL)
+			blobid = row[4];
+		}
+		else if (row[9] != NULL && !hooks_only) {
+		    enabled = row[10];
+		    hooks_enabled = row[11];
+		    fatal = row[12];
+		    blobid = row[7];
+		    if (blobid == NULL)
+			blobid = row[8];
+		}
+
+		if (row[17] != NULL) {
+		    admin_idx = 13;
+		    if (strcmp(row[17],"0") == 0) {
+			admin_service_not_overrideable = 1;
+		    }
+		    if (disable_node) 
+			disable_admin = 1;
+		}
+		else if (row[22] != NULL) {
+		    admin_idx = 18;
+		    if (strcmp(row[22],"0") == 0) {
+			admin_service_not_overrideable = 1;
+		    }
+		    if (disable_osid) 
+			disable_admin = 1;
+		}
+		else if (row[27] != NULL) {
+		    admin_idx = 23;
+		    if (strcmp(row[27],"0") == 0) {
+			admin_service_not_overrideable = 1;
+		    }
+		    if (disable_type) 
+			disable_admin = 1;
+		}
+
+		/* If the user wants to ignore the admin setting, and
+		 * the admin allows it to be overridden, AND the user
+		 * didn't specify a control for this service... skip! */
+		if (disable_admin && !admin_service_not_overrideable 
+		    && enabled == NULL) {
+		    --nrows;
+		    continue;
+		}
+
+		/* If the admin set hooks_only on a service, and didn't
+		 * specify a service entry, bail! */
+		if (hooks_only && admin_idx == 0) {
+		    --nrows;
+		    continue;
+		}
+
+		/* If the admin seting can't be overridden, or if the
+		 * user didn't specify a control for this node or
+		 * experiment-wide, send the admin setting */
+		if (admin_service_not_overrideable || enabled == NULL) {
+		    enabled = row[admin_idx+1];
+		    hooks_enabled = row[admin_idx+2];
+		    fatal = row[admin_idx+3];
+		    blobid = row[admin_idx+0];
+		}
+
+		/* the query should prevent against this, but... */
+		if (enabled == NULL) {
+		    error("MANIFEST: %s: got info from DB for %s, but no enabled!\n",
+			  reqp->nodeid,row[0]);
+		    --nrows;
+		    continue;
+		}
+
+		if (blobid == NULL)
+		    blobid = "";
+
+		OUTPUT(buf, sizeof(buf),
+		       "SERVICE NAME=%s ENV=%s WHENCE=%s"
+		       " ENABLED=%s HOOKS_ENABLED=%s FATAL=%s"
+		       " BLOBID=%s\n",
+		       row[0],row[1],row[2],
+		       enabled,hooks_enabled,fatal,blobid);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("MANIFEST: %s", buf);
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
+	/* grab the admin client side hooks */
+	res = mydb_query("select cs.service,cs.env,cs.whence,csh.obj_type,"
+			 "  csh.hook_blob_id,csh.hook_op,csh.hook_point,"
+			 "  csh.argv,csh.fatal,csh.user_can_override"
+			 " from reserved as r"
+			 " left join nodes as n on r.node_id=n.node_id"
+			 " straight_join client_services as cs"
+			 " left join client_service_hooks as csh on"
+			 "   (cs.idx=csh.service_idx"
+			 "    and cs.env=csh.env"
+			 "    and cs.whence=csh.whence)"
+			 " where r.exptidx=%d and r.node_id='%s'"
+			 "   and ((csh.obj_type='node'"
+			 "         and r.node_id=csh.obj_name)"
+			 "        or (csh.obj_type='osid'"
+			 "            and n.def_boot_osid=csh.obj_name)"
+			 "        or (csh.obj_type='node_type'"
+			 "            and n.type=csh.obj_name))",
+			 10,reqp->exptidx,reqp->nodeid);
+	if (!res) {
+		error("MANIFEST: %s: DB Error getting manifest admin hook info!\n",
+		      reqp->nodeid);
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		/*
+		 * skip this admin hook if it can be overridden, and if
+		 * the user turned off this type of admin hooks
+		 */
+		if (strcmp(row[9],"1") == 0
+		    && ((strcmp(row[3],"node") == 0 && disable_node)
+			|| (strcmp(row[3],"osid") == 0 && disable_osid)
+			|| (strcmp(row[3],"type") == 0 && disable_type))) {
+			--nrows;
+			continue;
+		}
+
+		OUTPUT(buf, sizeof(buf),
+		       "HOOK SERVICE=%s ENV=%s WHENCE=%s"
+		       " OP=%s POINT=%s FATAL=%s BLOBID=%s ARGV=\"%s\"\n",
+		       row[0],row[1],row[2],
+		       row[5],row[6],row[8],row[4],row[7]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("MANIFEST: %s", buf);
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
+	/* grab the user-specified client side hooks */
+	res = mydb_query("select cs.service,cs.env,cs.whence,"
+			 "  cshblobs.uuid,csh.hook_vblob_id,csh.hook_op,csh.hook_point,"
+			 "  csh.argv,csh.fatal"
+			 " from reserved as r"
+			 " left join nodes as n on r.node_id=n.node_id"
+			 " straight_join client_services as cs"
+			 " left join virt_client_service_hooks as csh on"
+			 "   (r.exptidx=csh.exptidx"
+			 "    and (csh.vnode='' or r.vname=csh.vnode)"
+			 "    and cs.idx=csh.service_idx"
+			 "    and cs.env=csh.env"
+			 "    and cs.whence=csh.whence)"
+			 " left join blobs as cshblobs on"
+			 "   (csh.exptidx=cshblobs.exptidx"
+			 "    and csh.hook_vblob_id=cshblobs.vblob_id)"
+			 " where r.exptidx=%d and r.node_id='%s'"
+			 "   and csh.hook_vblob_id is not NULL",
+			 9,reqp->exptidx,reqp->nodeid);
+	if (!res) {
+		error("MANIFEST: %s: DB Error getting manifest user hook info!\n",
+		      reqp->nodeid);
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		OUTPUT(buf, sizeof(buf),
+		       "HOOK SERVICE=%s ENV=%s WHENCE=%s"
+		       " OP=%s POINT=%s FATAL=%s BLOBID=%s ARGV=\"%s\"\n",
+		       row[0],row[1],row[2],
+		       row[5],row[6],row[8],(row[3]) ? row[3] : row[4],row[7]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("MANIFEST: %s", buf);
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
+	return 0;
+}
+
+/*
  * Return status of node. Is it allocated to an experiment, or free.
  */
 COMMAND_PROTOTYPE(dostatus)
@@ -1689,7 +2061,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the virtual interfaces.
 	 */
 	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue, "
+			 "       v.type,vll.vname,v.virtlanidx,vlans.tag, "
 			 "       l.lanid "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
@@ -1697,10 +2069,9 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "left join virt_lan_lans as vll on "
 			 "  vll.idx=v.virtlanidx and vll.exptidx=v.exptidx "
 			 "left join lans as l on "
-			 "  l.exptidx=vll.exptidx and l.vname=vll.vname and "
-			 "  l.link is null "
-			 "left join lan_attributes as la on "
-			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
+			 "  l.exptidx=vll.exptidx and l.vname=vll.vname "
+			 "left join vlans on "
+			 "  vlans.id=v.vlanid "
 			 "left join lan_attributes as la2 on "
 			 "  la2.lanid=v.vlanid and la2.attrkey='stack' "
 			 "where v.exptidx='%d' and v.node_id='%s' and "
@@ -2439,15 +2810,18 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Need a list of keys for this user.
 		 */
-		pubkeys_res = mydb_query("select idx,pubkey "
-					 " from %s "
-					 "where uid_idx='%s'",
-					 2,
-					 (didnonlocal ?
-					  "nonlocal_user_pubkeys" :
-					  "user_pubkeys"),
-					 row[17]);
-
+		if (didnonlocal) {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from nonlocal_user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
+		else {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
 		if (!pubkeys_res) {
 			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
 			goto skipkeys;
@@ -2586,22 +2960,30 @@ COMMAND_PROTOTYPE(doaccounts)
 	if (reqp->genisliver_idx && !didnonlocal &&
 	    (reqp->isvnode || !reqp->sharing_mode[0])) {
 	        didnonlocal = 1;
-
+		
+		/*
+		 * Within the nonlocal_user_accounts table, we do not
+		 * maintain globally unique unix_uid numbers, since these
+		 * accounts are per slice (experiment). Instead, just
+		 * use an auto_increment field, which always starts at
+		 * 1, and so to create a unix_gid, we just bump the
+		 * number into a typically unused area of the space.
+		 */
 		res = mydb_query("select distinct "
-				 "  u.uid,'*',u.uid_idx,u.name, "
+				 "  u.uid,'*', "
+				 "  u.unix_uid+20000,"
+				 "  u.name, "
 				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
 				 "  NULL,NULL, "
 				 "  UNIX_TIMESTAMP(now()), "
 				 "  u.email,'csh', "
 				 "  0,0, "
 				 "  NULL,u.uid_idx "
-				 "from nonlocal_user_bindings as b "
-				 "join nonlocal_users as u on "
-				 "     b.uid_idx=u.uid_idx "
+				 "from nonlocal_user_accounts as u "
 				 "join groups as g on "
 				 "     g.pid='%s' and "
 				 "     (g.pid=g.gid or g.gid='%s') "
-				 "where (b.exptidx='%d') "
+				 "where (u.exptidx='%d') "
 				 "order by u.uid",
 				 18, reqp->pid, reqp->gid,
 				 reqp->exptidx);
@@ -3604,6 +3986,15 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSGROUPDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", GROUPDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
 		return 0;
 	}
 	else if (!usesfs) {
@@ -3619,6 +4010,23 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		/*
+		 * If pid!=gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(reqp->pid, reqp->gid)) {
+			bufp = buf;
+			if (!nomounts)
+				bufp += OUTPUT(bufp, ebufp-bufp,
+					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
+					       reqp->pid, reqp->gid);
+			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
+			       GROUPDIR, reqp->pid, reqp->gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			/* Leave this logging on all the time for now. */
+			info("MOUNTS: %s", buf);
+		}
 
 		/*
 		 * Skip all this for a vnode; client does not ask.
@@ -3654,22 +4062,6 @@ COMMAND_PROTOTYPE(domounts)
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		/*
-		 * If pid!=gid, then this is group experiment, and we return
-		 * a mount for the group directory too.
-		 */
-		if (strcmp(reqp->pid, reqp->gid)) {
-			bufp = buf;
-			if (!nomounts)
-				bufp += OUTPUT(bufp, ebufp-bufp,
-					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
-					       reqp->pid, reqp->gid);
-			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
-			       GROUPDIR, reqp->pid, reqp->gid);
-			client_writeback(sock, buf, strlen(buf), tcp);
-			/* Leave this logging on all the time for now. */
-			info("MOUNTS: %s", buf);
-		}
 	}
 	else if (usesfs) {
 		/*

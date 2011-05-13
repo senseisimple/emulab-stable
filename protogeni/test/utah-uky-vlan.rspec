@@ -22,6 +22,7 @@
       name="urn:publicid:IDN+uky.emulab.net+image+emulab-ops//FEDORA10-STD" />
  </node>
   <link virtual_id="ionlink">
+    <bandwidth>100000</bandwidth>
     <component_manager
        name="urn:publicid:IDN+emulab.net+authority+cm"/>
     <component_manager
@@ -39,7 +40,7 @@
     <component_hop
 	component_urn="urn:publicid:IDN+uky.emulab.net+link+ion">
       <interface_ref
-	component_node_urn="urn:publicid:IDN+uky.emulab.net+node+ion"
+	component_node_urn="urn:publicid:IDN+emulab.net+node+ion"
 	component_interface_id="eth0"/>
     </component_hop>
   </link>

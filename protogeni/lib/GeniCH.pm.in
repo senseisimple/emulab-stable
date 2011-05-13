@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCH;
@@ -50,7 +50,35 @@ my $API_VERSION = 1;
 #
 sub GetVersion()
 {
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+    my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($me)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    my $commithash = VersionInfo("commithash") || "";
+    my @authorities = ();
+    my %peers = ();
+
+    if (GeniAuthority->ListAll(\@authorities) != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    foreach my $authority (@authorities) {
+	next
+	    if ($authority->type() ne "cm");
+	$peers{$authority->urn()} = $authority->url();
+    }
+    my $blob = {
+	"peers"      => \%peers,
+	"api"        => $API_VERSION,
+	"urn"        => $me->urn(),
+	"hrn"        => $me->hrn(),
+	"url"        => $me->url(),
+	"interface"  => "registry",
+	"code_tag"   => $commithash,
+	# XXX
+	"hostname"   => "www." . $OURDOMAIN,
+    };
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
 #
@@ -116,7 +144,14 @@ sub GetCredential($)
 				    "Malformed URN in the certificate")
 	    if (!GeniHRN::IsValid($urn));
 	my ($auth, $type, $id) = GeniHRN::Parse($urn);
-
+	
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Not an authority certificate")
+	    if ($type ne "authority");
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Not an am/cm/sa/ses certificate")
+	    if (! ($id =~ /^(am|cm|ses|sa)$/i));
+	
 	#
 	# Check for an existing authority. 
 	#
@@ -151,15 +186,22 @@ sub GetCredential($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Who are you?");
 	}
-
-	my $credential =
-	    GeniCredential->CreateSigned($authority,
-					 $caller_authority,
-					 $GeniCredential::LOCALMA_FLAG);
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+	my $credential = GeniCredential->Create($authority, $caller_authority);
+	if (!defined($credential)) {
+	    print STDERR "Could not create credential for $caller_authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	#
+	# We want this credential to be valid for a long time;
+	#
+	$credential->SetExpiration(time() + 24 * 60 * 60 * 120);
+	
+	if ($credential->Sign($GeniCredential::LOCALMA_FLAG) != 0) {
+	    $credential->Delete();
+	    print STDERR "Could not sign credential for $caller_authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create signed credential")
-	    if (!defined($credential));
-
+	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $credential->asString());
     }
@@ -400,7 +442,6 @@ sub Register($)
     if ($type eq "user") {
 	my $name    = $info->{'name'};
 	my $email   = $info->{'email'};
-	my $keys    = undef;
 
 	if (! TBcheck_dbslot($name, "users", "usr_name",
 			     TBDB_CHECKDBSLOT_ERROR)) {
@@ -432,9 +473,9 @@ sub Register($)
 					    "Not allowed to change hrn");
 	    }
 	    #
-	    # Update operation, but only name, email, and keys for now.
+	    # Update operation, but only name, email
 	    #
-	    if ($existing->Modify($name, $email, $keys) != 0) {
+	    if ($existing->Modify($name, $email) != 0) {
 		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					    "Could not update user");
 	    }
@@ -460,8 +501,7 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"user already registered");
 	}
-	my $newuser = GeniUser->Create($certificate, $slice_authority,
-				       $info, $keys);
+	my $newuser = GeniUser->Create($certificate, $slice_authority, $info);
 	if (!defined($newuser)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not be registered");

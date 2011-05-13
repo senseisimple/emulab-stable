@@ -20,7 +20,7 @@ sub usage()
     exit(-1);
 }
 my $optlist  = "dnp:e:o:";
-my $debug    = 1;
+my $debug    = 0;
 my $dlevel   = 1;
 my $impotent = 0;
 my $exitval  = 0;

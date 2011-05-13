@@ -32,7 +32,7 @@ use Data::Dumper;
 use overload ('""' => 'Stringify');
 
 use vars qw($NODEROLE_TESTNODE $MFS_INITIAL $STATE_INITIAL
-	    %nodes @cleantables);
+	    %nodes @cleantables %carped);
 
 # Exported defs
 $NODEROLE_TESTNODE	= 'testnode';
@@ -42,6 +42,36 @@ $NODEROLE_TESTNODE	= 'testnode';
 
 # Cache of instances to avoid regenerating them.
 %nodes = ();
+
+# Sorry, one carp per customer...
+%carped = ();
+
+#
+# XXX debugging
+# Find out where nulls at end of strings are coming from
+#
+sub checknodeid($$)
+{
+    my ($nid,$msg) = @_;
+
+    if ($nid =~ /^(.*)\x0/) {
+	my $onid = $nid;
+	$nid = $1;
+	if (!exists($carped{$nid}) && open(MAIL, "| /usr/sbin/sendmail -t")) {
+	    $carped{$nid} = 1;
+	    require Carp;
+	    my $TBOPS = "@TBOPSEMAIL@";
+	    print MAIL "To: $TBOPS\n";
+	    print MAIL "Subject: NUL in node_id '$nid' ('$onid')\n";
+	    print MAIL "$msg\n";
+	    print MAIL "\n";
+	    print MAIL Carp::longmess();
+	    print MAIL "\n";
+	    close(MAIL);
+	}
+    }
+    return $nid;
+}
 
 # Little helper and debug function.
 sub mysystem($)
@@ -53,7 +83,7 @@ sub mysystem($)
     return system($command);
 }
 
-# To avoid writting out all the methods.
+# To avoid writing out all the methods.
 AUTOLOAD {
 #    print STDERR "$AUTOLOAD $_[0]\n";
 
@@ -118,9 +148,18 @@ sub Lookup($$)
 	return undef;
     }
 
+    # XXX debug
+    $nodeid = checknodeid($nodeid, "Argument");
+
     # Look in cache first
-    return $nodes{$nodeid}
-        if (exists($nodes{$nodeid}));
+    if (exists($nodes{$nodeid})) {
+
+	# XXX debug
+	my $row = $nodes{$nodeid}->{"DBROW"};
+	$row->{'node_id'} = checknodeid($row->{'node_id'}, "Cache");
+
+	return $nodes{$nodeid};
+    }
 
     my $query_result =
 	DBQueryWarn("select * from nodes as n ".
@@ -129,8 +168,18 @@ sub Lookup($$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
+    #
+    # Make a copy of the array. Still fighting memory corruption error.
+    #
+    my $hash_orig = $query_result->fetchrow_hashref();
+    my $hash_copy = {};
+    foreach my $key (keys(%{ $hash_orig })) {
+	my $val = $hash_orig->{$key};
+	$hash_copy->{$key} = $val;
+    }
+
     my $self            = {};
-    $self->{"DBROW"}    = $query_result->fetchrow_hashref();
+    $self->{"DBROW"}    = $hash_copy;
     $self->{"RSRV"}     = undef;
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
@@ -138,6 +187,10 @@ sub Lookup($$)
     $self->{"WAROW"}    = undef;
     $self->{"HASH"}     = {};
     bless($self, $class);
+
+    # XXX debug
+    my $row = $self->{"DBROW"};
+    $nodeid = checknodeid($row->{'node_id'}, "From DB");
 
     # Add to cache.
     $nodes{$nodeid} = $self;
@@ -155,6 +208,12 @@ sub DESTROY {
     $self->{"IFACES"}   = undef;
     $self->{"HASH"}     = undef;
     $self->{"WAROW"}    = undef;
+}
+
+sub node_id($)
+{
+    my $self = shift;
+    return checknodeid($self->{"DBROW"}->{'node_id'}, "node_id method");
 }
 
 #
@@ -220,7 +279,7 @@ sub BulkLookup($$$)
 	if (!defined($query_result));
 
     while (my $row = $query_result->fetchrow_hashref()) {
-	my $nodeid = $row->{'node_id'};
+	my $nodeid = checknodeid($row->{'node_id'}, "BulkLookup method I");
 	my $node;
 
 	if (exists($nodes{$nodeid})) {
@@ -252,7 +311,7 @@ sub BulkLookup($$$)
 	if (!defined($query_result));
     
     while (my $row = $query_result->fetchrow_hashref()) {
-	my $nodeid = $row->{'node_id'};
+	my $nodeid = checknodeid($row->{'node_id'}, "BulkLookup method II");
 	my $node   = $nodelist{$nodeid};
 
 	return -1
@@ -269,7 +328,7 @@ sub BulkLookup($$$)
 	if (!defined($query_result));
     
     while (my $row = $query_result->fetchrow_hashref()) {
-	my $nodeid = $row->{'node_id'};
+	my $nodeid = checknodeid($row->{'node_id'}, "BulkLookup method III");
 	my $key    = $row->{'attrkey'};
 	my $node   = $nodelist{$nodeid};
 
@@ -539,6 +598,11 @@ sub Refresh($)
 	if (!$query_result || !$query_result->numrows);
 
     $self->{"DBROW"}  = $query_result->fetchrow_hashref();
+
+    # XXX debug
+    my $row = $nodes{$nodeid}->{"DBROW"};
+    $row->{'node_id'} = checknodeid($row->{'node_id'}, "Refresh");
+
     # Force reload
     $self->{"RSRV"}     = undef;
     $self->{"TYPEINFO"} = undef;
@@ -1624,16 +1688,23 @@ sub LoadInterfaces($)
 sub GetInterface($$$)
 {
     my ($self, $iface, $pref) = @_;
+    my $interface;
 
     # Must be a real reference. 
     return -1
 	if (! (ref($self) && ref($pref)));
 
-    $self->LoadInterfaces() == 0
-	or return -1;
+    if (exists($self->{'IFACES'}->{$iface})) {
+	# Might be undef if we already tried.
+	$interface = $self->{'IFACES'}->{$iface};
+    }
+    else {
+	$interface = Interface->LookupByIface($self, $iface);
+	$self->{'IFACES'}->{$iface} = $interface;
+    }
+    $$pref = $interface;    
     return -1
-	if (!exists($self->{'IFACES'}->{$iface}));
-    $$pref = $self->{'IFACES'}->{$iface};
+	if (!defined($interface));
     return 0;
 }
 
@@ -2543,6 +2614,22 @@ sub OSSelect($$$$)
 		"where node_id='$nodeid'")
 	or return -1;
 
+    return -1 
+	if ($self->ResetNextOpMode($debug) < 0);
+
+    return Refresh($self);
+}
+
+sub ResetNextOpMode($$)
+{
+    my ($self,$debug) = @_;
+    my $nodeid  = $self->node_id();
+    my $curmode = $self->op_mode();
+
+    # Why? When will this happen?
+    return 0
+	if (!$curmode);
+
     #
     # Determine what osid the node will now boot. We need to know this so we
     # can set the next opmode. This call has to return *something* or we are
@@ -2569,7 +2656,7 @@ sub OSSelect($$$$)
 		 "where node_id='$nodeid'")
 	or return -1;
 
-    return Refresh($self);
+    return 0;
 }
 
 #

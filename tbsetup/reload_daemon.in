@@ -10,16 +10,6 @@ use English;
 use Getopt::Std;
 
 #
-# This should run as root to make sure that it has permission to reboot nodes
-# (since only root is allowed to power cycle nodes at any time - it's time-
-# limited for anyone else)
-#
-if ($UID != 0) {
-    die("*** $0:\n".
-	"    Only root can run this script!\n");
-}
-
-#
 # Look for nodes to reload.
 #
 #	usage: reload_daemon [-d]
@@ -75,7 +65,7 @@ sub fatal($);
 sub notify($);
 sub freefromreloading($);
 		      
-my $os_load	= "$TB/bin/os_load -s";
+my $os_load	= "$TB/bin/os_load -s -R";
 my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
 my $tbrsync     = "$TB/bin/tbrsync";
@@ -124,6 +114,16 @@ if (defined($options{"t"})) {
     $tag = $options{"t"};
     # rename the logfile too
     $logfile = "$logfile-$tag";
+}
+
+#
+# This should run as root to make sure that it has permission to reboot nodes
+# (since only root is allowed to power cycle nodes at any time - it's time-
+# limited for anyone else)
+#
+if ($UID != 0 && !defined($tag)) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
 }
 
 #

@@ -1,0 +1,167 @@
+#
+# Add a bunch of tables for client service control.  Add a bunch of initial
+# state for the client_services table -- these are the services and points
+# at which they can be controlled in our current codebase. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("client_service_ctl")) {
+	DBQueryFatal("CREATE TABLE `client_service_ctl` (".
+		     "  `obj_type` enum('node_type','node','osid') NOT NULL default 'node_type',".
+		     "  `obj_name` varchar(64) NOT NULL default '',".
+		     "  `service_idx` int(10) NOT NULL default '0',".
+		     "  `env` enum('load','boot') NOT NULL default 'boot',".
+		     "  `whence` enum('first','every') NOT NULL default 'every',".
+		     "  `alt_blob_id` varchar(40) NOT NULL default '',".
+		     "  `enable` tinyint(1) NOT NULL default '1',".
+		     "  `enable_hooks` tinyint(1) NOT NULL default '1',".
+		     "  `fatal` tinyint(1) NOT NULL default '1',".
+		     "  `user_can_override` tinyint(1) NOT NULL default '1',".
+		     " PRIMARY KEY  (`obj_type`,`obj_name`,`service_idx`,`env`,`whence`)".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (!DBTableExists("client_service_hooks")) {
+	DBQueryFatal("CREATE TABLE `client_service_hooks` (".
+		     "  `obj_type` enum('node_type','node','osid') NOT NULL default 'node_type',".
+		     "  `obj_name` varchar(64) NOT NULL default '',".
+		     "  `service_idx` int(10) NOT NULL default '0',".
+		     "  `env` enum('load','boot') NOT NULL default 'boot',".
+		     "  `whence` enum('first','every') NOT NULL default 'every',".
+		     "  `hook_blob_id` varchar(40) NOT NULL default '',".
+		     "  `hook_op` enum('boot','shutdown','reconfig','reset') NOT NULL default 'boot',".
+		     "  `hook_point` enum('pre','post') NOT NULL default 'post',".
+		     "  `argv` varchar(255) NOT NULL default '',".
+		     "  `fatal` tinyint(1) NOT NULL default '0',".
+		     "  `user_can_override` tinyint(1) NOT NULL default '1',".
+		     " PRIMARY KEY  (`obj_type`,`obj_name`,`service_idx`,`env`,`whence`,`hook_blob_id`,`hook_op`)".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (!DBTableExists("client_services")) {
+	DBQueryFatal("CREATE TABLE `client_services` (".
+		     "  `idx` int(10) NOT NULL default '0',".
+		     "  `service` varchar(64) NOT NULL default 'isup',".
+		     "  `env` enum('load','boot') NOT NULL default 'boot',".
+		     "  `whence` enum('first','every') NOT NULL default 'every',".
+		     "  `hooks_only` int(1) NOT NULL default '0',".
+		     " PRIMARY KEY  (`idx`,`service`,`env`,`whence`)".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (!DBTableExists("virt_client_service_ctl")) {
+	DBQueryFatal("CREATE TABLE `virt_client_service_ctl` (".
+		     "  `pid` varchar(12) NOT NULL default '',".
+		     "  `eid` varchar(32) NOT NULL default '',".
+		     "  `exptidx` int(11) NOT NULL default '0',".
+		     "  `vnode` varchar(32) NOT NULL default '',".
+		     "  `service_idx` int(10) NOT NULL default '0',".
+		     "  `env` enum('load','boot') NOT NULL default 'boot',".
+		     "  `whence` enum('first','every') NOT NULL default 'every',".
+		     "  `alt_vblob_id` varchar(40) NOT NULL default '',".
+		     "  `enable` tinyint(1) NOT NULL default '1',".
+		     "  `enable_hooks` tinyint(1) NOT NULL default '1',".
+		     "  `fatal` tinyint(1) NOT NULL default '1',".
+		     " PRIMARY KEY  (`exptidx`,`vnode`,`service_idx`,`env`,`whence`)".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (!DBTableExists("virt_client_service_hooks")) {
+	DBQueryFatal("CREATE TABLE `virt_client_service_hooks` (".
+		     "  `pid` varchar(12) NOT NULL default '',".
+		     "  `eid` varchar(32) NOT NULL default '',".
+		     "  `exptidx` int(11) NOT NULL default '0',".
+		     "  `vnode` varchar(32) NOT NULL default '',".
+		     "  `service_idx` int(10) NOT NULL default '0',".
+		     "  `env` enum('load','boot') NOT NULL default 'boot',".
+		     "  `whence` enum('first','every') NOT NULL default 'every',".
+		     "  `hook_vblob_id` varchar(40) NOT NULL default '',".
+		     "  `hook_op` enum('boot','shutdown','reconfig','reset') NOT NULL default 'boot',".
+		     "  `hook_point` enum('pre','post') NOT NULL default 'post',".
+		     "  `argv` varchar(255) NOT NULL default '',".
+		     "  `fatal` tinyint(1) NOT NULL default '0',".
+		     " PRIMARY KEY  (`exptidx`,`vnode`,`service_idx`,`env`,`whence`,`hook_vblob_id`)".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (!DBTableExists("virt_client_service_opts")) {
+	DBQueryFatal("CREATE TABLE `virt_client_service_opts` (".
+		     "  `pid` varchar(12) NOT NULL default '',".
+		     "  `eid` varchar(32) NOT NULL default '',".
+		     "  `exptidx` int(11) NOT NULL default '0',".
+		     "  `vnode` varchar(32) NOT NULL default '',".
+		     "  `opt_name` varchar(32) NOT NULL default '',".
+		     "  `opt_value` varchar(64) NOT NULL default '',".
+		     " PRIMARY KEY  (`exptidx`,`vnode`,`opt_name`,`opt_value`)".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+
+    # db fill stuff
+    DBQueryFatal("replace into exported_tables values ('client_services')");
+
+    my @sa = ("REPLACE INTO `client_services` VALUES ",
+	      "(10,'rc.tbsetup','boot','every',1),",
+	      "(20,'rc.ipod','boot','every',0),",
+	      "(30,'rc.healthd','boot','every',0),",
+	      "(40,'rc.slothd','boot','every',0),",
+	      "(50,'rc.firewall','boot','every',0),",
+	      "(60,'rc.tpmsetup','boot','every',0),",
+	      "(70,'rc.misc','boot','every',0),",
+	      "(80,'rc.localize','boot','every',0),",
+	      "(90,'rc.keys','boot','every',0),",
+	      "(100,'rc.mounts','boot','every',0),",
+	      "(110,'rc.blobs','boot','every',0),",
+	      "(120,'rc.topomap','boot','every',0),",
+	      "(130,'rc.accounts','boot','every',0),",
+	      "(140,'rc.route','boot','every',0),",
+	      "(150,'rc.tunnels','boot','every',0),",
+	      "(160,'rc.ifconfig','boot','every',0),",
+	      "(170,'rc.delays','boot','every',0),",
+	      "(180,'rc.hostnames','boot','every',0),",
+	      "(190,'rc.lmhosts','boot','every',0),",
+	      "(200,'rc.trace','boot','every',0),",
+	      "(210,'rc.syncserver','boot','every',0),",
+	      "(220,'rc.trafgen','boot','every',0),",
+	      "(230,'rc.tarfiles','boot','every',0),",
+	      "(240,'rc.rpms','boot','every',0),",
+	      "(250,'rc.progagent','boot','every',0),",
+	      "(260,'rc.linkagent','boot','every',0),",
+	      "(270,'rc.tiptunnels','boot','every',0),",
+	      "(280,'rc.motelog','boot','every',0),",
+	      "(290,'rc.simulator','boot','every',0),",
+	      "(1000,'rc.canaryd','boot','every',1),",
+	      "(1010,'rc.linktest','boot','every',1),",
+	      "(1020,'rc.isup','boot','every',1),",
+	      "(1030,'rc.startcmd','boot','every',0),",
+	      "(1040,'rc.vnodes','boot','every',1),",
+	      "(1050,'rc.subnodes','boot','every',1)");
+    DBQueryFatal(join('',@sa));
+
+    my @ra = ("('virt_client_service_ctl','alt_vblob_id','text','regex','^[-\\\\d\\\\w]+\$',0,40,NULL)",
+	      "('virt_client_service_ctl','eid','text','redirect','experiments:eid',0,0,NULL)",
+	      "('virt_client_service_ctl','enable','int','redirect','default:boolean',0,0,NULL)",
+	      "('virt_client_service_ctl','enable_hooks','int','redirect','default:boolean',0,0,NULL)",
+	      "('virt_client_service_ctl','env','text','regex','^(boot|load)\$',0,0,NULL)",
+	      "('virt_client_service_ctl','fatal','int','redirect','default:boolean',0,0,NULL)",
+	      "('virt_client_service_ctl','pid','text','redirect','projects:pid',0,0,NULL)",
+	      "('virt_client_service_ctl','service_idx','int','redirect','default:int',0,0,NULL)",
+	      "('virt_client_service_ctl','vnode','text','redirect','virt_nodes:vname',0,0,NULL)",
+	      "('virt_client_service_ctl','whence','text','regex','^(first|every)\$',0,0,NULL)",
+	      "('virt_client_service_hooks','argv','text','regex','^[-\\\\w\\\\s\"]*\$',0,0,NULL)",
+	      "('virt_client_service_hooks','eid','text','redirect','experiments:eid',0,0,NULL)",
+	      "('virt_client_service_hooks','env','text','regex','^(boot|load)\$',0,0,NULL)",
+	      "('virt_client_service_hooks','fatal','int','redirect','default:boolean',0,0,NULL)",
+	      "('virt_client_service_hooks','hook_op','text','regex','^(boot|shutdown|reconfig|reset)\$',0,0,NULL)",
+	      "('virt_client_service_hooks','hook_point','text','regex','^(pre|post)\$',0,0,NULL)",
+	      "('virt_client_service_hooks','hook_vblob_id','text','regex','^[-\\\\d\\\\w]+\$',0,40,NULL)",
+	      "('virt_client_service_hooks','op','text','regex','^(boot|shutdown|reconfig|reset)\$',0,0,NULL)",
+	      "('virt_client_service_hooks','pid','text','redirect','projects:pid',0,0,NULL)",
+	      "('virt_client_service_hooks','point','text','regex','^(pre|post)\$',0,0,NULL)",
+	      "('virt_client_service_hooks','service_idx','int','redirect','default:int',0,0,NULL)",
+	      "('virt_client_service_hooks','vnode','text','redirect','virt_nodes:vname',0,0,NULL)",
+	      "('virt_client_service_hooks','whence','text','regex','^(first|every)\$',0,0,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".join(",",@ra));
+
+    return 0;
+}
+1;

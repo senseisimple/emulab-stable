@@ -139,6 +139,22 @@ namespace eval TBCOMPAT {
     variable EINEVALUE {^([-\w\.\+\,\s\/]+)$}
     variable EINEORDER {^\d+$}
 
+    # virt blobs stuff
+    variable vblob_id_count 0
+    variable virt_blobs {}
+    variable vblobmap
+    array set vblobmap {}
+
+    # client service/hook control stuff
+    variable servicenames
+    array set servicenames {}
+    variable servicepoints
+    array set servicepoints {}
+    variable virt_service_ctls
+    array set virt_service_ctls {}
+    variable virt_service_hooks
+    array set virt_service_hooks {}
+
     # OML measurement stuff.
     set oml_mps {}
 
@@ -359,6 +375,179 @@ proc tb-set-netmask {lanlink netmask} {
 	return
     }
     $lanlink set netmask $netmask
+}
+
+proc tb-set-node-service {service args} {
+    var_import ::TBCOMPAT::servicenames
+    var_import ::TBCOMPAT::servicepoints
+    var_import ::TBCOMPAT::virt_service_ctls
+    var_import ::TBCOMPAT::vblob_id_count
+    var_import ::TBCOMPAT::virt_blobs
+    var_import ::TBCOMPAT::vblobmap
+
+    set cmd "tb-set-node-service"
+
+    # these defaults should match the default value for each DB field
+    # in virt_client_service* tables
+    ::GLOBALS::named-args $args {
+	-node "" -env "boot" -whence "every" -script "" -scriptblob ""
+	-enable 1 -enablehooks 1 -fatal 1
+    }
+
+    if { $(-script) != "" && $(-scriptblob) != "" } {
+	perror "\[$cmd] you cannot define both a script ($(-script)) and a scriptblob ($(-scriptblob))!"
+	return
+    }
+
+    if {![info exists servicenames("$service:$(-env):$(-whence)")]} {
+	if {[info exists servicepoints($service)]} {
+	    perror "\[$cmd] service $service can only be controlled for the following whence and env tuples: $servicepoints($service); $service:$(-env):$(-whence)."
+	    return
+	}
+	perror "\[$cmd] Invalid service $service."
+	return
+    }
+
+    set mykey "$(-node):$service:$(-env):$(-whence)"
+    if {[info exists virt_service_ctls($mykey)]} {
+	perror "\[$cmd] service $service has already been controlled once for node $(-node) at $(-whence):$(-env)"
+	return
+    } else {
+	set vblobid $(-scriptblob)
+	if { $(-script) != "" && [info exists vblobmap($(-script))]} {
+	    # try to reuse virt blobs that already have been created
+	    set vblobid $vblobmap($(-script))
+	} elseif { $(-script) != "" } {
+	    # if we need to make a virt blob, do so now
+
+	    # Check the script to make sure it exists, is readable, etc...
+	    if {[string match "*://*" $(-script)]} {
+		perror "\[$cmd] '$(-script)' cannot be a URL!"
+		return
+		# It is a URL, check for a valid protocol.
+		#if {![::TBCOMPAT::verify-url $(-script)]} {
+		#    perror "\[$cmd] '$(-script)' is not an http, https, or ftp URL."
+		#    return
+		#}
+	    } elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $(-script)] &&
+		      ![string match "${::TBCOMPAT::GROUPROOT}/*" $(-script)] &&
+		      ![string match "${::TBCOMPAT::USERROOT}/*" $(-script)] &&
+		      (${::TBCOMPAT::SCRATCHROOT} == "" ||
+		       ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $(-script)])} {
+		perror "\[$cmd] '$(-script)' is not in an allowed directory"
+		return
+	    } elseif {![file exists $(-script)]} {
+		perror "\[$cmd] '$(-script)' does not exist."
+		return
+	    } elseif {![file isfile $(-script)]} {
+		perror "\[$cmd] '$(-script)' is not a file."
+		return
+	    } elseif {![file readable $(-script)]} {
+		perror "\[$cmd] '$(-script)' is not readable."
+		return
+	    }
+
+	    # finally, make the virt blob!
+	    lappend virt_blobs [list $vblob_id_count $(-script)]
+	    set vblobid $vblob_id_count
+	    set vblobmap($(-script)) $vblob_id_count
+
+	    incr vblob_id_count
+	}
+
+	set serviceidx $servicenames("$service:$(-env):$(-whence)")
+	set virt_service_ctls($mykey) \
+	    [list $(-node) $serviceidx $(-env) $(-whence) \
+		 $vblobid $(-enable) $(-enablehooks) $(-fatal)]
+    }
+}
+
+proc tb-add-node-service-hook {service args} {
+    var_import ::TBCOMPAT::servicenames
+    var_import ::TBCOMPAT::servicepoints
+    var_import ::TBCOMPAT::virt_service_hooks
+    var_import ::TBCOMPAT::vblob_id_count
+    var_import ::TBCOMPAT::virt_blobs
+    var_import ::TBCOMPAT::vblobmap
+
+    set cmd "tb-add-node-service-hook"
+
+    # these defaults should match the default value for each DB field
+    # in virt_client_service* tables
+    ::GLOBALS::named-args $args {
+	-node "" -env "boot" -whence "every" -script "" -scriptblob ""
+	-op "boot" -point "post" -argv "" -fatal 1
+    }
+
+    if { $(-script) != "" && $(-scriptblob) != "" } {
+	perror "\[$cmd] you cannot define both a script ($(-script)) and a scriptblob ($(-scriptblob))!"
+	return
+    } elseif { $(-script) == "" && $(-scriptblob) == "" } {
+	perror "\[$cmd] you must define either a script or a scriptblob!"
+	return
+    }
+
+    if {![info exists servicenames("$service:$(-env):$(-whence)")]} {
+	if {[info exists servicepoints($service)]} {
+	    perror "\[$cmd] service $service can only be controlled for the following whence and env tuples: $servicepoints($service); $service:$(-env):$(-whence)."
+	    return
+	}
+	perror "\[$cmd] Invalid service $service."
+	return
+    }
+
+    set mykey "$(-node):$service:$(-env):$(-whence)"
+    if {![info exists virt_service_ctls($mykey)]} {
+	set virt_service_ctls($mykey) {}
+    }
+
+    set vblobid $(-scriptblob)
+    if { $(-script) != "" && [info exists vblobmap($(-script))]} {
+	# try to reuse virt blobs that already have been created
+	set vblobid $vblobmap($(-script))
+    } elseif { $(-script) != "" } {
+	# if we need to make a virt blob, do so now
+
+	# Check the script to make sure it exists, is readable, etc...
+	if {[string match "*://*" $(-script)]} {
+	    perror "\[$cmd] '$(-script)' cannot be a URL!"
+	    return
+	    # It is a URL, check for a valid protocol.
+	    #if {![::TBCOMPAT::verify-url $(-script)]} {
+	    #    perror "\[$cmd] '$(-script)' is not an http, https, or ftp URL."
+	    #    return
+	    #}
+	} elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $(-script)] &&
+		  ![string match "${::TBCOMPAT::GROUPROOT}/*" $(-script)] &&
+		  ![string match "${::TBCOMPAT::USERROOT}/*" $(-script)] &&
+		  (${::TBCOMPAT::SCRATCHROOT} == "" ||
+		   ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $(-script)])} {
+	    perror "\[$cmd] '$(-script)' is not in an allowed directory"
+	    return
+	} elseif {![file exists $(-script)]} {
+	    perror "\[$cmd] '$(-script)' does not exist."
+	    return
+	} elseif {![file isfile $(-script)]} {
+	    perror "\[$cmd] '$(-script)' is not a file."
+	    return
+	} elseif {![file readable $(-script)]} {
+	    perror "\[$cmd] '$(-script)' is not readable."
+	    return
+	}
+
+	# finally, make the virt blob!
+	lappend virt_blobs [list $vblob_id_count $(-script)]
+	set vblobid $vblob_id_count
+	set vblobmap($(-script)) $vblob_id_count
+
+	incr vblob_id_count
+    }
+
+    # finally, add the hook!
+    set serviceidx $servicenames("$service:$(-env):$(-whence)")
+    lappend virt_service_hooks($mykey) \
+	[list $(-node) $serviceidx $(-env) $(-whence) \
+	     $vblobid $(-op) $(-point) $(-argv) $(-fatal)]
 }
 
 # Node state routines.

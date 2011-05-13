@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -250,8 +250,8 @@ my %interfaceips = ();
 # Read interfaces
 my $result =
     DBQueryFatal("SELECT node_id,card,port,iface,interface_type,role,IP" .
-		 " from interfaces " .
-		 ($genimode ne $NO_GENI ? "where role!='gw'" : ""));
+		 " from interfaces where logical=0 " .
+		 ($genimode ne $NO_GENI ? "and role!='gw'" : ""));
 		 
 while (($node,$card,$port,$iface,$type,$role,$ip) = $result->fetchrow_array) {
     push @{ $nodetointerface{"$node"} }, $iface;
@@ -719,7 +719,7 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 # features
 #
 $result = DBQueryFatal("SELECT DISTINCT node_id1, node_id2 " .
-                       "  FROM wires");
+                       "  FROM wires where logical=0");
 my %connections = ();
 while (my ($node_id1, $node_id2) = $result->fetchrow()) {
     foreach my $nodes ([$node_id1, $node_id2], [$node_id2, $node_id1]) {
@@ -1276,7 +1276,8 @@ while (($type,$capkey,$capval) = $result->fetchrow_array) {
 
 # Read interface switches
 $result = DBQueryFatal("SELECT node_id1, iface, node_id2 FROM wires AS w " .
-	"LEFT JOIN interfaces as i ON w.node_id1=i.node_id AND w.card1=i.card");
+	"LEFT JOIN interfaces as i ON w.node_id1=i.node_id AND w.card1=i.card ".
+	"where w.logical=0");
 
 while (($node,$iface,$switch) = $result->fetchrow_array) {
     if ($node && $iface) {
@@ -1286,7 +1287,7 @@ while (($node,$iface,$switch) = $result->fetchrow_array) {
 
 # Read interface cards and ports
 $result = DBQueryFatal("SELECT node_id, iface, card, port, IP ".
-		       "FROM interfaces");
+		       "FROM interfaces where logical=0");
 
 while (($node,$iface,$card,$port,$IP) = $result->fetchrow_array) {
     next
@@ -1344,7 +1345,8 @@ if (defined($experiment)) {
 }
 
 $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
- 		    " from wires where type=\"Node\" or type=\"Trunk\"");
+		       " from wires where logical=0 and ".
+		       "   (type=\"Node\" or type=\"Trunk\")");
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $result->fetchrow_array) {
     if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
@@ -1696,7 +1698,12 @@ sub print_header {
 	    printf("generated=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
 		   $times[5] + 1900, $times[4] + 1, $times[3],
 		   $times[2], $times[1], $times[0]);
-	    printf("valid_until=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
+	    if ($genimode eq $V_2) {
+		print "expires=";
+	    } else {
+		print "valid_until=";
+	    }
+	    printf("\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
 		   $times[5] + 1900, $times[4] + 1, $times[3],
 		   $times[2], $times[1], $times[0]);
 	    print ">\n";
@@ -1738,7 +1745,11 @@ sub print_switch
     if (!(defined($MAINSITE) && $MAINSITE && $name eq "procurve1")) {
 	push(@$types, "*lan:*");
     }
-    print_node($name, $types, [], [], $uuid, $interfaces,
+    # This is for mixing real nodes with pnodes in a lan. The goal is to
+    # prevent assign from putting the lan node on a pc; always prefer a
+    # real switch. See corresponding change in libvtop. 
+    my $features = ["real-switch:0"];
+    print_node($name, $types, $features, [], $uuid, $interfaces,
         $country, $latitude, $longitude, undef);
 }
 
@@ -1792,7 +1803,7 @@ sub print_node
 	if (defined($mainType) && $genimode eq $V_0_2) {
 	    print_osids($mainType);
 	}
-	print_node_types(@$types);
+	print_node_types($mainType, @$types);
 	my $avail = "false";
 	if ($nodetoavailable{$name}
 	    || $name eq $fake_inet_switch
@@ -1833,7 +1844,7 @@ sub print_node
 	# ptop format
 	print "<node name=\"$name\"";
 	print ">\n";
-	print_node_types(@$types);
+	print_node_types($mainType, @$types);
 	print_node_flags(@$flags);
 	print_node_features(@$features);
 	print "</node>\n";
@@ -1892,6 +1903,7 @@ sub print_type_limits
 # print_node_flags() must always be observed lest we break the schema.
 sub print_node_types
 {
+    my $mainType = shift(@_);
     my $i = 0;
     for (; $i < scalar(@_); ++$i) {
 	my ($name, $count) = split(/:/, $_[$i], 2);
@@ -1914,10 +1926,14 @@ sub print_node_types
 	    print "  />\n";
 	} elsif ($genimode eq $V_2) {
 	    if ($name eq "pc") {
-		print "  <sliver_type name=\"raw-pc\" />\n";
+		print "  <sliver_type name=\"raw-pc\">\n";
+		if (defined($mainType)) {
+		    print_osids($mainType);
+		}
+		print "  </sliver_type>\n";
 	    }
 	    if ($name eq "pcvm") {
-		print "  <sliver_type name=\"openvz\" />\n";
+		print "  <sliver_type name=\"emulab-openvz\" />\n";
 	    }
 	    print "  <hardware_type name=\"$name\">\n";
 	    if ($count eq "*") {

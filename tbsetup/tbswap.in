@@ -575,6 +575,11 @@ sub doSwapout($) {
 	$experiment->DeleteInternalProgramAgents();
     }
 
+    if ($type >= RETRY) {
+	print "Removing dynamic blobs.\n";
+	$experiment->RemoveBlobs();
+    }
+
     if ($type >= CLEANUP) {
 	#
 	# Undo plab in elab specialness.
@@ -652,6 +657,16 @@ sub doSwapout($) {
 		tberror("Could not delete slivers\n");
 		return 1;
 	    }
+	}
+
+	#
+	# Clear logical interfaces and wires. This might move to support
+	# swapmod.
+	#
+	print "Removing logical wires.\n";
+	if (Interface::Wire->DeleteLogicalWires($experiment)) {
+	    tberror("Could not delete logical wires and interfaces\n");
+	    return 1;
 	}
 
 	#
@@ -1100,6 +1115,18 @@ sub doSwapin($) {
 	return 1;
     }
     TBDebugTimeStamp("tarfiles_setup finished");
+
+    #
+    # Handle virt blobs.
+    #
+    if ($type >= RETRY) {
+	print "Creating dynamic blobs.\n";
+	$experiment->UploadBlobs(0);
+    }
+    elsif ($type == MODIFY) {
+	print "Updating dynamic blobs.\n";
+	$experiment->UploadBlobs(1);
+    }
 
     #
     # If there are any Plab dslice nodes in the experiment, create the

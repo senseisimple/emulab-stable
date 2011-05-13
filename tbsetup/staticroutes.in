@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -132,6 +132,8 @@ if (!$query_result->numrows) {
     tbwarn("No nodes in experiment $pid/$eid!");
     exit(0);
 }
+# Need to do this when we want to seek around inside the results.
+$query_result = $query_result->WrapForSeek();
 
 my $exptidx;
 if (!TBExptIDX($pid, $eid, \$exptidx)) {

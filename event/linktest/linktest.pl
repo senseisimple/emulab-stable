@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w -T
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -111,6 +111,7 @@ use constant TEST_RT_STATIC => 2;   # prior plus static routing
 use constant TEST_LOSS => 3;   # prior plus loss
 use constant TEST_BW => 4; # prior plus bandwidth
 use constant TEST_UNLINK => 5; # prior plus unconnected interfaces
+use constant TEST_UNLINK_COMPLETE => 6; # prior plus complete unlinktest
 
 # test names
 use constant NAME_RT_STATIC => "Routing";
@@ -118,6 +119,7 @@ use constant NAME_LATENCY => "Latency";
 use constant NAME_LOSS => "Loss";
 use constant NAME_BW => "Bandwidth";
 use constant NAME_UNLINK => "Unlink";
+use constant NAME_UNLINK_COMPLETE => "Unlink Complete";
 
 # error suffix for logs
 use constant SUFFIX_ERROR => ".error";
@@ -148,7 +150,8 @@ struct ( edge => {
     mac => '$',
     mpxstyle => '$',
     dstyle => '$',
-    symlanignore => '$'});
+    symlanignore => '$',
+    isunshaped => '$'});
 
 struct ( host => {
     name => '$',
@@ -216,6 +219,7 @@ my $total_error_count = 0;
 
 my $warn_partial_test = 0;
 my $warn_unshaped_links = 0;
+my $warn_totallyunshaped_links = 0;
 
 my $listener_iperf;
 my $listener_crude;
@@ -501,6 +505,10 @@ if (&dotest(TEST_BW)) {
 if (&dotest(TEST_LOSS)) {
     if ($printsched) {
 	&schedlog("start crude listener");
+    } elsif ($platform eq LINUX && $hostmap{$hostname}->isvnode) {
+	# XXX Linux vnodes (openvz) cannot change their priority
+	$listener_crude = &start_listener($PATH_CRUDE,"-l",CRUDE_DAT);
+	$listeners++;
     } else {
 	$listener_crude = &start_listener($PATH_CRUDE,"-l",CRUDE_DAT,
 					  "-P",CRUDE_PRI);
@@ -540,8 +548,16 @@ if ($warn_partial_test) {
     &post_event(EVENT_REPORT, $msg);
     &debug("\n$msg\n\n");
 }
+if ($warn_totallyunshaped_links && &dotest(TEST_LATENCY)) {
+    my $msg = "*** WARNING: no shaping on one or more".
+	      " zero-latency, zero-loss vnode-to-vnode links;".
+	      " checking only connectivity and not latency for those links.";
+    &sim_event(EVENT_LOG, $msg);
+    &post_event(EVENT_REPORT, $msg);
+    &debug("\n$msg\n\n");
+}
 if ($warn_unshaped_links && &dotest(TEST_BW)) {
-    my $msg = "*** WARNING: tb-set-noshaping used on one or more links,".
+    my $msg = "*** WARNING: no BW shaping on one or more links;".
 	      " skipping BW tests for those links.";
     &sim_event(EVENT_LOG, $msg);
     &post_event(EVENT_REPORT, $msg);
@@ -651,7 +667,7 @@ if(&dotest(TEST_BW)){
     &report_status(NAME_BW);
 }
 
-if(&dotest(TEST_UNLINK)) {
+if(&dotest(TEST_UNLINK) && ! &dotest(TEST_UNLINK_COMPLETE)) {
     my $stamp = TimeStamp();
     my $msg   = "Testing Unconnected Interfaces ... $stamp";
     &post_event(EVENT_REPORT,$msg);
@@ -665,6 +681,22 @@ if(&dotest(TEST_UNLINK)) {
     &debug("\n$msg\n\n");
     &unlink_test;
     &report_status(NAME_UNLINK);
+}
+
+if(&dotest(TEST_UNLINK_COMPLETE)) {
+    my $stamp = TimeStamp();
+    my $msg   = "Testing Unconnected Interfaces Complete ... $stamp";
+    &post_event(EVENT_REPORT,$msg);
+    &sim_event(EVENT_LOG,$msg);
+    # Ick, this barrier makes sure the above message gets into the log
+    # first, so as not to confuse Mike
+    if ($printsched) {
+	&schedlog("barrier $barriers_hit: pre-unlink test");
+    }
+    &barrier();
+    &debug("\n$msg\n\n");
+    &unlink_test_complete;
+    &report_status(NAME_UNLINK_COMPLETE);
 }
 
 &cleanup;
@@ -707,11 +739,12 @@ sub get_iflist {
     return \@result;
 }
 
-sub gather_stats {
+sub gather_stats
+{
     my @result = ();
     my @iflist = @{ &get_iflist() };
     foreach my $ifline (@iflist) {
-	if ($ifline =~ /^(\w+)\W.*RX packets:([0-9]+) /) {
+	if ($ifline =~ /^(\w+)\W.*HWaddr [0-9a-fA-F:]+\W.*RX packets:([0-9]+) /s) {
 	    if ($1 ne $control_if) {
 		push(@result, $2);
 	    }
@@ -720,7 +753,8 @@ sub gather_stats {
     return \@result;
 }
 
-sub check_stats {
+sub check_stats
+{
     my @first = @{ $_[0] };
     my @second = @{ $_[1] };
     my $result = 0;
@@ -736,16 +770,17 @@ sub check_stats {
     return $result;
 }
 
-sub arpping {
+sub arpping
+{
     my @iflist = @{ &get_iflist() };
     foreach my $ifline (@iflist) {
-	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/s) {
 	    my $ifname = $1;
 	    my $mac = lc(join('', split(':', $2)));
 	    if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
 		my $command
 		    = "sudo /sbin/ifconfig $ifname up; ".
-		      "sudo /sbin/arping -c 1 -w 1 -I $ifname 10.0.0.1; ".
+		      "sudo /sbin/arping -c 1 -w 1 -I $ifname 10.0.0.1 > /dev/null; ".
 		      "sudo /sbin/ifconfig $ifname down";
 #		print($command."\n");
 		system($command);
@@ -754,42 +789,97 @@ sub arpping {
     }
 }
 
-sub modify_interfaces {
+sub modify_interfaces
+{
     my ($speed, $duplex) = @_;
     my @iflist = @{ &get_iflist() };
     foreach my $ifline (@iflist) {
-	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
-	    my $ifname = $1;
-	    my $mac = lc(join('', split(':', $2)));
-	    if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
-		my $command = "sudo /sbin/ethtool -s $ifname speed $speed ".
-		              "duplex $duplex autoneg off";
+	&modify_single_interface($ifline, $speed, $duplex);
+    }
+}
+
+sub modify_single_interface
+{
+    my ($ifline, $speed, $duplex) = @_;
+    if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+	my $ifname = $1;
+	my $mac = lc(join('', split(':', $2)));
+	if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
+	    my $command = "sudo /sbin/ethtool -s $ifname speed $speed ".
+		"duplex $duplex autoneg off";
 #		print($command."\n");
-		system($command);
-	    }
+	    system($command);
 	}
     }
 }
 
-sub unlink_test {
+sub unlink_test
+{
     my @speeds = ('10', '100', '1000');
     my @duplexes = ('half', 'full');
     &setup_interfaces();
     my $start = &gather_stats();
     &barrier();
     &arpping();
+    &barrier();
     foreach my $speed (@speeds) {
 	foreach my $duplex (@duplexes) {
 	    &modify_interfaces($speed, $duplex);
+	    &barrier();
 	    &arpping();
+	    &barrier();
 	}
     }
-    &barrier();
     my $end = &gather_stats();
     if (! &check_stats($start, $end)) {
 	&error(NAME_UNLINK, undef,
 	       "Some interfaces received packets");
     }
+    &barrier();
+}
+
+sub unlink_test_complete
+{
+    my @speeds = ('10', '100', '1000');
+    my @duplexes = ('half', 'full');
+    &setup_interfaces();
+    my $start = &gather_stats();
+    &barrier();
+    &arpping();
+    &barrier();
+    foreach my $current (keys(%hostmap)) {
+	foreach my $dest_speed (@speeds) {
+	    foreach my $dest_duplex (@duplexes) {
+		&modify_interfaces($dest_speed, $dest_duplex);
+		&barrier();
+		if ($current eq $hostname) {
+		    foreach my $source_speed (@speeds) {
+			foreach my $source_duplex (@duplexes) {
+			    my @iflist = @{ &get_iflist() };
+			    foreach my $ifline (@iflist) {
+				if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+				    &modify_single_interface($ifline,
+							     $source_speed,
+							     $source_duplex);
+				    &arpping();
+				    &modify_single_interface($ifline,
+							     $dest_speed,
+							     $dest_duplex);
+				}
+			    }
+			}
+		    }
+		}
+		&barrier();
+	    }
+	}
+    }
+    my $end = &gather_stats();
+    if (! &check_stats($start, $end)) {
+	&error(NAME_UNLINK_COMPLETE, undef,
+	       "Some interfaces received packets");
+    }
+    &barrier();
 }
 
 
@@ -903,9 +993,14 @@ sub loss_test {
     # So, we add the extra rude option if conditions are met.
     #
     if ($numvnodes && $hostmap{$hostname}->isvnode) {
-	my $hz = `/sbin/sysctl kern.clockrate 2>/dev/null`;
-	if ($hz =~ /\shz = (\d+),/) {
-	    $rude_arg = "-C $1";
+	if ($platform eq BSD) {
+	    my $hz = `/sbin/sysctl kern.clockrate 2>/dev/null`;
+	    if ($hz =~ /\shz = (\d+),/) {
+		$rude_arg = "-C $1";
+	    }
+	} else {
+	    # assume linux runs at 1K HZ
+	    $rude_arg = "-C 1000";
 	}
     }
 
@@ -921,6 +1016,9 @@ sub loss_test {
 				  &get_loss_sample_size($edge) .
 				  ", time=" .
 				  LOSS_TEST_DURATION . "s, psize=20)");
+		    } elsif ($platform eq LINUX &&
+			     $hostmap{$hostname}->isvnode) {
+			&my_system($PATH_RUDE,"-s", RUDE_CFG, $rude_arg);
 		    } else {
 			&my_system($PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI,
 				   $rude_arg);
@@ -945,6 +1043,9 @@ sub loss_test {
 				  &get_loss_sample_size($edge) .
 				  ", time=" .
 				  LOSS_TEST_DURATION . "s, psize=20)");
+		    } elsif ($platform eq LINUX &&
+			     $hostmap{$hostname}->isvnode) {
+			&my_system($PATH_RUDE,"-s", RUDE_CFG, $rude_arg);
 		    } else {
 			&my_system($PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI,
 				   $rude_arg);
@@ -1339,9 +1440,23 @@ sub latency_test {
     while(&has_elems(\@edge_copy)) {
 	my ($edge,$other_edge) = &get_twoway_assign(\@edge_copy, 0);
 	if(defined($edge) && defined($other_edge)) {
-	    if($hostname eq $edge->src ) {
-		# todo: consider ignoring latency if no delay node.
+	    if($hostname eq $edge->src) {
 		if(&valid_latency($edge) && &valid_latency($other_edge)) {
+		    my $unshaped = 0;
+
+		    #
+		    # If both ends of the link are vnodes and there is no
+		    # shaping on the link, then latency could be anything
+		    # depending on the virtual interface implementation.
+		    # In this case we still ping just to ensure connectivity.
+		    #
+		    if ($hostmap{$edge->src}->isvnode &&
+			$edge->isunshaped &&
+			$hostmap{$other_edge->src}->isvnode &&
+			$other_edge->isunshaped) {
+			&debug("Testing connectivity only for " . &print_link($edge) . " to " . &print_link($other_edge) . "\n");
+			$unshaped = 1;
+		    }
 
 		    #
 		    # Tell ping to wait at least one round-trip time.
@@ -1373,7 +1488,7 @@ sub latency_test {
 				  &print_edge($edge) . 
 				  ": count/avg/stddev = ".
 				  "$result_cnt/$sample_avg/$sample_dev ".
-				  "(expected $u)\n");
+				  ($unshaped?"":"(expected $u)\n"));
 			    exit(EXIT_OK);
 			}
 
@@ -1383,7 +1498,7 @@ sub latency_test {
 			    my $errmsg = "No packets received (n=$n)\n";
 			    &error(NAME_LATENCY, $edge, $errmsg);
 			    exit(EXIT_NOT_OK);
-			} else {
+			} elsif (!$unshaped) {
 			    my $u = &link_rtt($edge, $other_edge);
 			    
 			    my $x_bar = $sample_avg;
@@ -2138,6 +2253,7 @@ sub get_topo {
 			$edge->mac($row[4]);
 			$edge->mpxstyle($row[5]);
 			$edge->dstyle($row[6]);
+			$edge->isunshaped(0);
 
 			#
 			# If the link is not doing BW shaping
@@ -2150,6 +2266,19 @@ sub get_topo {
 			if ($edge->dstyle =~ /(\w+)-nobw$/) {
 			    $edge->bw(LIMIT_BW_HI+1);
 			    $edge->dstyle($1);
+			    #
+			    # If there is also no delay or loss specified,
+			    # then there is no shaping being done at all
+			    # and we make a note of this as it can cause
+			    # extremely low latency to be seen.
+			    #
+			    if ($edge->delay == 0 && $edge->loss == 0) {
+				$edge->isunshaped(1);
+				if ($hostmap{$edge->src}->isvnode &&
+				    $hostmap{$edge->dst}->isvnode) {
+				    $warn_totallyunshaped_links++;
+				}
+			    }
 			    $warn_unshaped_links++;
 			}
 

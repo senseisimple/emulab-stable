@@ -95,6 +95,14 @@ if (REMOTE() && $action eq "boot") {
     sleep(5);
 }
 
+
+#
+# Grab our manifest so we can enable/disable/replace this script and 
+# run (or not) its hooks.
+#
+my %manifest;
+getmanifest(\%manifest);
+
 #
 # We want to save all of the output off, but also dup it to the console.
 #
@@ -263,9 +271,11 @@ sub doboot()
     }
 
     print("Informing Emulab Control that we have rebooted\n");
+    runhooks(\%manifest,'pre','rc.tbsetup','boot');
     if (tmcc(TMCCCMD_STATE, "TBSETUP") < 0) {
 	fatal("Error sending TBSETUP to Emulab Control!");
-    }
+    };
+    runhooks(\%manifest,'post','rc.tbsetup','boot');
 
     # Now we get into the real work.
     print("Checking Testbed reservation status\n");
@@ -276,22 +286,27 @@ sub doboot()
     #
     if (-x "$RCDIR/rc.ipod" && ! WINDOWS()) {
 	print("Setting up Ping of Death\n");
-	system("$RCDIR/rc.ipod");
-	# This is allowed to fail; ipod might not be supported.
+	# This is allowed to fail by default; ipod might not be supported.
+	if (!exists($manifest{'rc.ipod'})
+	    || !exists($manifest{'rc.ipod'}{'FATAL'})) {
+	    $manifest{'rc.ipod'}{'FATAL'} = 0;
+	}
+	runbootscript(\%manifest,$RCDIR,'rc.ipod','boot');
     }
 
     if (-x "$RCDIR/rc.healthd" && ! (WINDOWS() || REMOTE())) {
 	print("Starting node health monitoring daemon\n");
-	system("$RCDIR/rc.healthd start");
 	# If it fails, that is okay. Keep going.
+	if (!exists($manifest{'rc.healthd'})
+	    || !exists($manifest{'rc.healthd'}{'FATAL'})) {
+	    $manifest{'rc.healthd'}{'FATAL'} = 0;
+	}
+	runbootscript(\%manifest,$RCDIR,'rc.healthd','boot','start');
     }
     
     if (-x "$RCDIR/rc.slothd" && !(REMOTE() || GENVNODE())) {
 	print("Starting slothd usage detector\n");
-	system("$RCDIR/rc.slothd start");
-	if ($?) {
-	    fatal("Error running $RCDIR/rc.slothd");
-	}
+	runbootscript(\%manifest,$RCDIR,'rc.slothd','boot','start');
     }
 
     if (-x "$BINDIR/watchdog") {
@@ -373,10 +388,12 @@ sub doboot()
 
     if (-x "$RCDIR/rc.canaryd" && -x "$BINDIR/canaryd" && !REMOTE()) {
 	print("Starting canaryd usage tracer\n");
+	runhooks(\%manifest,'pre','rc.canaryd','boot');
 	system("$RCDIR/rc.canaryd start");
 	if ($?) {
 	    fatal("Error running $RCDIR/rc.canaryd");
 	}
+	runhooks(\%manifest,'post','rc.canaryd','boot');
     }
 
     #
@@ -384,10 +401,12 @@ sub doboot()
     # linktest is the node is hosting SIM or JAILS.
     #
     if (-x "$RCDIR/rc.linktest" && !REMOTE()) {
+	runhooks(\%manifest,'pre','rc.linktest','boot');
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
 	    fatal("Error running $RCDIR/rc.linktest");
 	}
+	runhooks(\%manifest,'post','rc.linktest','boot');
     }
 
     #
@@ -406,9 +425,11 @@ sub doboot()
 
     # Now send ISUP
     print("Informing Emulab Control that we are up and running\n");
+    runhooks(\%manifest,'pre','rc.isup','boot');
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
 	fatal("Error sending ISUP to Emulab Control!");
     }
+    runhooks(\%manifest,'post','rc.isup','boot');
 
     #
     # After everything is setup, run any startup command.
@@ -417,11 +438,7 @@ sub doboot()
     # regular user startup commands are run via the program agent.
     #
     if (-x "$RCDIR/rc.startcmd") {
-	TBDebugTimeStamp("running $RCDIR/rc.startcmd");
-	system("$RCDIR/rc.startcmd boot");
-	if ($?) {
-	    fatal("Error running $RCDIR/rc.startcmd");
-	}
+	runbootscript(\%manifest,$RCDIR,'rc.startcmd','boot');
     }
 
     #
@@ -431,19 +448,23 @@ sub doboot()
     #
     if (-x "$BINDIR/bootvnodes") {
 	print("Booting up vnodes\n");
+	runhooks(\%manifest,'pre','rc.vnodes','boot');
 	# Foreground mode.
 	system("$BINDIR/bootvnodes -f");
 	if ($?) {
 	    fatal("Error running $BINDIR/bootvnodes");
 	}
+	runhooks(\%manifest,'post','rc.vnodes','boot');
     }
     if (-x "$BINDIR/bootsubnodes") {
 	print("Booting up subnodes\n");
+	runhooks(\%manifest,'pre','rc.subnodes','boot');
 	# Foreground mode.
 	system("$BINDIR/bootsubnodes -f");
 	if ($?) {
 	    fatal("Error running $BINDIR/bootsubnodes");
 	}
+	runhooks(\%manifest,'post','rc.subnodes','boot');
     }
 
     # we are done!
@@ -456,11 +477,13 @@ sub doboot()
     }
     if (-x "$BINDIR/bootsubnodes") {
 	print("Booting up subnodes\n");
+	runhooks(\%manifest,'pre','rc.subnodes','boot');
 	# Foreground mode.
 	system("$BINDIR/bootsubnodes -f");
 	if ($?) {
 	    fatal("Error running $BINDIR/bootsubnodes");
 	}
+	runhooks(\%manifest,'post','rc.subnodes','boot');
     }
 }
 
@@ -474,17 +497,21 @@ sub doshutdown()
     #
     if (-x "$BINDIR/bootvnodes") {
 	print("Halting vnodes\n");
+	runhooks(\%manifest,'pre','rc.vnodes','shutdown');
 	# Foreground mode.
 	system("$BINDIR/bootvnodes -f -h");
 	if ($?) {
 	    fatal("Error running $BINDIR/bootvnodes");
 	}
+	runhooks(\%manifest,'post','rc.vnodes','shutdown');
     }
 
     print("Informing Emulab Control that we are are rebooting\n");
+    runhooks(\%manifest,'pre','rc.shutdown','shutdown');
     if (tmcc(TMCCCMD_STATE, "SHUTDOWN", undef, %TMCCTIMEOUT) < 0) {
 	fatal("Error sending SHUTDOWN to Emulab Control!");
     }
+    runhooks(\%manifest,'post','rc.shutdown','shutdown');
 }
 
 #
@@ -500,6 +527,8 @@ sub doreconfig()
     #
     # Very hacky. These options just tell bootvnodes to halt/kill vnodes.
     # 
+    # Don't run the reconfig hooks for vnodes here -- run them when
+    # they reboot!!
     if (-x "$BINDIR/bootvnodes") {
 	print("Halting vnodes\n");
 	# Foreground mode. -c is "reconfig" mode.
@@ -536,20 +565,24 @@ sub doreconfig()
     # vnodes to boot.
     #
     print("Informing Emulab Control that we are back up and running\n");
+    runhooks(\%manifest,'pre','rc.isup','reconfig');
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
 	fatal("Error sending ISUP to Emulab Control!");
     }
+    runhooks(\%manifest,'post','rc.isup','reconfig');
 
     #
     # And (re)boot vnodes.
     #
     if (-x "$BINDIR/bootvnodes") {
 	print("Booting vnodes\n");
+	runhooks(\%manifest,'pre','rc.vnodes','reconfig');
 	# Foreground mode. -c is "reconfig" mode.
 	system("$BINDIR/bootvnodes -f -c -b");
 	if ($?) {
 	    fatal("Error running $BINDIR/bootvnodes");
 	}
+	runhooks(\%manifest,'post','rc.vnodes','reconfig');
     }
     
     return 0;

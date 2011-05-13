@@ -680,11 +680,18 @@ sub Create($$$$$$)
 	    if (defined($sshdport));
     }
 
-    my $services = GeniXML::AddElement("services", $rspec);
-    my $login = GeniXML::AddElement("login", $services);
+    my $services = GeniXML::FindFirst("n:services", $rspec);
+    if (! defined($services)) {
+	$services = GeniXML::AddElement("services", $rspec);
+    }
+    my $login = GeniXML::FindFirst("n:login", $services);
+    if (! defined($login)) {
+	$login = GeniXML::AddElement("login", $services);
+    }
     GeniXML::SetText("authentication", $login, "ssh-keys");
     GeniXML::SetText("hostname", $login, $phostname);
     GeniXML::SetText("port", $login, $sshdport);
+    GeniXML::SetText("username", $login, $user->uid());
 
     my $sliver = GeniSliver->Create($slice, $user, $resource_uuid, "Node",
 				    $resource_id, $hrn, $nickname, $rspec);
@@ -933,7 +940,7 @@ sub ProcessManifest($$)
 	    my $sliver_urn = GeniXML::GetSliverId($ref);
 	    if (defined($sliver_urn) && $sliver_urn eq $self->sliver_urn()) {
 		# startup command.
-		my $startupcmd = GeniXML::GetText("startup_command", $ref);
+		my $startupcmd = GeniXML::GetStartupCommand($ref);
 		if (defined($startupcmd)) {
 		    if (! TBcheck_dbslot($startupcmd, "virt_nodes",
 					 "startupcmd",

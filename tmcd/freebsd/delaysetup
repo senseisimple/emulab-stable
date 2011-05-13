@@ -859,14 +859,15 @@ sub LinkDelaySetup
 		$redparams .= "$weight/$minthresh/$maxthresh/$max_p";
 	    }
 
-	    #
-	    # XXX don't try to set the speed/duplex of virtual devices
-	    # XXX we should not be hardwiring the speed/duplex here anyway
-	    #
-	    if ($iface !~ /^(vlan|veth)/) {
-		$upcmds .= "ifconfig $iface media 100baseTX ".
-		           "mediaopt full-duplex\n    ";
-	    }
+	    # rc.ifconfig (through the generated rc.ifc) does this
+	    ##
+	    ## XXX don't try to set the speed/duplex of virtual devices
+	    ## XXX we should not be hardwiring the speed/duplex here anyway
+	    ##
+	    #if ($iface !~ /^(vlan|veth)/) {
+	    #    $upcmds .= "ifconfig $iface media 100baseTX ".
+	    #               "mediaopt full-duplex\n    ";
+	    #}
 
 	    $upcmds .= "ipfw add $pipeno pipe $pipeno ip from any to ".
 		       "any out xmit $iface\n    ";

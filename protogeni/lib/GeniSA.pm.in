@@ -651,7 +651,9 @@ sub Remove($)
 sub GetKeys($)
 {
     my ($argref) = @_;
-    my $cred  = $argref->{'credential'};
+    my $cred     = $argref->{'credential'};
+    # Hidden option. Remove later.
+    my $version  = $argref->{'version'} || 1;
 
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
@@ -676,12 +678,31 @@ sub GetKeys($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Who are you? No local record");
     }
+    my $blob;
     my @keys;
     if ($this_user->GetKeyBundle(\@keys) != 0) {
 	print STDERR "Could not get keys for $this_user\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);	
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@keys);
+    if ("$version" eq "am") {
+	# Just for debugging the AM interface.
+	my @tmp = ();
+	foreach my $key (@keys) {
+	    push(@tmp, $key->{'key'});
+	}
+	$blob = [{'urn'   => $this_user->urn(),
+		  'keys'  => \@tmp}];
+    }
+    elsif ($version > 1) {
+	# Note new format.
+	$blob = [{'urn'   => $this_user->urn(),
+		  'login' => $this_user->uid(),
+		  'keys'  => \@keys}];
+    }
+    else {
+	$blob = \@keys;
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
 #

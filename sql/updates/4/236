@@ -1,0 +1,19 @@
+#
+# Add owner uid to blob table (to allow rmblob)
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if( !DBSlotExists( "blobs", "owner_uid" ) ) {
+    	DBQueryFatal( "ALTER TABLE blobs ADD " .
+  		      "`owner_uid` varchar(8) NOT NULL default ''" );
+    }
+
+    return 0;
+}
+
+1;
