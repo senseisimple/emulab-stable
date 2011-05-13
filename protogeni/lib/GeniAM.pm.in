@@ -17,8 +17,6 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniCMV2;
 use GeniResponse;
 use GeniCredential;

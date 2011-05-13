@@ -3609,7 +3609,9 @@ CREATE TABLE `testbed_stats` (
   `log_session` int(10) unsigned default NULL,
   PRIMARY KEY  (`idx`),
   KEY `rsrcidx` (`rsrcidx`),
-  KEY `exptidx` (`exptidx`)
+  KEY `exptidx` (`exptidx`),
+  KEY `uid_idx` (`uid_idx`),
+  KEY `idxdate` (`end_time`,`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
