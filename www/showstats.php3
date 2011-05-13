@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -176,8 +176,7 @@ else {
 }
 
 # Do the endwith to ensure the query does not take too long
-$endwith     = ($startwith ? $startwith - 1000 : 0);
-$startclause = ($startwith ? "(t.idx<$startwith and t.idx>$endwith)" : "");
+$startclause = ($startwith ? "(t.idx<$startwith)" : "");
 
 if (strlen($wclause)) {
     if (strlen($startclause)) {
