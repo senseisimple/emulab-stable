@@ -206,7 +206,9 @@ sub DiscoverResourcesAux($$$$)
 	if (!defined($version));
 
     # Sanity check since this can come from client.
-    if (! ($version eq "0.1" || $version eq "0.2" ||$version eq "2")) {
+    if (! ($version eq "0.1" || $version eq "0.2" || $version eq "2"
+	|| $version eq "PG 0.1" || $version eq "PG 0.2"
+	|| $version eq "PG 2")) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Improper version request");
     }
@@ -295,6 +297,13 @@ sub GetAdvertisement($$$$)
 {
     my ($available, $pc, $version, $experiment) = @_;
     my $xml = undef;
+
+    $version = "0.1"
+	if ($version eq "PG 0.1");
+    $version = "0.2"
+	if ($version eq "PG 0.2");
+    $version = "2"
+	if ($version eq "PG 2");
 
     my $invocation = "$PTOPGEN -x -g $version -r -p GeniSlices";
     if (defined($experiment)) {

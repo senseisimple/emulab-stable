@@ -82,12 +82,14 @@ my $API_VERSION    = 2;
 #
 sub GetVersion()
 {
-    my @input_rspec_versions = ( "0.1", "2" );
+    my @input_rspec_versions = ( "0.1", "0.2", "2", "PG 0.1", "PG 0.2", "PG 2" );
+    my @ad_rspec_versions = ( "0.1", "0.2", "2", "PG 0.1", "PG 0.2", "PG 2" );
     my $blob = {
 	"api" => $API_VERSION,
 	"level" => 1,
 	"input_rspec" => \@input_rspec_versions,
-	"output_rspec" => "0.1"
+	"output_rspec" => "0.2",
+	"ad_rspec" => \@ad_rspec_versions
     };
 
     return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob);
