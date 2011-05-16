@@ -31,8 +31,9 @@ OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o score.o \
 LIBS+= -lm
 LDFLAGS+= -pipe -O3
 CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-40
-# For OSX w/ fink
-CXXFLAGS += -I/sw/include
+# For OSX w/ macports
+CXXFLAGS += -I/opt/local/include
+LIBS += -L/opt/local/lib
 
 ifeq ($(HAVE_XERCES),yes)
 CXXFLAGS += -DWITH_XML

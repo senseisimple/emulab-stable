@@ -27,7 +27,7 @@ using namespace __gnu_cxx;
 
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
-#include <boost/property_map.hpp>
+#include BOOST_PMAP_HEADER
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 

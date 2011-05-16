@@ -43,5 +43,11 @@ using namespace __gnu_cxx;
 #include <slist>
 #endif
 
+#ifdef NEWER_BOOST
+#define BOOST_PMAP_HEADER <boost/property_map/property_map.hpp>
+#else
+#define BOOST_PMAP_HEADER <boost/property_map.hpp>
+#endif
+
 #else
 #endif

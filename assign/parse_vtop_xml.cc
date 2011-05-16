@@ -12,7 +12,7 @@ static const char rcsid[] = "$Id: parse_vtop_xml.cc,v 1.2 2009-05-20 18:06:08 ta
 
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
-#include <boost/property_map.hpp>
+#include BOOST_PMAP_HEADER
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 
