@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include "delay.h"
+#include "port.h"
 
 #include <set>
 #include <list>
@@ -16,9 +17,9 @@ using namespace std;
 
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
-#include <boost/property_map.hpp>
-#include <boost/graph/graph_traits.hpp>
+#include BOOST_PMAP_HEADER
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/graph_traits.hpp>
 using namespace boost;
 
 #include <string>
