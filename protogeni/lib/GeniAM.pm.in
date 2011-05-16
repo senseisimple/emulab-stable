@@ -83,6 +83,53 @@ sub GetVersion()
     my $url = $me->url();
     $url =~ s/cm$/am/;
 
+    my $default_ad = {
+	"type" => "ProtoGENI",
+	"version" => "0.1" };
+    my $request_0_1 = {
+	"type" => "ProtoGENI",
+	"version" => "0.1",
+	"schema" => "http://www.protogeni.net/resources/rspec/0.1/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/0.1",
+	"extensions" => []
+    };
+    my $request_0_2 = {
+	"type" => "ProtoGENI",
+	"version" => "0.2",
+	"schema" => "http://www.protogeni.net/resources/rspec/0.2/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/0.2",
+	"extensions" => []
+    };
+    my $request_2 = {
+	"type" => "ProtoGENI",
+	"version" => "2",
+	"schema" => "http://www.protogeni.net/resources/rspec/2/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/2",
+	"extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
+    };
+    my $ad_0_1 = {
+        "type" => "ProtoGENI",
+        "version" => "0.1",
+        "schema" => "http://www.protogeni.net/resources/rspec/0.1/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/0.1",
+        "extensions" => []
+    };
+    my $ad_0_2 = {
+        "type" => "ProtoGENI",
+        "version" => "0.2",
+        "schema" => "http://www.protogeni.net/resources/rspec/0.2/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/0.2",
+        "extensions" => []
+    };
+    my $ad_2 = {
+        "type" => "ProtoGENI",
+        "version" => "2",
+        "schema" => "http://www.protogeni.net/resources/rspec/2/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/2",
+        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1\
+"]
+    };
+
     my $blob = {
 	"geni_api"   => $API_VERSION,
 	"urn"        => $me->urn(),
@@ -92,6 +139,9 @@ sub GetVersion()
 	"code_tag"   => $commithash,
 	# XXX
 	"hostname"   => $hostname,
+	"request_rspec_versions" => [$request_0_1, $request_0_2, $request_2],
+	"ad_rspec_versions" => [$ad_0_1, $ad_0_2, $ad_2],
+	"default_ad_rspec" => $default_ad
     };
     $blob->{"peers"} = $peers
 	if ($MAINSITE);
