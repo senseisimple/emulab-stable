@@ -13,7 +13,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
 FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
-IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp
+IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp GetVnodeId
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
 GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
@@ -28,10 +28,12 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2);
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS);
 $RSPEC_0_1 = "0.1";
 $RSPEC_0_2 = "0.2";
 $RSPEC_2 = "2";
+
+$EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -338,6 +340,26 @@ sub GetIp($$)
     return $result;
 }
 
+# Returns the vnode id in the emulab extension or failing that the component_id
+sub GetVnodeId($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = GetNodeId($node);
+    } else {
+	my $vnoderef = GeniXML::FindNodesNS("vnode", $node,
+					    $EMULAB_NS)->pop();
+	if (defined($vnoderef)) {
+	    $result = GetText("name", $vnoderef);
+	}
+	if (! defined($result)) {
+	    $result = GetNodeId($node);
+	}
+    }
+    return $result;
+}
+
 # Returns the uuid or urn of an RSpec node or undef if it is not a node.
 sub GetNodeId($)
 {
@@ -635,10 +657,13 @@ sub CreateDocument($$)
 
 # Add a new element to a node. The new element will have the given
 # name and be otherwise empty.
-sub AddElement($$)
+sub AddElement($$;$)
 {
-    my ($name, $node) = @_;
-    my $ns = $node->namespaceURI();
+    my ($name, $node, $namespace) = @_;
+    my $ns = $namespace;
+    if (! defined($namespace)) {
+	$ns = $node->namespaceURI();
+    }
     my $child = $node->addNewChild($ns, "rs:$name");
     return $child;
 }

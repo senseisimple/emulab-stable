@@ -216,6 +216,12 @@ sub node_id($)
     return checknodeid($self->{"DBROW"}->{'node_id'}, "node_id method");
 }
 
+sub phys_nodeid($)
+{
+    my $self = shift;
+    return $self->{"DBROW"}->{'phys_nodeid'};
+}
+
 #
 # Stringify for output.
 #
