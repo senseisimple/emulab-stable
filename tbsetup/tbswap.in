@@ -660,6 +660,16 @@ sub doSwapout($) {
 	}
 
 	#
+	# Clear logical interfaces and wires. This might move to support
+	# swapmod.
+	#
+	print "Removing logical wires.\n";
+	if (Interface::Wire->DeleteLogicalWires($experiment)) {
+	    tberror("Could not delete logical wires and interfaces\n");
+	    return 1;
+	}
+
+	#
 	# remove all nodes from the experiment.
 	# (nfree will send them to RES_FREE_DIRTY)
 	#

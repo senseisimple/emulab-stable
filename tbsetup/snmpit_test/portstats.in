@@ -1,0 +1,488 @@
+#!/usr/bin/perl -T
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# portstats - Get port statistics for nodes in an experiment
+#
+#
+# NOTE: no -w, because $::line below is used in the eval, which perl
+# can't pick up on, so it warns about this variable being only used once
+#
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Configure variables
+#
+my $ELABINELAB = @ELABINELAB@;
+
+use lib '@prefix@/lib';
+
+use libdb;
+use snmpit_lib;
+use libtblog;
+use Port;
+
+use English;
+use Getopt::Long;
+use strict;
+
+sub usage {
+    print << "END";
+Usage: $0 [-h] <-p | <pid> <eid> > [vname ...] [vname:port ...]
+-h    This message
+-e    Show only error counters
+-a    Show all stats
+-z    Zero out counts for selected counters, after printing
+-q    Quiet: don't actually print counts - useful with -z
+-c    Print absolute, rather than relative, counts
+-p    The machines given are physical, not virtual, node IDs. No pid and
+      eid should be given when using this option.
+-s    Ports are specified in switch.port syntax
+-C    List control net, rather than experimental net, ports
+
+If only pid and eid are given, prints out information about all ports in the
+experiment. Otherwise, output is limited to the nodes and/or ports given.
+
+NOTE: Statistics are reported from the switch's perspective. This means that
+'In' packets are those sent FROM the node, and 'Out' packets are those
+sent TO the node.
+
+In the output, packets described as 'NUnicast' or 'NUcast' are non-unicast
+(broadcast or multicast) packets.'
+END
+
+    return 1;
+}
+
+#
+# Process command-line arguments
+#
+my %opt = ();
+Getopt::Long::Configure("no_ignore_case");
+GetOptions(\%opt,'h','a','e','p','b','z','q','c','s','C');
+
+if ($opt{h}) {
+    exit &usage;
+}
+
+my @oids = (); # The set of OIDs we care about
+
+if ($opt{a}) {
+    @oids = ('ifInOctets', 'ifInUcastPkts', 'ifInNUcastPkts', 'ifInDiscards',
+	     'ifInErrors', 'ifInUnknownProtos', 'ifOutOctets', 'ifOutUcastPkts',
+	     'ifOutNUcastPkts', 'ifOutDiscards', 'ifOutErrors', 'ifOutQLen');
+} elsif ($opt{e}) {
+    @oids = ('ifInDiscards', 'ifInErrors', 'ifInUnknownProtos', 'ifOutDiscards',
+	     'ifOutErrors');
+} else {
+    @oids = ('ifInOctets', 'ifInUcastPkts', 'ifInNUcastPkts',
+	     'ifOutOctets', 'ifOutUcastPkts', 'ifOutNUcastPkts');
+}
+
+#
+# Warn about OIDs that do not return numeric values.
+# Most likely these are ones that are unimplemented.
+# It will only warn once per device per OID, but even that might get tedious
+# so warnings can be turned off entirely here.
+#
+my $badoidwarnings = 1;
+
+my ($pid, $eid);
+if (!$opt{p} && !$opt{s}) {
+    if (@ARGV < 2) {
+	exit &usage;
+    }
+    ($pid,$eid) = (shift,shift);
+
+    #
+    # Untaint args.
+    #
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+        tbdie("Bad data in pid: $pid.");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+        $eid = $1;
+    }
+    else {
+        tbdie("Bad data in eid: $eid.");
+    }
+}
+
+#
+# Scan the rest of the arguments, doing a generic taint check. More
+# specific patterns are below.
+# 
+my @passedPorts = ();
+foreach my $arg (@ARGV) {
+    if ($opt{s}) {
+        if ($arg =~ /^([-\w\.\/]+)$/) {
+            $arg = $1;
+        }
+        else {
+            tbdie("Bad data in arg: $arg.");
+        }
+    } else {
+        if ($arg =~ /^([-\w\.:]+)$/) {
+            $arg = $1;
+        }
+        else {
+            tbdie("Bad data in arg: $arg.");
+        }
+    }
+    push(@passedPorts, $arg);
+}
+
+#
+# This hash is used to create colmn headers and the format string
+#
+my %oids = (
+    'ifInOctets'        => [['        In','    Octets'], '@>>>>>>>>>'],
+    'ifInUcastPkts'     => [[' InUnicast','   Packets'], '@>>>>>>>>>'],
+    'ifInNUcastPkts'    => [['InNUnicast','   Packets'], '@>>>>>>>>>'],
+    'ifInDiscards'      => [['        In','  Discards'], '@>>>>>>>>>'],
+    'ifInErrors'        => [['        In','    Errors'], '@>>>>>>>>>'],
+    'ifInUnknownProtos' => [['   Unknown','  Protocol'], '@>>>>>>>>>'],
+    'ifOutOctets'       => [['       Out','    Octets'], '@>>>>>>>>>'],
+    'ifOutUcastPkts'    => [['OutUnicast','   Packets'], '@>>>>>>>>>'],
+    'ifOutNUcastPkts'   => [[' OutNUcast','   Packets'], '@>>>>>>>>>'],
+    'ifOutDiscards'     => [['       Out','  Discards'], '@>>>>>>>>>'],
+    'ifOutErrors'       => [['       Out','    Errors'], '@>>>>>>>>>'],
+    'ifOutQLen'         => [['  OutQueue','    Length'], '@>>>>>>>>>']
+);
+
+#
+# First, make sure the experiment exists
+#
+if (!$opt{p} && !$opt{s}) {
+    if (!ExpState($pid,$eid)) {
+	die "There is no experiment $eid in project $pid\n";
+    }
+}
+
+#
+# Make sure they have access to it
+#
+if ($opt{s}) {
+    if ($UID && !TBAdmin($UID)) {
+        die("Only root or TB admins can use -s.");
+    }
+} elsif ($opt{p}) {
+    my @nodes = map { /^([^:]+)(:(\d+))?$/; $1; } @passedPorts;
+    if (!TBNodeAccessCheck($UID,TB_NODEACCESS_READINFO,@nodes)) {
+	die "You do not have permission to view one or more of @nodes\n";
+    }
+} else {
+    if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+	die "You do not have permission to view experiment $pid/$eid\n";
+    }
+}
+
+#
+# Eventually, we can pass this out via XMLRPC. For now just exit.
+# 
+if ($ELABINELAB) {
+    print "Not bothering with portstats inside an elabinelab.\n";
+    exit(0);
+}
+
+snmpit_lib::init(0);
+
+my @ports;
+#
+# If using "switch" syntax, make sure all names are in the correct format
+#
+if ($opt{s}) {
+    foreach my $port (@passedPorts) {
+        if ($port =~ /^[^.]+\.\d+\/\d+$/) {
+	    push @ports, convertPortFromString($port);
+	} else {
+	    print "'$port' not in correct switch.port syntax, ignoring\n";
+	}
+    }
+
+}
+#
+# If using physical port IDs, just use the list passed on the command line -
+# For an experiment, figure out which one(s) they wanted.
+#
+elsif ($opt{p}) {
+    #
+    # If they gave a node:port form, use just that port. Otherwise, try to find
+    # all the node's ports
+    #
+    foreach my $port (@passedPorts) {
+	$port =~ /^([^:]+)(:(\d+))?$/;
+	my ($hostname,$portnumber) = ($1,$3);
+	if (defined $portnumber) {
+	    push @ports, convertPortFromString($port);
+	} else  {
+	    my $interfaces = DBQueryFatal("select card, port from interfaces " .
+		"where node_id = '$hostname'");
+	    while (my ($card, $iport) = $interfaces->fetchrow()) {
+		push @ports, convertPortFromString("$port:$card.$iport");
+	    }
+	}
+    }
+} else {
+    my @experimentPorts;
+    #
+    # Get control net or experimental net ports, depending on what they
+    # asked for
+    #
+    if ($opt{C}) {
+        @experimentPorts = getExperimentControlPorts($pid,$eid);
+    } else {
+        @experimentPorts = getExperimentPorts($pid,$eid);
+    }
+    #print "ep: " . join(";",@experimentPorts) . "\n";
+    if (@passedPorts) {
+	#
+	# Handle a set of passed-in ports
+	#
+	foreach my $port (@passedPorts) {
+	    $port =~ /^([^:]+)(:(\d+))?$/;
+	    my ($hostname,$portnumber) = ($1,$3);
+	    my $nodeid;
+	    if (!VnameToNodeid($pid,$eid,$hostname,\$nodeid)) {
+		die "There is no node $hostname in $pid/$eid\n";
+	    }
+
+	    if (defined($portnumber)) {
+		# They gave us a specific interface
+		push @ports, convertPortFromString("$nodeid:$portnumber");
+	    } else {
+		# We need to find all experimental ports for this node
+		push @ports, grep(($nodeid eq $_->node_id()),@experimentPorts);
+	    }
+
+	}
+    } else {
+	#
+	# They didn't ask for specific ports, so we'll use 'em all
+	#
+	@ports = @experimentPorts;
+    }
+}
+
+#
+# List of OIDs we want to look at for each port
+#
+
+#
+# Find out which devices these ports are on
+#
+my %portMap = mapPortsToDevices(@ports);
+
+my @stats;
+DEVICE: foreach my $name (keys %portMap) {
+    my @ports = @{$portMap{$name}};
+    my %oidwarned = ();
+
+    #
+    # Connect to the switch and get the data we want off of it
+    #
+    my $type = getDeviceType($name);
+    my $device;
+    SWITCH: for ($type) {
+	/cisco/ && do {
+	    require snmpit_cisco;
+	    $device = new snmpit_cisco($name,0);
+	    last;
+	};
+	/intel/ && do {
+	    require snmpit_intel;
+	    $device = new snmpit_intel($name);
+	    last;
+	};
+	/foundry/ && do {
+	    require snmpit_foundry;
+	    $device = new snmpit_foundry($name);
+	    last;
+	};
+	/nortel/ && do {
+	    require snmpit_nortel;
+	    $device = new snmpit_nortel($name);
+	    last;
+	};
+	/hp/ && do {
+	    require snmpit_hp;
+	    $device = new snmpit_hp($name);
+	    last;
+	};
+
+	# 'default' case
+	warn "WARNING: Unknown switch type ($type) for $name, skipping some ports\n";
+        last DEVICE;
+    }
+    my @results = $device->getFields(\@ports,\@oids);
+
+    foreach my $result (@results) {
+	my $port = shift @ports;
+
+	#
+	# Figure out which port on which switch this corresponds to
+	#
+	my $switchport = $port->getSwitchPort()?
+	    $port->getSwitchPort():undef;
+	
+	if (!$switchport) {
+	    warn "WARNING: No switch port found for ".$port->toString()."\n";
+	} else {
+	    my ($switch_id,$switch_card,$switch_port) =
+		($switchport->node_id(), $switchport->card(),
+		 $switchport->port());
+	    my $dbresult = DBQueryFatal("select * from port_counters where ".
+	    		"node_id='$switch_id' and card=$switch_card and ".
+			"port=$switch_port");
+
+	    #
+	    # Make sure returned values are integers.  If not, warn (just
+	    # once per device) and set to zero.
+	    #
+	    for (my $i = 0; $i < @oids; $i++) {
+		if ($result->[$i] !~ /^(\d+)$/) {
+		    if ($badoidwarnings && !$oidwarned{$oids[$i]}) {
+			warn("WARNING: invalid value '" , $result->[$i],
+			     "' for OID '", $oids[$i], "'\n");
+			$oidwarned{$oids[$i]} = 1;
+		    }
+		    $result->[$i] = 0;
+		}
+	    }
+
+	    my $oldresult = [@$result];
+
+	    #
+	    # Unless they want absolute counters, go through and subtract
+	    # out the values stored in the database
+	    #
+	    if (!$opt{c}) {
+		if ($dbresult && $dbresult->num_rows()) {
+		    my %oldvals = $dbresult->fetchhash();
+		    for (my $i = 0; $i < @oids; $i++) {
+			if ($oldvals{$oids[$i]}) {
+			    #
+			    # Check for wraparound - of course, we can't tell
+			    # how many times it wrapped, but we can at least
+			    # not print a negative number.
+			    # XXX - we harcode the size of the counter here
+			    #
+			    if ($result->[$i] >= $oldvals{$oids[$i]}) {
+				$result->[$i] -= $oldvals{$oids[$i]};
+			    } else {
+				$result->[$i] += (2**32 - $oldvals{$oids[$i]});
+			    }
+			}
+		    }
+		}
+	    }
+
+	    #
+	    # If requested, update the counters in the database
+	    #
+	    if ($opt{z}) {
+		#
+		# What we do to the DB depends on whether or not there is
+		# already an entry for this port
+		#
+		my $query;
+		if ($dbresult->num_rows()) {
+		    $query = "update port_counters set ";
+		} else {
+		    $query = "insert into port_counters set ";
+		}
+
+		my @query_terms = ();
+		for (my $i = 0; $i < @oids; $i++) {
+		    push @query_terms, " $oids[$i]=$oldresult->[$i] ";
+		}
+		$query .= join(",",@query_terms);
+
+		if ($dbresult->num_rows()) {
+		    $query .= " where node_id='$switch_id' and " .
+			    "card=$switch_card and port=$switch_port";
+		} else {
+		    $query .= ", node_id='$switch_id', card=$switch_card, " .
+			    "port=$switch_port ";
+		}
+
+		DBQueryFatal($query);
+	    }
+	}
+
+	if (!$opt{p} && !$opt{s}) {
+	    #
+	    # Try to translate the port name to the node's vname
+	    #
+	    if ($port->node_id() && $port->card()) {
+	        my $portnum = $port->card();
+		my ($junk, $vname);
+		NodeidToExp($port->node_id(),\$junk,\$junk,\$vname);
+		$port = "$vname:$portnum";
+	    }
+	}
+
+	#
+	# Throw this onto a list, so that we can sort it
+	#
+	push @stats, [Port->isPort($port)?$port->toString():$port,@$result];
+    }
+}
+
+#
+# Exit now if they wanted quiet operation
+#
+if ($opt{q}) {
+    exit(0);
+}
+
+#
+# Build up the heading a format strings
+#
+my @heading1 = ('              ');
+my @heading2 = ('Port          ');
+my @format   = ('@<<<<<<<<<<<<<');
+
+foreach my $line (@oids{@oids}) {
+    my ($heading,$format) = @$line;
+    push @heading1, $$heading[0];
+    push @heading2, $$heading[1];
+    push @format,   $format;
+}
+
+my $heading1 = join(" ",@heading1);
+my $heading2 = join(" ",@heading2);
+
+my $format = "format stats =\n" . join(" ",@format) . "\n";
+$format .= join(",",map {"\$\$::line[$_]"} (0 .. @oids)) . "\n.\n";
+
+eval $format;
+$FORMAT_NAME = 'stats';
+
+#
+# Print out the heading
+#
+print "$heading1\n";
+print "$heading2\n";
+print "-" x length($heading1),"\n";
+
+#
+# Finally, print out the results
+#
+foreach $::line (sort {$$a[0] cmp $$b[0]} @stats) {
+    write;
+}

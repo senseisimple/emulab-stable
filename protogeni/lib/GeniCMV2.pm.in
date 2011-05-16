@@ -18,7 +18,6 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
 use GeniResponse;
 use GeniTicket;

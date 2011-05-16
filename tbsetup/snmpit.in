@@ -476,15 +476,14 @@ if ($pid && $eid) {
 #
 # See if we use the alternate version of snmpit from Rob.
 #
-if ($MAINSITE && $TB eq "/usr/testbed" && !$opt{Z}) {
+if ($TB eq "/usr/testbed" && !$opt{Z}) {
     my $group = (defined($experiment) ? $experiment->GetGroup() : undef);
     $EmulabFeatures::verbose = 0;
-    my $robsnmpit =
-        (EmulabFeatures->FeatureEnabled("RobSnmpit",
+    my $testsnmpit =
+        (EmulabFeatures->FeatureEnabled("TestSnmpit",
 					$this_user, $group, $experiment));
-    if ($robsnmpit) {
-	# Rob, change this path:
-	my $newpath = "$TB/bin/snmpit";
+    if ($testsnmpit) {
+	my $newpath = "$TB/bin/snmpit_test";
 	print STDERR "Invoking alternate snmpit from $newpath\n";
 	
         unshift(@SAVEARGV, "-Z");

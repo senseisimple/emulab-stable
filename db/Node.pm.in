@@ -1694,16 +1694,23 @@ sub LoadInterfaces($)
 sub GetInterface($$$)
 {
     my ($self, $iface, $pref) = @_;
+    my $interface;
 
     # Must be a real reference. 
     return -1
 	if (! (ref($self) && ref($pref)));
 
-    $self->LoadInterfaces() == 0
-	or return -1;
+    if (exists($self->{'IFACES'}->{$iface})) {
+	# Might be undef if we already tried.
+	$interface = $self->{'IFACES'}->{$iface};
+    }
+    else {
+	$interface = Interface->LookupByIface($self, $iface);
+	$self->{'IFACES'}->{$iface} = $interface;
+    }
+    $$pref = $interface;    
     return -1
-	if (!exists($self->{'IFACES'}->{$iface}));
-    $$pref = $self->{'IFACES'}->{$iface};
+	if (!defined($interface));
     return 0;
 }
 

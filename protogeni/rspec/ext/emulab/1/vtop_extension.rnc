@@ -59,6 +59,10 @@ VclassSpec = element emulab:vclass {
     element emulab:physical_type { attribute name { text } }+
 }
 
+# Information about the virtual node in the nodes table assigned to a
+# particular node.
+VnodeSpec = element emulab:vnode { attribute name { text } }
+
 start = HintToSpec | NodeFlagSpec | LinkFlagSpec | VclassSpec 
-      		   | FixedInterfaceSpec
+      		   | FixedInterfaceSpec | VnodeSpec
 

@@ -138,6 +138,7 @@ sub mac($)     { return field($_[0], 'mac'); }
 sub IP($)      { return field($_[0], 'IP'); }
 sub role($)    { return field($_[0], 'role'); }
 sub type($)    { return field($_[0], 'interface_type'); }
+sub logical($) { return field($_[0], 'logical'); }
 sub mask($)    { return field($_[0], 'mask'); }
 sub uuid($)    { return field($_[0], 'uuid'); }
 # Wires table
@@ -277,12 +278,12 @@ sub Create($$$)
 
     my $node_id = $node->node_id();
 
-    my $MAC        = $argref->{'MAC'};
+    my $MAC        = $argref->{'MAC'} || $argref->{'mac'};
     my $IP         = $argref->{'IP'};
     my $mask       = $argref->{'mask'};
     my $card       = $argref->{'card'};
     my $port       = $argref->{'port'};
-    my $iftype     = $argref->{'type'};
+    my $iftype     = $argref->{'type'} || $argref->{'interface_type'};
     my $ifrole     = $argref->{'role'};
     my $uuid       = $argref->{'uuid'};
     my $max_speed  = $argref->{'max_speed'};
@@ -294,6 +295,7 @@ sub Create($$$)
     my $cable      = $argref->{'cable'};
     my $length     = $argref->{'length'};
     my $iface      = $argref->{'iface'};
+    my $logical    = $argref->{'logical'};
     
     $iface = "eth$card"    
 	if (!defined($iface));
@@ -307,6 +309,8 @@ sub Create($$$)
 	if (!defined($duplex));
     $max_speed = 0
 	if (!defined($max_speed));
+    $logical = 0
+	if (!defined($logical));
     if (!defined($uuid)) {
 	$uuid = NewUUID();
 	if (!defined($uuid)) {
@@ -315,7 +319,7 @@ sub Create($$$)
 	}
     }
     if (! (defined($card) && defined($ifrole) && defined($MAC) &&
-	   defined($IP) && defined($port) && defined($mask) &&
+	   defined($IP) && defined($port) && 
 	   defined($iftype) && defined($iface) && defined($max_speed) &&
 	   defined($duplex) && defined($uuid))) {
 	print STDERR "Interface::Create: Missing fields in arguments:\n";
@@ -345,9 +349,10 @@ sub Create($$$)
     }
     
     if (!DBQueryWarn("insert into interfaces set ".
-		"  node_id='$node_id', " .
+		"  node_id='$node_id', logical='$logical', " .
 		"  card=$card, port=$port, role='$ifrole', ".
-		"  mac='$MAC', IP='$IP', mask='$mask', " .
+		"  mac='$MAC', IP='$IP', " .
+		(defined($mask) ? "mask='$mask', " : "") .
 		"  interface_type='$iftype', iface='$iface', " .
 		"  current_speed='$max_speed', duplex='$duplex', ".
 		"  uuid='$uuid'")) {
@@ -374,7 +379,7 @@ sub Create($$$)
 	    $cable_len .= ", len=$length";
 	}
 	if (!DBQueryWarn("insert into wires set".
-			 "  type='$wire_type', " .
+			 "  type='$wire_type', logical='$logical', " .
 			 "  node_id1='$node_id', card1=$card, port1=$port, " .
 			 "  node_id2='$switch_id', card2='$switch_card', " .
 			 "  port2='$switch_port' $cable_len")) {
@@ -390,6 +395,57 @@ sub Create($$$)
     }
     DBQueryWarn("unlock tables");
     return Interface->Lookup($node_id, $card, $port);
+}
+
+#
+# Delete a logical interface.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    if (! $self->logical()) {
+	print STDERR "Refusing to delete real $self\n";
+	return -1;
+    }
+    my $node_id = $self->node_id();
+    my $card    = $self->card();
+    my $port    = $self->port();
+
+    return -1
+	if (!DBQueryWarn("delete from interface_state ".
+			 "where node_id='$node_id' and card='$card' and ".
+			 "      port='$port'"));
+    return -1
+	if (!DBQueryWarn("delete from interfaces ".
+			 "where logical=1 and ".
+			 "      node_id='$node_id' and card='$card' and ".
+			 "      port='$port'"));
+    return 0;
+}
+
+#
+# Create a fake object, as for the mapper (assign_wrapper) during debugging.
+#
+sub MakeFake($$$)
+{
+    my ($class, $node, $argref) = @_;
+
+    my $nodeid = $node->node_id();
+    $argref->{'node_id'} = $nodeid;
+
+    my $self            = {};
+    $self->{"DBROW"}    = $argref;
+    bless($self, $class);
+
+    # Cache by card,port and by iface
+    my $iface = $argref->{'iface'};
+    my $card  = $argref->{'card'};
+    my $port  = $argref->{'port'};
+    $all_interfaces{"$nodeid:$card:$port"} = $self;
+    $all_interfaces{"$nodeid:$iface"}      = $self;
+    
+    return $self;
 }
 
 #
@@ -789,6 +845,416 @@ sub Update($$)
     return Refresh($self);
 }
 
-# _Always_ make sure that this 1 is at the end of the file...
+##############################################################################
+#
+# A wrapper class for a wire. 
+#
+package Interface::Wire;
+use libdb;
+use Node;
+use libtestbed;
+use English;
+use overload ('""' => 'Stringify');
 
+#
+# Lookup a wire, using the interface of the "pc" side.
+#
+sub Lookup($$)
+{
+    my ($class, $interface) = @_;
+
+    if (!ref($interface)) {
+	# Allow "nodeid:card:port" argument.
+	if ($interface =~ /^([-\w]*):(\w+):(\w+)$/) {
+	    $interface = Interface->Lookup($1, $2, $3);
+	    return undef
+		if (!defined($interface));
+	}
+	else {
+	    return undef;
+	}
+    }
+    my $node_id1 = $interface->node_id();
+    my $card1    = $interface->card();
+    my $port1    = $interface->port();
+
+    my $query_result =
+	DBQueryWarn("select * from wires ".
+		    "where node_id1='$node_id1' and ".
+		    "      card1='$card1' and port1='$port1'");
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $wire = {};
+    $wire->{"DBROW"}  = $query_result->fetchrow_hashref();
+    bless($wire, $class);
+    return $wire;
+}
+sub field($$)	       { return $_[0]->{'DBROW'}->{$_[1]}; }
+sub node_id1($)        { return $_[0]->field('node_id1'); }
+sub node_id2($)        { return $_[0]->field('node_id2'); }
+sub card1($)           { return $_[0]->field('card1'); }
+sub card2($)           { return $_[0]->field('card2'); }
+sub port1($)           { return $_[0]->field('port1'); }
+sub port2($)           { return $_[0]->field('port2'); }
+sub type($)            { return $_[0]->field('type'); }
+sub logical($)         { return $_[0]->field('logical'); }
+sub IsActive($)        { return ($_[0]->type() eq "Unused" ? 0 : 1); }
+
+#
+# Delete a logical wire and its interfaces.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+    my ($interface1, $interface2) = $self->Interfaces();
+
+    if (! $self->logical()) {
+	print STDERR "Refusing to delete real $self\n";
+	return -1;
+    }
+    if (defined($interface1) && $interface1->logical()) {
+	$interface1->Delete() == 0
+	    or return -1;
+    }
+    if (defined($interface2) && $interface2->logical()) {
+	$interface2->Delete() == 0
+	    or return -1;
+    }
+    my $node_id1 = $self->node_id1();
+    my $card1    = $self->card1();
+    my $port1    = $self->port1();
+
+    return -1
+	if (!DBQueryWarn("delete from wires ".
+			 "where logical=1 and node_id1='$node_id1' and ".
+			 "      card1=$card1 and port1=$port1"));
+    return 0;
+}
+
+#
+# A wire has two interfaces, but we do not always create interface
+# table entries for both sides; the switch side is generally not in
+# the interfaces table. 
+#
+sub Interfaces($)
+{
+    my ($self) = @_;
+
+    return (Interface->Lookup($self->node_id1(),
+			      $self->card1(), $self->port1()),
+	    Interface->Lookup($self->node_id2(),
+			      $self->card2(), $self->port2()));
+}
+
+#
+# Stringify for output. 
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $node1   = $self->node_id1();
+    my $node2   = $self->node_id2();
+    my $card1   = $self->card1();
+    my $card2   = $self->card2();
+    my $port1   = $self->port1();
+    my $port2   = $self->port2();
+    my $type    = ($self->logical() ? "LogicalWire" : "Wire");
+
+    return "[$type: $node1:$card1:$port1/$node2:$card2:$port2]";
+}
+
+#
+# Activate a (logical) wire by setting the type. Default to "Node".
+#
+sub Activate($;$)
+{
+    my ($self, $type) = @_;
+    my $node_id1 = $self->node_id1();
+    my $card1    = $self->card1();
+    my $port1    = $self->port1();
+    $type = "Node" if (!defined($type));
+
+    return -1
+	if (!DBQueryWarn("update wires set type='$type' ".
+			 "where node_id1='$node_id1' and ".
+			 "      card1=$card1 and port1=$port1"));
+
+    return 0;
+}
+
+sub DeActivate($)
+{
+    my ($self) = @_;
+    my $node_id1 = $self->node_id1();
+    my $card1    = $self->card1();
+    my $port1    = $self->port1();
+
+    return -1
+	if (!DBQueryWarn("update wires set type='Unused' ".
+			 "where node_id1='$node_id1' and ".
+			 "      card1=$card1 and port1=$port1"));
+
+    return 0;
+}
+
+#
+# Find all logical wires for an experiment.
+#
+sub ExperimentLogicalWires($$$)
+{
+    my ($class, $experiment, $plist) = @_;
+
+    return -1
+	if (! (ref($plist) && ref($experiment)));
+    
+    my $exptidx = $experiment->idx();
+    my @result  = ();
+
+    # Note that a wire between two pc interfaces will cause this
+    # query to return two results, one of which is bogus, since
+    # the wires table is unique on node_id1,card1,port1. Need to
+    # check for this in the where clause.
+    my $query_result =
+	DBQueryWarn("select r.node_id,w.card1,w.port1 from reserved as r ".
+		    "left join interfaces as i on i.node_id=r.node_id ".
+		    "left join wires as w on w.node_id1=r.node_id and ".
+		    "     w.card1=i.card and w.port1=i.port ".
+		    "where i.logical=1 and r.exptidx='$exptidx' and ".
+		    "      card1 is not null");
+    return -1
+	if (!$query_result);
+
+    while (my ($nodeid,$card,$port) = $query_result->fetchrow_array()) {
+	my $wire = Interface::Wire->Lookup("$nodeid:$card:$port");
+	if (!defined($wire)) {
+	    print STDERR "Could not lookup wire: $nodeid:$card:$port\n";
+	    return -1;
+	}
+	push(@result, $wire);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+#
+# Delete all logical wires for an experiment, as for swapout.
+#
+sub DeleteLogicalWires($$)
+{
+    my ($class, $experiment) = @_;
+    my @wires  = ();
+    my $errors = 0;
+
+    return -1
+	if (! ref($experiment));
+    
+    return -1
+	if (Interface::Wire->ExperimentLogicalWires($experiment, \@wires));
+    return 0
+	if (!@wires);
+
+    foreach my $wire (@wires) {
+	print STDERR "Deleting $wire\n";
+	
+	if ($wire->IsActive()) {
+	    print STDERR "$wire is still active; cannot delete!\n";
+	    $errors++;
+	}
+	if ($wire->Delete()) {
+	    print STDERR "$wire could not be deleted!\n";
+	    $errors++;
+	}
+    }
+    return $errors;
+}
+
+##############################################################################
+#
+# A wrapper class for a "logical wire". This is a wire that exists
+# cause it was created with a layer 1 switch. Basically the same as
+# wire above, but this class is handy for the mapper and for display.
+# Not really intended to be used outside the mapper. Use the class above.
+#
+package Interface::LogicalWire;
+use libdb;
+use Node;
+use libtestbed;
+use English;
+use overload ('""' => 'Stringify');
+
+#
+# Create a pair of logical interfaces that will later be wired together
+# at layer 1. 
+#
+sub Create($$$$$$)
+{
+    my ($class, $impotent, $nodeA, $portA, $nodeB, $portB) = @_;
+
+    #
+    # See if one is the switch; the switch is node_id2 in the wires table.
+    #
+    my $pnodeA = Node->Lookup($nodeA);
+    if (!defined($pnodeA)) {
+	print STDERR "Could not lookup '$nodeA'\n";
+	return undef;
+    }
+    my $pnodeB = Node->Lookup($nodeB);
+    if (!defined($pnodeB)) {
+	print STDERR "Could not lookup '$nodeB'\n";
+	return undef;
+    }
+    my $interfaceA = Interface->LookupByIface($pnodeA, $portA);
+    if (!defined($interfaceA)) {
+	print STDERR "Could not lookup '$pnodeA:$portA'\n";
+	return undef;
+    }
+    my $interfaceB = Interface->LookupByIface($pnodeB, $portB);
+    if (!defined($interfaceB)) {
+	print STDERR "Could not lookup '$pnodeB:$portB'\n";
+	return undef;
+    }
+    
+    #
+    # Create interfaces, but not for things that are marked as
+    # switches since we do not put interfaces for switches into
+    # the interfaces table.
+    #
+    if (!$pnodeA->isswitch()) {
+	#
+	# Create a logical interface. Note we have to force a hash copy.
+	#
+	my %argref = %{ $interfaceA->{'DBROW'} };
+	my $argref = \%argref;
+
+	# Update the card and iface.
+	# XXX Need a better way to allocate the card numbers.
+	$argref->{'card'}    = $interfaceA->card() + 200;
+	$argref->{'iface'}   = "eth" . $argref->{'card'};
+	$argref->{'logical'} = 1;
+	$argref->{'uuid'}    = undef;
+
+	if (!$impotent) {
+	    $interfaceA = Interface->Create($pnodeA, $argref);
+	    return undef
+		if (!defined($interfaceA));
+	}
+	else {
+	    # Fake things up.
+	    $interfaceA = Interface->MakeFake($pnodeA, $argref);
+	}
+    }
+    if (!$pnodeB->isswitch()) {
+	#
+	# Create a logical interface. Note we have to force a hash copy.
+	#
+	my %argref = %{ $interfaceB->{'DBROW'} };
+	my $argref = \%argref;
+
+	# Update the card and iface.
+	# XXX Need a better way to allocate the card numbers.
+	$argref->{'card'}    = $interfaceB->card() + 200;
+	$argref->{'iface'}   = "eth" . $argref->{'card'};
+	$argref->{'logical'} = 1;
+	$argref->{'uuid'}    = undef;
+
+	if (!$impotent) {
+	    $interfaceB = Interface->Create($pnodeB, $argref);
+	    return undef
+		if (!defined($interfaceB));
+	}
+	else {
+	    # Fake things up.
+	    $interfaceB = Interface->MakeFake($pnodeB, $argref);
+	}
+    }
+    #
+    # For consistency and because we still have an implicit assumption
+    # the switch is node_id2 in the wires table. 
+    #
+    my ($interface1,$interface2) = ($interfaceA, $interfaceB);
+    if ($pnodeA->isswitch() && !$pnodeB->isswitch()) {
+	($interface1,$interface2) = ($interfaceB, $interfaceA);
+    }
+    # Create a wires table entry, ordered properly.
+    if (!$impotent) {
+	my $node_id1 = $interface1->node_id();
+	my $node_id2 = $interface2->node_id();
+	my $card1    = $interface1->card();
+	my $port1    = $interface1->port();
+	my $card2    = $interface2->card();
+	my $port2    = $interface2->port();
+
+	#
+	# The wire is not active yet. When snmpit tuns and actually
+	# wires things up at layer 1, it will update this wire to
+	# reflect that. Use the 'Unused' type to indicate it is not
+	# active.
+	#
+	if (!DBQueryWarn("replace into wires set".
+			 "  type='Unused', logical=1, " .
+			 "  node_id1='$node_id1',card1=$card1,port1=$port1, " .
+			 "  node_id2='$node_id2',card2=$card2,port2=$port2")) {
+	    return undef;
+	}
+    }
+    my $self = {};
+    #
+    # Do not reorder here; the caller will just be confused.
+    #
+    $self->{"interfaceA"} = $interfaceA;
+    $self->{"interfaceB"} = $interfaceB;
+    $self->{"interface1"} = $interface1;
+    $self->{"interface2"} = $interface2;
+
+    bless($self, $class);
+    return $self;
+}
+sub interfaceA($)      { return $_[0]->{'interfaceA'}; }
+sub interfaceB($)      { return $_[0]->{'interfaceB'}; }
+sub nodeA($)           { return $_[0]->interfaceA()->node_id(); }
+sub nodeB($)           { return $_[0]->interfaceB()->node_id(); }
+sub ifaceA($)          { return $_[0]->interfaceA()->iface(); }
+sub ifaceB($)          { return $_[0]->interfaceB()->iface(); }
+# Wires table ordering.
+sub interface1($)      { return $_[0]->{'interface1'}; }
+sub interface2($)      { return $_[0]->{'interface2'}; }
+
+#
+# The wires table is indexed by node_id1,card1,port1 ... return
+# something that allows us to find that wires table entry.
+#
+sub WireID($)
+{
+    my ($self) = @_;
+
+    my $interface1 = $self->interface1();
+    my $node_id1   = $interface1->node_id();
+    my $card1      = $interface1->card();
+    my $port1      = $interface1->port();
+
+    return "$node_id1:$card1:$port1";
+}
+
+#
+# Stringify for output. 
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    my $interfaceA = $self->interfaceA();
+    my $interfaceB = $self->interfaceB();
+    
+    my $nodeA   = $self->nodeA();
+    my $nodeB   = $self->nodeB();
+    my $ifaceA  = $self->ifaceA();
+    my $ifaceB  = $self->ifaceB();
+
+    return "[LogicalWire: $nodeA:$ifaceA/$nodeB:$ifaceB]";
+}
+
+
+# _Always_ make sure that this 1 is at the end of the file...
 1;

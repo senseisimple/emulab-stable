@@ -597,6 +597,39 @@ sub GotTrunks($$)
 }
 
 #
+# Get the set of lans that are linked to this lan. Optionally provide the
+# type, say to look for just vlans.
+#
+sub GetLinkedTo($$;$)
+{
+    my ($class, $lan, $type) = @_;
+
+    if (! ref($lan)) {
+	$lan = Lan->Lookup($lan);
+	return ()
+	    if (!defined($lan));
+    }
+    my $exptidx = $lan->exptidx();
+    my $lanid   = $lan->lanid();
+    my @result  = ();
+
+    my $query_result =
+	DBQueryWarn("select lanid from lans ".
+		    "where link='$lanid' ".
+		    (defined($type) ? "and type='$type'" : ""));
+    return ()
+	if (!$query_result || !$query_result->numrows);
+
+    while (my ($id) = $query_result->fetchrow_array()) {
+	my $vlan = Lan->Lookup($id);
+	return undef
+	    if (!defined($vlan));
+	push(@result, $vlan);
+    }
+    return @result;
+}
+
+#
 # Stringify for output.
 #
 sub Stringify($)
@@ -1883,6 +1916,7 @@ sub Instantiate($)
 	my $vport       = $protomember->{'vport'};
 	my $iface       = $protomember->{'iface'};
 	my $pport       = $protomember->{'pport'};
+	my $attributes  = $protomember->{'attrs'};
 	my $member;
 
 	if (defined($pport)) {
@@ -1899,6 +1933,13 @@ sub Instantiate($)
 	if (!defined($interface)) {
 	    $lan->Destroy();
 	    return -1;
+	}
+	if (defined($attributes)) {
+	    foreach my $attrkey (keys(%{$attributes})) {
+		my $attrvalue = $attributes->{$attrkey};
+
+		$interface->SetAttribute($attrkey, $attrvalue);
+	    }
 	}
     }
     $self->{'INSTANCE'} = $lan;
@@ -2009,9 +2050,9 @@ sub Dump($)
 #
 # Add an interface to a protolan.
 #
-sub AddInterface($$$$$;$)
+sub AddInterface($$$$$;$$)
 {
-    my ($self, $node, $vnode, $vport, $iface, $pport) = @_;
+    my ($self, $node, $vnode, $vport, $iface, $pport, $attributes) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -2030,6 +2071,7 @@ sub AddInterface($$$$$;$)
 					     "vport" => $vport,
 					     "iface" => $iface,
 					     "pport" => $pport,
+					     "attrs" => $attributes,
 					    };
     return 0;
 }
@@ -2252,6 +2294,7 @@ sub id($)       { return $_[0]->GetLan()->lanid(); }
 sub vname($)	{ return $_[0]->GetLan()->vname(); }
 sub ready($)	{ return $_[0]->GetLan()->ready(); }
 sub type($)	{ return $_[0]->GetLan()->type(); }
+sub link($)	{ return $_[0]->GetLan()->link(); }
 sub GetLan($)   { return $_[0]->{'LAN'}; }
 sub GetExperiment($) { return $_[0]->GetLan()->GetExperiment(); }
 sub vlanid($)   { return $_[0]->lanid(); }
@@ -2969,6 +3012,29 @@ sub ExperimentVLans($$$)
 }
 
 #
+# Find a vlan by looking an interface in the vlan.
+#
+sub FindVlanByInterface($$$)
+{
+    my ($class, $experiment, $interface) = @_;
+    my $exptidx = $experiment->idx();
+    my $iface   = $interface->iface();
+    my @vlans   = ();
+
+    #
+    # We do not do this often, so worry about optimizing later.
+    #
+    return undef
+	if (VLan->ExperimentVLans($experiment, \@vlans) != 0);
+
+    foreach my $vlan (@vlans) {
+	return $vlan
+	    if ($vlan->IsMember($interface->node_id(), $interface->iface()));
+    }
+    return undef;
+}
+
+#
 # Utility function to add a vlan to the switch infrastructure. 
 #
 sub Instantiate($;$)
@@ -3235,6 +3301,27 @@ sub StaleVlanList($$$)
     }
     @$pref = @result;
     return 0;
+}
+
+#
+# Get the set of lans that are linked to this lan. Optionally provide the
+# type, say to look for just vlans.
+#
+sub GetLinkedTo($$;$)
+{
+    my ($class, $lan, $type) = @_;
+
+    my @result = Lan->GetLinkedTo($lan, $type);
+    return @result
+	if (!@result);
+
+    # Convert to VLan;
+    my @tmp = ();
+    foreach my $lan (@result) {
+	bless($lan, $class);
+	push(@tmp, $lan);
+    }
+    return @tmp;
 }
 
 ############################################################################

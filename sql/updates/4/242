@@ -1,0 +1,24 @@
+#
+# Add extenal references slots to nodes table, as for geni.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBKeyExists("testbed_stats", "uid_idx")) {
+        print "  *** Updating indexes ... please be patient.\n";
+	DBQueryFatal("ALTER TABLE testbed_stats " .
+		     "ADD KEY `uid_idx` (`uid_idx`)");
+    }
+    if (!DBKeyExists("testbed_stats", "idxdate")) {
+        print "  *** Updating indexes ... please be patient.\n";
+	DBQueryFatal("ALTER TABLE testbed_stats " .
+		     "ADD KEY `idxdate` (`end_time`,`idx`)");
+    }
+    return 0;
+}
+
+1;

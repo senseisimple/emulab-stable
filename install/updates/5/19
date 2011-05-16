@@ -1,0 +1,40 @@
+#
+# Remove stated from syslog.conf, since we no longer use syslog.
+# It holds open the log file when it is rolled.
+#
+use strict;
+use libinstall;
+
+my $SYSLOG_CONF  = "/etc/syslog.conf";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "stated", "Updating stated logging", sub {
+	    Phase "syslog.conf", "Updating $SYSLOG_CONF", sub {
+		PhaseSkip("Already updated")
+		    if !`grep 'stated' $SYSLOG_CONF`;
+
+		BackUpFileFatal($SYSLOG_CONF);
+		ExecQuietFatal("sed -i .orig -e '/stated/d' $SYSLOG_CONF");
+	    };
+	    Phase "syslogd", "Restarting syslogd", sub {
+		HUPDaemon("syslog");
+	    };
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    
+    return 0;
+}
+1;
