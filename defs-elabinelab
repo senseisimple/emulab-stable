@@ -55,6 +55,8 @@ OUTERBOSS_NODENAME=changeme
 TBCOOKIESUFFIX=changeme
 # XXX hack to work around perl bug
 SELFLOADER_DATA=changeme
+# Start a multicast router
+NEEDMROUTED=changeme
 TBUSEDBI=1
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.

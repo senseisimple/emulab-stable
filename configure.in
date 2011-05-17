@@ -222,6 +222,7 @@ AC_SUBST(EXP_VIS_SUPPORT)
 AC_SUBST(NOSHAREDFS)
 AC_SUBST(SELFLOADER_DATA)
 AC_SUBST(TBUSEDBI)
+AC_SUBST(NEEDMROUTED)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -314,6 +315,7 @@ NOSTACKMIB=0
 NOSHAREDFS=0
 NFSRACY=1
 SELFLOADER_DATA="__DATA__"
+NEEDMROUTED=0
 
 #
 # XXX You really don't want to change these!

@@ -154,6 +154,10 @@ my $SINGLE_CONTROLNET = 0;
 # Support a shared filesystem between fs server and nodes
 my $SHAREDFS   = 1;
 
+# Start up mrouted so frisbee works (if there is no other mcast router)
+# -1 means let the system decide.
+my $NEEDMROUTED= -1;
+
 #
 # Defaults for configuration attributes (options).
 # These can be overridden if values are passed in via the emulabconfig command.
@@ -184,6 +188,7 @@ my %emulabconfig = (
     #	CONFIG_USERDB	support integrated MySQL DB (part of COLLAB)
     #   CONFIG_WIKI	support integrated wiki (part of COLLAB)
     #	CONFIG_SHAREDFS	support shared filesystem	    
+    #	CONFIG_MROUTED	install/configure multicast router
     #
     "CONFIG_NOSETUP"    => $NOSETUP,
     "CONFIG_SCRATCHFS"  => $SCRATCHFS,
@@ -198,6 +203,7 @@ my %emulabconfig = (
     "CONFIG_USERDB"     => !$NOCOLLAB,
     "CONFIG_WIKI"       => !$NOCOLLAB,
     "CONFIG_SHAREDFS"	=> $SHAREDFS,
+    "CONFIG_MROUTED"	=> $NEEDMROUTED,
 
     #
     # Elabinelab build options:
@@ -1596,6 +1602,19 @@ sub SetupBossNode()
     mysystem("mount ${fsname}:" . $emulabconfig{BOSS_PKG_DIR} . " /packages");
 
     #
+    # Determine if we need to run a multicast router.
+    # We will if: 1) using a private control net and 2) kernel support mroute
+    #
+    if ($emulabconfig{"CONFIG_MROUTED"} == -1) {
+	if (!$emulabconfig{"CONFIG_SINGLECNET"} &&
+	    !system("sysctl -N net.inet.ip.mrtstat 2>&1")) {
+	    $emulabconfig{"CONFIG_MROUTED"} = 1;
+	} else {
+	    $emulabconfig{"CONFIG_MROUTED"} = 0;
+	}
+    }
+
+    #
     # Need to create an /etc/rc.conf that is more suitable for boss.
     # I took most of this from our real boss node. It will be modified
     # by the boss-install script below.
@@ -1734,6 +1753,23 @@ sub SetupBossNode()
     mysystem("cat /root/.ssh/authorized_keys | ssh " . $emulabconfig{"FSIP"} .
 	     " '(cat >> /root/.ssh/authorized_keys)'")
 	if ($emulabconfig{"OPSIP"} ne $emulabconfig{"FSIP"});
+
+    #
+    # Need to tweak mrouted.conf as appropriate for an inner-elab
+    # (ignore the real control net, otherwise we will get ALL mcast traffic
+    # in the testbed delivered to our doorstep!)
+    #
+    if ($emulabconfig{"CONFIG_MROUTED"}) {
+	# make sure old "standard" mrouted doesn't interfere with port
+	if (-r "/usr/local/etc/rc.d/mrouted" && -r "/etc/rc.d/mrouted") {
+	    unlink("/etc/rc.d/mrouted");
+	}
+	if (-x "/usr/local/sbin/mrouted" && -x "/usr/sbin/mrouted") {
+	    unlink("/usr/sbin/mrouted");
+	}
+
+	mysystem("echo 'phyint $outer_controlif force_leaf noflood deny 0/0 bidir' >> /usr/local/etc/mrouted.conf");
+    }
 
     #
     # XXX Remove conflicting package installed by boss-install.
@@ -2136,6 +2172,14 @@ sub CreateDefsFile($)
 		    #
 		    if ($FBSD_VERSION < 6 || $FBSD_VERSION == 7.2) {
 			print OUTDEFS "SELFLOADER_DATA=\"\"\n";
+		    }
+		    last SWITCH;
+		};
+		/^NEEDMROUTED$/ && do {
+		    if ($emulabconfig{"CONFIG_MROUTED"} == 1) {
+			print OUTDEFS "NEEDMROUTED=1\n";
+		    } else {
+			print OUTDEFS "NEEDMROUTED=0\n";
 		    }
 		    last SWITCH;
 		};
