@@ -525,6 +525,17 @@ sub doSwapout($) {
 	}
 
 	#
+	# Grab our per-experiment switch stack name.
+	#
+	my @expswitches = $experiment->SwitchList(1);
+	my ($perexpstack,$leader,@curswitches) = \
+	    GetPerExperimentSwitchStack($experiment);
+	my $stackarg = "";
+	if (defined($perexpstack) && (@expswitches || @curswitches)) {
+	    $stackarg = "-S $perexpstack --skip-supplied";
+	}
+
+	#
 	# Clean up any VLANs in experiment.
 	#
 	# When modifying an elabinelab experiment, leave the vlans intact
@@ -536,7 +547,7 @@ sub doSwapout($) {
 	    my $tagopt = ($type != MODIFY ? "-C" : "");
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
-	    if (system("snmpit --redirect-err $tagopt -r $pid $eid")) {
+	    if (system("snmpit $stackarg --redirect-err $tagopt -r $pid $eid")) {
 		tberror({type => 'secondary', severity => SEV_SECONDARY,
 			 error => ['vlan_reset_failed']},
 			"Failed to reset VLANs");
@@ -558,7 +569,7 @@ sub doSwapout($) {
 	    }
 	    if (@stale) {
 		print "Removing stale vlans @stale\n";
-		system("snmpit --redirect-err -f -C ".
+		system("snmpit $stackarg --redirect-err -f -C ".
                     join(" ", map("-o $_", @stale)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
@@ -567,6 +578,15 @@ sub doSwapout($) {
 		    $swapout_errors = 1;
 		}
 	    }
+	}
+
+	#
+	# Remove per-experiment switch stacks -- don't bother to check if there
+	# are any; it's cheap.
+	#
+	if ($type >= RETRY && defined($perexpstack)) {
+	    print STDERR "Removing per-experiment switch stack.\n";
+	    DeletePerExperimentSwitchStack($experiment);
 	}
     }
 	
@@ -957,6 +977,30 @@ sub doSwapin($) {
     }
 
     #
+    # Create/update per-experiment switch stacks if necessary.
+    # Still haven't done any vlan synch for modify.
+    #
+    my @expswitches = $experiment->SwitchList(1);
+    my ($perexpstack,$leader,@curswitches) = \
+	GetPerExperimentSwitchStack($experiment);
+    my $stackarg = "";
+    if (($type > MODIFY && @expswitches)
+	|| ($type == MODIFY && (!defined($perexpstack) && @expswitches))) {
+	print STDERR "Creating per-experiment switch stack.\n";
+	AddPerExperimentSwitchStack($experiment,@expswitches);
+	$perexpstack = GetPerExperimentSwitchStackName($experiment);
+    }
+    elsif ($type == MODIFY && defined($perexpstack)
+	   && (@expswitches || @curswitches)) {
+	print STDERR "Updating per-experiment switch stack.\n";
+	UpdatePerExperimentSwitchStack($experiment,@expswitches);
+    }
+    if (defined($perexpstack) && (@expswitches || @curswitches)) {
+	print STDERR "Will configure per-experiment switch stack ($perexpstack) later.\n";
+	$stackarg = "-S $perexpstack --skip-supplied";
+    }
+
+    #
     # When doing a modify, we have to compare vlans to determine which
     # vlans actually changed and need to be deleted, before processing
     # the new vlans for the experiment. Note that vlans that already
@@ -986,7 +1030,7 @@ sub doSwapin($) {
 	if ($ELABINELAB || !$syncvlans) {
 	    if (@diff) {
 		print "Removing obsolete vlans @diff\n";
-		system("snmpit --redirect-err -f -C ".
+		system("snmpit $stackarg --redirect-err -f -C ".
 		       join(" ", map("-o $_", @diff)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
@@ -994,16 +1038,35 @@ sub doSwapin($) {
 			    "Failed to remove obsolete VLANs.");
 		    return 1;
 		}
+		if (defined($perexpstack)) {
+		    system("snmpit -S $perexpstack --redirect-err -f -C ".
+			   join(" ", map("-o $_", @diff)));
+		    if ($?) {
+			tberror({type => 'summary', severity => SEV_SECONDARY,
+				 error => ['vlan_setup_failed']},
+				"Failed to remove obsolete per-experiment VLANs.");
+			return 1;
+		    }
+		}
 	    }
 	}
 	else {
 	    print "Synchronizing VLANs.\n";
-	    system("snmpit --redirect-err -X $pid $eid");
+	    system("snmpit $stackarg --redirect-err -X $pid $eid");
 	    if ($?) {
 		tberror({type => 'summary', severity => SEV_SECONDARY,
 			 error => ['vlan_setup_failed']},
 			"Failed to synchronize VLANs.");
 		return 1;
+	    }
+	    if (defined($perexpstack)) {
+		system("snmpit -S $perexpstack --redirect-err -X $pid $eid");
+		if ($?) {
+		    tberror({type => 'summary', severity => SEV_SECONDARY,
+			     error => ['vlan_setup_failed']},
+			    "Failed to synchronize per-experiment VLANs.");
+		    return 1;
+		}
 	    }
 	}
     }
@@ -1335,7 +1398,7 @@ sub doSwapin($) {
 	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
-	if (system("snmpit --redirect-err -t $pid $eid")) {
+	if (system("snmpit $stackarg --redirect-err -t $pid $eid")) {
 	    tberror({type => 'summary', severity => SEV_SECONDARY,
 		     error => ['vlan_setup_failed']},
 		    "Failed to set up VLANs.");
@@ -1364,7 +1427,7 @@ sub doSwapin($) {
     if ($type >= RETRY) {
 	print "Clearing port counters.\n";
 	TBDebugTimeStamp("portstats started");
-	if (system("portstats -z -a -q $pid $eid")) {
+	if (system("portstats $stackarg -z -a -q $pid $eid")) {
 	    tbwarn "Failed to clear port counters.";
 	    #
 	    # This is a non-fatal error.
@@ -1416,6 +1479,22 @@ sub doSwapin($) {
 	undef $os_setup_pid;
 	tberror "Error waiting for os_setup to finish.";
 	return 1;
+    }
+
+    #
+    # Run snmpit on the per-experiment switch stacks if os_setup didn't fail!
+    #
+    if (defined($perexpstack) && !$experiment->skipvlans() &&
+	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
+	print "Setting up per-experiment VLANs.\n";
+	TBDebugTimeStamp("snmpit started");
+	if (system("snmpit -S $perexpstack --redirect-err -t $pid $eid")) {
+	    tberror({type => 'summary', severity => SEV_SECONDARY,
+		     error => ['vlan_setup_failed']},
+		    "Failed to set up per-experiment VLANs.");
+	    return 1;
+	}
+	TBDebugTimeStamp("snmpit finished");
     }
 
     #

@@ -2697,6 +2697,56 @@ sub NodeList($;$$)
 }
 
 #
+# Return list of experiment switches (objects or just names)
+#
+sub SwitchList($;$$)
+{
+    my ($self, $namesonly, $includevirtual) = @_;
+    my @nodenames = ();
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+    $includevirtual = 0
+	if (!defined($includevirtual));
+    $namesonly = 0
+	if (!defined($namesonly));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select r.node_id,nt.isvirtnode from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where r.pid='$pid' and r.eid='$eid' and nt.isswitch=1");
+    return undef
+	if (!$query_result);
+    return ()
+	if (!$query_result->numrows);
+
+    while (my ($nodeid,$isvirt) = $query_result->fetchrow_array()) {
+	next
+	    if ($isvirt && !$includevirtual);
+	push(@nodenames, $nodeid);
+    }
+    return @nodenames
+	if ($namesonly);
+
+    my @nodes = ();
+
+    foreach my $nodeid (@nodenames) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    print STDERR "*** Could not map $nodeid to its object\n";
+	    return undef;
+	}
+	push(@nodes, $node);
+    }
+    return @nodes;
+}
+
+#
 # Copy log files to long term storage.
 #
 sub SaveLogFiles($)
