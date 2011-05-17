@@ -1,6 +1,8 @@
 #!/bin/sh
 
 version=0.70
+srcurl="http://sourceforge.net/projects/rude/files/rude/rude-$version"
+tarball="rude-$version.tar.gz"
 
 if [ -x /usr/bin/fetch ]; then
     fetch=/usr/bin/fetch
@@ -11,28 +13,46 @@ else
     exit 1
 fi
 
-if [ ! -d rude-$version/src ]; then
-    cd $1
-    if [ ! -f rude-$version.tar.gz ]; then
-      echo "Downloading rude source from www.emulab.net to $1 ..."
-      $fetch http://www.emulab.net/downloads/rude-$version.tar.gz
+if [ -n "$1" ]; then srcdir=$1; else srcdir=$PWD ; fi
+if [ -n "$2" ]; then tarball=$2; fi
+if [ -n "$3" ]; then host=$3; else host=www.emulab.net ; fi
+dir=$PWD
+
+if [ ! -d $dir/rude-$version/src ]; then
+    if [ ! -f "$tarball" ]; then
+      cd $dir
+      echo "Downloading rude source from $host to $dir ..."
+      $fetch http://$host/$tarball
       if [ $? -ne 0 ]; then
            echo "Failed..."
-	   exit 1
+           echo "Downloading rude source from $srcurl to $dir ..."
+           $fetch $srcurl/$tarball || {
+	       echo "ERROR: rude-fetch: $fetch failed"
+	       exit 1
+	   }
       fi
     fi
-    echo "Unpacking/patching $rude-version source ..."
-    tar xzof rude-$version.tar.gz || {
+    echo "Unpacking/patching rude-$version source ..."
+    tar xzof $tarball || {
         echo "ERROR: rude-fetch.sh: tar failed"
 	exit 1
     }
     if [ -d rude -a ! -d rude-$version ]; then
         mv rude rude-$version
     fi
-    cd rude-$version && patch -p0 < ../rude-patch || {
+
+    # XXX hack to deal with relative paths...argh!
+    case $srcdir in
+    /*)
+	;;
+    *)
+        srcdir="../$srcdir"
+	;;
+    esac
+    cd rude-$version && patch -p0 < $srcdir/rude-patch || {
         echo "ERROR: rude-fetch.sh: patch failed"
 	exit 1
     }
-    rm -f ../rude-$version.tar.gz */*.orig
+    rm -f */*.orig
 fi
 exit 0

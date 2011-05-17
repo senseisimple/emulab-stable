@@ -1,0 +1,36 @@
+These example programs show how to do various things with Trousers and
+libtpm.  The only important ones are these:
+
+	idkey.c		- Goes through the trouble of creating an
+			identity key - this process is fairly complex
+			under normal circumstances but in our
+			environment it is much simpler.  This is why we
+			are able to skip all the Privacy CA stuff.
+
+	doquote.c	- This is a helper program that we use inside
+			the TPM MFS; it was made to be used in scripts
+			with tmcc.  It will take the output from TMCD
+			'quoteprep' command, do the proper quote, and
+			then write the output back out so it can be
+			piped right back to tmcc for the 'nextstate'
+			command.  See the usage for more details.
+
+	loadkey.c	- This demonstrates how to load an encrypted
+			identity key blob and make a quote with it.  It
+			also has some bonus code that shows how to parse
+			the quote.
+
+	ltpmloadkey.c	- This also loads an identity key (but it uses
+			libtpm, unlike all other code here), generates a
+			quote with the identity key, parses it, and
+			verifies it.  This is fairly valuable because
+			there is/was practically no documentation on how
+			to do this.
+
+	pcrcomposite.c	- Shows the PCR composite structure (also in
+			ltpmloadkey.c).
+
+	tpm-signoff.c	- This is another helper program we use in the
+			TPM MFS.  It extends rubbish into the specified
+			PCR.  We use this for the sign-off phase of the
+			boot chain.

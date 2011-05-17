@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -394,7 +394,7 @@ foreach my $lan (sort keys(%lans)) {
 my $havepmap = 0;
 $query_result =
     DBQueryFatal("select v.vname,n.node_id,n.phys_nodeid,n.type,".
-		 " o.osid,o.OS,o.version,o.osfeatures".
+		 " o.osid,o.OS,o.version,o.osfeatures,r.erole".
 		 " from virt_nodes as v,reserved as r,nodes as n,os_info as o".
 		 " where v.pid=r.pid and v.eid=r.eid and v.vname=r.vname".
 		 " and r.node_id=n.node_id and n.def_boot_osid=o.osid and".
@@ -416,11 +416,28 @@ if ($query_result->numrows) {
     # Version 2 added osfeatures field
     #
     print $LTPOUT "V 2\n";
-    while (my ($vname,$node,$pnode,$ptype,$osid,$os,$osvers,$osfeatures) =
-	   $query_result->fetchrow_array) {
+    while (my ($vname,$node,$pnode,$ptype,$osid,$os,$osvers,$osfeatures,$role)
+	   = $query_result->fetchrow_array) {
 	$os = "UNKNOWN" if (!$os);
 	$osvers = "0" if (!$osvers);
 	$osfeatures = "UNKNOWN" if (!$osfeatures);
+	#
+	# Ugh. Nodes with role "virthost" can now be part of the explicit
+	# topology. Nothing wrong with that except that those nodes will
+	# not run linktest! To ensure that such a node does not get nominated
+	# as the coordinator for a linktest run, we remove the "linktest"
+	# attribute from osfeatures. This will tell the linktest script not
+	# to consider the node for that honor.
+	#
+	# One would think that we should just pass the node's role to linktest
+	# and let it decide for itself, but that would create another level
+	# of backward incompatibility.
+	#
+	if ($role eq "virthost" && $osfeatures =~ /linktest/) {
+	    $osfeatures = join(',',
+			       grep($_ ne "linktest",
+				    split(',', $osfeatures)));
+	}
 	print $LTPOUT
 	    "H $vname $node $pnode $ptype $osid $os $osvers $osfeatures\n";
     }

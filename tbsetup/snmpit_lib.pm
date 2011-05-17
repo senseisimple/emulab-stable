@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,13 +15,13 @@ use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum portiface Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
-                getSwitchesInStacks
+                getSwitchesInStacks getVlanIfaces
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
-		getExperimentTrunks setVlanTag setVlanStack
+		getExperimentTrunks setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks getStacksForSwitches
-		getStackType getStackLeader
+		getStackType getStackLeader filterVlansBySwitches
 		getDeviceOptions getTrunks getTrunksFromSwitches
                 getTrunkHash 
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
@@ -33,7 +33,10 @@ use Exporter;
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
 	        getExperimentVlanPorts
-                uniq);
+                uniq isSwitchPort getPathVlanIfaces
+		reserveVlanTag getReservedVlanTag clearReservedVlanTag
+		mapVlansToSwitches mapStaleVlansToSwitches
+);
 
 use English;
 use libdb;
@@ -161,6 +164,128 @@ sub ReadTranslationTable {
 }
 
 #
+# Return an array of ifaces belonging to the VLAN
+#
+sub getVlanIfaces($) {
+    my $vlanid = shift;
+    my @ports = ();
+
+    my $vlan = VLan->Lookup($vlanid);
+    if (!defined($vlan)) {
+        die("*** $0:\n".
+	    "    No vlanid $vlanid in the DB!\n");
+    }
+    my @members;
+    if ($vlan->MemberList(\@members) != 0) {
+        die("*** $0:\n".
+	    "    Unable to load members for $vlan\n");
+	}
+    foreach my $member (@members) {
+	my $nodeid;
+	my $iface;
+	
+	if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
+	    $member->GetAttribute("iface", \$iface) != 0) {
+	    die("*** $0:\n".
+		"    Missing attributes for $member in $vlan\n");
+	}
+	push(@ports, "$nodeid:$iface");
+    }
+
+    return @ports;
+}
+
+#
+# Get real ifaces on switch node in a VLAN that implements a path
+# that consists of two layer 1 connections and also has a switch as
+# the middle node.
+#
+sub getPathVlanIfaces($$) {
+    my $vlanid = shift;
+    my $ifaces = shift;
+
+    my $vlan = VLan->Lookup($vlanid);
+    my $experiment = $vlan->GetExperiment();
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+    
+    my %ifacesonswitchnode = ();
+    
+    # find the underline path of the link
+    my $query_result =
+	DBQueryWarn("select distinct implemented_by_path from ".
+		    "virt_lans where pid='$pid' and eid='$eid' and vname='".
+		    $vlan->vname()."';");
+    if (!$query_result || !$query_result->numrows) {
+	warn "Can't find VLAN $vlanid definition in DB.";
+	return -1;
+    }
+
+    # default implemented_by is empty
+    my ($path) = $query_result->fetchrow_array();
+    if (!$path || $path eq "") {
+	print "VLAN $vlanid is not implemented by a path\n" if $debug;
+	return -1;
+    }
+
+    # find the segments of the path
+    $query_result = DBQueryWarn("select segmentname, segmentindex from virt_paths ".
+				"where pid='$pid' and eid='$eid' and pathname='$path';");
+    if (!$query_result || !$query_result->numrows) {
+	warn "Can't find path $path definition in DB.";
+	return -1;
+    }
+
+    if ($query_result->numrows > 2) {
+	warn "We can't handle the path with more than two segments.";
+	return -1;
+    }
+    
+    my @vlans = ();
+    VLan->ExperimentVLans($experiment, \@vlans);
+    
+    while (my ($segname, $segindex) = $query_result->fetchrow())
+    {
+	foreach my $myvlan (@vlans)
+	{	    
+	    if ($myvlan->vname eq $segname) {
+		my @members;
+
+		$vlan->MemberList(\@members);		
+		foreach my $member (@members) {
+		    my ($node,$iface);
+
+		    $member->GetAttribute("node_id",  \$node);
+		    $member->GetAttribute("iface", \$iface);
+
+		    if ($myvlan->IsMember($node, $iface)) {
+			my @pref;
+
+			$myvlan->PortList(\@pref);
+
+			# only two ports allowed in the vlan
+			if (@pref != 2) {
+			    warn "Vlan ".$myvlan->id()." doesnot have exact two ports.\n";
+			    return -1;
+			}
+
+			if ($pref[0] eq "$node:$iface") {
+			    $ifacesonswitchnode{"$node:$iface"} = $pref[1];
+			} else {
+			    $ifacesonswitchnode{"$node:$iface"} = $pref[0];
+			}
+		    }
+		}
+	    }
+	}
+    }
+
+    %$ifaces = %ifacesonswitchnode;
+    return 0;
+}
+
+
+#
 # Returns an array of ports (in node:card form) used by the given VLANs
 #
 sub getVlanPorts (@) {
@@ -172,27 +297,8 @@ sub getVlanPorts (@) {
     my @ports = ();
 
     foreach my $vlanid (@vlans) {
-	my $vlan = VLan->Lookup($vlanid);
-	if (!defined($vlan)) {
-	    die("*** $0:\n".
-		"    No vlanid $vlanid in the DB!\n");
-	}
-	my @members;
-	if ($vlan->MemberList(\@members) != 0) {
-	    die("*** $0:\n".
-		"    Unable to load members for $vlan\n");
-	}
-	foreach my $member (@members) {
-	    my $nodeid;
-	    my $iface;
-
-	    if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
-		$member->GetAttribute("iface", \$iface) != 0) {
-		die("*** $0:\n".
-		    "    Missing attributes for $member in $vlan\n");
-	    }
-	    push(@ports, "$nodeid:$iface");
-	}
+	my @ifaces = getVlanIfaces($vlanid);
+	push @ports, @ifaces;
     }
     # Convert from the DB format to the one used by the snmpit modules
     return convertPortsFromIfaces(@ports);
@@ -242,7 +348,7 @@ sub getExperimentCurrentTrunks($$) {
 }
 
 #
-# Returns an an array of ports (in node:card form) that currently in
+# Returns an an array of ports (in node:card form) that are currently in
 # the given vlan.
 #
 sub getExperimentVlanPorts($) {
@@ -286,6 +392,45 @@ sub getPlannedStacksForVlans(@) {
 }
 
 #
+# Filter a set of vlans by devices; return only those vlans that exist
+# on the set of provided stacks. Do not worry about vlans that cross
+# stacks; that is caught higher up.
+#
+sub filterVlansBySwitches($@) {
+    my ($devref, @vlans) = @_;
+    my @result   = ();
+    my %devices  = ();
+
+    if ($debug) {
+	print("filterVlansBySwitches: " . join(",", @{ $devref }) . "\n");
+    }
+
+    foreach my $device (@{ $devref }) {
+	$devices{$device} = $device;
+    }
+    
+    foreach my $vlanid (@vlans) {
+	my @ports = getVlanPorts($vlanid);
+	if ($debug) {
+	    print("filterVlansBySwitches: ".
+		  "ports for $vlanid: " . join(",",@ports) . "\n");
+	}
+	my @tmp = getDeviceNames(@ports);
+	if ($debug) {
+	    print("filterVlansBySwitches: ".
+		  "devices for $vlanid: " . join(",",@tmp) . "\n");
+	}
+	foreach my $device (@tmp) {
+	    if (exists($devices{$device})) {
+		push(@result, $vlanid);
+		last;
+	    }
+	}
+    }
+    return @result;
+}
+
+#
 # Get the list of stacks that the given VLANs actually occupy
 #
 sub getActualStacksForVlans(@) {
@@ -312,26 +457,6 @@ sub getActualStacksForVlans(@) {
 }
 
 #
-# Update database to store vlan tag.
-#
-sub setVlanTag ($$) {
-    my ($vlan_id, $tag) = @_;
-    
-    # Silently exit if they passed us no VLANs
-    if (!$vlan_id || !defined($tag)) {
-	return ();
-    }
-
-    my $vlan = VLan->Lookup($vlan_id);
-    return ()
-	if (!defined($vlan));
-    return ()
-	if ($vlan->SetTag($tag) != 0);
-
-    return 0;
-}
-
-#
 # Ditto for stack that VLAN exists on
 #
 sub setVlanStack($$) {
@@ -344,6 +469,44 @@ sub setVlanStack($$) {
 	if ($vlan->SetStack($stack_id) != 0);
 
     return 0;
+}
+
+#
+# Update database to reserve a vlan tag. The tables will be locked to
+# make sure we can get it. 
+#
+sub reserveVlanTag ($$) {
+    my ($vlan_id, $tag) = @_;
+    
+    if (!$vlan_id || !defined($tag)) {
+	return 0;
+    }
+
+    my $vlan = VLan->Lookup($vlan_id);
+    return 0
+	if (!defined($vlan));
+
+    return $vlan->ReserveVlanTag($tag);
+}
+
+sub clearReservedVlanTag ($) {
+    my ($vlan_id) = @_;
+    
+    my $vlan = VLan->Lookup($vlan_id);
+    return -1
+	if (!defined($vlan));
+
+    return $vlan->ClearReservedVlanTag();
+}
+
+sub getReservedVlanTag ($) {
+    my ($vlan_id) = @_;
+
+    my $vlan = VLan->Lookup($vlan_id);
+    return 0
+	if (!defined($vlan));
+
+    return $vlan->GetReservedVlanTag();
 }
 
 #
@@ -417,19 +580,61 @@ sub convertPortsFromIfaces(@) {
 sub convertPortFromIface($) {
     my ($port) = $_;
     if ($port =~ /(.+):(.+)/) {
-        my ($node,$iface) =  ($1,$2);
-        my $result = DBQueryFatal("SELECT card FROM interfaces " .
-            "WHERE node_id='$node' AND iface='$iface'");
+	my ($node,$iface) =  ($1,$2);
+        my $result = DBQueryFatal("SELECT card, port FROM interfaces " .
+				  "WHERE node_id='$node' AND iface='$iface'");
         if (!$result->num_rows()) {
             warn "WARNING: convertPortFromIface($port) - Unable to get card\n";
             return $port;
         }
-        my $card = ($result->fetchrow())[0];
+        my @row = $result->fetchrow();
+        my $card = $row[0];
+        my $cport = $row[1];
+
+        $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+                               "(SELECT type FROM nodes WHERE node_id='$node')");
+
+        if (!$result->num_rows()) {
+            warn "WARNING: convertPortFromIface($port) -".
+                " Uable to decide if $node is a switch or not\n";
+            return $port;
+        }
+
+        if (($result->fetchrow())[0] == 1) {
+	    #
+	    # Should return the later one, but many places in snmpit
+	    # and this file depend on the old format...
+	    #
+            return "$node:$card";
+            #return "$node:$card.$cport";                                            
+        }
+
         return "$node:$card";
+
     } else {
         warn "WARNING: convertPortFromIface($port) - Bad port format\n";
         return $port;
     }
+}
+
+#                                                                                    
+# If a port is on switch, some port ops in snmpit                                    
+# should be avoided.                                                                 
+#                                                                                    
+sub isSwitchPort($) {
+    my $port = shift;
+
+    if ($port =~ /^(.+):(.+)/) {
+        my $node = $1;
+
+        my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+                                  "(SELECT type FROM nodes WHERE node_id='$node')");
+
+        if (($result->fetchrow())[0] == 1) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 #
@@ -579,6 +784,13 @@ sub getDeviceType ($) {
 sub getInterfaceSettings ($) {
 
     my ($interface) = @_;
+
+    #
+    # Switch ports are evil and we don't touch them.
+    #
+    if (isSwitchPort($interface)) {
+	return ();
+    }
 
     $interface =~ /^(.+):(\d+)$/;
     my ($node, $port) = ($1, $2);
@@ -773,7 +985,10 @@ sub getDeviceOptions($) {
     my %options;
 
     my $result = DBQueryFatal("SELECT supports_private, " .
-	"single_domain, snmp_community, min_vlan, max_vlan " .
+	"single_domain, s.snmp_community as device_community, ".
+        "t.min_vlan, t.max_vlan, " .
+	"t.snmp_community as stack_community, ".
+	"s.min_vlan as device_min, s.max_vlan as device_max ".
 	"FROM switch_stacks AS s left join switch_stack_types AS t " .
 	"    ON s.stack_id = t.stack_id ".
 	"WHERE s.node_id='$switch'");
@@ -783,14 +998,16 @@ sub getDeviceOptions($) {
 	return undef;
     }
 
-    my ($supports_private, $single_domain, $snmp_community, $min_vlan,
-	$max_vlan) = $result->fetchrow();
+    my ($supports_private, $single_domain, $device_community, $min_vlan,
+	$max_vlan, $stack_community, $device_min, $device_max) =
+	    $result->fetchrow();
 
     $options{'supports_private'} = $supports_private;
     $options{'single_domain'} = $single_domain;
-    $options{'snmp_community'} = $snmp_community || "public";
-    $options{'min_vlan'} = $min_vlan || 2;
-    $options{'max_vlan'} = $max_vlan || 1000;
+    $options{'snmp_community'} =
+ 	$device_community || $stack_community || "public";
+    $options{'min_vlan'} = $device_min || $min_vlan || 2;
+    $options{'max_vlan'} = $device_max || $max_vlan || 1000;
 
     $options{'type'} = getDeviceType($switch);
 
@@ -890,6 +1107,98 @@ sub getTrunkPath($$$$) {
 	    return ();
 	}
     }
+}
+
+#
+# Given a set of vlans, determine *exactly* what devices are needed
+# for the ports and any trunks that need to be crossed. This is done
+# in the stack module, but really want to do this before the stack
+# is created so that we do not add extra devices if not needed.
+#
+sub mapVlansToSwitches(@)
+{
+    my @vlan_ids = @_;
+    my %switches = ();
+
+    #
+    # This code is lifted from setPortVlan() in snmpit_stack.pm
+    #
+    foreach my $vlan_id (@vlan_ids) {
+	my @ports   = uniq(getVlanPorts($vlan_id),
+			   getExperimentVlanPorts($vlan_id));
+	my @devices = mapPortsToSwitches(@ports);
+
+	# And update the total set of switches.
+	foreach my $device (@devices) {
+	    $switches{$device} = 1;
+	}
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    print "mapVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# An alternate version for a "stale" vlan; one that is destroyed cause of
+# a swapmod (syncVlansFromTables). 
+#
+sub mapStaleVlansToSwitches(@)
+{
+    my @vlan_ids = @_;
+    my %switches = ();
+
+    foreach my $vlan_id (@vlan_ids) {
+	#
+	# Get the ports that we think are already in the vlan, since
+	# this might be a remove/modify operation. Can probably optimize
+	# this. 
+	#
+	my @ports   = getExperimentVlanPorts($vlan_id);
+	my @devices = mapPortsToSwitches(@ports);
+
+	# And update the total set of switches.
+	foreach my $device (@devices) {
+	    $switches{$device} = 1;
+	}
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    print "mapStaleVlansToSwitches: @sorted\n";
+    return @sorted;
+}
+
+#
+# Map a set of ports to the devices they are on plus the trunks.
+# See above.
+#
+sub mapPortsToSwitches(@)
+{
+    my @ports    = @_;
+    my %switches = ();
+    my %trunks   = getTrunks();
+    my %map      = mapPortsToDevices(@ports);
+    my %devices  = ();
+    
+    foreach my $device (keys %map) {
+	$devices{$device} = 1;
+    }
+
+    #
+    # This code is lifted from setPortVlan() in snmpit_stack.pm
+    #
+    # Find every switch which might have to transit this VLAN through
+    # its trunks.
+    #
+    my @trunks = getTrunksFromSwitches(\%trunks, keys %devices);
+    foreach my $trunk (@trunks) {
+	my ($src,$dst) = @$trunk;
+	$devices{$src} = $devices{$dst} = 1;
+    }
+    # And update the total set of switches.
+    foreach my $device (keys(%devices)) {
+	$switches{$device} = 1;
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    return @sorted;
 }
 
 #

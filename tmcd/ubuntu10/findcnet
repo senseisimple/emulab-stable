@@ -1,0 +1,173 @@
+#!/bin/sh
+
+#
+# Find the Emulab control network interface.
+#
+# When called the first time (an invocation on any interface when
+# /var/emulab/boot/controlif does not exist) we run DHCP and find the
+# control network.
+#
+# On all invocations, we check the contents of that file against the
+# interface we were called with and return "cnet" if we are the control
+# net.  Otherwise we just return the physical interface name.
+#
+
+static_widearea_config()
+{
+	local iface=$1
+
+	if [ -e /etc/emulab/isrem -a -e /etc/emulab/waconfig ]; then
+		echo "Found Emulab widearea config info..."
+		. /etc/emulab/waconfig
+	else
+		return 1
+	fi
+
+	# XXX check WA_MAC?
+	if [ "$WA_BOOTMETHOD" != static ]; then
+		return 1
+	fi
+	
+	cnetif=`/sbin/ifconfig -a | \
+		sed -n 's/^\([^ ]*\) *Link encap:Ethernet *HWaddr '$WA_MAC' *$/\1/ip'`
+
+	if [ -z "$cnetif" ]; then
+		echo "Could not find iface with MAC $WA_MAC; trying DHCP!"
+		return 1
+	elif [ -z "$WA_HOSTNAME"   -o -z "$WA_DOMAIN" -o \
+	       -z "$WA_IP_ADDR"    -o -z "$WA_IP_NETMASK" -o \
+	       -z "$WA_IP_GATEWAY" -o -z "$WA_IP_DNS1" ]; then
+		echo "Missing static IP config vars; trying DHCP!"
+		return 1
+	fi
+
+	# Make sure ifup passed us the correct interface.  If not,
+	# exit successfully so that the DHCP client isn't run
+	if [ "$cnetif" != "$iface" ]; then
+		return 0
+	fi
+
+	# We're going ahead with the static config
+	echo "Statically configuring control net on $cnetif ..."
+	/sbin/ifconfig "$cnetif" inet "$WA_IP_ADDR" netmask "$WA_IP_NETMASK" up
+	/sbin/route add default gateway "$WA_IP_GATEWAY"
+		
+        # setup resolv.conf
+	echo "search $WA_DOMAIN" > /etc/resolv.conf
+	echo "nameserver $WA_IP_DNS1" >> /etc/resolv.conf
+	if [ -n "$WA_IP_DNS2" ]; then
+		echo "nameserver $WA_IP_DNS2" >> /etc/resolv.conf
+	fi
+
+        # set hostname
+	hosts_str="$WA_HOSTNAME"
+	if echo "$WA_HOSTNAME" | grep -q \\.; then
+		hostname "$WA_HOSTNAME"
+	else
+		hostname "${WA_HOSTNAME}.${WA_DOMAIN}"
+		hosts_str="${WA_HOSTNAME}.${WA_DOMAIN} ${hosts_str}"
+	fi
+
+        # setup hosts file
+	echo "$WA_IP_ADDR ${hosts_str}" >> /etc/hosts
+
+        # setup a few necessary emulab files...
+	echo "$cnetif" > $BOOTDIR/controlif
+	if [ -e "/etc/emulab/bossnode" ]; then
+		bossnode=`cat /etc/emulab/bossnode`
+		i = 0
+		while [ $i -lt 6 ]; do
+			bossip=`host -t A "$bossnode"`
+			[ $? -eq 0 ] && break
+			i=`expr $i + 1`
+			sleep 5
+		done
+		
+		echo `echo "$bossip" | sed -n -e 's/.*has address\s*\(.*\)/\1/p'` \
+			> $BOOTDIR/bossip
+	fi
+	echo "$WA_HOSTNAME" > $BOOTDIR/realname
+	echo "$WA_IP_GATEWAY" > $BOOTDIR/routerip
+	echo "$WA_IP_ADDR" > $BOOTDIR/myip
+	echo "$WA_IP_NETMASK" > $BOOTDIR/mynetmask
+
+	return 0
+}
+
+export LANG=C
+iface="$1"
+
+lockdir=/var/lock/findcnet
+
+. /etc/emulab/paths.sh
+
+while ! mkdir $lockdir 2> /dev/null; do
+	sleep 1
+done
+
+cnetfile="/var/run/cnet"
+cnetif=''
+
+#
+# We use /var/run to store the current idea of the cnet interface
+# because we want it to go away on reboot.
+#
+
+if [ -f $cnetfile ]; then
+    cnetif=`cat $cnetfile`
+elif static_widearea_config $iface; then
+	echo $iface > $cnetfile
+	cnetif=`cat $cnetfile`
+	/sbin/initctl emit -n 'emulab-findcnet-done'
+else
+    #
+    # Find a list of candidate interfaces
+    #
+    _iflist=`ifconfig -a | grep '^eth' | awk '{ print $1 }'`
+    echo "`date`: $iface: findcnet running dhclient on: $_iflist"
+
+    #
+    # If dhclient returns success, then it has configured the first interface
+    # and gone into background mode.  At that point we don't care about it any
+    # more and just kill it.  We also shutdown all the other interfaces (which
+    # dhclient will leave "up").
+    #
+    if [ -x /sbin/dhclient ] && /sbin/dhclient -q $_iflist ; then
+        killall dhclient
+	rm -f /var/run/dhclient.pid
+        echo "`date`: $iface: findcnet dhclient returned"
+	[ -f $BOOTDIR/controlif ] && cp $BOOTDIR/controlif $cnetfile
+    	cnetif=`cat $cnetfile`
+	for _if in $_iflist; do
+	    [ $_if = $cnetif ] && continue
+	    echo "`date`: taking $_if down"
+	    ifconfig $_if down
+	done
+    fi
+
+    # Emit this upstart event to allow boot to continue, even
+    # if we couldn't get a dhcp lease.
+    /sbin/initctl emit -n 'emulab-findcnet-done'
+fi >>$LOGDIR/dhclient.log 2>&1
+
+#
+# In case ifup/ifdown try to feed us anything
+#
+while read foo bar; do
+    echo "`date`: $iface: findcnet got \"$foo $bar\" from caller"
+done >>$LOGDIR/dhclient.log 2>&1
+
+if [ -z "$cnetif" ]; then
+    echo "`date`: $iface: findcnet got empty $cnetfile" >>$LOGDIR/dhclient.log
+fi
+
+echo "`date`: $iface: cnet is $cnetif" >>$LOGDIR/dhclient.log
+
+if [ "$cnetif" = $iface ]; then
+    echo cnet
+else
+    echo $iface
+fi
+
+rm -rf $lockdir
+exit 0

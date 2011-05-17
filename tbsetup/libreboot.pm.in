@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # node reboot library. Basically the backend to the node_reboot script, but
@@ -34,10 +34,6 @@ my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
-if ($PGENISUPPORT) {
-    require libGeni;
-}
-
 #
 # The number of nodes we reboot at a time and the time to wait between batches.
 # The batch size determines the degree of parallelism.
@@ -56,13 +52,16 @@ my $MAXWAITTIME	= (6 * 60);
 #
 # Testbed Support libraries
 #
-use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 use event;
 use POSIX qw(strftime);
 use IO::Handle;
 use Fcntl;
+if ($PGENISUPPORT) {
+    require libGeni;
+}
 
 # External Programs
 my $ssh		= "$TB/bin/sshtb -n";
@@ -70,7 +69,7 @@ my $power	= "$TB/bin/power";
 my $ipod	= "$TB/sbin/apod";
 my $vnodesetup	= "$TB/sbin/vnode_setup";
 my $bisend      = "$TB/sbin/bootinfosend";
-my $logfile	= "$TB/log/power.log";
+my $logfile	= "$TB/log/reboot.log";
 my $ping	= "/sbin/ping";
 my $reboot      = "$TB/bin/node_reboot";
 
@@ -131,6 +130,7 @@ sub nodereboot($$)
     my $reconfig    = 0;
     my $asyncmode   = 0;
     my $pipemode    = 0;
+    my $force       = 0;
 
     $powercycle  = $args->{'powercycle'} if (exists($args->{'powercycle'}));
     $rebootmode  = $args->{'rebootmode'} if (exists($args->{'rebootmode'}));
@@ -142,6 +142,7 @@ sub nodereboot($$)
     $prepare     = $args->{'prepare'}    if (exists($args->{'prepare'}));
     $reconfig    = $args->{'reconfig'}   if (exists($args->{'reconfig'}));
     $asyncmode   = $args->{'asyncmode'}  if (exists($args->{'asyncmode'}));
+    $force       = $args->{'force'}      if (exists($args->{'force'}));
 
     #
     # If pipeno is specified in the environment, we write the results to
@@ -180,7 +181,7 @@ sub nodereboot($$)
 	my $rebootable = $nodeobject->rebootable();
 
 	$nodeobjects{$node} = $nodeobject;
-	push(@temp,$node) if $rebootable;
+	push(@temp,$node) if ($rebootable || $force);
     }
     @nodes = @temp;
     # END XXX
@@ -193,6 +194,13 @@ sub nodereboot($$)
     #
     my %realnodes = ();
     my %virtnodes = ();
+
+    #
+    # Geni node reboot/wait is optimized inside libGeni, so keep them
+    # separate. Both real and virtual; libGeni treats them the same
+    # since the Protogeni interface makes no distinction.
+    #
+    my %geninodes = ();
 
     foreach my $node (@nodes) {
 	my $nodeobj = $nodeobjects{$node};
@@ -208,8 +216,11 @@ sub nodereboot($$)
 	# All nodes start out as being successful; altered later as needed.
 	$result->{$node} = 0;
 
-	if ($nodeobj->isvirtnode()) {
-	    if (!$jailed && !$plab && !$geninode && !$rebootable) {
+	if ($geninode) {
+	    $geninodes{$node} = $nodeobj;
+	}
+	elsif ($nodeobj->isvirtnode()) {
+	    if (!$jailed && !$plab && !$rebootable) {
 		print "reboot ($node): Skipping old style virtual node\n";
 		next;
 	    }
@@ -232,7 +243,7 @@ sub nodereboot($$)
 	    delete($virtnodes{$node});
 	}
     }
-    if (! keys(%realnodes) && ! keys(%virtnodes)) {
+    if (! (keys(%realnodes) || keys(%virtnodes) || keys(%geninodes))) {
 	print "reboot: No nodes to reboot.\n";
 	return 0;
     }
@@ -309,6 +320,31 @@ sub nodereboot($$)
     }
 
     #
+    # Fire off the geninode reboots. 
+    #
+    if (keys(%geninodes)) {
+	my $this_user = User->ThisUser();
+	if (!defined($this_user)) {
+	    tbdie("Could not determine current user for libGeni\n");
+	}
+	if (libGeni::RestartNodes($this_user, $debug, values(%geninodes))) {
+	    tbdie("Could not restart protogeni nodes\n");
+	}
+	#
+	# We always do a wait for geni nodes since for nodes in "basic"
+	# cooked mode, nothing will be reporting a state change from the
+	# node. We have to go poll it to make sure that the node is alive,
+	# and so we can report ISUP for it. This is a bit of a violation of
+	# the default reboot model, which is fire and forget when waitmode
+	# is not set, but no way around it.
+	#
+	if (libGeni::WaitForNodes($this_user, $debug,
+				  undef, values(%geninodes))) {
+	    tbdie("Error in waiting for protogeni nodes\n");
+	}
+    }
+
+    #
     # We do not want lots of nodes all rebooting at the same time, it puts
     # a strain on UDP-based PXE/DHCP/TFTP protocols.  So we group them in
     # batches and wait a short time between batches.
@@ -335,9 +371,10 @@ sub nodereboot($$)
 	    # batch, and continue on. We do not wait for them to go down or
 	    # reboot.
 	    #
-	    info("*** reboot: Powercyle mode: power cycle ".join(" ",@batch));
+	    info("*** reboot: Powercycle mode: power cycle ".join(" ",@batch));
 	    if (PowerCycle(@batch)) {
-		tberror "Powercyle failed for " . join(" ",@batch);
+		tberror "Powercycle failed for one or more of " .
+		    join(" ",@batch);
 		foreach my $node (@batch) {
 		    $result->{$node} = -1;
 		    $failed++;
@@ -409,7 +446,8 @@ sub nodereboot($$)
     #
     if (@needPowercycle) {
 	if (PowerCycle(@needPowercycle)) {
-	    tberror "Powercyle failed for " . join(" ",@needPowercycle);
+	    tberror "Powercycle failed for one or more of " .
+		join(" ",@needPowercycle);
 	    foreach my $node (@needPowercycle) {
 		$result->{$node} = -1;
 		$failed++;
@@ -830,19 +868,6 @@ sub RebootVNode($$) {
 	return($exitstatus);
     }
 
-    if ($geninode) {
-	#
-	# Do this via the Geni API and return that status to the caller.
-	#
-	my $experiment = $nodeobj->Reservation();
-	if (!defined($experiment)) {
-	    print STDERR "*** reboot ($vnode): geninode not allocated.\n";
-	    exit(1);
-	}
-	$EUID = $UID;
-	exit(GeniEmulab->StartSlivers($experiment, [ $nodeobj ]));
-    }
-
     my $addargs = "-t ";	# Turn on timestamps.
     if ($plab) {
 	$addargs .= "-p ";
@@ -1008,6 +1033,8 @@ sub nodereboot_exec($$)
 	if (exists($args->{'reconfig'}) && $args->{'reconfig'});
     $cmdline .= " -W$args->{waittime}"
 	if (exists($args->{'waittime'}) && $args->{'waittime'});
+    $cmdline .= " -F"
+	if (exists($args->{'force'}));
     $cmdline .= " @{ $args->{'nodelist'}}";
     
     $asyncmode = $args->{'asyncmode'} if (exists($args->{'asyncmode'}));

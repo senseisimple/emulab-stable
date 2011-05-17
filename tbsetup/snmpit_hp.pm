@@ -3,7 +3,7 @@
 #
 # EMULAB-LGPL
 # Copyright (c) 2000-2010 University of Utah and the Flux Group.
-# Copyright (c) 2004-2009 Regents, University of California.
+# Copyright (c) 2004-2010 Regents, University of California.
 # All rights reserved.
 #
 
@@ -214,7 +214,7 @@ sub hammer($$$;$) {
 
 sub get1($$$) {
     my ($self, $obj, $instance) = @_;
-    my $id = $self->{NAME} . ":get1 $obj.$instance";
+    my $id = $self->{NAME} . "::get1($obj.$instance)";
     my $closure = sub () {
 	my $RetVal = snmpitGet($self->{SESS}, [$obj, $instance], 1);
 	if (!defined($RetVal)) { sleep 4;}
@@ -646,9 +646,8 @@ sub createVlan($$$) {
 	#
 	# Sometimes we loose responses, or on the second time around
 	# it might refuse to create a vlan that's already there, so wait
-	# a bit to see if it exists (also so as to not get too
-	# agressive with the switch which can cause to crash with
-	# certain sets, e.g. IGMP stuff)
+	# a bit to see if it exists (also so as to not get too agressive
+	# with the switch which caused nortels to crash with IGMP stuff)
 	#
 	sleep (2);
 	$RetVal = $self->get1($createOID, $vlan);
@@ -660,22 +659,19 @@ sub createVlan($$$) {
     print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
 	    "$self->{NAME} ...\n";
 
-
-    # You'ld think you'ld be able to add IgmpSnoopEnable to the above as one
-    # more item, but that caused it to fail, even though it wins as a separate
-    # packet.
-
-    # There also something in the IGMP magic that causes the switch
-    # to get totally confused, so we're going to throw in some superfluous
-    # queries just to make sure things happened and slow down our interactions.
-
-    $RetVal = $self->findVlan($vlan_id);
-    if (!defined($RetVal) || ("$RetVal" ne $vlan)) {
-	warn "$id: created vlan $vlan_id with number $RetVal" .
-	  "instead of $vlan_number\n";
+    #
+    # Check that it happened.
+    #
+    $RetVal = $self->get1($VlanName, $vlan);
+    if (!defined($RetVal) || ("$RetVal" ne $hpvlan_id)) {
+	warn "$id: created vlan $vlan_id with name $RetVal" .
+	  "instead of $hpvlan_id\n";
     }
 
     if ($self->{SKIPIGMP}) { return $vlan_number ; }
+
+    # XXX the following code has *NEVER* been tested.
+
     my $IgmpEnable = 'hpSwitchIgmpState';
     $RetVal = $self->get1($IgmpEnable, $vlan);
 
@@ -773,13 +769,46 @@ sub setVlanLists($@) {
 	my $arrayref = shift @args;
 	foreach my $i (0, 1, 2) {
 	    @$todo[$j++] = [ @$oids[$i], $vlan,
-			    pack("B*",join('', @{@$arrayref[$i]})), "OCTETSTR"];
+		    pack("B*",join('', @{@$arrayref[$i]})), "OCTETSTR"];
 	}
     }
     $j = $self->set($todo);
     if (!defined($j)) { print "vlists failed\n";}
     return $j;
 }
+
+#
+# Some design comments about HP switch conventions:
+
+# This code was written after having observed packet traces while
+# running the HP management tool, which appeared to remove a port
+# from a vlan merely by getting and setting the 3 OID in getVlanLists
+# or transferred it between vlans by setting a pair of the 3 OIDS.
+
+# It seems that a port may be an untagged member of at most one vlan
+# but may be a tagged member of several others,  i.e. the packets
+# ared rx'd from the port or tx'd to the port with vlan tags added.
+
+# If a port appears only in the $egressOIDs and never in a $normOID
+# (so that it is like a normal interswitch single wire trunk), the
+# The $aftOID = admitOnlyVlanTagged, without our having to set it.
+
+# The OID describing the PVID of a port seem to correspond to
+# the untagged membership of the port in some vlan, and it does
+# not seem necessary to set this OID either.
+
+# In this case, the port has $aftOID (dot1QPortAceptableFrameType) = admitAll.
+
+# If we want the port to be like dual mode port on a foundry or cisco, we can
+# merely add the port to the egress OID of any additonal vlan.
+
+# However, if a switch belongs to a unique vlan, and is an untagged member,
+# there would be no way to determine if the intent was to be a dual mode port
+# or for the port have the semantics of most other switches, i.e. adding it
+# to one vlan takes it out of the first.
+
+# Since this is the common case, we record the dual mode intent
+# by marking the port as being forbidden to join vlan 1.
 
 #
 # Put the given ports in the given VLAN. The VLAN is given as an 802.1Q 
@@ -789,38 +818,23 @@ sub setVlanLists($@) {
 #	 returns 0 on sucess.
 #	 returns the number of failed ports on failure.
 #
-# hp specific: if the vlan_number < 0 *remove* the ports from the vlan
-# No good place to write down the following crazy convention:
-#
-# A normal member of a vlan has its PVID set to that vlan, 
-# has dot1QPortAceptableFrameType = admitAll. and only has 1 egress
-# port among all vlans, namely on its PVID.  (I think ;-)
-#
-# If we want the port to be like dual mode on a foundry or cisco, we would
-# merely add a the egress port on a second vlan.  There would be no way
-# of telling the intent to permit this port to go into dual mode.
-# since this is the common case, if we want to tell that when we directly
-# move a normal port from one vlan to another that it should loose its
-# membership in the first (and shake up all switches in the stack)
-# we will adopt the convention that we will do this, unless the port
-# is marked as being forbidden to join vlan 1.
-#
 sub setPortVlan($$@) {
     my $self = shift;
     my $vlan_number = shift;
     my @ports = @_;
 
-    my $id = $self->{NAME} . "::setPortVlan";
-    $self->debug("$id: $vlan_number ");
+    my $id = $self->{NAME} . "::setPortVlan($vlan_number)";
+    $self->debug($id);
     my %vlansToPorts; # i.e. bumpedVlansToListOfPorts
     my @newTaggedPorts = ();
-    my ($errors, $portIndex, $pvid) = (0,0,0);
+    my ($errors, $portIndex, $pvid, $rv, @protoTrunks) = (0);
 	   
     #
     # Run the port list through portmap to find the ports on the switch that
     # we are concerned with
     #
 
+    return 0 unless(@ports);
     my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX, @ports);
     $self->debug("ports: " . join(",",@ports) . "\n");
     $self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
@@ -830,7 +844,6 @@ sub setPortVlan($$@) {
     # before adding to other.  This is a read_modify_write so lock out
     # other instances of snmpit_hp.
 
-    $self->lock();
     my $defaultInfo = $self->getVlanLists(1);
     foreach $portIndex (@portlist) {
 	# check for three easy cases
@@ -838,18 +851,26 @@ sub setPortVlan($$@) {
 	# b. the ports is not allocated
 	# c. the port is a trunk
 
-	# This is a dual port, so it doesn't have to leave its PVID.
+	# case a: This is a dual port, so it doesn't have to leave its PVID.
 	if (@{@$defaultInfo[0]}[$portIndex - 1]) {
 	    push @newTaggedPorts, $portIndex;
 	    next;
 	}
-	# Unallocated untrunked port.
+	# case b: Unallocated untrunked port.
 	if (@{@$defaultInfo[1]}[$portIndex - 1]) {
 	    $pvid = 1;
 	} else {
 	    my $tagOnly = $self->get1($aftOID,$portIndex);
 	    if ($tagOnly eq "admitOnlyVlanTagged") {
 		# case c: Trunk Port
+		if (@{@$defaultInfo[2]}[$portIndex - 1]) {
+		    # Total grot - happens when port was made an equal trunk
+		    # having no vlans, so is on vlan 1, and might be disabled.
+		    # It might also be the case that this version of the driver
+		    # is being run for the first time on a switch where
+		    # we were previously sloppier about membership in vlan 1.
+		    push @protoTrunks, $portIndex;
+		}
 		push @newTaggedPorts, $portIndex;
 		next;
 	    } else {
@@ -860,18 +881,15 @@ sub setPortVlan($$@) {
 		$pvid = $self->get1("dot1qPvid", $portIndex);
 	    }
 	}
-	if (defined($pvid) && ($pvid != $vlan_number)) {
-	    if (!exists($vlansToPorts{$pvid})) {
-		@{$vlansToPorts{$pvid}} = ();
-	    }
-	    push @{$vlansToPorts{$pvid}}, $portIndex;
-	}
+	push @{$vlansToPorts{$pvid}}, $portIndex # autovivifies if null
+	    if (defined($pvid) && ($pvid != $vlan_number));
     }
     @{$self->{DISPLACED_VLANS}} = grep {$_ != 1;} keys %vlansToPorts;
  
+    $self->lock();
     my $newInfo = $self->getVlanLists($vlan_number);
     foreach my $vlan (keys %vlansToPorts) {
-	my $oldInfo = $vlan == 1 ? $defaultInfo : $self->getVlanLists($vlan) ;
+	my $oldInfo = $self->getVlanLists($vlan) ;
 	foreach $portIndex (@{$vlansToPorts{$vlan}}) {
 	    @{@$oldInfo[1]}[$portIndex-1] = 0;
 	    @{@$newInfo[1]}[$portIndex-1] = 1;
@@ -890,24 +908,22 @@ sub setPortVlan($$@) {
     }
     $self->unlock();
 
-    #
-    # We need to make sure the ports get enabled.
-    #
+    # We need to make sure the ports get enabled, and protoTrunks cleaned up.
 
-    $self->debug("Enabling "  . join(',',@ports) . "...\n");
-    if ( my $rv = $self->portControl("enable",@ports) ) {
-	print STDERR "Port enable had $rv failures.\n";
+    if (@protoTrunks) {
+	$rv = $self->delPortVlan(1, @protoTrunks) +
+		    $self->portControl("enable", @protoTrunks);
 	$errors += $rv;
+	warn "$id: $rv failures with protoTrunks\n"
+	     if ($rv);
     }
 
-    if ($self->{SKIPIGMP}) { return $errors; }
-
-#   Old nortel code for inspiration.
-#    $self->lock();
-#    my $igmp = "rcVlanIgmpVer1SnoopMRouterPorts";
-#    my $IgnoredVal = $self->{SESS}->get("$igmp.$vlan_number");
-#    $errors += $self->snmpSetCheckPortSet($igmp, $vlan_number, $SetVal);
-#    $self->unlock();
+    my $onoroff = ($vlan_number ne "1") ? "enable" : "disable";
+    $self->debug("$id; will $onoroff"  . join(',',@ports) . "...\n");
+    if ( $rv = $self->portControl($onoroff, @ports) ) {
+	warn "$id: Port enable had $rv failures.\n";
+	$errors += $rv;
+    }
 
     return $errors;
 }
@@ -933,22 +949,30 @@ sub delPortVlan($$@) {
     my $vlan_number = shift;
     my @ports = @_;
 
-    $self->debug($self->{NAME} . "::delPortVlan $vlan_number ");
+    return $self->updateOneVlan(0,0,0,$vlan_number,@ports);
+}
+
+sub updateOneVlan($$$$$@)
+{
+    my ($self,$forbid,$untag,$mem,$vlan_number,@ports) = @_;
+
+    $self->debug($self->{NAME} . "::updateOneVlan($untag,$mem,$vlan_number) ");
 	   
     #
     # Run the port list through portmap to find the ports on the switch that
     # we are concerned with
     #
 
+    $self->lock();
     my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX, @ports);
     $self->debug("ports: " . join(",",@ports) . "\n");
     $self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
 
-    $self->lock();
     my $vlist = $self->getVlanLists($vlan_number);
     foreach my $port (@portlist) {
-	@{@$vlist[1]}[$port - 1] = 0;
-	@{@$vlist[2]}[$port - 1] = 0;
+	@{@$vlist[0]}[$port - 1] = $forbid if ($vlan_number eq "1");
+	@{@$vlist[1]}[$port - 1] = $untag;
+	@{@$vlist[2]}[$port - 1] = $mem;
     }
     my $result = $self->setVlanLists($vlan_number, $vlist);
     $self->unlock();
@@ -970,48 +994,15 @@ sub removePortsFromVlan($@) {
     my $id = $self->{NAME} . "::removePortsFromVlan";
 
     foreach my $vlan_number (@vlan_numbers) {
-	#
-	# Do two passes: 1st untrunk any dual-mode ports on this vlan.
-	# 2nd, remove all ports.
-	#
-	my $dualPorts = mirvPortSet($self->get1($forbidOID, 1)); # array
-	my @portlist = $self->portSetToList
-			($self->get1($normOID, $vlan_number));
-	foreach my $portIndex (@portlist) {
-		if (@$dualPorts[$portIndex-1])
-		    { $self->disablePortTrunking($portIndex);}
-	}
-	$self->lock();
-	my $defaultLists = $self->getVlanLists(1);
-	my $vLists = $self->getVlanLists($vlan_number);
-	@portlist = bitSetToList(@$vLists[2]);
-	$self->debug("$id $vlan_number: @portlist\n");
-
-	foreach my $portIndex (@portlist) {
-	    #
-	    # If this port is not listed as a tagged member of the vlan,
-	    # then it could have only gotten here either as a trunk
-	    # or dual-mode port from another vlan, so don't disable it.
-	    #
-	    if (@{@$vLists[1]}[$portIndex - 1]) {
-		@{@$defaultLists[1]}[$portIndex - 1] = 1;
-		@{@$defaultLists[2]}[$portIndex - 1] = 1;
-		$self->debug("disabling port $portIndex  "
-				. "from vlan $vlan_number \n" );
-		$self->set(["ifAdminStatus",$portIndex,"down","INTEGER"],$id);
-	    }
-	    @{@$vLists[1]}[$portIndex - 1] = 0;
-	    @{@$vLists[2]}[$portIndex - 1] = 0;
-	}
-	$errors += $self->setVlanLists($vlan_number, $vLists, 1, $defaultLists);
-	$self->unlock();
+	my @ports = $self->portSetToList($self->get1($egressOID, $vlan_number));
+	$errors += $self->removeSomePortsFromVlan($vlan_number, @ports);
     }
     return $errors;
 }
 
 #
-# Removes and disables some ports in a given VLAN. The VLAN is given as a VLAN
-# 802.1Q tag value.  Ports are known to be regular ports and not trunked.
+# Removes and disables some ports in a given VLAN.
+# The VLAN is given as a VLAN 802.1Q tag value.
 #
 # usage: removeSomePortsFromVlan(self,vlan,@ports)
 #	 returns 0 on sucess.
@@ -1019,12 +1010,39 @@ sub removePortsFromVlan($@) {
 #
 sub removeSomePortsFromVlan($$@) {
     my ($self, $vlan_number, @ports) = @_;
-    my ($errors, $changes, $id, %porthash) =
+    my ($errors, $changes, $id, %porthash, $tagOnly, $pvid) =
 	(0, 0, $self->{NAME} . "::removeSomePortsFromVlan");
 
     @ports = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
     @porthash{@ports} = @ports;
+    my $dualPorts = mirvPortSet($self->get1($forbidOID, 1)); # array
 
+    foreach my $portIndex (@ports) {
+	if (@$dualPorts[$portIndex-1]) {
+	    # We make any dual ports whose PVID is this vlan into equaltrunks.
+	    # A dualtrunked port whose primary vlan is not this vlan
+	    # can be deleted by the code dealing with normal ports
+	    $pvid = $self->get1("dot1qPvid", $portIndex);
+	    next if ("$pvid" ne $vlan_number);
+	    $self->updateOneVlan(0,0,1,$vlan_number,$portIndex); #make tagged
+	    $self->updateOneVlan(0,0,0,1,$portIndex); # clear dual marker.
+	    # fall through to next case
+	}
+	$tagOnly = $self->get1($aftOID,$portIndex);
+	if ($tagOnly eq "admitOnlyVlanTagged") {
+	    if ($self->delPortVlan($vlan_number, $portIndex)) {
+		# assume it failed because it belonged to no other vlans
+		# so add it to vlan 1 and try again.
+		$self->updateOneVlan(0,0,1,1,$portIndex);
+		if ($self->delPortVlan($vlan_number, $portIndex)) {
+		    warn "$id: failed to remove ifIndex $portIndex\n";
+		}
+	    }
+	    delete $porthash{$portIndex};
+	}
+    }
+
+    # Now, remove the remaining ports from the vlan.
     $self->lock();
     my $defaultLists = $self->getVlanLists(1);
     my $vLists = $self->getVlanLists($vlan_number);
@@ -1034,7 +1052,7 @@ sub removeSomePortsFromVlan($$@) {
     foreach my $portIndex (@portlist) {
 	next unless exists($porthash{$portIndex});
 	if (@{@$vLists[1]}[$portIndex - 1]) {
-	    # otherwise, port is tagged, or dual; maybe should complain.
+	    # otherwise, port is tagged.
 
 	    @{@$defaultLists[1]}[$portIndex - 1] = 1;
 	    @{@$defaultLists[2]}[$portIndex - 1] = 1;
@@ -1054,8 +1072,7 @@ sub removeSomePortsFromVlan($$@) {
 
 #
 # Remove the given VLANs from this switch. Removes all ports from the VLAN,
-# It's necessary to call removePortsFromVlan() first on HP's. The VLAN is
-# given as a VLAN identifier from the database.
+# The VLAN is given as a VLAN identifier from the database.
 #
 # usage: removeVlan(self,int vlan)
 #	 returns 1 on success
@@ -1068,6 +1085,7 @@ sub removeVlan($@) {
     my $errors = 0;
     my $name = $self->{NAME};
 
+    $self->removePortsFromVlan(@vlan_numbers);
     foreach my $vlan_number (@vlan_numbers) {
 	#
 	# Perform the actual removal
@@ -1109,7 +1127,7 @@ sub UpdateField($$$@) {
 	    next;
 	}
 	$self->debug("Port $portname, row $row was $Status\n");
-	if (!($OID =~ /^ifAdmin/)) {
+	if ($OID eq "hpSwitchPortFastEtherMode") {
 	    #
 	    # Procurves use the same mib variable to set both
 	    # speed and duplex concurrently; only certain
@@ -1331,91 +1349,47 @@ sub listPorts($) {
 # 
 # Get statistics for ports on the switch
 #
-# usage: getPorts($self)
+# usage: getStats($self)
 # see snmpit_cisco_stack.pm for a description of return value format
 #
 #
-sub getStats ($) {
+sub getStats() {
     my $self = shift;
 
-    my $ifTable = ["ifInOctets",0];
-    my %inOctets=();
-    my %inUcast=();
-    my %inNUcast=();
-    my %inDiscard=();
-    my %inErr=();
-    my %inUnkProt=();
-    my %outOctets=();
-    my %outUcast=();
-    my %outNUcast=();
-    my %outDiscard=();
-    my %outErr=();
-    my %outQLen=();
-    my ($varname, $port, $value);
+    #
+    # Walk the tree for the VLAN members
+    #
+    my $vars = new SNMP::VarList(['ifInOctets'],['ifInUcastPkts'],
+    				 ['ifInNUcastPkts'],['ifInDiscards'],
+				 ['ifInErrors'],['ifInUnknownProtos'],
+				 ['ifOutOctets'],['ifOutUcastPkts'],
+				 ['ifOutNUcastPkts'],['ifOutDiscards'],
+				 ['ifOutErrors'],['ifOutQLen']);
+    my @stats = $self->{SESS}->bulkwalk(0,32,$vars);
 
     #
-    # Walk the whole stats tree, and fill these ha
+    # We need to flip the two-dimentional array we got from bulkwalk on
+    # its side, and convert ifindexes into node:port
     #
-    $self->{SESS}->getnext($ifTable);
-    do {
-	($varname,$port,$value) = @{$ifTable};
-	$self->debug("getStats: Got $varname, $port, $value\n");
-	    if ($port > $self->{MAXPORT}) {
-		# do nothing.  There are entries for vlan interfaces, etc.
-	    } elsif ($varname =~ /InOctets/) {
-		$inOctets{$port} = $value;
-	    } elsif ($varname =~ /InUcast/) {
-		$inUcast{$port} = $value;
-	    } elsif ($varname =~ /InNUcast/) {
-		$inNUcast{$port} = $value;
-	    } elsif ($varname =~ /InDiscard/) {
-		$inDiscard{$port} = $value;
-	    } elsif ($varname =~ /InErrors/) {
-		$inErr{$port} = $value;
-	    } elsif ($varname =~ /InUnknownP/) {
-		$inUnkProt{$port} = $value;
-	    } elsif ($varname =~ /OutOctets/) {
-		$outOctets{$port} = $value;
-	    } elsif ($varname =~ /OutUcast/) {
-		$outUcast{$port} = $value;
-	    } elsif ($varname =~ /OutNUcast/) {
-		$outNUcast{$port} = $value;
-	    } elsif ($varname =~ /OutDiscard/) {
-		$outDiscard{$port} = $value;
-	    } elsif ($varname =~ /OutErrors/) {
-		$outErr{$port} = $value;
-	    } elsif ($varname =~ /OutQLen/) {
-		$outQLen{$port} = $value;
-	    }
-	$self->{SESS}->getnext($ifTable);
-    } while ( $varname =~ /^i[f](In|Out)/) ;
+    my $i = 0;
+    my %stats;
+    foreach my $array (@stats) {
+	while (@$array) {
+	    my ($name,$ifindex,$value) = @{shift @$array};
 
-    #
-    # Put all of the data gathered in the loop into a list suitable for
-    # returning
-    #
-    my @rv = ();
-    foreach my $id ( keys %inOctets ) {
-	my $modport = $self->{IFINDEX}{$id};
-	$port = portnum($self->{NAME} . ":" . $modport);
-	if (!$port && $self->{DOALLPORTS}) {
-		$modport =~ s/\./\//;
-		$port = $self->{NAME} . ".$modport";
+            # See comments in walkTable above.
+
+            if (! defined $self->{IFINDEX}{$ifindex}) { next; }
+            my $port = portnum("$self->{NAME}:$ifindex")
+                || portnum("$self->{NAME}:".$self->{IFINDEX}{$ifindex});
+            if (! defined $port) { next; } # Skip if we don't know about it
+            
+	    ${$stats{$port}}[$i] = $value;
 	}
-	#
-	# Skip ports that don't seem to have anything interesting attached
-	#
-	if (!$port) {
-	    $self->debug("$id does not seem to be connected, skipping\n");
-	    next;
-	}
-	push @rv, [$port,$inOctets{$id},$inUcast{$id},$inNUcast{$id},
-		$inDiscard{$id},$inErr{$id},$inUnkProt{$id},$outOctets{$id},
-		$outUcast{$id},$outNUcast{$id},$outDiscard{$id},$outErr{$id},
-		$outQLen{$id}];
-
+	$i++;
     }
-    return @rv;
+
+    return map [$_,@{$stats{$_}}], sort {tbsort($a,$b)} keys %stats;
 }
 
 #
@@ -1493,10 +1467,12 @@ sub setVlansOnTrunk($$$$) {
     # Some error checking
     #
     if (($value != 1) && ($value != 0)) {
-	die "Invalid value $value passed to setVlansOnTrunk\n";
+	warn "Invalid value $value passed to setVlansOnTrunk\n";
+	return 0;
     }
     if (grep(/^1$/,@vlan_numbers)) {
-	die "VLAN 1 passed to setVlansOnTrunk\n";
+	warn "VLAN 1 passed to setVlansOnTrunk\n";
+	return 0;
     }
     $self->debug("$id: m $modport v $value nums @vlan_numbers\n");
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
@@ -1513,8 +1489,7 @@ sub setVlansOnTrunk($$$$) {
     }
 
     foreach my $vlan_number (@vlan_numbers) {
-	$RetVal = ($value == 1) ? $self->setPortVlan($vlan_number,$modport) :
-				    $self->delPortVlan($vlan_number,$modport);
+	$RetVal = $self->updateOneVlan(0, 0, $value, $vlan_number, $modport);
 	if ($RetVal) {
 	    $errors++;
 	    warn "$id:couldn't " .  (($value == 1) ? "add" : "remove") .
@@ -1527,108 +1502,113 @@ sub setVlansOnTrunk($$$$) {
 #
 # Enable trunking on a port
 #
-# usage: enablePortTrunking2(self, modport, nativevlan, equaltrunking)
+# usage: enablePortTrunking2(self, modport, nativevlan, equaltrunking[, drop])
 #        modport: module.port of the trunk to operate on
 #        nativevlan: VLAN number of the native VLAN for this trunk
 #	 equaltrunk: don't do dual mode; tag PVID also.
+#	 exclude: need to choose something other than this, which actually
+#        is the current PVID for this port.
 #        Returns 1 on success, 0 otherwise
 #
 sub enablePortTrunking2($$$$) {
     my ($self,$port,$native_vlan,$equaltrunking) = @_;
-
-    if ($equaltrunking) {
-	if (!$native_vlan) { $native_vlan = 1; }
-    } elsif (!defined($native_vlan) || ($native_vlan <= 1)) {
-	warn "Error: innappropriate or missing PVID for trunk\n";
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
+    my $id = $self->{NAME} .
+		"::enablePortTrunking($port,$native_vlan,$equaltrunking)";
+    my ($defLists, $rv);
+		
+    if ((!$equaltrunking) && (!defined($native_vlan) || ($native_vlan <= 1))) {
+	warn "$id: inappropriate or missing PVID for trunk\n";
 	return 0;
     }
-    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
     #
-    # portSetVlan will clear out all other vlans and set the PVID
+    # Deal with already trunked ports here, so as to not disrupt traffic
     #
-    my $rv = $self->setPortVlan($native_vlan, $port);
-    if ($rv) {
-	warn "ERROR: Unable to add Trunk $port to PVID $native_vlan\n";
-	return 0;
-    } 
+    my $tagOnly = $self->get1($aftOID,$ifIndex);
+    my $dualPorts = mirvPortSet($self->get1($forbidOID, 1)); # array
+    my $pvid = $self->get1("dot1qPvid", $ifIndex);
+    if ($tagOnly eq "admitOnlyVlanTagged") {
+	if ($equaltrunking) {
+	    # We've been called redundantly, so just add the vlan
+	    return 1 if ($native_vlan eq "1");
+	    # the following enables empty trunks and drops vlan 1 from them;
+	    return ! $self->setPortVlan($native_vlan, $port);
+	} else {
+	    # update to dual mode
+	    return (!$self->updateOneVlan(0, 1, 1, $native_vlan, $port)) # untag
+		    && (!$self->updateOneVlan(1, 0, 0, 1, $port)); # mark
+	}
+    } elsif (@$dualPorts[$ifIndex-1]) {
+	if ($equaltrunking) {
+	    $rv = $self->updateOneVlan(0, 0, 0, 1, $port) || # clear marker
+		$self->updateOneVlan(0, 0, 1, $pvid, $port) || # make untagged
+		(($native_vlan ne "$pvid") &&
+		    $self->updateOneVlan(0, 0, 1, $native_vlan, $port));
+	    return !$rv;
+	}
+	return 1 if ($native_vlan eq "$pvid"); # port already member
+	$self->updateOneVlan(0, 0, 1, $pvid, $port); # make pvid tagged
+	$self->updateOneVlan(0, 1, 1, $native_vlan, $port); # make untagged
+    } elsif ($native_vlan ne "$pvid") {
+	warn "$id: Unable to add Trunk to native VLAN\n"
+	    if $self->setPortVlan($native_vlan, $port);
+    }
     #
     # Set port type apropriately.
     #
     if ($equaltrunking) {
-	my $portType = [$aftOID,$ifIndex,"admitOnlyVlanTagged","INTEGER"];
-	$rv = $self->{SESS}->set($portType);
-	if (!defined($rv)) {
-	    warn "enablePortTrunking: Unable to set port type\n";
-	    return 0;
-	}
+	$rv = $self->updateOneVlan(0, 0, 1, $native_vlan, $port); # untag
     } else {
-	$self->lock();
-	my $defLists = $self->getVlanLists(1);
-	@{@$defLists[0]}[$ifIndex - 1] = 1;  # add to forbid list of default 
-	$rv = $self->setVlanLists(1, $defLists);
-	$self->unlock();
-	if (!defined($rv)) {
-	    warn "enablePortTrunking: Unable to set port type\n";
-	    return 0;
-	}
+	$rv = $self->updateOneVlan(1, 0, 0, 1, $port); # mark dual
     }
-    return 1;
+    return  !$rv;
+}
+
+#
+# Internal helper for trunking
+#
+sub otherTrunkedVlans($$$)
+{
+    my ($self, $portIndex, $pvid) = @_;
+    my @others;
+    #
+    # we have to walk all of the blasted vlans to find out
+    # which ones have this port as a member.
+    #
+    my ($rows) = $self->{SESS}->bulkwalk(0,32, [$egressOID]);
+    foreach my $rowref (@$rows) {
+	my ($ignored_name, $vnum, $portset) = @$rowref;
+        push @others, $vnum
+	    if (testPortSet($portset, $portIndex - 1) && ($vnum ne "$pvid"));
+    }
+    return @others;
 }
 
 #
 # Disable trunking on a port
 #
 # usage: disablePortTrunking(self, modport)
-#        modport: module.port of the trunk to operate on
 #        Returns 1 on success, 0 otherwise
 #
 sub disablePortTrunking($$) {
     my ($self, $port) = @_;
+    my $id = $self->{NAME} . "::disablePortTrunking($port)";
 
     my ($portIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
-    my $native_vlan = $self->get1("dot1qPvid",$portIndex);
-    if (!defined($native_vlan) || ($native_vlan == 0)) {
-	$native_vlan = 1;
-    }
-    #
-    # we have to walk all of the blasted vlans to find out
-    # which ones have this port as a member of and remove it.
-    #
-    my ($rows) = $self->{SESS}->bulkwalk(0,32, [$egressOID]);
-    foreach my $rowref (@$rows) {
-	my ($name,$vlan_number,$portset) = @$rowref;
-	if (testPortSet($portset, $portIndex - 1) &&
-		   ($vlan_number != $native_vlan))
-	    { $self->delPortVlan($vlan_number, $portIndex); }
-    }
+    my $native_vlan = $self->get1("dot1qPvid",$portIndex) || 1;
+    my @remvlans = $self->otherTrunkedVlans($portIndex, $native_vlan);
 
-    $self->lock();
-    #
-    # clear annotation that this is a dual port
-    #
-    my $defLists = $self->getVlanLists(1);
-    if (@{@$defLists[0]}[$portIndex - 1]) {
-	@{@$defLists[0]}[$portIndex - 1] = 0;
-	$self->setVlanLists(1, $defLists);
+    if ($native_vlan eq "1") {
+	$self->updateOneVlan(0, 1, 1, 1, $port); # make untagged
+	warn "$id: Unable to disable former equaltrunk\n"
+	    if ($self->portControl("disable",$port));
+    } else {
+	$self->updateOneVlan(0, 0, 0, 1, $port); # clear marker
+	$self->updateOneVlan(0, 1, 1, $native_vlan, $port); # make untagged;
     }
-    #
-    # make port have untagged exit
-    #
-    if ($native_vlan != 1) {
-	$defLists = $self->getVlanLists($native_vlan);
-    }
-    if (@{@$defLists[1]}[$portIndex - 1] == 0) {
-	@{@$defLists[1]}[$portIndex - 1] = 1;
-	@{@$defLists[2]}[$portIndex - 1] = 1;
-	$self->setVlanLists($native_vlan, $defLists);
-    }
-    $self->unlock();
-
-    my $portType = [$aftOID,$portIndex,"admitAll","INTEGER"];
-    my $rv = $self->{SESS}->set($portType);
-    if (!defined($rv)) {
-	warn "ERROR: Unable to set port type to access\n";
-	return 0;
+    foreach my $vlan_number (@remvlans) {
+	warn "$id: Unable to remove VLAN $vlan_number\n"
+	   if $self->delPortVlan($vlan_number, $portIndex);
     }
     return 1;
 }

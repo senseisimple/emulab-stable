@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -40,6 +40,9 @@
 #ifdef EVENTSYS
 #include "event.h"
 #endif
+
+/* XXX: Not sure this is okay! */
+#include "tpm.h"
 
 /*
  * XXX This needs to be localized!
@@ -110,6 +113,10 @@ CHECKMASK(char *arg)
 #define DBNAME_SIZE	64
 #define HOSTID_SIZE	(32+64)
 #define DEFAULT_DBNAME	TBDBNAME
+
+/* For secure disk loading */
+#define SECURELOAD_OPMODE "SECURELOAD"
+#define SECURELOAD_STATE  "RELOADSETUP"
 
 int		debug = 0;
 static int	verbose = 0;
@@ -202,7 +209,8 @@ typedef struct {
 	char		testdb[TBDB_FLEN_TINYTEXT];
 	char		sharing_mode[TBDB_FLEN_TINYTEXT];
 	char            privkey[PRIVKEY_LEN+1];
-	char            urn[URN_LEN+1];
+        /* This key is a replacement for privkey, on protogeni resources */
+	char            external_key[PRIVKEY_LEN+1];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *, char*);
 static int	checkdbredirect(tmcdreq_t *);
@@ -221,15 +229,18 @@ static event_handle_t	event_handle = NULL;
 
 COMMAND_PROTOTYPE(doreboot);
 COMMAND_PROTOTYPE(donodeid);
+COMMAND_PROTOTYPE(domanifest);
 COMMAND_PROTOTYPE(dostatus);
 COMMAND_PROTOTYPE(doifconfig);
 COMMAND_PROTOTYPE(doaccounts);
+COMMAND_PROTOTYPE(dobridges);
 COMMAND_PROTOTYPE(dodelay);
 COMMAND_PROTOTYPE(dolinkdelay);
 COMMAND_PROTOTYPE(dohosts);
 COMMAND_PROTOTYPE(dorpms);
 COMMAND_PROTOTYPE(dodeltas);
 COMMAND_PROTOTYPE(dotarballs);
+COMMAND_PROTOTYPE(doblobs);
 COMMAND_PROTOTYPE(dostartcmd);
 COMMAND_PROTOTYPE(dostartstat);
 COMMAND_PROTOTYPE(doready);
@@ -292,6 +303,9 @@ COMMAND_PROTOTYPE(dotpmblob);
 COMMAND_PROTOTYPE(dotpmpubkey);
 COMMAND_PROTOTYPE(dotpmdummy);
 COMMAND_PROTOTYPE(dodhcpdconf);
+COMMAND_PROTOTYPE(dosecurestate);
+COMMAND_PROTOTYPE(doquoteprep);
+COMMAND_PROTOTYPE(doimagekey);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -323,15 +337,18 @@ struct command {
 } command_array[] = {
 	{ "reboot",	  FULLCONFIG_NONE, 0, doreboot },
 	{ "nodeid",	  FULLCONFIG_ALL,  0, donodeid },
+	{ "manifest",	  FULLCONFIG_ALL,  0, domanifest },
 	{ "status",	  FULLCONFIG_NONE, 0, dostatus },
 	{ "ifconfig",	  FULLCONFIG_ALL,  F_ALLOCATED, doifconfig },
 	{ "accounts",	  FULLCONFIG_ALL,  F_REMREQSSL, doaccounts },
 	{ "delay",	  FULLCONFIG_ALL,  F_ALLOCATED, dodelay },
+	{ "bridges",	  FULLCONFIG_ALL,  F_ALLOCATED, dobridges },
 	{ "linkdelay",	  FULLCONFIG_ALL,  F_ALLOCATED, dolinkdelay },
 	{ "hostnames",	  FULLCONFIG_NONE, F_ALLOCATED, dohosts },
 	{ "rpms",	  FULLCONFIG_ALL,  F_ALLOCATED, dorpms },
 	{ "deltas",	  FULLCONFIG_NONE, F_ALLOCATED, dodeltas },
 	{ "tarballs",	  FULLCONFIG_ALL,  F_ALLOCATED, dotarballs },
+	{ "blobs",	  FULLCONFIG_ALL,  F_ALLOCATED, doblobs },
 	{ "startupcmd",	  FULLCONFIG_ALL,  F_ALLOCATED, dostartcmd },
 	{ "startstatus",  FULLCONFIG_NONE, F_ALLOCATED, dostartstat }, /* Before startstat*/
 	{ "startstat",	  FULLCONFIG_NONE, 0, dostartstat },
@@ -393,6 +410,9 @@ struct command {
 	{ "tpmpubkey",	  FULLCONFIG_ALL, 0, dotpmpubkey },
 	{ "tpmdummy",	  FULLCONFIG_ALL, F_REQTPM, dotpmdummy },
 	{ "dhcpdconf",	  FULLCONFIG_ALL, 0, dodhcpdconf },
+	{ "securestate",  FULLCONFIG_NONE, F_REMREQSSL, dosecurestate},
+	{ "quoteprep",    FULLCONFIG_NONE, F_REMREQSSL, doquoteprep},
+	{ "imagekey",     FULLCONFIG_NONE, F_REQTPM, doimagekey},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1058,23 +1078,21 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		}
 
 		/*
-		 * Look for URN.
+		 * Look for external key
 		 */
-		if (sscanf(bp, "URN=%" XSTRINGIFY(URN_LEN) "s", buf)) {
+		if (sscanf(bp, "IDKEY=%" XSTRINGIFY(PRIVKEY_LEN) "s", buf)) {
 			for (i = 0; i < strlen(buf); i++){
-				if (! (isalnum(buf[i]) ||
-				       buf[i] == '_' || buf[i] == '-' ||
-				       buf[i] == '.' || buf[i] == '/' ||
-				       buf[i] == ':' || buf[i] == '+')) {
+				if (! isalnum(buf[i])) {
 					info("tmcd client provided invalid "
-					     "characters in URN");
+					     "characters in IDKEY");
 					goto skipit;
 				}
 			}
-			strncpy(reqp->urn, buf, sizeof(reqp->urn));
+			strncpy(reqp->external_key,
+				buf, sizeof(reqp->external_key));
 
 			if (debug) {
-				info("URN %s\n", buf);
+				info("IDKEY %s\n", buf);
 			}
 			continue;
 		}
@@ -1103,12 +1121,13 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		if (privkey) {
 			error("No such node with wanode_key [%s]\n", privkey);
 		}
-		else if (reqp->urn[0]) {
+		else if (reqp->external_key[0]) {
 			if (reqp->isvnode)
-				error("No such vnode %s with urn %s\n",
-				      reqp->vnodeid, reqp->urn);
+				error("No such vnode %s with key %s\n",
+				      reqp->vnodeid, reqp->external_key);
 			else
-				error("No such node with urn %s\n", reqp->urn);
+				error("No such node with key %s\n",
+				      reqp->external_key);
 		}
 		else if (reqp->isvnode) {
 			error("No such vnode %s associated with %s\n",
@@ -1369,6 +1388,376 @@ COMMAND_PROTOTYPE(donodeid)
 
 	OUTPUT(buf, sizeof(buf), "%s\n", reqp->nodeid);
 	client_writeback(sock, buf, strlen(buf), tcp);
+	return 0;
+}
+
+/*
+ * Return a boot manifest for the node's boot scripts.
+ */
+COMMAND_PROTOTYPE(domanifest)
+{
+	MYSQL_RES	*res = NULL;
+	MYSQL_ROW	row;
+	char		buf[2*MYBUFSIZE];
+	int		nrows = 0;
+	int		disable_type = 0, disable_osid = 0, disable_node = 0;
+
+	res = mydb_query("select opt_name,opt_value"
+			 " from virt_client_service_opts"
+			 " where exptidx=%d or vnode='%s'",
+			 2, reqp->exptidx, reqp->nickname);
+	if (!res) {
+		info("MANIFEST: %s: DB Error getting expt client service opts!\n",
+		      reqp->nodeid);
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		if (strcmp(row[0],"disable_type") == 0 
+		    && strcmp(row[1],"1") == 0) {
+			disable_type = 1;
+		}
+		else if (strcmp(row[0],"disable_osid") == 0 
+			 && strcmp(row[1],"1") == 0) {
+			disable_osid = 1;
+		}
+		else if (strcmp(row[0],"disable_node") == 0 
+			 && strcmp(row[1],"1") == 0) {
+			disable_node = 1;
+		}
+		else {
+			info("MANIFEST: %s: unknown expt client service opt %s!\n",
+			     reqp->nodeid,row[0]);
+		}
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
+	/*
+	 * This is a messy query.  The rules for the manifest are
+	 * 0) only service and hook entries whose service (service,env,whence)
+	 *    tuples exist in the client_services table can be returned;
+	 * 1) only one SERVICE line foreach (service,env) tuple can be 
+	 *    returned;
+	 * 2) the user can only override (service,env) tuples that have
+	 *    user_can_override set to 1;
+	 *    (and if there are multiple admin tuples, but the highest-prio
+	 *    one allows override, even if less prio ones don't, we still
+	 *    allow override!)
+	 * 3) multiple HOOK lines can be returned, and the order in
+	 *    which hook lines are generated is by querying the
+	 *    client_service_hooks table for node types matching this node;
+	 *    the client_service_hooks table for osids matching this node;
+	 *    the client_service_hooks table for nodes matching this node;
+	 *    the virt_client_service_hooks table for '' nodes
+	 *      (wildcard, experiment wide);
+	 *    the virt_client_service_hooks table for nodes matching
+	 *      this node.
+	 * 4) the user can disable all admin hooks with
+	 *    user_can_override set to 1
+	 * 5) the virt_client_service_opts table controls which types of 
+	 *    admin hooks are disabled, across the experiment, or per-node.
+	 */
+	res = mydb_query("select cs.service,cs.env,cs.whence,"
+			 /* 3 */
+			 "  vcsnodeblobs.uuid,vcsnode.alt_vblob_id,vcsnode.enable,vcsnode.enable_hooks,vcsnode.fatal,"
+			 /* 8 */
+			 "  vcsexptblobs.uuid,vcsexpt.alt_vblob_id,vcsexpt.enable,vcsexpt.enable_hooks,vcsexpt.fatal,"
+			 /* 13 */
+			 "  csnode.alt_blob_id,csnode.enable,csnode.enable_hooks,"
+			 /* 16 */
+			 "  csnode.fatal,csnode.user_can_override,"
+			 /* 18 */
+			 "  csos.alt_blob_id,csos.enable,csos.enable_hooks,"
+			 /* 21 */
+			 "  csos.fatal,csos.user_can_override,"
+			 /* 23 */
+			 "  cstype.alt_blob_id,cstype.enable,cstype.enable_hooks,"
+			 /* 26 */
+			 "  cstype.fatal,cstype.user_can_override,"
+			 /* 28 */
+			 "  cs.hooks_only"
+			 " from reserved as r"
+			 " left join nodes as n on r.node_id=n.node_id"
+			 " straight_join client_services as cs"
+			 " left join virt_client_service_ctl as vcsexpt on"
+			 "   (r.exptidx=vcsexpt.exptidx and vcsexpt.vnode=''"
+			 "    and cs.idx=vcsexpt.service_idx"
+			 "    and cs.env=vcsexpt.env"
+			 "    and cs.whence=vcsexpt.whence)"
+			 " left join blobs as vcsexptblobs on"
+			 "   (vcsexpt.exptidx=vcsexptblobs.exptidx"
+			 "    and vcsexpt.alt_vblob_id=vcsexptblobs.vblob_id)"
+			 " left join virt_client_service_ctl as vcsnode on"
+			 "   (r.exptidx=vcsnode.exptidx"
+			 "    and r.vname=vcsnode.vnode"
+			 "    and cs.idx=vcsnode.service_idx"
+			 "    and cs.env=vcsnode.env"
+			 "    and cs.whence=vcsnode.whence)"
+			 " left join blobs as vcsnodeblobs on"
+			 "   (vcsnode.exptidx=vcsnodeblobs.exptidx"
+			 "    and vcsnode.alt_vblob_id=vcsnodeblobs.vblob_id)"
+			 " left join client_service_ctl as csnode on"
+			 "   (csnode.obj_type='node'"
+			 "    and r.node_id=csnode.obj_name"
+			 "    and cs.idx=csnode.service_idx"
+			 "    and cs.env=csnode.env"
+			 "    and cs.whence=csnode.whence)"
+			 " left join client_service_ctl as csos on"
+			 "   (csos.obj_type='osid' and n.def_boot_osid=csos.obj_name"
+			 "    and cs.idx=csos.service_idx and cs.env=csos.env"
+			 "    and cs.whence=csos.whence)"
+			 " left join client_service_ctl as cstype on"
+			 "   (cstype.obj_type='node_type'"
+			 "    and n.type=cstype.obj_name"
+			 "    and cs.idx=cstype.service_idx"
+			 "    and cs.env=cstype.env and cs.whence=cstype.whence)"
+			 " where r.exptidx=%d and r.node_id='%s'"
+			 "   and (vcsnode.enable is not NULL"
+			 "        or vcsexpt.enable is not NULL"
+			 "        or csnode.enable is not NULL"
+			 "        or csos.enable is not NULL"
+			 "        or cstype.enable is not NULL)",
+			 29, reqp->exptidx, reqp->nodeid);
+	if (!res) {
+		error("MANIFEST: %s: DB Error getting manifest info!\n",
+		      reqp->nodeid);
+		nrows = 0;
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		char *enabled = NULL;
+		char *hooks_enabled = NULL;
+		char *fatal = NULL;
+		char *blobid = NULL;
+		int admin_service_not_overrideable = 0;
+		int admin_idx = 0;
+		int hooks_only;
+		int disable_admin = 0;
+
+		row = mysql_fetch_row(res);
+		hooks_only = (strcmp(row[28],"1") == 0) ? 1 : 0;
+
+		/* figure out which service control entry to use! */
+		/* start by choosing the per-node or per-experiment stuff */
+		if (row[5] != NULL && !hooks_only) {
+		    enabled = row[5];
+		    hooks_enabled = row[6];
+		    fatal = row[7];
+		    blobid = row[3];
+		    /* 
+		     * If there was nothing in blob_blobs for this blob, 
+		     * just return the vblob and hope it was a real,
+		     * hardcoded blob in the blob store.
+		     */
+		    if (blobid == NULL)
+			blobid = row[4];
+		}
+		else if (row[9] != NULL && !hooks_only) {
+		    enabled = row[10];
+		    hooks_enabled = row[11];
+		    fatal = row[12];
+		    blobid = row[7];
+		    if (blobid == NULL)
+			blobid = row[8];
+		}
+
+		if (row[17] != NULL) {
+		    admin_idx = 13;
+		    if (strcmp(row[17],"0") == 0) {
+			admin_service_not_overrideable = 1;
+		    }
+		    if (disable_node) 
+			disable_admin = 1;
+		}
+		else if (row[22] != NULL) {
+		    admin_idx = 18;
+		    if (strcmp(row[22],"0") == 0) {
+			admin_service_not_overrideable = 1;
+		    }
+		    if (disable_osid) 
+			disable_admin = 1;
+		}
+		else if (row[27] != NULL) {
+		    admin_idx = 23;
+		    if (strcmp(row[27],"0") == 0) {
+			admin_service_not_overrideable = 1;
+		    }
+		    if (disable_type) 
+			disable_admin = 1;
+		}
+
+		/* If the user wants to ignore the admin setting, and
+		 * the admin allows it to be overridden, AND the user
+		 * didn't specify a control for this service... skip! */
+		if (disable_admin && !admin_service_not_overrideable 
+		    && enabled == NULL) {
+		    --nrows;
+		    continue;
+		}
+
+		/* If the admin set hooks_only on a service, and didn't
+		 * specify a service entry, bail! */
+		if (hooks_only && admin_idx == 0) {
+		    --nrows;
+		    continue;
+		}
+
+		/* If the admin seting can't be overridden, or if the
+		 * user didn't specify a control for this node or
+		 * experiment-wide, send the admin setting */
+		if (admin_service_not_overrideable || enabled == NULL) {
+		    enabled = row[admin_idx+1];
+		    hooks_enabled = row[admin_idx+2];
+		    fatal = row[admin_idx+3];
+		    blobid = row[admin_idx+0];
+		}
+
+		/* the query should prevent against this, but... */
+		if (enabled == NULL) {
+		    error("MANIFEST: %s: got info from DB for %s, but no enabled!\n",
+			  reqp->nodeid,row[0]);
+		    --nrows;
+		    continue;
+		}
+
+		if (blobid == NULL)
+		    blobid = "";
+
+		OUTPUT(buf, sizeof(buf),
+		       "SERVICE NAME=%s ENV=%s WHENCE=%s"
+		       " ENABLED=%s HOOKS_ENABLED=%s FATAL=%s"
+		       " BLOBID=%s\n",
+		       row[0],row[1],row[2],
+		       enabled,hooks_enabled,fatal,blobid);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("MANIFEST: %s", buf);
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
+	/* grab the admin client side hooks */
+	res = mydb_query("select cs.service,cs.env,cs.whence,csh.obj_type,"
+			 "  csh.hook_blob_id,csh.hook_op,csh.hook_point,"
+			 "  csh.argv,csh.fatal,csh.user_can_override"
+			 " from reserved as r"
+			 " left join nodes as n on r.node_id=n.node_id"
+			 " straight_join client_services as cs"
+			 " left join client_service_hooks as csh on"
+			 "   (cs.idx=csh.service_idx"
+			 "    and cs.env=csh.env"
+			 "    and cs.whence=csh.whence)"
+			 " where r.exptidx=%d and r.node_id='%s'"
+			 "   and ((csh.obj_type='node'"
+			 "         and r.node_id=csh.obj_name)"
+			 "        or (csh.obj_type='osid'"
+			 "            and n.def_boot_osid=csh.obj_name)"
+			 "        or (csh.obj_type='node_type'"
+			 "            and n.type=csh.obj_name))",
+			 10,reqp->exptidx,reqp->nodeid);
+	if (!res) {
+		error("MANIFEST: %s: DB Error getting manifest admin hook info!\n",
+		      reqp->nodeid);
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		/*
+		 * skip this admin hook if it can be overridden, and if
+		 * the user turned off this type of admin hooks
+		 */
+		if (strcmp(row[9],"1") == 0
+		    && ((strcmp(row[3],"node") == 0 && disable_node)
+			|| (strcmp(row[3],"osid") == 0 && disable_osid)
+			|| (strcmp(row[3],"type") == 0 && disable_type))) {
+			--nrows;
+			continue;
+		}
+
+		OUTPUT(buf, sizeof(buf),
+		       "HOOK SERVICE=%s ENV=%s WHENCE=%s"
+		       " OP=%s POINT=%s FATAL=%s BLOBID=%s ARGV=\"%s\"\n",
+		       row[0],row[1],row[2],
+		       row[5],row[6],row[8],row[4],row[7]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("MANIFEST: %s", buf);
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
+	/* grab the user-specified client side hooks */
+	res = mydb_query("select cs.service,cs.env,cs.whence,"
+			 "  cshblobs.uuid,csh.hook_vblob_id,csh.hook_op,csh.hook_point,"
+			 "  csh.argv,csh.fatal"
+			 " from reserved as r"
+			 " left join nodes as n on r.node_id=n.node_id"
+			 " straight_join client_services as cs"
+			 " left join virt_client_service_hooks as csh on"
+			 "   (r.exptidx=csh.exptidx"
+			 "    and (csh.vnode='' or r.vname=csh.vnode)"
+			 "    and cs.idx=csh.service_idx"
+			 "    and cs.env=csh.env"
+			 "    and cs.whence=csh.whence)"
+			 " left join blobs as cshblobs on"
+			 "   (csh.exptidx=cshblobs.exptidx"
+			 "    and csh.hook_vblob_id=cshblobs.vblob_id)"
+			 " where r.exptidx=%d and r.node_id='%s'"
+			 "   and csh.hook_vblob_id is not NULL",
+			 9,reqp->exptidx,reqp->nodeid);
+	if (!res) {
+		error("MANIFEST: %s: DB Error getting manifest user hook info!\n",
+		      reqp->nodeid);
+	}
+	else if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		res = NULL;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		OUTPUT(buf, sizeof(buf),
+		       "HOOK SERVICE=%s ENV=%s WHENCE=%s"
+		       " OP=%s POINT=%s FATAL=%s BLOBID=%s ARGV=\"%s\"\n",
+		       row[0],row[1],row[2],
+		       row[5],row[6],row[8],(row[3]) ? row[3] : row[4],row[7]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("MANIFEST: %s", buf);
+	}
+	if (res) {
+		mysql_free_result(res);
+		res = NULL;
+		nrows = 0;
+	}
+
 	return 0;
 }
 
@@ -1672,21 +2061,24 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the virtual interfaces.
 	 */
 	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue "
+			 "       v.type,vll.vname,v.virtlanidx,vlans.tag, "
+			 "       l.lanid "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "left join virt_lan_lans as vll on "
 			 "  vll.idx=v.virtlanidx and vll.exptidx=v.exptidx "
-			 "left join lan_attributes as la on "
-			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
+			 "left join lans as l on "
+			 "  l.exptidx=vll.exptidx and l.vname=vll.vname "
+			 "left join vlans on "
+			 "  vlans.id=v.vlanid "
 			 "left join lan_attributes as la2 on "
 			 "  la2.lanid=v.vlanid and la2.attrkey='stack' "
 			 "where v.exptidx='%d' and v.node_id='%s' and "
 			 "      (la2.attrvalue='Experimental' or "
 			 "       la2.attrvalue is null) "
 			 "      and %s",
-			 10, reqp->exptidx, reqp->pnodeid, buf);
+			 11, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {
 		error("%s: IFCONFIG: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -1703,20 +2095,32 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 	while (nrows) {
 		char *bufp   = buf;
+		char *ifacetype;
 		int isveth, doencap;
 
 		row = mysql_fetch_row(res);
 		nrows--;
 
-		if (strcmp(row[6], "veth") == 0) {
+		if (strcmp(row[6], "vlan") == 0 && !row[3]) {
+			/*
+			 * Convert to a loopback lan, however the client
+			 * is able to do it.
+			 */
+			isveth    = 0;
+			doencap   = 0;
+			ifacetype = "loop";
+		} else if (strcmp(row[6], "veth") == 0) {
 			isveth = 1;
 			doencap = 1;
+			ifacetype = "veth";
 		} else if (strcmp(row[6], "veth-ne") == 0) {
 			isveth = 1;
 			doencap = 0;
+			ifacetype = "veth";
 		} else {
 			isveth = 0;
 			doencap = 0;
+			ifacetype = row[6];
 		}
 
 		/*
@@ -1739,7 +2143,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "IFACETYPE=%s "
 			       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s",
-			       isveth ? "veth" : row[6],
+			       ifacetype,
 			       row[1], CHECKMASK(row[4]), row[0], row[2],
 			       row[3] ? row[3] : "none");
 
@@ -1765,7 +2169,9 @@ COMMAND_PROTOTYPE(doifconfig)
 			char *tag = "0";
 			if (isveth)
 				tag = row[8];
-			else if (strcmp(row[6], "vlan") == 0)
+			else if (strcmp(ifacetype, "loop") == 0)
+				tag = row[10];
+			else if (strcmp(ifacetype, "vlan") == 0)
 				tag = row[9] ? row[9] : "0";
 
 			/* sanity check the tag */
@@ -1776,7 +2182,6 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			bufp += OUTPUT(bufp, ebufp - bufp, " VTAG=%s", tag);
 		}
-
 		OUTPUT(bufp, ebufp - bufp, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
@@ -2393,25 +2798,30 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * Add an argument of "pubkeys" to get the PUBKEY data.
 		 * An "windows" argument also returns a user's Windows Password.
 		 */
+#ifndef NOSHAREDFS
 		if (reqp->islocal &&
 		    ! reqp->genisliver_idx &&
 		    ! reqp->sharing_mode[0] &&
 		    ! (strncmp(rdata, "pubkeys", 7) == 0
 		       || strncmp(rdata, "windows", 7) == 0))
 			goto skipsshkeys;
+#endif
 
 		/*
 		 * Need a list of keys for this user.
 		 */
-		pubkeys_res = mydb_query("select idx,pubkey "
-					 " from %s "
-					 "where uid_idx='%s'",
-					 2,
-					 (didnonlocal ?
-					  "nonlocal_user_pubkeys" :
-					  "user_pubkeys"),
-					 row[17]);
-
+		if (didnonlocal) {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from nonlocal_user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
+		else {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
 		if (!pubkeys_res) {
 			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
 			goto skipkeys;
@@ -2463,7 +2873,9 @@ COMMAND_PROTOTYPE(doaccounts)
 		}
 		mysql_free_result(pubkeys_res);
 
+#ifndef NOSHAREDFS
 	skipsshkeys:
+#endif
 		/*
 		 * Do not bother to send back SFS keys if the node is not
 		 * running SFS.
@@ -2548,23 +2960,33 @@ COMMAND_PROTOTYPE(doaccounts)
 	if (reqp->genisliver_idx && !didnonlocal &&
 	    (reqp->isvnode || !reqp->sharing_mode[0])) {
 	        didnonlocal = 1;
-
+		
+		/*
+		 * Within the nonlocal_user_accounts table, we do not
+		 * maintain globally unique unix_uid numbers, since these
+		 * accounts are per slice (experiment). Instead, just
+		 * use an auto_increment field, which always starts at
+		 * 1, and so to create a unix_gid, we just bump the
+		 * number into a typically unused area of the space.
+		 */
 		res = mydb_query("select distinct "
-				 "  u.uid,'*',u.uid_idx,u.name, "
+				 "  u.uid,'*', "
+				 "  u.unix_uid+20000,"
+				 "  u.name, "
 				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
 				 "  NULL,NULL, "
 				 "  UNIX_TIMESTAMP(now()), "
 				 "  u.email,'csh', "
 				 "  0,0, "
 				 "  NULL,u.uid_idx "
-				 "from nonlocal_user_bindings as b "
-				 "join nonlocal_users as u on "
-				 "     b.uid_idx=u.uid_idx "
+				 "from nonlocal_user_accounts as u "
 				 "join groups as g on "
-				 "     g.pid='%s' and g.pid=g.gid "
-				 "where (b.exptidx='%d') "
+				 "     g.pid='%s' and "
+				 "     (g.pid=g.gid or g.gid='%s') "
+				 "where (u.exptidx='%d') "
 				 "order by u.uid",
-				 18, reqp->pid, reqp->exptidx);
+				 18, reqp->pid, reqp->gid,
+				 reqp->exptidx);
 
 		if (res) {
 			if ((nrows = mysql_num_rows(res)))
@@ -2722,8 +3144,8 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		 " i.node_id=d.node_id and i.iface=d.iface "
 		 "left join vinterfaces as v on "
 		 " v.node_id=d.node_id and v.IP=d.ip "
-		 "where d.node_id='%s' %s",
-		 28, reqp->pnodeid, buf);
+		 "where d.node_id='%s' and d.exptidx='%d' %s",
+		 28, reqp->pnodeid, reqp->exptidx, buf);
 	if (!res) {
 		error("LINKDELAY: %s: DB Error getting link delays!\n",
 		      reqp->nodeid);
@@ -2759,6 +3181,63 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		nrows--;
 		if (verbose)
 			info("LINKDELAY: %s", buf);
+	}
+	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
+ * Return bridge config stuff.
+ */
+COMMAND_PROTOTYPE(dobridges)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	char		buf[2*MYBUFSIZE], *ebufp = &buf[sizeof(buf)];
+	int		nrows;
+
+	/*
+	 * Get bridge parameters for the machine. 
+	 */
+	res = mydb_query("select b.bridx,i.MAC,b.vnode,b.vname "
+			 " from bridges as b "
+			 "left join interfaces as i on "
+			 " i.node_id=b.node_id and i.iface=b.iface "
+			 " where b.node_id='%s' order by bridx",
+			 4, reqp->nodeid);
+	if (!res) {
+		error("BRIDGES: %s: DB Error getting bridges!\n", reqp->nodeid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	while (nrows) {
+		char	*bufp = buf;
+
+		row = mysql_fetch_row(res);
+
+		/*
+		 * Sanity check.
+		 */
+		if (!row[0] || !row[1] || !row[2] || !row[3]) {
+			error("BRIDGES: %s: DB values are bogus!\n",
+			      reqp->nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
+
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "BRIDGE IDX=%s IFACE=%s VNODE=%s LINKNAME=%s\n",
+			       row[0], row[1], row[2], row[3]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("BRIDGES: %s", buf);
 	}
 	mysql_free_result(res);
 
@@ -3142,6 +3621,72 @@ COMMAND_PROTOTYPE(dotarballs)
 	return 0;
 }
 
+/* 
+ *
+ */
+COMMAND_PROTOTYPE(doblobs)
+{
+	MYSQL_RES       *res;
+	MYSQL_ROW       row;
+	int             nrows;
+	char            buf[MYBUFSIZE];
+	char            *bufp = buf, *ebufp = &buf[sizeof(buf)];
+	
+	res = mydb_query("select path,action from experiment_blobs "
+			 " where exptidx=%d order by idx",
+			 2, reqp->exptidx);
+	
+	if (!res) {
+		error("BLOBS: %s: DB Error getting blobs for %s/%s!\n",
+		      reqp->nodeid, reqp->pid, reqp->eid);
+		return 1;
+	}
+	
+	nrows = (int)mysql_num_rows(res);
+	if (nrows <= 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Frisbee blobs did exist prior to version 33, but the infrastructure
+	 * was not deployed on more than a couple of images and only at Utah.
+	 * So we are not going to bother with frisbee backward compat changes
+	 * and just require that all images have the new frisbee master server
+	 * infrastructure.
+	 */
+	if (vers < 33) {
+		error("BLOBS: %s: requires new frisbee, rebuild image!\n",
+		      reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	while (nrows > 0) {
+		row = mysql_fetch_row(res);
+		if (row[0] == NULL || row[0][0] == '\0' ||
+		    row[1] == NULL || row[1][0] == '\0') {
+			error("BLOBS: %s: bogus path/action for %s/%s in DB\n",
+			      reqp->nodeid, reqp->pid, reqp->eid);
+			continue;
+		}
+
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "URL=frisbee://%s ACTION=%s\n",
+			       row[0], row[1]);
+		nrows--;
+	}
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	if (verbose)
+		info("doblobs: %s", buf);
+
+	mysql_free_result(res);
+	return 0;
+}
+
+
 /*
  * This is deprecated, but left in case old images reference it.
  */
@@ -3320,16 +3865,33 @@ COMMAND_PROTOTYPE(domounts)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
+	char		*bufp, *ebufp = &buf[sizeof(buf)];
 	int		nrows, usesfs;
+	int		nomounts = 0;
 #ifdef  ISOLATEADMINS
 	int		isadmin;
 #endif
 
 	/*
+	 * Do we export filesystems at all?
+	 * XXX this could be made per-experiment/project/whatever.
+	 */
+#ifdef	NOSHAREDFS
+	nomounts = 1;
+#endif
+
+	/*
+	 * Older clients will not properly handle the new format mount
+	 * lines, so just return nothing and hope for the best.
+	 */
+	if (vers < 32 && nomounts)
+		return 0;
+
+	/*
 	 * Should SFS mounts be served?
 	 */
 	usesfs = 0;
-	if (vers >= 6 && strlen(fshostid)) {
+	if (vers >= 6 && strlen(fshostid) && !nomounts) {
 		if (strlen(reqp->sfshostid))
 			usesfs = 1;
 		else {
@@ -3357,31 +3919,79 @@ COMMAND_PROTOTYPE(domounts)
 		return 0;
 
 	/*
+	 * Return info about the file server
+	 */
+	if (vers >= 32) {
+		char *fstype = "";
+
+		/* XXX sanity for code below */
+		if (reqp->sharing_mode[0] && !reqp->isvnode)
+			usesfs = 0;
+
+		if (nomounts) {
+			fstype = "LOCAL";
+		} else if (usesfs) {
+			fstype = "SFS";
+		} else {
+#ifdef NFSRACY
+			fstype = "NFS-RACY";
+#else
+			fstype = "NFS";
+#endif
+		}
+
+		OUTPUT(buf, sizeof(buf), "FSTYPE=%s\n", fstype);
+		client_writeback(sock, buf, strlen(buf), tcp);
+	}
+
+
+	/*
 	 * A local phys node acting as a shared host gets toplevel mounts only.
 	 */
 	if (reqp->sharing_mode[0] && !reqp->isvnode) {
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
-		       FSUSERDIR, USERDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSUSERDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", USERDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 
 #ifdef FSSCRATCHDIR
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
-		       FSSCRATCHDIR, SCRATCHDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSSCRATCHDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", SCRATCHDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
 #ifdef FSSHAREDIR
-		OUTPUT(buf, sizeof(buf),
-		       "REMOTE=%s LOCAL=%s\n", FSSHAREDIR, SHAREDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSSHAREDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", SHAREDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
-		       FSPROJDIR, PROJDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSPROJDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", PROJDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
+
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSGROUPDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", GROUPDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
@@ -3391,11 +4001,32 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return project mount first.
 		 */
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
-			FSPROJDIR, reqp->pid, PROJDIR, reqp->pid);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s/%s ", FSPROJDIR, reqp->pid);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s\n",
+		       PROJDIR, reqp->pid);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		/*
+		 * If pid!=gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(reqp->pid, reqp->gid)) {
+			bufp = buf;
+			if (!nomounts)
+				bufp += OUTPUT(bufp, ebufp-bufp,
+					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
+					       reqp->pid, reqp->gid);
+			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
+			       GROUPDIR, reqp->pid, reqp->gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			/* Leave this logging on all the time for now. */
+			info("MOUNTS: %s", buf);
+		}
 
 		/*
 		 * Skip all this for a vnode; client does not ask.
@@ -3407,8 +4038,13 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return scratch mount if its defined.
 		 */
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
-		       FSSCRATCHDIR, reqp->pid, SCRATCHDIR, reqp->pid);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s/%s ",
+				       FSSCRATCHDIR, reqp->pid);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s\n",
+		       SCRATCHDIR, reqp->pid);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
@@ -3417,25 +4053,15 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return share mount if its defined.
 		 */
-		OUTPUT(buf, sizeof(buf),
-		       "REMOTE=%s LOCAL=%s\n",FSSHAREDIR, SHAREDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSSHAREDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", SHAREDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		/*
-		 * If pid!=gid, then this is group experiment, and we return
-		 * a mount for the group directory too.
-		 */
-		if (strcmp(reqp->pid, reqp->gid)) {
-			OUTPUT(buf, sizeof(buf),
-			       "REMOTE=%s/%s/%s LOCAL=%s/%s/%s\n",
-			       FSGROUPDIR, reqp->pid, reqp->gid,
-			       GROUPDIR, reqp->pid, reqp->gid);
-			client_writeback(sock, buf, strlen(buf), tcp);
-			/* Leave this logging on all the time for now. */
-			info("MOUNTS: %s", buf);
-		}
 	}
 	else if (usesfs) {
 		/*
@@ -3594,8 +4220,11 @@ COMMAND_PROTOTYPE(domounts)
 			continue;
 		}
 #endif
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
-			FSUSERDIR, row[0], USERDIR, row[0]);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp, "REMOTE=%s/%s ",
+				       FSUSERDIR, row[0]);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s\n", USERDIR, row[0]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 
 		if (verbose)
@@ -3845,21 +4474,20 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		mbrvers[51];
 	char            *loadpart, *OS, *prepare;
 	int		disknum, nrows, zfill;
-	int             frisbee_pid;
 
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
-			 "   mustwipe,mbr_version,access_key,imageid,prepare,"
-			 "   i.imagename,p.pid,g.gid,i.path"
-			 "  from current_reloads as r "
-			 "left join images as i on i.imageid = r.image_id "
-			 "left join os_info as o on i.default_osid = o.osid "
+	res = mydb_query("select loadpart,OS,mustwipe,mbr_version,access_key,"
+			 "   i.imageid,prepare,i.imagename,p.pid,g.gid,i.path "
+			 "from current_reloads as r "
+			 "left join images as i on i.imageid=r.image_id "
+			 "left join frisbee_blobs as f on f.imageid=i.imageid "
+			 "left join os_info as o on i.default_osid=o.osid "
 			 "left join projects as p on i.pid_idx=p.pid_idx "
 			 "left join groups as g on i.gid_idx=g.gid_idx "
 			 "where node_id='%s' order by r.idx",
-			 13, reqp->nodeid);
+			 11, reqp->nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -3873,11 +4501,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	}
 
 	if (nrows > 1 && vers <= 29) {
-
+	updatemfs:
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=/NEWER-MFS-NEEDED PART=0 PARTOS=Bogus\n");
 
-		error("doloadinfo: %s: Old MFS Version found, need version 30\n",
+		error("doloadinfo: %s: Old MFS Version found, need version 33\n",
 		      reqp->nodeid);
 
 #ifdef EVENTSYS
@@ -3909,16 +4537,21 @@ COMMAND_PROTOTYPE(doloadinfo)
 	else while (nrows) {
 
 		row = mysql_fetch_row(res);
-		loadpart = row[1];
-		OS = row[2];
-		prepare = row[8];
+		loadpart = row[0];
+		OS = row[1];
+		prepare = row[6];
 
-		res2 = mydb_query("select load_address,frisbee_pid,IP from subboss_images as i "
-				 "left join subbosses as s on s.subboss_id = i.subboss_id "
-				 "left join interfaces as n on n.node_id =  s.subboss_id "
-				 "where s.node_id = '%s' and s.service = 'frisbee' and "
-				 "i.imageid = '%s' and i.load_address != '' and "
-				 "n.role='ctrl' and i.sync != 1", 3, reqp->nodeid, row[7]);
+		res2 = mydb_query("select IP "
+				  "from subboss_images as i "
+				  "left join subbosses as s "
+				  "  on s.subboss_id=i.subboss_id "
+				  "left join interfaces as n "
+				  "  on n.node_id=s.subboss_id "
+				  "where s.node_id='%s' and "
+				  "  s.service='frisbee' and "
+				  "  i.imageid='%s' and "
+				  "  n.role='ctrl' and i.sync!=1",
+				  1, reqp->nodeid, row[5]);
 
 		if (!res2) {
 			error("doloadinfo: %s: DB Error getting subboss info!\n",
@@ -3927,87 +4560,99 @@ COMMAND_PROTOTYPE(doloadinfo)
 			return 1;
 		}
 
-		frisbee_pid = 0;
-		address[0] = '\0';
-		server_address[0] = '\0';
-
 		if (mysql_num_rows(res2)) {
 			row2 = mysql_fetch_row(res2);
-
-			if (row2[0] && row2[0][0])
-				strcpy(address, row2[0]);
-
-			if (row2[1] && row2[1][0])
-				frisbee_pid = atoi(row2[1]);
-			
-			strcpy(server_address, row2[2]);
+			strcpy(server_address, row2[0]);
 		} else {
-			if (row[0] && row[0][0])
-				strcpy(address, row[0]);
-
-			if (row[3] && row[3][0])
-				frisbee_pid = atoi(row[3]);
-			
 			strcpy(server_address, BOSSNODE_IP);
 		}
-
 		mysql_free_result(res2);
 
 		/*
 		 * Remote nodes get a URL for the address.
 		 */
 		if (!reqp->islocal) {
-			if (!row[6] || !row[6][0]) {
+			if (!row[4] || !row[4][0]) {
 				error("doloadinfo: %s: "
 				      "No access key associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
 			OUTPUT(address, sizeof(address),
 			       "%s/spewimage.php?imageid=%s&access_key=%s",
-			       TBBASE, row[7], row[6]);
+			       TBBASE, row[5], row[4]);
 			
 			server_address[0] = 0;
 		}
-		else {
-			/*
-			 * Simple text string.
-			 */
-			if (!address[0]) {
-				mysql_free_result(res);
-				return 0;
-			}
+		/*
+		 * As of version 33, local nodes no longer get an address,
+		 * they contact the frisbee master server instead.
+		 *
+		 * We provide temporary backward compat by firing off
+		 * a proxy request to the master server. If that doesn't
+		 * work, we draw attention to ourselves via the update MFS
+		 * path above.
+		 */
+		else if (vers >= 33) {
+			address[0] = '\0';
+		} else {
+			char _buf[512];
+			int gotit = 0;
+			FILE *cfd;
 
+			info("%s LOADINFO compat: starting server for imageid %s",
+			     reqp->nodeid, row[5]);
 			/*
-			 * Sanity check
+			 * XXX for vnodes we use the pnode name since the
+			 * master server wants to validate a node_id by
+			 * looking up its control net IP address in the
+			 * interfaces table.  Vnodes have no interfaces
+			 * table entries so that won't work.
 			 */
-			if (!frisbee_pid) {
-				error("doloadinfo: %s: "
-				      "No pid associated with address %s\n",
-				      reqp->nodeid, address);
-				mysql_free_result(res);
-				return 1;
+			snprintf(_buf, sizeof _buf,
+				 "%s/sbin/frisbeehelper -n %s %s",
+				 TBROOT,
+				 reqp->isvnode ? reqp->pnodeid : reqp->nodeid,
+				 row[5]);
+			if ((cfd = popen(_buf, "r")) == NULL)
+				goto updatemfs;
+			while (fgets(_buf, sizeof _buf, cfd) != NULL) {
+#if 0
+				if (debug > 1)
+					info("got: '%s'\n", _buf);
+#endif
+				if (strncmp(_buf, "Address is ", 11) == 0) {
+					gotit = 1;
+					break;
+				}
 			}
+			pclose(cfd);
+			if (!gotit ||
+			    sscanf(_buf, "Address is %32s", address) != 1)
+				goto updatemfs;
+
+			/* XXX address info is for boss, not a subboss */
+			strcpy(server_address, BOSSNODE_IP);
 		}
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=%s PART=%s PARTOS=%s", address, loadpart, OS);
-		
+
 		if (server_address[0] && (vers >= 31)) {
 			bufp += OUTPUT(bufp, ebufp - bufp,
 			               " SERVER=%s", server_address);
 		}
 
 		/*
-		 * Remember zero-fill free space, mbr version fields, and access_key
+		 * Add zero-fill free space, MBR version fields, and access_key
 		 */
 		zfill = 0;
-		if (row[4] && row[4][0])
-			zfill = atoi(row[4]);
-		strcpy(mbrvers,"1");
-		if (row[5] && row[5][0])
-			strcpy(mbrvers, row[5]);
+		if (row[2] && row[2][0])
+			zfill = atoi(row[2]);
+		strcpy(mbrvers, "1");
+		if (row[3] && row[3][0])
+			strcpy(mbrvers, row[3]);
 
 		/*
 		 * Get disk type and number
@@ -4063,63 +4708,76 @@ COMMAND_PROTOTYPE(doloadinfo)
 			       disktype, disknum, zfill, useacpi, mbrvers, useasf, prepare);
 
 		/*
-		 * If this is a vnode, tack on some additional image metadata
-		 * fields so that all vnodes (shared and not) can uniquely
-		 * identify the image to load, and see if it needs to be
-		 * re-fetched.
+		 * Vnodes (and post v32 local nodes) get additional image
+		 * metadata fields so that they can uniquely identify the
+		 * image.
 		 */
-		if (reqp->isvnode) {
+		if (reqp->isvnode || (reqp->islocal && vers >= 33)) {
 			struct stat sb;
 
-			if (!row[9] || !row[9][0]) {
+ 			if (!row[7] || !row[7][0]) {
 				error("doloadinfo: %s: No imagename"
 				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
-			if (!row[10] || !row[10][0]) {
+			if (!row[8] || !row[8][0]) {
 				error("doloadinfo: %s: No pid"
 				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
-			if (!row[11] || !row[11][0]) {
+			if (!row[9] || !row[9][0]) {
 				error("doloadinfo: %s: No gid"
 				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
-				mysql_free_result(res);
-				return 1;
-			}
-			if (!row[12] || !row[12][0]) {
-				error("doloadinfo: %s: No path"
-				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
-				mysql_free_result(res);
-				return 1;
-			}
-			else if (stat(row[12],&sb)) {
-				error("doloadinfo: %s: Could not stat path %s"
-				      " associated with imageid %s: %s\n",
-				      reqp->nodeid, row[12], row[7],
-				      strerror(errno));
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
 
-			bufp += OUTPUT(bufp, ebufp - bufp,
-				       " IMAGEID=%s,%s,%s IMAGEMTIME=%d\n",
-				       row[10],row[11],row[9],sb.st_mtime);
+			bufp += OUTPUT(bufp, ebufp - bufp, " IMAGEID=%s,%s,%s",
+				       row[8], row[9], row[7]);
+
+			/*
+			 * Vnodes also get a time stamp for the imagepath.
+			 * This is not strictly necessary since the master
+			 * frisbee server will return this info, but vnodes
+			 * use this to create a file name before calling
+			 * the server.
+			 */
+			if (reqp->isvnode) {
+				if (!row[10] || !row[10][0]) {
+					error("doloadinfo: %s: No path"
+					      " associated with imageid %s\n",
+					      reqp->nodeid, row[5]);
+					mysql_free_result(res);
+					return 1;
+				}
+				else if (stat(row[10], &sb)) {
+					error("doloadinfo: %s: Could not stat path %s"
+					      " associated with imageid %s: %s\n",
+					      reqp->nodeid, row[10], row[5],
+					      strerror(errno));
+					mysql_free_result(res);
+					return 1;
+				}
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " IMAGEMTIME=%u\n",
+					       sb.st_mtime);
+			}
+
 		}
 
 		/* Tack on the newline, finally */
-		bufp += OUTPUT(bufp, ebufp - bufp,"\n");
+		bufp += OUTPUT(bufp, ebufp - bufp, "\n");
 
 		nrows--;
 	}
 
-	mysql_free_result(res);
+	if (res)
+		mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
@@ -4275,6 +4933,8 @@ COMMAND_PROTOTYPE(donseconfigs)
 COMMAND_PROTOTYPE(dostate)
 {
 	char 		newstate[128];	/* More then we will ever need */
+	MYSQL_RES	*res;
+	int		nrows;
 	int		i;
 #ifdef EVENTSYS
 	address_tuple_t tuple;
@@ -4292,6 +4952,37 @@ COMMAND_PROTOTYPE(dostate)
 		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
+
+        /*
+         * Check to make sure that this is not a state that must be reported
+         * by the securestate mechanism - we can tell because there are one
+         * or more PCR values required in the tpm_quote_values table for
+         * the state.
+         */
+	res = mydb_query("select q.pcr from nodes as n "
+			"left join tpm_quote_values as q "
+                        "on n.op_mode = q.op_mode "
+			"where n.node_id='%s' and q.state ='%s'",
+			1, reqp->nodeid,newstate);
+	if (!res){
+		error("state: %s: DB error check for pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+        mysql_free_result(res);
+
+	if (nrows){
+            error("state: %s: tried to go into secure state %s using "
+                    "insecure state command\n",reqp->nodeid,newstate);
+            return 1;
+            // XXX Probably should send a SECVIOLATION state and/or send
+            // mail, but this needs more thought before making it the
+            // default action.
+        }
+
 	/*
 	 * Sanity check. No special or weird chars.
 	 */
@@ -4302,7 +4993,7 @@ COMMAND_PROTOTYPE(dostate)
 			return 1;
 		}
 	}
-	
+
 #ifdef EVENTSYS
 	/*
 	 * Send the state out via an event
@@ -4331,6 +5022,586 @@ COMMAND_PROTOTYPE(dostate)
 	info("%s: STATE: %s\n", reqp->nodeid, newstate);
 	return 0;
 
+}
+
+/* There are probably classic functions available to do this but I couldn't
+ * find one that will convert two bytes of ACII to one byte.  sscanf writes a
+ * full int and atoi gives us an int too
+ */
+static unsigned char hextochar(char *in)
+{
+	unsigned char lh, rh;
+
+	lh = in[0];
+	if (lh >= '0' && lh <= '9')
+		lh = lh - '0';
+	else if (lh >= 'A' && lh <= 'F')
+		lh = lh - 'A' + 10;
+	else if (lh >= 'a' && lh <= 'f')
+		lh = lh - 'a' + 10;
+
+	rh = in[1];
+	if (rh >= '0' && rh <= '9')
+		rh = rh - '0';
+	else if (rh >= 'A' && rh <= 'F')
+		rh = rh - 'A' + 10;
+	else if (rh >= 'a' && rh <= 'f')
+		rh = rh - 'a' + 10;
+
+	return (lh << 4) | rh;
+}
+
+static int ishex(char in)
+{
+	return ((in >= 'a' && in <= 'f') || (in >= 'A' && in <= 'F') ||
+	    (in >= '0' && in <= '9'));
+}
+
+/*
+ * Report that the node has entered a new state - secure version: the report
+ * includes a TPM quote that will be checked against the database.
+ * If this check fails, we report a SECVIOLATION event instead, and tell the
+ * client so.
+ * TODO: Should probably reduce code duplication from dostate()
+ */
+COMMAND_PROTOTYPE(dosecurestate)
+{
+	char 		newstate[128];	/* More then we will ever need */
+        char            quote[1024];
+        char            pcomp[256];
+        unsigned char   quote_bin[256];
+        unsigned char   pcomp_bin[128];
+	ssize_t		pcomplen, quotelen;
+        int             quote_passed;
+        char            result[16];
+	ETPM_NONCE	nonce;
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+        int             i,j;
+	unsigned int	temp;
+
+        unsigned short  wantpcrs;
+        TPM_PCR         *pcrs;
+
+#ifdef EVENTSYS
+	address_tuple_t tuple;
+#endif
+
+	/*
+	 * Dig out state that the node is reporting and the quote
+	 */
+	if (rdata == NULL ||
+	    sscanf(rdata, "%127s %1023s %255s", newstate, quote, pcomp) != 3 ||
+	    strlen(newstate) + 1 == sizeof(newstate) ||
+	    strlen(quote) + 1 == sizeof(quote) ||
+	    strlen(pcomp) + 1 == sizeof(pcomp)) {
+		error("SECURESTATE: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * Have to covert the hex representations of quote and pcomp into
+	 * simple binary.
+	 */
+        if ((strlen(quote) % 2) != 0) {
+            error("SECURESTATE: %s: Malformed quote: odd length\n");
+            return 1;
+        }
+        quotelen = strlen(quote)/2;
+        printf("quotelen is %d\n",quotelen);
+        for (i = 0; i < quotelen; i++) {
+		if (!ishex(quote[i * 2]) || !ishex(quote[i * 2 + 1])) {
+			error("Error parsing quote\n");
+			// XXX: Send error to client
+			return 1;
+		}
+		quote_bin[i] = hextochar(&quote[i * 2]);
+        }
+
+        if ((strlen(pcomp) % 2) != 0) {
+            error("SECURESTATE: %s: Malformed pcomp: odd length\n");
+            return 1;
+        }
+        pcomplen = strlen(pcomp)/2;
+        for (i = 0; i < pcomplen; i++) {
+		if (!ishex(pcomp[i * 2]) || !ishex(pcomp[i * 2 + 1])) {
+			error("Error parsing pcomp\n");
+			// XXX: Send error to client
+			return 1;
+		}
+		pcomp_bin[i] = hextochar(&pcomp[i * 2]);
+        }
+
+        /*
+         * Pull the nonce out, verify the exipration date, and clear it so that
+         * it can't be used again.
+         */
+	res = mydb_query("select nonce, (expires >= UNIX_TIMESTAMP()) "
+			"from nonces "
+			"where node_id='%s' and purpose='state-%s'",
+			2, reqp->nodeid,newstate);
+	if (!res){
+		error("SECURESTATE: %s: DB error getting nonce\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no nonce in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+                // XXX: return error to client
+		return 1;
+	}
+
+        // Delete from the database so that it can't be used again
+	mydb_update("delete from nonces where node_id='%s' and "
+                "purpose='state-%s' ", reqp->nodeid,newstate);
+
+
+        row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+        // XXX: Check to make sure the expire check is working
+        if (strcmp(row[1],"1") != 0) {
+            error("SECURESTATE: %s: Nonce is expired\n");
+            mysql_free_result(res);
+            // XXX: return error to client
+            return 1;
+        }
+
+        // Have to covert the hex representation in the database back into
+        // simple binary
+        if (nlen[0] != TPM_NONCE_BYTES * 2) {
+            error("SECURESTATE: %s: Nonce length is incorrect (%d)",
+                    reqp->nodeid, nlen[0]);
+        }
+        for (i = 0; i < TPM_NONCE_BYTES; i++) {
+            if (sscanf(row[0] + (i*2),"%2x", &temp) != 1) {
+		nonce[i] = (unsigned char)temp;
+                error("SECURESTATE: %s: Error parsing nonce\n", reqp->nodeid);
+                mysql_free_result(res);
+                // XXX: return error to client
+                return 1;
+            }
+        }
+
+        mysql_free_result(res);
+
+        /*
+         * Make a list of the PCR values we need to have verified
+         */
+	res = mydb_query("select q.pcr,q.value from nodes as n "
+			 "left join tpm_quote_values as q "
+			 "on (n.op_mode = q.op_mode or q.op_mode='*') "
+			 "and n.node_id = q.node_id "
+			 "where n.node_id='%s' and q.state ='%s' "
+			 "order by q.pcr",
+			 2, reqp->nodeid, newstate);
+	if (!res) {
+		error("SECURESTATE: %s: DB error getting pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no TPM quote values in database for state %s\n",
+			reqp->nodeid, newstate);
+		mysql_free_result(res);
+		return 1;
+	}
+
+        wantpcrs = 0;
+        pcrs = malloc(nrows*sizeof(TPM_PCR));
+        for (i = 0; i < nrows; i++) {
+            int pcr;
+
+            row = mysql_fetch_row(res);
+            // XXX: Check for nonsensical values for the pcr index
+            // XXX: Check for nlen...
+            // XXX: Check for proper PCR size
+            pcr = atoi(row[0]);
+            wantpcrs |= (1 << pcr);
+            for (j = 0; j < TPM_PCR_BYTES; j++) {
+                if (sscanf(row[1] + (j*2),"%2x", &temp) != 1) {
+		    pcrs[i][j] = (unsigned char)temp;
+                    error("SECURESTATE: %s: Error parsing PCR\n", reqp->nodeid);
+                    free(pcrs);
+                    mysql_free_result(res);
+                    // XXX: return error to client
+                    return 1;
+                }
+            }
+
+        }
+
+        mysql_free_result(res);
+
+        /*
+         * Get the identity key for vertification purposes
+         */
+	res = mydb_query("select tpmidentity "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+
+	if (!res){
+		error("securestate: %s: DB error getting tpmidentity\n",
+			reqp->nodeid);
+                free(pcrs);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no tpmidentity in database for this node.\n",
+			reqp->nodeid);
+                free(pcrs);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen || !nlen[0]){
+		error("%s: invalid identity length.\n",
+			reqp->nodeid);
+                free(pcrs);
+		mysql_free_result(res);
+		return 1;
+	}
+
+        // NOTE: Do *not* free the mysql result until *after* the call to
+        // verify, as we're passing the identiy key directly from the SQL
+        // result.
+
+        /*
+         * Parse and check the quote
+         *
+	 * quote and pcomp both come from the client's TPM - they are both
+	 * returned from the quote operation.  We must dig up our nonce again.
+         */
+        quote_passed = tmcd_tpm_verify_quote(quote_bin, quotelen, pcomp_bin,
+                pcomplen, nonce, wantpcrs, pcrs, (unsigned char *)row[0]);
+
+	mysql_free_result(res);
+        free(pcrs);
+
+	/* The state reported below depends on whether the quote checked. */
+	if (!quote_passed)
+		strcpy(newstate, "SECVIOLATION");
+
+#ifdef EVENTSYS
+	/*
+	 * Send the state out via an event
+	 */
+	/* XXX: Maybe we don't need to alloc a new tuple every time through */
+	tuple = address_tuple_alloc();
+	if (tuple == NULL) {
+		error("dostate: Unable to allocate address tuple!\n");
+		return 1;
+	}
+
+        // TODO: It might be nice to mark in the event that it was verified
+        // securely, but the connection to the event server is secure, and
+        // we'll refuse the insecure state command for secure states.
+	tuple->host      = BOSSNODE;
+	tuple->objtype   = "TBNODESTATE";
+	tuple->objname	 = reqp->nodeid;
+	tuple->eventtype = newstate;
+
+	if (myevent_send(tuple)) {
+		error("dostate: Error sending event\n");
+		return 1;
+	}
+
+	address_tuple_free(tuple);
+#endif /* EVENTSYS */
+
+        /*
+         * Let the client know whether the quote checks out or not. Note that
+         * we do this *after* sending the event so that a malicious client
+         * can't stall or prevent the event notification by trying to hold up
+         * the TCP connection.
+         * Probably a slightly simpler way to do this, but want to stick with
+         * the common idioms in this file.
+         */
+        if (quote_passed) {
+            OUTPUT(result, sizeof(result), "OK");
+        } else { 
+            OUTPUT(result, sizeof(result), "FAILED");
+        }
+	client_writeback(sock, result, strlen(result), tcp);
+
+
+	/* Leave this logging on all the time for now. */
+	info("%s: SECURESTATE: %s\n", reqp->nodeid, newstate);
+	return 0;
+
+}
+
+/*
+ * Prepare for a TPM quote: give the client the encrypted identity key,
+ * a nonce to use in the quote, and the set of PCRs that need to be included in
+ * the quote. This saves some state (the nonce) that will be checked again in
+ * dosecurestate().
+ */
+COMMAND_PROTOTYPE(doquoteprep)
+{
+	char            newstate[128];	/* More then we will ever need */
+        ETPM_NONCE       nonce;
+        char            nonce_hex[2*TPM_NONCE_BYTES + 1];
+        int             i;
+
+        // XXX: is MYBUFSIZE big enough?
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf;
+	char		*bufe = &buf[MYBUFSIZE];
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+	/*
+	 * Dig out state that the node is reporting - we need this so that we
+         * can tell it what PCRs to include
+	 */
+	if (rdata == NULL || sscanf(rdata, "%128s", newstate) != 1 ||
+	    strlen(newstate) == sizeof(newstate)) {
+		error("DOQUOTEPREP: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+        /*
+         * Get the set of PCRs that have to be quoted to move into this state.
+         */
+	res = mydb_query("select q.pcr from nodes as n "
+			 "left join tpm_quote_values as q "
+			 "on (n.op_mode = q.op_mode or q.op_mode='*') "
+			 "and n.node_id = q.node_id "
+			 "where n.node_id='%s' and q.state ='%s' "
+			 "order by q.pcr",
+			 1, reqp->nodeid, newstate);
+	if (!res){
+		error("quoteprep: %s: DB error getting pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no TPM quote values in database for state %s\n",
+			reqp->nodeid,newstate);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	bufp += OUTPUT(bufp, bufe - bufp, "PCR=");
+
+        for (i = 0; i < nrows; i++) {
+            row = mysql_fetch_row(res);
+            // XXX: Is this already passed to us as a string?
+            bufp += OUTPUT(bufp, bufe - bufp,"%s",row[0]);
+            if (i < (nrows - 1)) {
+                    bufp += OUTPUT(bufp, bufe - bufp, ",");
+            }
+        }
+
+        bufp += OUTPUT(bufp, bufe - bufp, " ");
+        mysql_free_result(res);
+
+        /*
+         * Grab the (encrypted) identity key for the node - noone else will be
+         * able to decrypt it, so we don't have to be too paranoid about who
+         * we give it to.
+         */
+	res = mydb_query("select tpmidentity "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+
+	if (!res){
+		error("quoteprep: %s: DB error getting tpmidentity\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no tpmidentity in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen || !nlen[0]){
+		error("%s: invalid identity length.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	bufp += OUTPUT(bufp, bufe - bufp, "IDENTITY=");
+        for (i = 0;i < nlen[0];++i)
+                bufp += OUTPUT(bufp, bufe - bufp,
+                        "%.02x", (0xff & ((char)*(row[0]+i))));
+
+        bufp += OUTPUT(bufp, bufe - bufp, " ");
+	mysql_free_result(res);
+        
+        /*
+         * Generate a cryptographic nonce - we have to keep track of this to
+         * prevent replay attacks.
+         */
+        if (tmcd_tpm_generate_nonce(nonce)) {
+            error("DOQUOTEPREP: %s: Failed to generate nonce\n", reqp->nodeid);
+            return 1;
+        }
+
+        // Make a hex representation of the nonce
+        for (i = 0; i < TPM_NONCE_BYTES; i++) {
+            sprintf(nonce_hex + (i*2),"%.02x",nonce[i]);
+        }
+        nonce_hex[TPM_NONCE_BYTES*2] = '\0';
+        // XXX
+        info("NONCE: %s\n", nonce_hex);
+
+        // Store the nonce in the database. It expires in one minute, and we
+        // overwrite any existing nonces for this node/state combo
+	mydb_update("replace into nonces "
+		    " (node_id, purpose, nonce, expires) "
+		    " values ('%s', 'state-%s','%s', UNIX_TIMESTAMP()+60)",
+		    reqp->nodeid,newstate,nonce_hex);
+
+	bufp += OUTPUT(bufp, bufe - bufp, "NONCE=%s",nonce_hex);
+
+	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+
+        /*
+         * Return to the client
+         */
+	client_writeback(sock, buf, bufp - buf, tcp);
+
+        return 0;
+}
+
+/*
+ * Get the decryption key for the image a node is suposed to be loading
+ */
+COMMAND_PROTOTYPE(doimagekey)
+{
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf;
+	char		*bufe = &buf[MYBUFSIZE];
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+        /* No arguments - we don't allow the client to ask for a specific image
+         * key, just the one for the image they are supposed to be loading
+         * according to the database
+         */
+        
+        /*
+         * Make sure that this node is in the right state - hardcoding it is
+         * probably not a good idea, but the right way to get it isn't clear
+         */
+        res = mydb_query("select op_mode, eventstate from nodes where "
+                "node_id='%s'",2,reqp->nodeid);
+
+	if (!res) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) != 1) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+                return 1;
+        }
+
+        if (strncmp(row[0],SECURELOAD_OPMODE,nlen[0]) ||
+            strncmp(row[1],SECURELOAD_STATE,nlen[1])) {
+		error("IMAGEKEY: %s: Node is in the wrong state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+                return 1;
+        }
+        mysql_free_result(res);
+
+        /*
+         * Grab and return the key itself
+         */
+	res = mydb_query("select i.auth_uuid,i.auth_key,i.decryption_key "
+			 "from current_reloads as r "
+			 "left join images as i on i.imageid=r.image_id "
+			 "where node_id='%s' order by r.idx",
+			 3, reqp->nodeid);
+	if (!res) {
+		error("IMAGEKEY: %s: DB Error getting key\n", reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		info("IMAGEKEY: %s: No current reload for this node\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Note: if there is more than one reload, we are only grabbing the
+	 * 'most recent' due to the 'order by' clause.
+	 */
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!row || !nlen) {
+		error("IMAGEKEY: %s: no auth/encryption key information\n",
+		      reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+        
+	/*
+	 * Put out the authentication UUID and signing key.
+	 * XXX these don't need to be protected as the encryption key,
+	 * they could be sent back via "loadinfo".
+	 */
+	if (row[0])
+		bufp += OUTPUT(bufp, bufe - bufp, "UUID=%s\n", row[0]);
+	if (row[1])
+		bufp += OUTPUT(bufp, bufe - bufp, "SIGKEY=%s\n", row[1]);
+	if (row[2])
+		bufp += OUTPUT(bufp, bufe - bufp, "ENCKEY=%s\n", row[2]);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+        mysql_free_result(res);
+        return 0;
 }
 
 /*
@@ -4691,11 +5962,11 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	else if (reqp->isvnode) {
 		char	clause[BUFSIZ];
 
-		if (reqp->urn[0]) {
+		if (reqp->external_key[0]) {
 			sprintf(clause,
-				"r.external_resource_id is not null and "
-				"r.external_resource_id='%s'",
-				reqp->urn);
+				"r.external_resource_key is not null and "
+				"r.external_resource_key='%s'",
+				reqp->external_key);
 		}
 		else {
 			sprintf(clause,
@@ -4741,11 +6012,11 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	else {
 		char	clause[BUFSIZ];
 
-		if (reqp->urn[0]) {
+		if (reqp->external_key[0]) {
 			sprintf(clause,
-				"r.external_resource_id is not null and "
-				"r.external_resource_id='%s'",
-				reqp->urn);
+				"r.external_resource_key is not null and "
+				"r.external_resource_key='%s'",
+				reqp->external_key);
 		}
 		else {
 			sprintf(clause,
@@ -7351,7 +8622,7 @@ COMMAND_PROTOTYPE(dotopomap)
 		reqp->pid, reqp->eid);
 
 	if ((fp = fopen(buf, "r")) == NULL) {
-		errorc("DOTOPOMAP: Could not open topomap for %s:",
+		errorc("DOTOPOMAP: Could not open topomap for %s",
 		       reqp->nodeid);
 		return 1;
 	}
@@ -7388,7 +8659,7 @@ COMMAND_PROTOTYPE(doltmap)
 		reqp->pid, reqp->eid);
 
 	if ((fp = fopen(buf, "r")) == NULL) {
-		errorc("DOLTMAP: Could not open ltmap for %s:",
+		errorc("DOLTMAP: Could not open ltmap for %s",
 		       reqp->nodeid);
 		return 1;
 	}

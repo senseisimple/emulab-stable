@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -46,6 +46,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use Experiment;
+use User;
 use snmpit_lib;
 
 # The set of OIDs we care about
@@ -68,13 +69,13 @@ if (@ARGV != 1) {
 # Lookup user.
 my $this_user = User->ThisUser();
 if (! defined($this_user)) {
-    tbdie("You ($UID) do not exist!");
+    die("You ($UID) do not exist!");
 }
 
 # Lookup experiment.
 my $experiment = Experiment->Lookup($ARGV[0]);
 if (!defined($experiment)) {
-    tbdie("Could not lookup experiment object for $ARGV[0]!")
+    die("Could not lookup experiment object for $ARGV[0]!")
 }
 my $pid       = $experiment->pid();
 my $eid       = $experiment->eid();

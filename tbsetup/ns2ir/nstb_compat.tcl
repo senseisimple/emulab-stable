@@ -20,6 +20,8 @@ proc tb-set-ip-interface {src dst ip} {}
 proc tb-set-ip-link {src link ip} {}
 proc tb-set-ip-lan {src lan ip} {}
 proc tb-set-netmask {lanlink netmask} {}
+proc tb-set-node-service {service args} {}
+proc tb-add-node-service-hook {service args} {}
 proc tb-set-hardware {node type args} {}
 proc tb-set-node-os {node os {parentos 0}} {}
 proc tb-set-link-loss {src args} {}
@@ -28,6 +30,7 @@ proc tb-set-node-rpms {node args} {}
 proc tb-set-node-startup {node cmd} {}
 proc tb-set-node-cmdline {node cmd} {}
 proc tb-set-node-tarfiles {node args} {}
+proc tb-set-tarfiles {args} {}
 proc tb-set-node-lan-delay {node lan delay} {}
 proc tb-set-node-lan-bandwidth {node lan bw} {}
 proc tb-set-node-lan-loss {node lan loss} {}
@@ -101,6 +104,12 @@ proc tb-set-dpdb {onoff} {}
 proc tb-fix-interface {vnode lanlink iface} {}
 proc tb-set-node-usesharednode {node weight} {}
 proc tb-set-node-sharingmode {node sharemode} {}
+
+#add for OML
+proc tb-set-use-oml {args} {}
+proc tb-set-oml-server {node} {}
+proc tb-set-oml-mp {args} {}
+proc tb-set-oml-use-control {args} {}
 
 proc tb-set-security-level {level} {
 

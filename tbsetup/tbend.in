@@ -48,9 +48,6 @@ use libdb;
 use libtestbed;
 use libtblog;
 use Experiment;
-if ($PGENISUPPORT) {
-    require libGeni;
-}
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -89,6 +86,8 @@ if (!$force && $state ne EXPTSTATE_TERMINATING) {
 }
 
 if ($PGENISUPPORT) {
+    require libGeni;
+
     if (libGeni::UnRegister($experiment)) {
 	tbdie("Could not delete protogeni slice\n");
     }

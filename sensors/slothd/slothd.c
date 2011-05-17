@@ -349,7 +349,7 @@ int init_slothd(void) {
       return -1;
     }
     /* Try to get lock.  If can't, then bail out. */
-    if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
+    if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR, 0644)) < 0) {
       lerror("Can't create lock file.");
       return -1;
     }

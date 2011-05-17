@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -47,6 +47,7 @@ my $scratchdir  = "@FSDIR_SCRATCH@";
 my $DISABLED	= "@DISABLE_EXPORTS_SETUP@";
 my $WINSUPPORT  = @WINSUPPORT@;
 my $ISOLATEADMIN= @ISOLATEADMINS@;
+my $NOSHAREDFS	= @NOSHAREDFS@;
 
 # XXX for TESTMODE: output to stdout
 my $TOSTDOUT	= 0;
@@ -67,8 +68,9 @@ my $EXPORT_PAT	= q(on ([\S]+)\s\(.*NFS exported.*\));
 
 #
 # Testbed doesn't support changing exports file
+# or we just do not export filesystems.
 #
-if ($DISABLED) {
+if ($DISABLED || $NOSHAREDFS) {
     exit(0);
 }
 
@@ -252,6 +254,7 @@ while ($row = $nodes_result->fetchrow_hashref) {
 	    # Shared local nodes get toplevel mounts.
 	    #
 	    push(@dirlist, "$projdir");
+	    push(@dirlist, "$groupdir");
 	    push(@dirlist, "$scratchdir")
 		if ($scratchdir && -d "$SCRATCHROOT");
 	    push(@dirlist, "$usersdir");

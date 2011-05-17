@@ -86,9 +86,6 @@ use Template;
 use Experiment;
 use User;
 
-# Be careful not to exit on transient error; 0 means infinite retry.
-$libdb::DBQUERY_MAXTRIES = 0;
-
 # For the END block below.
 my $cleaning = 0;
 my $justexit = 1;
@@ -321,7 +318,7 @@ if (my $instance = Template::Instance->LookupByExptidx($experiment->idx())) {
 # Sanity check.
 if (! (-e $workdir && -e $userdir)) {
     die("*** $0:\n".
-	"    Missing a critical directory! Stopping now ...\n");
+	"    $pid/$eid is missing a critical directory! Stopping now ...\n");
 }
 if (! -e $infodir) {
     if (! -e "$TB/expinfo/$pid") {
@@ -1402,14 +1399,19 @@ sub cleanup()
     }
     elsif ($inout eq "modify") {
 	#
-	# If the modify fails, and the experiment is swapped out, then
-	# insert a record for that since that is different then a modify
-	# that fails, but results in the experiment being restored the
-	# way it was. 
+	# If the modify fails, must clean up the record (remove it).
 	#
-	$experiment->SwapFail($this_user, TBDB_STATS_SWAPMODIFY, $errorstat,
-			      ($modifyHosed ? TBDB_STATS_FLAGS_MODHOSED() :0));
+	$experiment->SwapFail($this_user, TBDB_STATS_SWAPMODIFY, $errorstat);
+
+	#
+	# If it got swapped out, then force this into the record. The
+	# time stamps will be funky, but no big deal. Just looks like a
+	# really fast swapout.
+	#
 	if ($modifySwapped) {
+	    $experiment->PreSwap($this_user,
+				 TBDB_STATS_SWAPOUT, EXPTSTATE_ACTIVE);
+	    sleep(1);
 	    $experiment->PostSwap($this_user, TBDB_STATS_SWAPOUT);
 	}
     }

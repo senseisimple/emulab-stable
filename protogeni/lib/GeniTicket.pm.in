@@ -109,15 +109,7 @@ sub Lookup($$)
 
     my $row = $query_result->fetchrow_hashref();
 
-    # Map the component
-    my $component;
-    if ($row->{'component_uuid'}) {
-	$component = GeniComponent->Lookup($row->{'component_uuid'});
-	return undef
-	    if (!defined($component));
-    }
-    my $ticket = GeniTicket->CreateFromSignedTicket($row->{'ticket_string'},
-						    $component, 1);
+    my $ticket = GeniTicket->CreateFromSignedTicket($row->{'ticket_string'},1);
     return undef
 	if (!defined($ticket));
 
@@ -169,7 +161,6 @@ sub Create($$$$)
     $self->{'target_cert'}   = $target->GetCertificate();
     $self->{'seqno'}         = $seqno;
     $self->{'ticket_string'} = undef;
-    $self->{'component'}     = undef;
     $self->{'slice'}         = undef;
     $self->{'stored'}        = 0;	# Stored to the DB.
     $self->{'LOCKED'}        = 0;
@@ -178,7 +169,7 @@ sub Create($$$$)
     # For now, all tickets expire very quickly ...
     #
     $self->{'redeem_before'} =
-	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (5*60)));
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (10*60)));
 
     #
     # Locally generated tickets need a local DB index, which can be the
@@ -213,8 +204,6 @@ sub ticket_string($)	{ return field($_[0], "ticket_string"); }
 sub redeem_before($)	{ return field($_[0], "redeem_before"); }
 sub expires($)	        { return field($_[0], "expires"); }
 sub redeemed($   )	{ return field($_[0], "redeemed"); }
-sub component_uuid($)	{ return field($_[0], "component_uuid"); }
-sub component($)	{ return field($_[0], "component"); }
 sub stored($)		{ return field($_[0], "stored"); }
 sub slice($)            { return $_[0]->{'slice'}; }
 sub slice_uuid($)	{ return $_[0]->slice()->uuid(); }
@@ -244,9 +233,9 @@ sub Stringify($)
 	$idx = "S$seqno";
     }
     my $owner_hrn   = $self->owner_hrn();
-    my $target_uuid = $self->target_uuid();
+    my $target_urn  = $self->target_urn();
     
-    return "[GeniTicket: $idx, owner:$owner_hrn, target_uuid:$target_uuid]";
+    return "[GeniTicket: $idx, owner:$owner_hrn, target:$target_urn]";
 }
 
 #
@@ -262,9 +251,9 @@ sub Flush($)
 #
 # Create a ticket object from a signed ticket string.
 #
-sub CreateFromSignedTicket($$;$$)
+sub CreateFromSignedTicket($$;$)
 {
-    my ($class, $ticket_string, $component, $nosig) = @_;
+    my ($class, $ticket_string, $nosig) = @_;
 
     #
     # This flag is used to avoid verifying the signature since I do not
@@ -411,7 +400,6 @@ sub CreateFromSignedTicket($$;$$)
     $self->{'owner_cert'}    = $owner_certificate;
     $self->{'ticket_string'} = $ticket_string;
     $self->{'xmlref'}        = $doc;
-    $self->{'component'}     = $component;
     $self->{'seqno'}         = $seqno;
     $self->{'expires'}       = $expires;
     $self->{'stored'}        = 0;
@@ -627,18 +615,12 @@ sub Store($;$)
     my $slice_uuid  = $self->slice_uuid();
 
     #
-    # For a locally created/signed ticket, seqno=idx. For a ticket from
-    # another component, we have to generate a locally unique idx for
-    # the DB insertion.
+    # For a locally created/signed ticket, seqno=idx. 
     #
     if (!defined($idx)) {
 	$idx = TBGetUniqueIndex('next_ticket', 1);
 	$self->{'idx'} = $idx;
     }
-    # A locally generated ticket will not have a component. Might change that.
-    push(@insert_data, "component_uuid='" . $self->component()->uuid() . "'")
-	if (defined($self->component()));
-
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
@@ -782,10 +764,7 @@ sub Release($$)
     return -1
 	if (! ref($self));
 
-    $self->ReleaseHolding($flag) == 0
-	or return -1;
-
-    # Older tickets do not have this, but handled in ReleaseHolding.
+    # Older tickets do not have this.
     return 0
 	if (!defined($self->slice_uuid()) || $self->slice_uuid() eq "");
 
@@ -798,6 +777,7 @@ sub Release($$)
     my $eid     = $experiment->eid();
     my @nodeids = ();
     my @nodes   = ();
+    my @vhosts  = ();
 
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$self->rspec())->get_nodelist()) {
@@ -809,25 +789,20 @@ sub Release($$)
 	next
 	    if (!GeniXML::IsLocalNode($ref));
 	
-	my $resource_uuid = GeniXML::GetNodeId($ref);
-	if (!defined($resource_uuid)) {
+	my $resource_id = GeniXML::GetNodeId($ref);
+	if (!defined($resource_id)) {
 	    print STDERR "No resource id for node in ticket\n";
 	    print GeniXML::Serialize($ref);
 	    return -1;
 	}
 
-	# Virtual nodes not created until ticket redeemed.
-	my $node = GeniUtil::LookupNode($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_id);
 	next
 	    if (!defined($node));
 
 	my $reservation = $node->Reservation();
 	next
 	    if (!defined($reservation));
-
-	# Watch for duplicates, as in multiple vnodes on a pnode.
-	next
-	    if (grep {$_ eq $node->node_id()} @nodeids);
 
 	#
 	# If the node is still in the experiment and not incorporated,
@@ -840,6 +815,13 @@ sub Release($$)
 		 $restable->{'genisliver_idx'} == 0)) {
 		push(@nodeids, $node->node_id());
 		push(@nodes, $node);
+
+		# So we can tell if we need to deallocate a physical
+		# host once all the VMs on it are gone. 
+		if ($node->isvirtnode() && !$node->sharing_mode()) {
+		    push(@vhosts, $node->phys_nodeid())
+			if (! grep {$_ eq $node->phys_nodeid()} @vhosts);
+		}
 	    }
 	}
     }
@@ -849,81 +831,51 @@ sub Release($$)
 	#
 	#system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
 	system("$NFREE -x -q $pid $eid @nodeids");
+	return -1
+	    if ($?);
     }
     foreach my $node (@nodes) {
 	$node->Refresh();
     }
-    $self->Delete($flag);
-    return 0;
-}
 
-#
-# Retained for backwards compatability.
-#
-sub ReleaseHolding($$)
-{
-    my ($self, $flag) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $experiment = Experiment->Lookup("GeniSlices", "reservations");
-    if (!defined($experiment)) {
-	return 0;
-    }
-    my $pid     = $experiment->pid();
-    my $eid     = $experiment->eid();
-    my @nodeids = ();
-    my @nodes   = ();
-
-    foreach my $ref (GeniXML::FindNodes("n:node",
-					$self->rspec())->get_nodelist()) {
-	# Skip lan nodes; they are fake.
-	next
-	    if (GeniXML::IsLanNode($ref));
+    @nodes = @nodeids = ();
+    #
+    # Now go through the vhosts that belong to us, and see if we can
+    # free them cause there are no longer VMs on them.
+    #
+    foreach my $pnode_id (@vhosts) {
+	my $pnode = Node->Lookup($pnode_id);
+	if (!defined($pnode)) {
+	    print STDERR "ReleaseTicket: *** No such pnode $pnode_id\n";
+	    next;
+	}
 	
-	# Skip remote nodes.
+	my $reservation = $pnode->Reservation();
 	next
-	    if (!GeniXML::IsLocalNode($ref));
+	    if (!defined($reservation) ||
+		!$reservation->SameExperiment($experiment));
 	
-	my $resource_uuid = GeniXML::GetNodeId($ref);
-	if (!defined($resource_uuid)) {
-	    print STDERR "No resource id for node in ticket\n";
-	    print GeniXML::Serialize($ref);
+	my @vnodes = ();
+	if ($pnode->VirtualNodes(\@vnodes) != 0) {
+	    print STDERR
+		"ReleaseTicket: *** Could not get vnode list for $pnode_id\n";
 	    return -1;
 	}
-
-	my $node = Node->Lookup($resource_uuid);
-	next
-	    if (!defined($node));
-
-	my $reservation = $node->Reservation();
-	next
-	    if (!defined($reservation));
-
-	# Watch for duplicates, as in multiple vnodes on a pnode.
-	next
-	    if (grep {$_ eq $node->node_id()} @nodeids);
-
-	#
-	# If the node is still in the reservations experiment, it
-	# is by definition, not in use by a slice. 
-	#
-	if ($reservation->SameExperiment($experiment)) {
-	    push(@nodeids, $node->node_id());
-	    push(@nodes, $node);
+	if (!@vnodes) {
+	    push(@nodeids, $pnode->node_id());
+	    push(@nodes, $pnode);
 	}
     }
     if (@nodeids) {
-	#
-	# XXX Need to determine when a node needs to be reloaded.
-	#
-	#system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
 	system("$NFREE -x -q $pid $eid @nodeids");
+	return -1
+	    if ($?);
     }
     foreach my $node (@nodes) {
 	$node->Refresh();
     }
+    
+    $self->Delete($flag);
     return 0;
 }
 

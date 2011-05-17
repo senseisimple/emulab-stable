@@ -73,6 +73,47 @@ REPLACE INTO comments VALUES ('widearea_delays','','Delay and bandwidth metrics 
 REPLACE INTO comments VALUES ('virt_nodes','','Experiment virtual nodes');
 
 --
+-- Dumping data for table `client_services`
+--
+
+
+REPLACE INTO `client_services` VALUES (10,'rc.tbsetup','boot','every',1);
+REPLACE INTO `client_services` VALUES (20,'rc.ipod','boot','every',0);
+REPLACE INTO `client_services` VALUES (30,'rc.healthd','boot','every',0);
+REPLACE INTO `client_services` VALUES (40,'rc.slothd','boot','every',0);
+REPLACE INTO `client_services` VALUES (50,'rc.firewall','boot','every',0);
+REPLACE INTO `client_services` VALUES (60,'rc.tpmsetup','boot','every',0);
+REPLACE INTO `client_services` VALUES (70,'rc.misc','boot','every',0);
+REPLACE INTO `client_services` VALUES (80,'rc.localize','boot','every',0);
+REPLACE INTO `client_services` VALUES (90,'rc.keys','boot','every',0);
+REPLACE INTO `client_services` VALUES (100,'rc.mounts','boot','every',0);
+REPLACE INTO `client_services` VALUES (110,'rc.blobs','boot','every',0);
+REPLACE INTO `client_services` VALUES (120,'rc.topomap','boot','every',0);
+REPLACE INTO `client_services` VALUES (130,'rc.accounts','boot','every',0);
+REPLACE INTO `client_services` VALUES (140,'rc.route','boot','every',0);
+REPLACE INTO `client_services` VALUES (150,'rc.tunnels','boot','every',0);
+REPLACE INTO `client_services` VALUES (160,'rc.ifconfig','boot','every',0);
+REPLACE INTO `client_services` VALUES (170,'rc.delays','boot','every',0);
+REPLACE INTO `client_services` VALUES (180,'rc.hostnames','boot','every',0);
+REPLACE INTO `client_services` VALUES (190,'rc.lmhosts','boot','every',0);
+REPLACE INTO `client_services` VALUES (200,'rc.trace','boot','every',0);
+REPLACE INTO `client_services` VALUES (210,'rc.syncserver','boot','every',0);
+REPLACE INTO `client_services` VALUES (220,'rc.trafgen','boot','every',0);
+REPLACE INTO `client_services` VALUES (230,'rc.tarfiles','boot','every',0);
+REPLACE INTO `client_services` VALUES (240,'rc.rpms','boot','every',0);
+REPLACE INTO `client_services` VALUES (250,'rc.progagent','boot','every',0);
+REPLACE INTO `client_services` VALUES (260,'rc.linkagent','boot','every',0);
+REPLACE INTO `client_services` VALUES (270,'rc.tiptunnels','boot','every',0);
+REPLACE INTO `client_services` VALUES (280,'rc.motelog','boot','every',0);
+REPLACE INTO `client_services` VALUES (290,'rc.simulator','boot','every',0);
+REPLACE INTO `client_services` VALUES (1000,'rc.canaryd','boot','every',1);
+REPLACE INTO `client_services` VALUES (1010,'rc.linktest','boot','every',1);
+REPLACE INTO `client_services` VALUES (1020,'rc.isup','boot','every',1);
+REPLACE INTO `client_services` VALUES (1030,'rc.startcmd','boot','every',0);
+REPLACE INTO `client_services` VALUES (1040,'rc.vnodes','boot','every',1);
+REPLACE INTO `client_services` VALUES (1050,'rc.subnodes','boot','every',1);
+
+--
 -- Dumping data for table `event_eventtypes`
 --
 
@@ -149,6 +190,7 @@ REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
 REPLACE INTO exported_tables VALUES ('emulab_pubs_month_map');
 REPLACE INTO exported_tables VALUES ('event_triggertypes');
+REPLACE INTO exported_tables VALUES ('client_services');
 
 --
 -- Dumping data for table `foreign_keys`
@@ -279,6 +321,12 @@ REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','ISUP','Re
 REPLACE INTO mode_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','ALWAYSUP','ISUP','ReloadDone');
 REPLACE INTO mode_transitions VALUES ('PCVM','SHUTDOWN','RELOAD-PCVM','SHUTDOWN','ReloadSetup');
 REPLACE INTO mode_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','PCVM','SHUTDOWN','ReloadDone');
+REPLACE INTO mode_transitions VALUES ('RELOAD-PUSH','SHUTDOWN','MINIMAL','SHUTDOWN','ReloadDone');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','RELOAD-PUSH','SHUTDOWN','ReloadStart');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','NORMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','PXEFBSD','SHUTDOWN','');
 
 --
 -- Dumping data for table `priorities`
@@ -329,7 +377,7 @@ REPLACE INTO state_timeouts VALUES ('USERSTATUS','ACTIVE',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','FROZEN',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','NEWUSER',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,'');
-REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',15,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',75,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWEROFF',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERON',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERCYCLE',0,'CMDRETRY');
@@ -344,6 +392,19 @@ REPLACE INTO state_timeouts VALUES ('NORMALv2','TBSETUP',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('NORMALv2','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('GARCIA-STARGATEv1','TBSETUP',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('PXEKERNEL','PXEWAKEUP',20,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','BOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','GPXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','PXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','SHUTDOWN',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','TPMSIGNOFF',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','BOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','GPXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','PXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','RELOADDONE',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','RELOADING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','RELOADSETUP',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','SHUTDOWN',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','TPMSIGNOFF',3600,'STATE:SECVIOLATION');
 
 --
 -- Dumping data for table `state_transitions`
@@ -534,6 +595,33 @@ REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADSETUP','RELOADING','
 REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADING','RELOADDONE','ReloadDone');
 REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADDONE','SHUTDOWN','ReloadDone');
 REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','RELOADSETUP','ReloadSetup');
+REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','TBSETUP','FailedBoot');
+REPLACE INTO state_transitions VALUES ('RELOAD','TBSETUP','ISUP','FailedBoot');
+REPLACE INTO state_transitions VALUES ('RELOAD','TBSETUP','TBFAILED','FailedBoot');
+REPLACE INTO state_transitions VALUES ('RELOAD','ISUP','SHUTDOWN','RebootAfterFail');
+REPLACE INTO state_transitions VALUES ('RELOAD','TBFAILED','SHUTDOWN','RebootAfterFail');
+REPLACE INTO state_transitions VALUES ('RELOAD-PUSH','SHUTDOWN','BOOTING','Booting');
+REPLACE INTO state_transitions VALUES ('RELOAD-PUSH','BOOTING','BOOTING','BootRetry');
+REPLACE INTO state_transitions VALUES ('RELOAD-PUSH','RELOADSETUP','RELOADING','ReloadStart');
+REPLACE INTO state_transitions VALUES ('RELOAD-PUSH','RELOADING','RELOADDONE','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD-PUSH','RELOADDONE','SHUTDOWN','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD-PUSH','SHUTDOWN','RELOADSETUP','ReloadSetup');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','BOOTING','SECVIOLATION','QuoteFailed');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','BOOTING','TPMSIGNOFF','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','GPXEBOOTING','PXEBOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','PXEBOOTING','BOOTING','BootInfo');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','BOOTING','PXEBOOTING','re-BootInfo');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','BOOTING','RELOADSETUP','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','BOOTING','SECVIOLATION','QuoteFailed');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','GPXEBOOTING','PXEBOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','PXEBOOTING','BOOTING','BootInfo');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADDONE','SECVIOLATION','QuoteFailed');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADDONE','TPMSIGNOFF','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADING','RELOADDONE','ImageOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADING','SECVIOLATION','ImageBad');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADSETUP','RELOADING','ReloadReady');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','SHUTDOWN','GPXEBOOTING','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','SHUTDOWN','SECVIOLATION','QuoteFailed');
 
 --
 -- Dumping data for table `state_triggers`
@@ -552,6 +640,17 @@ REPLACE INTO state_triggers VALUES ('*','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
 REPLACE INTO state_triggers VALUES ('*','NORMALv2','WEDGED','POWERCYCLE');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADOLDMFS','RELOADOLDMFS');
 REPLACE INTO state_triggers VALUES ('*','RELOAD-PCVM','RELOADDONE','RESET, RELOADDONE');
+REPLACE INTO state_triggers VALUES ('*','RELOAD','ISUP','REBOOT');
+REPLACE INTO state_triggers VALUES ('*','RELOAD','TBFAILED','REBOOT');
+REPLACE INTO state_triggers VALUES ('*','RELOAD-PUSH','RELOADDONE','RELOADDONE');
+REPLACE INTO state_triggers VALUES ('*','*','GPXEBOOTING','SECUREBOOT');
+REPLACE INTO state_triggers VALUES ('*','*','SECVIOLATION','POWEROFF, EMAILNOTIFY');
+REPLACE INTO state_triggers VALUES ('*','SECUREBOOT','BOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECUREBOOT','PXEBOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECUREBOOT','TPMSIGNOFF','PXEBOOT, BOOTING, CHECKGENISUP');
+REPLACE INTO state_triggers VALUES ('*','SECURELOAD','BOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECURELOAD','PXEBOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECURELOAD','RELOADDONE','RESET, RELOADDONE');
 
 --
 -- Dumping data for table `table_regex`
@@ -645,6 +744,7 @@ REPLACE INTO table_regex VALUES ('virt_agents','objecttype','int','redirect','de
 REPLACE INTO table_regex VALUES ('virt_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','vindex','int','redirect','default:int',0,4098,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','delay','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','bandwidth','int','redirect','default:int',0,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','lossrate','float','function','_checklossrate',0,1,NULL);
@@ -816,6 +916,7 @@ REPLACE INTO table_regex VALUES ('event_groups','agent_name','text','redirect','
 REPLACE INTO table_regex VALUES ('virt_lan_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lan_lans','failureaction','text','regex','^(fatal|nonfatal)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','eid','text','redirect','experimenets:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
@@ -985,6 +1086,40 @@ REPLACE INTO table_regex VALUES ('elabinelab_attributes','role','text','regex','
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','attrkey','text','regex','^[-\\w\\.]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','attrvalue','text','regex','^[-\\w\\.\\+,\\s\\/]+$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','ordering','int','redirect','default:tinyint',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('images','auth_key','text','regex','^[0-9a-fA-F,]+$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','auth_uuid','text','regex','^[0-9a-fA-F]+$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','decryption_key','text','regex','^[0-9a-fA-F]+$',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('experiment_blobs','path','text','redirect','default:text',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiment_blobs','action','text','redirect','default:text',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('virt_blobs','filename','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('virt_blobs','vblob_id','text','regex','^[-\\d\\w]+$',0,40,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','alt_vblob_id','text','regex','^[-\\d\\w]+$',0,40,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','enable','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','enable_hooks','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','env','text','regex','^(boot|load)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','fatal','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','service_idx','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_ctl','whence','text','regex','^(first|every)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','argv','text','regex','^[-\\w\\s\"]*$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','env','text','regex','^(boot|load)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','fatal','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','hook_op','text','regex','^(boot|shutdown|reconfig|reset)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','hook_point','text','regex','^(pre|post)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','hook_vblob_id','text','regex','^[-\\d\\w]+$',0,40,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','op','text','regex','^(boot|shutdown|reconfig|reset)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','point','text','regex','^(pre|post)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','service_idx','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_client_service_hooks','whence','text','regex','^(first|every)$',0,0,NULL);
+
 
 REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,256,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');

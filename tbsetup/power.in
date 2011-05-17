@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,15 +23,18 @@ my $RPCSERVER  = "@OUTERBOSS_NODENAME@";
 my $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
 my $RPCCERT    = "@OUTERBOSS_SSLCERTNAME@";
 my $WOL        = "$TB/sbin/whol";
+my $TBLOG	= "@TBLOGFACIL@";
 
 use lib "@prefix@/lib";
 use libdb;
 use libxmlrpc;
+use power_ipmi;
 use power_rpc27;
 use power_sgmote;
 use power_mail;
 use power_whol;
 use power_ilo;
+use power_icebox;
 use snmpit_apc;
 use libtestbed;
 use User;
@@ -41,6 +44,8 @@ use StateWait;
 use strict;
 use English;
 use Getopt::Std;
+use POSIX qw(strftime);
+use Sys::Syslog;
 
 sub usage() {
     print << "END";
@@ -70,6 +75,7 @@ my $this_user;
 # Protos
 sub dostatus(@);
 sub dowol(@);
+sub logit($);
 
 #
 # Process command-line arguments
@@ -133,6 +139,9 @@ foreach my $n (0..$#machines) {
 #
 print "do \"$op\" to @machines\n" if $verbose > 1;
 
+# Set up syslog
+openlog("power", "pid", $TBLOG);
+
 #
 # Handle the status command which is not a per-node operation and not
 # allowed by anyone except admins.
@@ -162,6 +171,8 @@ if ($ELABINELAB) {
 
     exit(0)
 	if (! @nodelist);
+
+    logit("$op: @nodelist\n");
 
     libxmlrpc::Config({"server"  => $RPCSERVER,
 		       "verbose" => 1,
@@ -318,13 +329,41 @@ foreach my $power_id (keys %outlets) {
 	}
 	($type, $IP, $class) = $result->fetchrow();
     }
+    # Log now, and not worry about errors. Just want to know we tried.
+    logit("$op: @nodes\n");
 
     #
     # Finally, we look at the controller type and construct the proper type
     # of object
     #
     my $errors = 0;
-    if ($type eq "APC") {
+    if ($type eq "IPMI") {
+        my $device = new power_ipmi($IP,$verbose);
+	if (!defined $device) {
+	    warn "Unable to contact controller for $nodestr. Skipping...\n";
+	    next;
+	} else {
+	    print "Calling device->power($op,@outlets)\n" if $verbose > 1;
+	    if ($device->power($op,@outlets)) {
+		print "Control of $nodestr failed.\n";
+		$errors++;
+	    }
+	}
+    }
+    elsif ($type eq "icebox") {
+        my $device = new power_icebox($IP,$verbose);
+	if (!defined $device) {
+	    warn "Unable to contact controller for $nodestr. Skipping...\n";
+	    next;
+	} else {
+	    print "Calling device->power($op,@outlets)\n" if $verbose > 1;
+	    if ($device->power($op,@outlets)) {
+		print "Control of $nodestr failed.\n";
+		$errors++;
+	    }
+	}
+    }
+    elsif ($type eq "APC") {
 	my $device = new snmpit_apc($IP,$verbose);
 	if (!defined $device) {
 	    warn "Unable to contact controller for $nodestr. Skipping...\n";
@@ -488,7 +527,28 @@ sub dostatus(@) {
     for my $ctrl (@nwanted) {
 	my %status;
 
-	if ($ctrls{$ctrl} eq "APC") {
+	if ($ctrls{$ctrl} eq 'icebox') {
+  	    my $device = new power_icebox($IPs{$ctrl}, $verbose);
+	    if (!defined $device) {
+		warn "Unable to contact controller $ctrl.\n";
+		$errors++;
+		next;
+	    } else {
+		print "Calling device->status()\n"
+		    if $verbose > 1;
+		if ($device->status(\%status)) {
+		    print "Could not get status for $ctrl.\n";
+		    $errors++;
+		    next;
+		}
+	        for my $outlet (1..24) {
+		    my $ostr = "outlet$outlet";
+		    print "$ctrl Outlet $outlet: ", $status{$ostr}, "\n"
+		        if (defined($status{$ostr}));
+	        }
+	        print "\n";
+	    }
+	} elsif ($ctrls{$ctrl} eq "APC") {
 	    my $device = new snmpit_apc($IPs{$ctrl}, $verbose);
 	    if (!defined $device) {
 		warn "Unable to contact controller $ctrl.\n";
@@ -581,6 +641,7 @@ sub dowol(@)
     @nodeids = keys(%macs);
 
     print "Doing a plain WOL to @nodeids via interface $iface\n";
+    logit("WOL: @nodeids\n");
 
     #
     # This is going to take an arbitrary length of time; we have no idea
@@ -645,4 +706,16 @@ sub dowol(@)
 	return -1;
     }
     return 0;
+}
+
+sub logit($)
+{
+    my ($message) = @_;
+    my ($me) = getpwuid($UID);
+
+    syslog("info", "[$me] $message");
+}
+
+END {
+    closelog();
 }

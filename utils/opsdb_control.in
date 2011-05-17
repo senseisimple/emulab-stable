@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -836,6 +836,9 @@ sub Initialize()
 #  		     "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
 #		     "       g.pid='tbres' or g.pid='utahstud')" .
 		     "order by u.admin");
+
+    # Need to do this when we want to seek around inside the results.
+    $users_result = $users_result->WrapForSeek();
 
     while (my ($uid) = $users_result->fetchrow_array()) {
 	AddUser(($uid)) == 0

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -58,6 +58,16 @@ if ($simple) {
 	'hide_sidebar' => 1);
 } else {
     $view = array();
+}
+
+if (NOLOGINS() && !$adminmode) {
+    PAGEHEADER("Login", $view);
+
+    USERERROR("Sorry. The Web Interface is ".
+	      "<a href=nologins.php3>Temporarily Unavailable!</a>", 1);
+
+    PAGEFOOTER($view);
+    die("");
 }
 
 #

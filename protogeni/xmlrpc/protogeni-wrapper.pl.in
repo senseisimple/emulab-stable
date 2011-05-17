@@ -1,0 +1,430 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Simple CGI interface to the GENI xmlrpc interface. This script is invoked
+# from the web server. The certificate information is in the environment
+# set up by apache.
+#
+use strict;
+use English;
+use Frontier::Responder;
+use Frontier::RPC2;
+use Data::Dumper;
+use POSIX;
+use Crypt::X509;
+use Crypt::OpenSSL::X509;
+use Time::HiRes qw( gettimeofday tv_interval );
+
+# Yack. apache does not close fds before the exec, and if this dies
+# we are left with a giant mess.
+BEGIN {
+    no warnings;
+    for (my $i = 3; $i < 1024; $i++) {
+      POSIX:close($i);
+    }
+}
+
+# Configure variables
+my $MAINSITE 	   = @TBMAINSITE@;
+my $TBOPS          = "@TBOPSEMAIL@";
+my $MODULE;
+my $GENIURN;
+
+my $AM_MODULE = "am";
+
+# These are the modules we load for each service.
+my %GENI_MODULES = ( "cm"        => "@prefix@/lib/protogeni-cm.pm",
+		     $AM_MODULE  => "@prefix@/lib/geni-am.pm",
+		     "sa"        => "@prefix@/lib/protogeni-sa.pm",
+		     "ch"        => "@prefix@/lib/protogeni-ch.pm",
+		     "ses"       => "@prefix@/lib/protogeni-ses.pm" );
+
+# These variables are shared with the loaded module.
+use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION
+	    $GENI_RESPONSE_CONVERTER);
+
+# Testbed libraries.
+use lib '@prefix@/lib';
+use Genixmlrpc;
+use GeniResponse;
+use libaudit;
+use libEmulab;
+use libtestbed;
+
+# Geniuser.
+my $user  = "geniuser";
+my $group = "GeniSlices";
+
+# Need a command line option.
+my $debug      = 0;
+my $mailerrors = 1;
+
+# Determined by version.
+my $responder;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Helper function to return a properly formated XML error.
+#
+sub XMLError($$)
+{
+    my ($code, $string) = @_;
+
+    my $decoder = Frontier::RPC2->new();
+    print "Content-Type: text/xml \n\n";
+    print $decoder->encode_fault($code, $string);
+    exit(0);
+}
+
+#
+# Check for NoLogins; return XMLRPC
+#
+if (NoLogins()) {
+    XMLError(503, "CM temporarily offline; please try again later");
+}
+
+#
+# Check for excessive load
+#
+if ($MAINSITE) {
+    my $uptime = `uptime`;
+    if ($uptime =~ /load averages:\s+([\.\d]+),\s+([\.\d]+),\s+[\.\d]+/) {
+	if ($1 > 10.0) {
+	    XMLError(503, "Server is WAY too busy; please try again later");
+	}
+    }
+}
+
+#
+# Make sure the client presented a valid certificate that apache says
+# is okay.
+#
+# THIS HAS TO BE HERE! Why? Cause recent security patches disable SSL
+# renegotiation, which is needed when a subdir turns on ssl client
+# verification (as httpd.conf used to). Now, we set it to "optional",
+# which avoids the renegotiation problem, but we have to make that
+# this interface is always invoked by a client supplying a verifiable
+# certificate. 
+#
+if (! (exists($ENV{'SSL_CLIENT_VERIFY'}) &&
+       $ENV{'SSL_CLIENT_VERIFY'} eq "SUCCESS")) {
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid or missing certificate");
+}
+
+#
+# In the prototype, we accept certificate signed by trusted roots
+# (CA certs we have locally cached). This script runs as "geniuser"
+# so that there is an emulab user context, or many of the scripts we
+# invoke will complain and croak. 
+#
+my $unix_uid = getpwnam("$user") or
+    die("*** $0:\n".
+	"    No such user $user\n");
+my $unix_gid = getgrnam("$group") or
+    die("*** $0:\n".
+	"    No such group $group\n");
+
+# Flip to user and never go back
+$GID            = $unix_gid;
+$EGID           = "$unix_gid $unix_gid";
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $user;
+$ENV{'LOGNAME'} = $user;
+
+if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
+    my $pathinfo = $ENV{'PATH_INFO'};
+    $pathinfo =~ s/^\///;
+    my @parts = split(/\//, $pathinfo);
+    if (@parts) {
+	my $m = shift(@parts);
+	if ($m =~ /^[-\w]+$/) {
+	    $MODULE = $m;
+	    if (@parts) {
+		my $v = shift(@parts);
+		if ($v =~ /^[\d\.]+$/) {
+		    $GENI_VERSION = "$v";
+		}
+	    }
+	}
+    }
+}
+
+#
+# The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
+# If it actually looks like a UUID, then this correponds to an actual user,
+# and the supplied credentials/tickets must match. At present, if there is
+# no UUID, it is another emulab making a request directly, with no user
+# context, and we just let that pass for now.
+#
+if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
+    $ENV{'SSL_CLIENT_S_DN_CN'} =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+    $ENV{'GENIUSER'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+    $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+}
+elsif (defined($MODULE) && ($MODULE eq $AM_MODULE)) {
+    # Do not expect a UUID if calling to the AM.
+}
+else {
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid certificate; no UUID");
+}
+
+#
+# The CERT data from apache holds the URN of the caller. 
+#
+if (exists($ENV{'SSL_CLIENT_CERT'})) {
+    my $x509 = eval {
+	Crypt::OpenSSL::X509->new_from_string($ENV{'SSL_CLIENT_CERT'}); };
+    if ($@) {
+	XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid certificate: $@");
+    }
+    my $cert = $x509->as_string(Crypt::OpenSSL::X509::FORMAT_ASN1);
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "Could not convert certificate to ASN1")
+	if (!defined($cert) || $cert eq '');
+    my $decoded = Crypt::X509->new( cert => $cert );
+    if ($decoded->error) {
+	XMLError(XMLRPC_APPLICATION_ERROR(),
+		 "Error decoding certificate:" . $decoded->error);
+    }
+    foreach my $tmp (@{ $decoded->SubjectAltName }) {
+	if ($tmp =~ /^uniformResourceIdentifier=(urn:publicid:.*)$/ ||
+	    $tmp =~ /^(urn:publicid:.*)$/) {
+	    $GENIURN = $ENV{'GENIURN'} = $1;
+	}
+    }
+}
+XMLError(XMLRPC_APPLICATION_ERROR(),
+	 "Invalid authentication certificate; no URN. Please regenerate.")
+    if (!exists($ENV{'GENIURN'}));
+
+#
+# Reaching into the Frontier code so I can debug this crap.
+#
+my $request = Frontier::Responder::get_cgi_request();
+if (!defined($request)) {
+    print "Content-Type: text/txt\n\n";
+    exit(0);
+}
+
+if (!defined($MODULE) || !exists($GENI_MODULES{$MODULE})) {
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid module specification")
+}
+my $file = $GENI_MODULES{$MODULE};
+
+# This just loads the file.
+my $return = do $file;
+if (!defined($return)) {
+    SENDMAIL($TBOPS, "Error loading module",
+	     ($@ ? $@ : ($! ? $! : Dumper(%ENV))));
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Internal error loading module");
+}
+if (!(defined($GENI_METHODS) && defined($EMULAB_PEMFILE))) {
+    SENDMAIL($TBOPS, "Error loading module $MODULE",
+	     "No definition for GENI_METHODS or EMULAB_PEMFILE");
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "Internal error loading module; missing definitions");
+}
+
+#
+# So we know who/what we are acting as.
+#
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    die("*** $0:\n".
+	"    Could not get uuid from $EMULAB_PEMFILE\n");
+}
+$ENV{'MYUUID'} = $certificate->uuid();
+$ENV{'MYURN'}  = $certificate->urn();
+
+#
+# Create and set our RPC context for any calls we end up making.
+#
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+#
+# Use libaudit to capture any output from libraries and programs.
+# Send that to tbops so they can be fixed.
+#
+if ($MAINSITE) {
+    LogStart(0);
+    AddAuditInfo("to", "protogeni-errors\@flux.utah.edu")
+}
+else {
+    LogStart(0, undef, LIBAUDIT_LOGTBOPS());
+}
+
+# CC errors to Utah for now.
+AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu");
+
+#
+# This is lifted from the Frontier code. I want the actual response
+# object, not the XML. 
+#
+my $decoder   = Frontier::RPC2->new();
+my $call;
+my $response;
+
+$request =~ s/(<\?XML\s+VERSION)/\L$1\E/;
+eval { $call = $decoder->decode($request) };
+if ($@) {
+    XMLError(XMLRPC_PARSE_ERROR(), "error decoding RPC:\n" . $@);
+}
+if ($call->{'type'} ne 'call') {
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "expected RPC methodCall, got $call->{'type'}");
+}
+my $method = $call->{'method_name'};
+if (!defined($GENI_METHODS->{$method})) {
+    XMLError(XMLRPC_APPLICATION_ERROR() + 3, "no such method $method\n");
+}
+# Strictly for debugging the CM.
+my $target;
+if (defined($call->{'value'})) {
+    my ($argref) = @{ $call->{'value'} };
+    if (ref($argref) eq "HASH") {
+	if (exists($argref->{'slice_urn'})) {
+	    $target = $argref->{'slice_urn'};
+	}
+	elsif (exists($argref->{'sliver_urn'})) {
+	    $target = $argref->{'sliver_urn'};
+	}
+    }
+}
+
+my $result;
+my $message =
+    "URN:     $GENIURN\n";
+$message .=
+    "Target:  $target\n" if (defined($target));
+$message .=
+    "Module:  $MODULE\n".
+    "Method:  $method\n";
+$message .=
+    "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
+$message .=
+    "Start:   " . TBTimeStamp() . "\n";
+
+my $starttime = [gettimeofday()];
+eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
+if ($@) {
+    #
+    # These errors should get mailed to tbops.
+    #
+    print STDERR "Error executing RPC method $method:\n" . $@ . "\n";
+    AddAuditInfo("to", $TBOPS);
+    $response = $decoder->encode_fault(XMLRPC_SERVER_ERROR(),
+				       "Internal Error executing $method");
+
+    AddAuditInfo("message", $message .
+		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
+}
+else {
+    my $elapsed = tv_interval($starttime);
+    $message .= "End:     " . TBTimeStamp() . "\n";
+    $message .= "Elapsed: " . sprintf("%f", $elapsed) . "\n";
+
+    if (!ref($result)) {
+	$message .= "Return:    $result\n";
+    }
+    else {
+	if (GeniResponse::IsError($result)) {
+	    $message .= "Error:   " . $result->{'code'} . "\n";
+	}
+	else {
+	    $message .= "Code:    " . $result->{'code'} . "\n";
+	}
+	$message .= "Output:  " . $result->{'output'} . "\n"
+	    if (defined($result->{'output'}));
+
+	$message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
+    }
+    $message .= "Request:\n" . $request . "\n";
+    
+    AddAuditInfo("message", $message);
+
+    if (! ref($result)) {
+	#
+	# This could happen if the child forks. 
+	#
+	if ($result) {
+	    print STDERR "Child forked but returned an error\n";
+	}
+    }
+    else {
+	#
+	# If the response indicates error, and no output is defined in
+	# the response, then send back the contents of the audit file.
+	# Not sure this makes any sense at all yet, but the point is to
+	# get more info back to the user.
+	#
+	if (GeniResponse::IsError($result) &&
+	    (!defined($result->{'output'}) || $result->{'output'} eq "") &&
+	    exists($ENV{'TBAUDITLOG'}) && -s $ENV{'TBAUDITLOG'}) {
+	    $result->{'output'} = `cat $ENV{'TBAUDITLOG'}`;
+	}
+	# Do this after above so that silly comment is not sent to user.
+	if (GeniResponse::IsError($result) && $mailerrors &&
+	    $result->{'code'} != GENIRESPONSE_SEARCHFAILED()) {
+	    print STDERR "Mail Errors is on.\n";
+	}
+
+	#
+	# Added this for geni-am ...
+	#
+	if (defined($GENI_RESPONSE_CONVERTER)) {
+	    $response = &$GENI_RESPONSE_CONVERTER($result);
+	}
+	else {
+	    $response = $decoder->encode_response($result);
+	}
+    }
+}
+
+if ($debug) {
+    print STDERR "Debugging is on.\n";
+}
+
+#
+# Terminate the log capture so that we can print the response to STDOUT
+# for the web server.
+#
+LogEnd(0);
+
+print "Content-Type: text/xml \n\n" . $response
+    if (defined($response));
+exit(0);
+
+#
+# Want to prevent bad exit.
+#
+END {
+    my $exitcode = $?;
+
+    if ($exitcode) {
+	LogEnd(0);
+
+	my $decoder = Frontier::RPC2->new();
+	print "Content-Type: text/xml \n\n";
+	print $decoder->encode_fault(XMLRPC_SYSTEM_ERROR(),
+				     "XMLRPC Server Error");
+
+	# Since we converted to a normal error and sent the log message.
+	$? = 0;
+    }
+}
+

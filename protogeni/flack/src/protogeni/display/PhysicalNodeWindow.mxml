@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						width="675" height="500"
+						title="Node Information" close="closeWindow()">
+	<fx:Script>
+		<![CDATA[
+			import protogeni.resources.PhysicalNode;
+			
+			public function loadNode(n:PhysicalNode):void {
+				nodeInfo.load(n);
+			}
+		]]>
+	</fx:Script>
+	
+	<display:PhysicalNodeInfo id="nodeInfo" height="100%" width="100%" />
+	
+</display:DefaultWindow>

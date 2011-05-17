@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniXML;
@@ -11,7 +11,14 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA = "Exporter";
-@EXPORT = qw(Parse ParseFile FindNodes FindNodesNS FindFirst FindElement FindAttr IsLanNode IsLocalNode GetNodeId GetVirtualId GetManagerId SetText GetText CreateDocument AddElement PolicyExists);
+@EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
+FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
+IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp GetVnodeId
+GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
+GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
+GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
+GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
+CreateDocument AddElement RemoveChild PolicyExists);
 
 use English;
 use XML::LibXML;
@@ -21,7 +28,13 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-# Configure variables
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS);
+$RSPEC_0_1 = "0.1";
+$RSPEC_0_2 = "0.2";
+$RSPEC_2 = "2";
+
+$EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
+
 # Configure variables
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
@@ -58,6 +71,33 @@ sub ParseFile($)
     } else {
 	return $doc->documentElement();
     }
+}
+
+# Determines the rspec version of a node by examining is namespace URI
+sub GetVersion($)
+{
+    my ($node) = @_;
+    my $result = $RSPEC_0_1;
+    my $ns = $node->namespaceURI();
+    if (defined($ns)) {
+	if ($ns =~ /protogeni.net\/resources\/rspec\/0.1$/) {
+	    $result = $RSPEC_0_1;
+	} elsif ($ns =~ /protogeni.net\/resources\/rspec\/0.2$/) {
+	    $result = $RSPEC_0_2;
+	} elsif ($ns =~ /protogeni.net\/resources\/rspec\/2$/) {
+	    $result = $RSPEC_2;
+	} else {
+	    carp("Unknown rspec namespace: " . $ns);
+	    $result = $RSPEC_0_1;
+	}
+    }
+    return $result;
+}
+
+sub IsVersion0($)
+{
+    my $version = GetVersion($_[0]);
+    return $version eq $RSPEC_0_1 || $version eq $RSPEC_0_2;
 }
 
 # Returns a NodeList for a given XPath using a given node as
@@ -152,14 +192,52 @@ sub FindAttr($$)
     return FindNodeType($path, $node, XML_ATTRIBUTE_NODE);
 }
 
+sub GetElementByVirtualId($$$)
+{
+    my ($name, $type, $node) = @_;
+    my @list = FindNodes('n:'.$type.'[@virtual_id = "'.$name.'"]',
+			 $node)->get_nodelist();
+    if (scalar(@list) == 0) {
+	@list = FindNodes('n:'.$type.'[@nickname = "'.$name.'"]',
+			  $node)->get_nodelist();
+    }
+    if (scalar(@list) == 0) {
+	@list = FindNodes('n:'.$type.'[@client_id = "'.$name.'"]',
+			  $node)->get_nodelist();
+    }
+    my $result = undef;
+    if (scalar(@list) > 0)
+    {
+	$result = $list[0];
+    }
+    if (scalar(@list) > 1)
+    {
+	cluck("WARNING: Multiple $type with virtual_id $name found");
+    }
+    return $result;
+}
+
+sub GetNodeByVirtualId($$)
+{
+    my ($name, $node) = @_;
+    return GetElementByVirtualId($name, 'node', $node);
+}
+
+sub GetLinkByVirtualId($$)
+{
+    my ($name, $node) = @_;
+    return GetElementByVirtualId($name, 'link', $node);    
+}
+
 # Returns true if a given XML Node is an RSpec node and is of type lan
 sub IsLanNode($)
 {
     my ($node) = @_;
     my $result = 0;
     if (defined($node) && $node->localname() eq "node") {
-	foreach my $lan (FindNodes("n:node_type", $node)->get_nodelist()) {
-	    my $typeName = GetText("type_name", $lan);
+	foreach my $lan (FindNodes("n:hardware_type",
+				   $node)->get_nodelist()) {
+	    my $typeName = GetFirstText($lan, "type_name", "name");
 	    if (defined($typeName) && $typeName eq "lan") {
 		$result = 1;
 		last;
@@ -188,33 +266,290 @@ sub IsLocalNode($)
     return $result;
 }
 
+sub IsTunnel($)
+{
+    my ($link) = @_;
+    my $result = 0;
+    if (IsVersion0($link)) {
+	my $link_type = GetText("link_type", $link);
+	$result = (defined($link_type) && $link_type eq "tunnel");
+    } else {
+	my @types = FindNodes("n:link_type", $link)->get_nodelist();
+	foreach my $current (@types) {
+	    my $name = GetText("name", $current);
+	    if (defined($name) && $name eq "gre-tunnel") {
+		$result = 1;
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub GetExpires($)
+{
+    my ($node) = @_;
+    return GetFirstText($node, "valid_until", "expires");
+}
+
+sub SetExpires($$)
+{
+    my ($node, $arg) = @_;
+    if (IsVersion0($node)) {
+	SetText("valid_until", $node, $arg);
+    } else {
+	SetText("expires", $node, $arg);
+    }
+}
+
+sub GetBandwidth($)
+{
+    my ($link) = @_;
+    my $result = undef;
+    if (IsVersion0($link)) {
+	$result = GeniXML::GetText("bandwidth", $link);
+    } else {
+	my $prop = FindFirst("n:property", $link);
+	if (defined($prop)) {
+	    $result = GeniXML::GetText("capacity", $prop);
+	}
+    }
+    return $result;
+}
+
+sub GetIp($$)
+{
+    my ($ifaceref, $node) = @_;
+    my $result = undef;
+    if (IsVersion0($ifaceref)) {
+	$result = GetText("tunnel_ip", $ifaceref);
+    } else {
+	my $id = GetInterfaceId($ifaceref);
+	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
+	foreach my $iface (@ifaces) {
+	    my $testid = GetInterfaceId($iface);
+	    if (defined($id) && defined($testid) && $testid eq $id) {
+		my $ip = FindFirst("n:ip", $iface);
+		if (defined($ip)) {
+		    $result = GetText("address", $ip);
+		}
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+# Returns the vnode id in the emulab extension or failing that the component_id
+sub GetVnodeId($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = GetNodeId($node);
+    } else {
+	my $vnoderef = GeniXML::FindNodesNS("vnode", $node,
+					    $EMULAB_NS)->pop();
+	if (defined($vnoderef)) {
+	    $result = GetText("name", $vnoderef);
+	}
+	if (! defined($result)) {
+	    $result = GetNodeId($node);
+	}
+    }
+    return $result;
+}
+
 # Returns the uuid or urn of an RSpec node or undef if it is not a node.
 sub GetNodeId($)
 {
     my ($node) = @_;
-    return GetText("component_uuid", $node) ||
-	GetText("component_urn", $node) ||
-	GetText("uuid", $node);
+    my $result = GetFirstText($node, "component_urn", "component_id",
+			      "component_uuid", "uuid");
+    if (defined($result) && $result eq "") {
+	$result = undef;
+    }
+    return $result;
 }
 
 sub GetVirtualId($)
 {
     my ($node) = @_;
-    return GetText("virtual_id", $node) ||
-	GetText("nickname", $node);
+    return GetFirstText($node, "virtual_id", "nickname", "client_id");
+}
+
+sub GetInterfaceId($)
+{
+    my ($node) = @_;
+    return GetFirstText($node, "virtual_interface_id", "iface_name",
+			"client_id", "virtual_port_id", "virtual_id");
+}
+
+sub GetInterfaceNodeId($)
+{
+    my ($node) = @_;
+    return GetFirstText($node, "virtual_node_id", "node_nickname");
 }
 
 sub GetSliverId($)
 {
     my ($node) = @_;
-    return GetText("sliver_urn", $node);
+    return GetFirstText($node, "sliver_urn", "sliver_id");
 }
 
 sub GetManagerId($)
 {
     my ($node) = @_;
-    return GetText("component_manager_uuid", $node) ||
-	GetText("component_manager_urn", $node);
+    my $result = GetFirstText($node, "component_manager_urn",
+			      "component_manager_id",
+			      "component_manager_uuid");
+    if (defined($result) && $result eq "") {
+	$result = undef;
+    }
+    return $result;
+}
+
+sub GetColocate($)
+{
+    my ($node) = @_;
+    my $result = GetFirstText($node, "colocate", "phys_nickname");
+    return $result;
+}
+
+sub GetSubnodeOf($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = GetText("subnode_of", $node);
+    } else {
+	my @relations = FindNodes("n:relation", $node)->get_nodelist();
+	foreach my $current (@relations) {
+	    if (GetText("type", $current) == "subnode_of") {
+		$result = GetText("client_id", $current);
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub GetStartupCommand($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+        $result = GetText("startup_command", $node);
+    } else {
+	my $execute = FindFirst("n:services/n:execute", $node);
+	if (defined($execute)) {
+	    $result = GetText("command", $execute);
+	}
+    }
+    return $result;
+}
+
+sub GetTarball($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+        $result = GetText("tarfiles", $node);
+    } else {
+	$result = "";
+	my @tarlist = FindNodes("n:services/n:install",
+				$node)->get_nodelist();
+	foreach my $current (@tarlist) {
+	    my $url = GetText("url", $current);
+	    my $install = GetText("install_path", $current);
+	    if (defined($url) && defined($install)) {
+		# TODO: Make sure url/install don't have semicolons or spaces
+		# TODO: Flag an error if either one is not defined
+		if ($result ne "") {
+		    $result .= ";";
+		}
+		$result .= $install . " " . $url;
+	    }
+	}
+	if (defined($result) && $result eq "") {
+	    $result = undef;
+	}
+    }
+    return $result;
+}
+
+sub GetVirtualizationType($)
+{
+    my ($node) = @_;
+    my $result = "emulab-vnode";
+    if (IsVersion0($node)) {
+	$result = GetText("virtualization_type", $node);
+    }
+    return $result;
+}
+
+sub SetVirtualizationSubtype($$)
+{
+    my ($node, $arg) = @_;
+    my $result = 1;
+    if (IsVersion0($node)) {
+	$result = SetText("virtualization_subtype", $node, $arg);
+    } else {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (! defined($type)) {
+	    $type = AddElement("sliver_type", $node);
+	}
+	SetText("name", $type, $arg);
+    }
+    return $result;
+}
+
+sub GetVirtualizationSubtype($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = GetText("virtualization_subtype", $node);
+    } else {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (defined($type)) {
+	    $result = GetText("name", $type);
+	}
+    }
+    return $result;
+}
+
+sub GetExclusive($)
+{
+    my ($node) = @_;
+    my $exclusive = GetText("exclusive", $node);
+    my $result = $exclusive;
+    if (defined($exclusive) && ! IsVersion0($node)) {
+	$result = ($exclusive eq "true");
+    }
+    return $result;
+}
+
+sub SetExclusive($$)
+{
+    my ($node, $arg) = @_;
+    my $result = 1;
+    if (IsVersion0($node)) {
+	$result = SetText("exclusive", $node, $arg);
+    } else {
+	my $textArg = "false";
+	if ($arg) {
+	    $textArg = "true";
+	}
+	$result = SetText("exclusive", $node, $textArg);
+    }
+    return $result;
+}
+
+sub GetLinkManager($)
+{
+    my ($link) = @_;
+    return GetFirstText($link, "id", "name");
 }
 
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets
@@ -282,13 +617,31 @@ sub GetText($$)
     return $result;
 }
 
+# Run GetText serially using the initial argument as an XML node
+# reference and the remaining arguments as names and return the first
+# defined result. Returns undefined if there are no names or if all
+# GetText calls return undefined.
+sub GetFirstText($@)
+{
+    my $node = shift(@_);
+    my $result = undef;
+    foreach my $name (@_) {
+	$result = GetText($name, $node);
+	if (defined($result)) {
+	    last;
+	}
+    }
+    return $result;
+}
+
 # Converts the XML representation of a node to a UTF-8 string and
 # outputs it as a complete XML document.
-sub Serialize($)
+sub Serialize($;$)
 {
-    my ($node) = @_;
+    my ($node, $format) = @_;
+    $format = 0 if (!defined($format));
     my $newnode = $node->cloneNode(1);
-    return $newnode->toString();
+    return $newnode->toString($format);
 }
 
 # Create a new XML document with a given namespace URI and document
@@ -304,10 +657,13 @@ sub CreateDocument($$)
 
 # Add a new element to a node. The new element will have the given
 # name and be otherwise empty.
-sub AddElement($$)
+sub AddElement($$;$)
 {
-    my ($name, $node) = @_;
-    my $ns = $node->namespaceURI();
+    my ($name, $node, $namespace) = @_;
+    my $ns = $namespace;
+    if (! defined($namespace)) {
+	$ns = $node->namespaceURI();
+    }
     my $child = $node->addNewChild($ns, "rs:$name");
     return $child;
 }
@@ -324,6 +680,15 @@ sub RemoveChild($$)
     if (defined($child)) {
 	$node->removeChild($child);
     }
+}
+
+# Replaces a node (oldnode) with a copy of another node (newnode)
+sub ReplaceNode($$)
+{
+    my ($oldnode, $newnode) = @_;
+    my $copy = $newnode->cloneNode(1);
+    $oldnode->replaceNode($copy);
+    return $copy;
 }
 
 # checks for the existense of policy in extensions of the given

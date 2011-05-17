@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Button xmlns:fx="http://ns.adobe.com/mxml/2009"
+		  xmlns:s="library://ns.adobe.com/flex/spark"
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  height="100%" width="10%" fontSize="12" minHeight="24" minWidth="24"
+		  creationComplete="value = smallLetter; if(label.length==0) label = smallLetter">
+	<fx:Script>
+		<![CDATA[
+			public var smallLetter:String = '';
+			public var capitalLetter:String = '';
+			public var value:String = '';
+			
+			public function setShift(shift:Boolean):void {
+				if(shift) {
+					value = capitalLetter;
+				} else {
+					value = smallLetter;
+				}
+				if(smallLetter != " ")
+					label = value;
+			}
+		]]>
+	</fx:Script>
+</s:Button>

@@ -43,9 +43,10 @@ void usage(char * name);
 // structure, and sets up the two subscription strings for events.
 void writePidFile(string const & pidFile);
 void initEvents(string const & server, string const & port,
-                string const & keyFile, string const & subscription);
+                string const & keyFile, string const & subscription,
+                string const & group);
 void subscribe(event_handle_t handle, address_tuple_t eventTuple,
-               string const & subscription);
+               string const & subscription, string const & group);
 void callback(event_handle_t handle,
               event_notification_t notification, void *data);
 
@@ -63,12 +64,13 @@ void readArgs(int argc, char * argv[])
   string port;
   string keyFile;
   string subscription;
+  string group;
 
   // Prevent getopt from printing an error message.
   opterr = 0;
 
   /* get params from the optstring */
-  char const * argstring = "s:p:dE:k:u:";
+  char const * argstring = "s:p:dE:k:u:g:";
   int option = getopt(argc, argv, argstring);
   while (option != -1)
   {
@@ -93,6 +95,9 @@ void readArgs(int argc, char * argv[])
     case 'u':
       subscription = optarg;
       break;
+    case 'g':
+      group = optarg;
+      break;
     case '?':
     default:
       usage(argv[0]);
@@ -106,18 +111,19 @@ void readArgs(int argc, char * argv[])
       usage(argv[0]);
 
 
-  initEvents(server, port, keyFile, subscription);
+  initEvents(server, port, keyFile, subscription, group);
 }
 
 void usage(char * name)
 {
   cerr << "Usage: " << name << " -E proj/exp -s server [-d] [-p port] "
-       << "[-i pidFile] [-k keyFile] [-u subscription]" << endl;
+       << "[-i pidFile] [-k keyFile] [-u subscription] [-g group]" << endl;
   exit(-1);
 }
 
 void initEvents(string const & server, string const & port,
-                string const & keyFile, string const & subscription)
+                string const & keyFile, string const & subscription,
+                string const & group)
 {
   cerr << "Initializing event system" << endl;
   string serverString = "elvin://" + server;
@@ -144,7 +150,7 @@ void initEvents(string const & server, string const & port,
 
   address_tuple_t eventTuple = address_tuple_alloc();
 
-  subscribe(handle, eventTuple, subscription);
+  subscribe(handle, eventTuple, subscription, group);
 
   address_tuple_free(eventTuple);
 
@@ -152,10 +158,15 @@ void initEvents(string const & server, string const & port,
 }
 
 void subscribe(event_handle_t handle, address_tuple_t eventTuple,
-               string const & subscription)
+               string const & subscription, string const & group)
 {
-  cerr << "Link subscription names: " << subscription << endl;
-  eventTuple->objname = const_cast<char *>(subscription.c_str());
+  string name = subscription;
+  if (group != "")
+  {
+    name += "," + group;
+  }
+  cerr << "Link subscription names: " << name << endl;
+  eventTuple->objname = const_cast<char *>(name.c_str());
 //  eventTuple->objtype = TBDB_OBJECTTYPE_LINK;
   eventTuple->objtype = ADDRESSTUPLE_ANY;
 //  eventTuple->eventtype = TBDB_EVENTTYPE_MODIFY;

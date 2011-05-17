@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package User;
@@ -11,13 +11,14 @@ use Exporter;
 use vars qw(@ISA);
 @ISA    = "Exporter";
 
-use libdb;
+use emdb;
+use emutil;
+use EmulabConstants;
 use libtestbed;
 use English;
 use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
-use Project;
 use vars qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
 	    $NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
 	    $NEWUSER_FLAGS_NOUUID
@@ -541,7 +542,7 @@ sub Delete($)
 	or return -1;
     DBQueryWarn("delete from users where uid_idx='$uid_idx'")
 	or return -1;
-    
+
     return 0;
 }
 
@@ -640,6 +641,7 @@ sub ImpliedUser($)
 sub IsOpsGuy($)
 {
     my ($self) = @_;
+    require Group;
 
     return 0
 	if (! ref($self));
@@ -648,8 +650,12 @@ sub IsOpsGuy($)
 	print STDERR "*** IsOpsGuy: Must be invoked on current user!\n";
 	return 0;
     }
-    return TBMinTrust(TBProjTrust($self->uid_idx(), TBOPSPID()),
-		      PROJMEMBERTRUST_USER());
+    my $group = Group->Lookup(TBOPSPID(), TBOPSPID());
+    if (!defined($group)) {
+	print STDERR "*** IsOpsGuy: No emulab-ops project!\n";
+	return 0;
+    }
+    return TBMinTrust($group->Trust($self), PROJMEMBERTRUST_USER());
 }
 
 #
@@ -966,6 +972,7 @@ sub SameUser($$)
 sub FirstApprovedProject($$)
 {
     my ($self, $pptr) = @_;
+    require Project;
 
     # Must be a real reference. 
     return -1
@@ -1058,6 +1065,41 @@ sub GetSSHKeys($$)
 	DBQueryWarn("select pubkey from user_pubkeys ".
 		    "where uid_idx='$uid_idx' and ".
 		    "      comment not like '%${OURDOMAIN}'");
+
+    return -1
+	if (!defined($query_result));
+
+    while (my ($key) = $query_result->fetchrow_array()) { 
+	push(@result, $key);
+    }    
+    @$pref = @result;
+    return 0;
+}
+
+#
+# Get (hopefully) unencrypted, locally-generated user ssh keys.  This is 
+# bogus; I am making sure to only return locally-generated keys.
+#
+sub GetDefaultSSHKeys($$;$)
+{
+    my ($self, $pref, $onlylatest) = @_;
+    my @result = ();
+    
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $extra = '';
+    if (defined($onlylatest) && $onlylatest) {
+	$extra = 'order by stamp desc limit 1';
+    }
+
+    my $query_result =
+	DBQueryWarn("select pubkey from user_pubkeys ".
+		    "where uid_idx='$uid_idx' and ".
+		    "      comment like '%\@${OURDOMAIN}' $extra");
 
     return -1
 	if (!defined($query_result));
@@ -1188,6 +1230,7 @@ sub SetUserInterface($$)
 sub SendVerifiedEmail($)
 {
     my ($self) = @_;
+    require Group;
 
     # Must be a real reference. 
     return -1
@@ -1249,6 +1292,7 @@ sub SendVerifiedEmail($)
 sub GroupMembershipList($$;$)
 {
     my ($self, $prval, $desired_trust) = @_;
+    require Group;
 
     # Must be a real reference. 
     return -1
@@ -1296,6 +1340,8 @@ sub GroupMembershipList($$;$)
 sub ProjectMembershipList($$;$)
 {
     my ($self, $prval, $desired_trust) = @_;
+    require Project;
+    require Group;
 
     # Must be a real reference. 
     return -1
@@ -1344,6 +1390,7 @@ sub ProjectMembershipList($$;$)
 sub ProjectLeaderList($$;$)
 {
     my ($self, $prval) = @_;
+    require Project;
 
     # Must be a real reference. 
     return -1
@@ -1524,7 +1571,7 @@ sub AccessCheck($$$)
 
     my $mintrust;
 
-    if ($access_type < TB_USERINFO_MIN || $access_type > TB_USERINFO_MAX) {
+    if ($access_type < TB_USERINFO_MIN() || $access_type > TB_USERINFO_MAX()) {
 	print "*** Invalid access type $access_type!\n";
 	return 0;
     }
@@ -1542,7 +1589,7 @@ sub AccessCheck($$$)
     #
     # Only project leader in same project as user.
     #
-    if ($access_type == TB_USERINFO_MODIFYINFO) {
+    if ($access_type == TB_USERINFO_MODIFYINFO()) {
         #
         # This join will allow the operation if the current user is in the 
         # same project (any project) as the target user, but with root permissions.
@@ -1582,243 +1629,6 @@ sub escapeshellarg($)
     $str =~ s/[^[:alnum:]]/\\$&/g;
     $str =~ /^(.+)$/; # untaint the result
     return $1;
-}
-
-#############################################################################
-# Non-local users, as for federation/geni.
-#
-package User::NonLocal;
-use User;
-use libdb;
-use libtestbed;
-use English;
-use overload ('""' => 'Stringify');
-
-# Cache of instances to avoid regenerating them.
-my %nonlocal_users      = ();
-
-#
-# Lookup by idx.
-#
-sub Lookup($$)
-{
-    my ($class, $token) = @_;
-    my $idx;
-    my $query_result;
-
-    if ($token =~ /^\d+$/) {
-	$idx = $token;
-    }
-    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
-	$query_result =
-	    DBQueryWarn("select uid_idx from nonlocal_users ".
-			"where uid_uuid='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
-
-	    ($idx) = $query_result->fetchrow_array();
-    }
-    else {
-	return undef;
-    }
-    
-    # Look in cache first
-    return $nonlocal_users{"$idx"}
-        if (exists($nonlocal_users{"$idx"}));
-
-    $query_result =
-	DBQueryWarn("select * from nonlocal_users where uid_idx='$idx'");
-
-    return undef
-	if (!$query_result || !$query_result->numrows);
-
-    my $self          = {};
-    $self->{'USER'}   = $query_result->fetchrow_hashref();
-    # Want to know if this is a shadow of a local user.
-    $self->{'SHADOW'} = User->Lookup($idx);
-
-    bless($self, $class);
-    
-    # Add to cache. 
-    $nonlocal_users{$self->{'USER'}->{'uid_idx'}} = $self;
-    
-    return $self;
-}
-# accessors
-sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
-sub uid_idx($)		{ return field($_[0], "uid_idx"); }
-sub idx($)		{ return field($_[0], "uid_idx"); }
-sub uid($)		{ return field($_[0], "uid"); }
-sub uid_uuid($)		{ return field($_[0], "uid_uuid"); }
-sub created($)		{ return field($_[0], "created"); }
-sub name($)		{ return field($_[0], "name"); }
-sub email($)		{ return field($_[0], "email"); }
-sub shadow($)		{ return $_[0]->{'SHADOW'}; }
-
-#
-# Stringify for output.
-#
-sub Stringify($)
-{
-    my ($self) = @_;
-    
-    my $uid = $self->uid();
-    my $idx = $self->idx();
-
-    return "[NonLocalUser: $uid, IDX: $idx]";
-}
-
-#
-# Class function to create a new nonlocal user and return object.
-#
-sub Create($$$$$$;$)
-{
-    my ($class, $idx, $uid, $uuid, $name, $email, $sshkeys) = @_;
-    my @insert_data = ();
-    my $islocal = 0;
-
-    # Every user gets a new unique index.
-    if (!defined($idx) || $idx == 0) {
-	$idx = User->NextIDX();
-    }
-    else {
-	# Sanity check.
-	my $existing = User->Lookup($idx);
-	if (defined($existing)) {
-	    if ($uuid eq $existing->uuid()) {
-		#
-		# Shadow a local user, strictly for tmcd.
-		#
-		$islocal = 1;
-	    }
-	    else {
-		print STDERR "NonLocal user with $idx exists: $existing\n";
-		return undef;
-	    }
-	}
-    }
-
-    # Now tack on other stuff we need.
-    push(@insert_data, "created=now()");
-    push(@insert_data, "uid_idx='$idx'");
-
-    my $safe_uid   = DBQuoteSpecial($uid);
-    my $safe_name  = DBQuoteSpecial($name);
-    my $safe_email = DBQuoteSpecial($email);
-    my $safe_uuid  = DBQuoteSpecial($uuid);
-    push(@insert_data, "uid=$safe_uid");
-    push(@insert_data, "name=$safe_name");
-    push(@insert_data, "email=$safe_email");
-    push(@insert_data, "uid_uuid=$safe_uuid");
-
-    if (defined($sshkeys)) {
-	foreach my $sshkey (@{ $sshkeys }) {
-	    my $safe_sshkey = DBQuoteSpecial($sshkey);
-
-	    DBQueryWarn("insert into nonlocal_user_pubkeys set ".
-			"  uid=$safe_uid, uid_idx='$idx', ".
-			"  idx=NULL, stamp=now(), pubkey=$safe_sshkey")
-		or return undef;
-	}
-    }
-
-    # Insert into DB.
-    if (!DBQueryWarn("insert into nonlocal_users set " .
-		     join(",", @insert_data))) {
-	DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
-	    if (!$islocal);
-	return undef;
-    }
-    return User::NonLocal->Lookup($idx);
-}
-
-#
-# Modify the keys.
-#
-sub ModifyKeys($$)
-{
-    my ($self, $sshkeys) = @_;
-
-    my $idx = $self->uid_idx();
-    my $uid = $self->uid();
-    
-    DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
-	or return -1;
-    
-    if (defined($sshkeys)) {
-	foreach my $sshkey (@{ $sshkeys }) {
-	    my $safe_sshkey = DBQuoteSpecial($sshkey);
-
-	    DBQueryWarn("insert into nonlocal_user_pubkeys set ".
-			"  uid='$uid', uid_idx='$idx', ".
-			"  idx=NULL, stamp=now(), pubkey=$safe_sshkey")
-		or return -1;
-	}
-    }
-    return 0;
-}
-
-#
-# Delete the user, as for registration errors.
-#
-sub Delete($)
-{
-    my ($self) = @_;
-
-    return 0
-	if (! ref($self));
-
-    my $idx = $self->idx();
-
-    DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
-	or return -1;
-    DBQueryWarn("delete from nonlocal_user_bindings where uid_idx='$idx'")
-	or return -1;
-    DBQueryWarn("delete from nonlocal_users where uid_idx='$idx'")
-	or return -1;
-    
-    return 0;
-}
-
-#
-# Bind nonlocal user to experiment (slice, in Geni).
-#
-sub BindToExperiment($$)
-{
-    my ($self, $experiment) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $uid     = $self->uid();
-    my $idx     = $self->idx();
-    my $exptidx = $experiment->idx();
-    
-    # Insert into DB.
-    DBQueryWarn("replace into nonlocal_user_bindings set " .
-		"  uid='$uid', uid_idx='$idx', exptidx='$exptidx'")
-	or return -1;
-
-    return 0;
-}
-
-sub UnBindFromExperiment($$)
-{
-    my ($self, $experiment) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $uid     = $self->uid();
-    my $idx     = $self->idx();
-    my $exptidx = $experiment->idx();
-    
-    # Insert into DB.
-    DBQueryWarn("delete from nonlocal_user_bindings " .
-		"where uid_idx='$idx' and exptidx='$exptidx'")
-	or return -1;
-
-    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

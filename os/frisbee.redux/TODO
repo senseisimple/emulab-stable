@@ -46,6 +46,10 @@ NEW FEATURES:
    data will go into every chunk and still compress that, but there
    is no point since we pad out every chunk to 1MB.
 
+   [ The discovery protocol is now done.  On-the-fly images has not
+     though we can distribute arbitrary files, we do so without creating
+     imagezip-format images. ]
+
    Now one could imagine a super, caching frisbee server that creates
    compressed images on the fly and caches them for later use.  Perhaps
    it would become more of a chunk server where it caches every chunk
@@ -137,6 +141,13 @@ ENHANCEMENTS:
    chunks.  So maybe 1448B/blk * 768 blks/chunk == 1.06MB/chunk.  PREQUEST
    BlockMaps come down from 128 bytes to 96.
 
+   [ Support for jumbo packets has been done.  This increases the block
+     size to 8192 and reduces the blocks/chunk to 128 to keep the chunk
+     size constant (so that we can continue to distribute our existing
+     images).  Currently this requires static re-compilation of both the
+     client and server, though some support has been put in for negotiating
+     the blocksize (in join v2 messages). ]
+
 6. Dynamic rate pacing in the server.
 
    Our attempts to date have been pretty feeble.  I think we have a
@@ -151,6 +162,40 @@ ENHANCEMENTS:
    the last chunk in the image file to be partial, and having imageunzip
    and frisbeed pad it out, we can save a lot of disk space for these
    small images.
+
+   [ DONE ]
+
+8. Allow a server to serve multiple unicast clients.
+
+   Right now an instance of the server not only serves just a single
+   image, but only to a single destination address.  This is reasonable
+   for broadcast/multicast but is overly restrictive for unicast.  Changing
+   this should be minor, we just need to keep track of destinations
+   (addr/port) in the queue along with block ranges to send out.  We would
+   need to back off the queue optimizations where we combine incoming
+   requests with those already in the queue (i.e., now we would also have
+   to make sure that they are for the same destination before we combine).
+   Minor changes would be needed to PacketSend/Recv to track the client
+   IP/port rather than just assuming/using the global mcastaddr/portnum.
+
+   One nice side-effect of this is that the client would no longer have
+   to bind to a specific port in the unicast case, since each reply from
+   the server could be tagged with the proper destination port.
+
+9. Allow the frisbee client to be used in a pipe.
+
+   If we could pipe the output of frisbee into another utility, this would
+   make it more useful for arbitrary file distribution.  For example:
+	frisbee -m <addr> -p <port> - | tar xzf
+   to download and unpack a tarfile.  The problem is out-of-order processing
+   of chunks and there are a couple of ways around it.  Frisbee can already
+   request chunks in-order, but it is also opportunistic and saves other
+   chunk data it needs that other clients have requested.  We could just
+   ignore that data and keep re-requesting blocks in order as we need them,
+   or we could do some limited memory caching of incoming data; i.e., save
+   but don't decompress chunks until we need them.  We could cache to disk
+   as well, but then we don't really save anything over just frisbeeing into
+   a tmp file and giving that to the next util in the pipeline.
 
 PROBLEMS:
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -43,6 +43,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Protos
 sub fatal($);
+sub logit($$);
 sub NodeIsDead($);
 sub NodeIsOkay($);
 	  
@@ -68,6 +69,9 @@ if (defined($options{"d"})) {
 if (defined($options{"n"})) {
     $impotent = 1;
 }
+
+# Set this to turn off tblog in libraries.
+$ENV{'TBLOG_OFF'} = "yep";
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
@@ -137,7 +141,7 @@ if (! $debug) {
 if (MarkDaemonRunning("checknodes_daemon")) {
     fatal("Could not mark daemon as running!");
 }
-print "Check Nodes Daemon starting ... pid $$, at ".`date`;
+logit("Check Nodes Daemon starting ... pid $$", 0);
 
 if ($elabman->FlipTo($experiment->unix_gid())) {
     fatal("Could not flipto $elabman ($experiment)");
@@ -163,13 +167,11 @@ while (1) {
     my @tmp = ();
     my $disabled;
 
-    print "Running at ".
-	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
-
     if (! TBGetSiteVar("web/nologins", \$disabled) || $disabled) {
-	print "  Skipping this loop cause of nologins\n";
+	logit("Skipping this loop because of nologins", 0);
 	goto loop;
     }
+    logit("Running", 0);
 
     #
     # Look for nodes in a wierd state. Lets test them.
@@ -193,7 +195,7 @@ while (1) {
     while (my ($nodeid,$eventstate,$stamp) = $query_result->fetchrow_array()) {
 	my $node = Node->Lookup($nodeid);
 	if (!defined($node)) {
-	    print STDERR "Cannot find object for $nodeid\n";
+	    logit("Cannot find object for $nodeid", 1);
 	    next;
 	}
 	#
@@ -204,7 +206,7 @@ while (1) {
 	    if (!$node->imageable() ||
 		!defined($node->default_imageid()));
 
-	print "Node in unknown state: $nodeid,$eventstate,$stamp\n";
+	logit("Node in unknown state: $nodeid,$eventstate,$stamp", 0);
 
 	next
 	    if ($impotent);
@@ -214,7 +216,7 @@ while (1) {
 	# push it into the hwcheckup experiment.
 	#
 	if ($node->MoveReservation($experiment)) {
-	    print STDERR "Could not move $node to $experiment\n";
+	    logit("Could not move $node to $experiment", 1);
 	    next;
 	}
 	$node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
@@ -230,17 +232,17 @@ while (1) {
 	if (!@nodelist);
 
     if ($impotent) {
-	print "Would check @nodelist\n";
+	logit("Would check @nodelist", 0);
 	goto loop;
     }
 
     foreach my $node (@nodelist) {
 	if ($node->ClearBootAttributes()) {
-	    print STDERR "$node: Could not clear boot attributes.\n";
+	    logit("$node: Could not clear boot attributes.", 1);
 	    next;
 	}
 	if (! $node->imageable()) {
-	    print STDERR "$node is not imageable.\n";
+	    logit("$node is not imageable.", 1);
 	    NodeIsDead($node);
 	    push(@informtbopsfatal, $node->node_id());
 	    next;
@@ -249,24 +251,24 @@ while (1) {
     }
     @nodelist = @tmp;
 
-    print "Checking nodes @nodelist\n";
+    logit("Checking nodes @nodelist", 0);
 
     if (@nodelist) {
-	print "Running $GENTOPOFILE ...\n";
+	logit("Running $GENTOPOFILE ...", 0);
 	if (system("$GENTOPOFILE $pid $eid")) {
-	    print STDERR "$GENTOPOFILE failed\n";
+	    logit("$GENTOPOFILE failed", 1);
 	    next;
 	}
-	print "Running $EXPORTS_SETUP ...\n";
+	logit("Running $EXPORTS_SETUP ...", 0);
 	if (system("$EXPORTS_SETUP")) {
-	    print STDERR "$EXPORTS_SETUP failed\n";
+	    logit("$EXPORTS_SETUP failed", 1);
 	    next;
 	}
 	# The nodes will not boot locally unless there is a DNS
 	# record.
-	print "Running $NAMED_SETUP ...\n";
+	logit("Running $NAMED_SETUP ...", 0);
 	if (system("$NAMED_SETUP")) {
-	    print STDERR "$NAMED_SETUP failed\n";
+	    logit("$NAMED_SETUP failed", 1);
 	    next;
 	}
 	my @nodenames       = map { $_->node_id() } @nodelist;
@@ -275,11 +277,12 @@ while (1) {
 
 	$reload_args{'debug'}     = $debug;
 	$reload_args{'waitmode'}  = 2; # XXX Wait till reboot after reload.
+	$reload_args{'prepare'}   = 1; # XXX Clear out old disk metadata.
 	$reload_args{'nodelist'}  = [ @nodenames ];
-	print "Running osload on @nodenames\n";
+	logit("Running osload on @nodenames", 0);
 	my $failures = osload(\%reload_args, \%reload_results);
 	if ($failures) {
-	    print STDERR "osload returned $failures failures\n";
+	    logit("osload returned $failures failures", 1);
 	}
 
 	foreach my $node (@nodelist) {
@@ -317,20 +320,20 @@ while (1) {
 	}
     }
 
-    print "Running $GENTOPOFILE ...\n";
+    logit("Running $GENTOPOFILE ...", 0);
     if (system("$GENTOPOFILE $pid $eid")) {
-	print STDERR "$GENTOPOFILE failed\n";
+	logit("$GENTOPOFILE failed", 1);
 	next;
     }
-    print "Running $EXPORTS_SETUP ...\n";
+    logit("Running $EXPORTS_SETUP ...", 0);
     if (system("$EXPORTS_SETUP")) {
-	print STDERR "$EXPORTS_SETUP failed\n";
+	logit("$EXPORTS_SETUP failed", 1);
 	next;
     }
     # The nodes will not boot locally unless there is a DNS record.
-    print "Running $NAMED_SETUP ...\n";
+    logit("Running $NAMED_SETUP ...", 0);
     if (system("$NAMED_SETUP")) {
-	print STDERR "$NAMED_SETUP failed\n";
+	logit("$NAMED_SETUP failed", 1);
 	next;
     }
   loop:
@@ -344,10 +347,10 @@ sub NodeIsDead($)
     my ($node) = @_;
     
     if ($node->MoveReservation($hwdown_experiment)) {
-	print STDERR "Could not move $node to $hwdown_experiment\n";
+	logit("Could not move $node to $hwdown_experiment", 1);
 	return;
     }
-    print STDERR "$node is fatally ill; moving to hwdown.\n";
+    logit("$node is fatally ill; moving to hwdown.", 1);
     $node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
 			      "Moved to hwdown by checknodes daemon");
 }
@@ -356,7 +359,7 @@ sub NodeIsOkay($)
 {
     my ($node) = @_;
 
-    print STDERR "$node appears to be okay; releasing.\n";
+    logit("$node appears to be okay; releasing.", 1);
     $node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
 			      "Released by checknodes daemon");
 }
@@ -379,3 +382,14 @@ sub fatal($)
 	"    $msg\n");
 }
 
+sub logit($$)
+{
+    my ($msg,$stderr) = @_;
+    my $stamp = POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime());
+
+    if ($stderr) {
+	print STDERR "$stamp: $msg\n";
+    } else {
+	print "$stamp: $msg\n";
+    }
+}

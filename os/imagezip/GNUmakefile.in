@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,8 +11,8 @@ SUBDIR		= os/imagezip
 DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
 		  imageunzip.c crc.c checksum.c disksize.c imageunzip.8 \
-		  extfs/*.[hc] ext4fs/*.[hc] fat/*.[hc] ffs/*.[hc] ntfs/*.[hc] shd/*.[hc] \
-		  hashmap/*.[hc]
+		  extfs/*.[hc] ext4fs/*.[hc] fat/*.[hc] ffs/*.[hc] \
+		  ntfs/*.[hc] hashmap/*.[hc]
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
@@ -44,10 +44,6 @@ WITH_LTHREADS	= 1
 endif
 endif
 endif
-
-# XXX special checkpoint/shadow device support
-WITH_SHD	= 0
-
 endif
 
 # Linux specific goop
@@ -154,14 +150,6 @@ SUBDIRS		+= fat
 ZIPLIBS		+= fat/libfat.a
 endif
 
-# with SHD
-ifeq ($(WITH_SHD),1)
-CFLAGS		+= -DWITH_SHD
-SUBDIRS		+= shd
-ZIPLIBS		+= shd/libshd.a
-SHDLIBS		+= shd/libshd.a
-endif
-
 # with HASH
 ifeq ($(WITH_HASH),1)
 CFLAGS		+= -DWITH_HASH -DHASHSTATS
@@ -194,8 +182,8 @@ imageunzip: imageunzip.o disksize.o checksum.o crc.o version.o
 imageunzip.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
 
-imagedump: imagedump.o checksum.o version.o $(SHDLIBS)
-	$(CC) $(CFLAGS) imagedump.o checksum.o version.o $(LIBS) $(SHDLIBS) -o imagedump
+imagedump: imagedump.o checksum.o version.o
+	$(CC) $(CFLAGS) imagedump.o checksum.o version.o $(LIBS) -o imagedump
 
 imagehash: imagehash.o version.o
 	$(CC) $(CFLAGS) imagehash.o version.o $(HASHLIBS) -o imagehash
@@ -203,7 +191,7 @@ imagehash: imagehash.o version.o
 imagehash.o:	imagehash.c
 	$(CC) -c $(HASHCFLAGS) -o imagehash.o $<
 
-ffs extfs ext4fs ntfs fat shd hashmap:
+$(SUBDIRS):
 	@$(MAKE) SUBDIRCFLAGS="$(SUBDIRCFLAGS)" -C $@ all
 
 imagezip.o: sliceinfo.h imagehdr.h global.h
@@ -252,4 +240,4 @@ imagezip.tar: Makefile.sa Makefile-linux.sa
 	tar cf imagezip.tar imagezip-dist
 	rm -rf imagezip-dist
 
-.PHONY:	$(SUBDIRS)
+.PHONY: $(SUBDIRS)

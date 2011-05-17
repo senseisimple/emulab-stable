@@ -1,23 +1,13 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use English;
 use Getopt::Std;
-
-#
-# This should run as root to make sure that it has permission to reboot nodes
-# (since only root is allowed to power cycle nodes at any time - it's time-
-# limited for anyone else)
-#
-if ($UID != 0) {
-    die("*** $0:\n".
-	"    Only root can run this script!\n");
-}
 
 #
 # Look for nodes to reload.
@@ -28,11 +18,17 @@ if ($UID != 0) {
 #
 sub usage()
 {
-    print STDOUT "Usage: reload_daemon [-d]\n" .
-	"Use the -d option to prevent daemonization\n";
+    print STDOUT "Usage: reload_daemon [-d] [-t tag]\n" .
+	"    -d     Prevent daemonization\n" . 
+	"    -t tag Only manage reloads for nodes or node types\n" . 
+	"           that have the value of <tag> for a node_type_attribute\n" . 
+	"           or a node_attribute named 'reload_daemon_tag'.\n" . 
+	"           IF this tag is not set, the reload_daemon picks only\n" . 
+	"           those nodes that DO NOT have this type or node\n" . 
+	"           attribute set!\n";
     exit(-1);
 }
-my  $optlist = "d";
+my  $optlist = "dt:";
 
 #
 # Configure variables
@@ -44,6 +40,9 @@ my $TBOPS    = "@TBOPSEMAIL@";
 # XXX
 my $BUILDING = "MEB-ROBOTS";
 my $FLOOR = 4;
+
+# Set this to turn off tblog in libraries.
+$ENV{'TBLOG_OFF'} = "yep";
 
 # Testbed Support library
 use lib "@prefix@/lib";
@@ -66,12 +65,13 @@ sub fatal($);
 sub notify($);
 sub freefromreloading($);
 		      
-my $os_load	= "$TB/bin/os_load -s";
+my $os_load	= "$TB/bin/os_load -s -R";
 my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
 my $tbrsync     = "$TB/bin/tbrsync";
 my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
+my $tag;
 my $retry_time  = 20;              # in minutes
 my $warn_time   = $retry_time * 2; # in minutes
 my $widearea_multiplier = 2;       # widearea nodes get (mult+1)x longer, but
@@ -110,11 +110,27 @@ if (@ARGV != 0) {
 if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
+if (defined($options{"t"})) {
+    $tag = $options{"t"};
+    # rename the logfile too
+    $logfile = "$logfile-$tag";
+}
 
 #
-# Only one please.
+# This should run as root to make sure that it has permission to reboot nodes
+# (since only root is allowed to power cycle nodes at any time - it's time-
+# limited for anyone else)
 #
-if (CheckDaemonRunning("reload_daemon")) {
+if ($UID != 0 && !defined($tag)) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
+
+#
+# Only one please (for the default reload_daemon).  If you specified
+# a tag, it's your problem.
+#
+if (!defined($tag) && CheckDaemonRunning("reload_daemon")) {
     fatal("Not starting another reload daemon!");
 }
 
@@ -124,7 +140,7 @@ if (! $debug) {
 	exit(0);
     }
 }
-if (MarkDaemonRunning("reload_daemon")) {
+if (!defined($tag) && MarkDaemonRunning("reload_daemon")) {
     fatal("Could not mark daemon as running!");
 }
 #
@@ -159,6 +175,29 @@ while (1) {
     my $time = time();
 
     #
+    # If we are the default reload daemon (i.e., have no tag for our 
+    # reload_pool), only look for nodes that have neither a reload_pool
+    # node_type_attribute nor a node_attribute.
+    #
+    # If we have a reload_pool tag, only pick up nodes that 
+    #  * have our tag for the node_type_attribute, and our tag or NULL
+    #    for the node_attribute, OR
+    #  * have our tag for the node attribute.
+    #
+    my $tag_query = '';
+    if (!defined($tag)) {
+	$tag_query = 'and nta_reload_pool.attrvalue is NULL' . 
+	    ' and na_reload_pool.attrvalue is NULL';
+    }
+    else {
+	$tag_query = "" . 
+	    " and ((nta_reload_pool.attrvalue='$tag' and" . 
+	    "       (na_reload_pool.attrvalue='$tag'" . 
+	    "        or na_reload_pool.attrvalue is NULL))" . 
+	    "      or na_reload_pool.attrvalue='$tag')";
+    }
+
+    #
     # First, look for nodes that have been in the reloading experiment for
     # longer than $retry_time, and try rebooting them
     #
@@ -170,9 +209,16 @@ while (1) {
 	DBQueryWarn("select r.node_id,r.mustwipe from reserved as r" . 
 		    " left join nodes as n on r.node_id=n.node_id" . 
 		    " left join node_types as nt on n.type=nt.type " . 
-		    "where r.pid='$RELOADPID' and r.eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL ($retry_time * (r.mustwipe + 1) + (nt.isremotenode * $retry_time * $widearea_multiplier)) MINUTE)".
-		    "  > rsrv_time");
+		    " left outer join (select type,attrvalue from node_type_attributes" . 
+		    "   where attrkey='reload_daemon_pool') as nta_reload_pool" . 
+		    "   on n.type=nta_reload_pool.type" . 
+		    " left outer join (select node_id,attrvalue from node_attributes" . 
+		    "   where attrkey='reload_daemon_pool') as na_reload_pool" . 
+		    "   on r.node_id=na_reload_pool.node_id" . 
+		    " where r.pid='$RELOADPID' and r.eid='$RELOADEID' and" .
+		    " (CURRENT_TIMESTAMP - INTERVAL ($retry_time * (r.mustwipe + 1) + (nt.isremotenode * $retry_time * $widearea_multiplier)) MINUTE)".
+		    "  > rsrv_time" . 
+		    " $tag_query");
 
     if (! $query_result) {
 	print "DB Error. Waiting a bit.\n";
@@ -230,9 +276,16 @@ while (1) {
 	DBQueryWarn("select r.node_id,r.mustwipe from reserved as r" . 
 		    " left join nodes as n on r.node_id=n.node_id" . 
 		    " left join node_types as nt on n.type=nt.type " . 
-		    "where r.pid='$RELOADPID' and r.eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL ($warn_time * (mustwipe + 1) + (nt.isremotenode * $warn_time * $widearea_multiplier)) MINUTE)".
-		    "  > rsrv_time");
+		    " left outer join (select type,attrvalue from node_type_attributes" . 
+		    "   where attrkey='reload_daemon_pool') as nta_reload_pool" . 
+		    "   on n.type=nta_reload_pool.type" . 
+		    " left outer join (select node_id,attrvalue from node_attributes" . 
+		    "   where attrkey='reload_daemon_pool') as na_reload_pool" . 
+		    "   on r.node_id=na_reload_pool.node_id" . 
+		    " where r.pid='$RELOADPID' and r.eid='$RELOADEID' and " .
+		    " (CURRENT_TIMESTAMP - INTERVAL ($warn_time * (mustwipe + 1) + (nt.isremotenode * $warn_time * $widearea_multiplier)) MINUTE)".
+		    "  > rsrv_time" . 
+		    " $tag_query");
     
     if (! $query_result) {
 	print "DB Error. Waiting a bit.\n";
@@ -273,9 +326,16 @@ while (1) {
 		    "from reserved as b ".
 		    "left join nodes as a on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
-		    "left join node_types as n on n.type=a.type where ".
-		    "(b.node_id is null and $CLASSCLAUSE and l.pid!='') ".
-		    "or (b.pid='$RELOADPID' and b.eid='$PENDINGEID') ".
+		    "left join node_types as n on n.type=a.type ".
+		    " left outer join (select type,attrvalue from node_type_attributes" . 
+		    "   where attrkey='reload_daemon_pool') as nta_reload_pool" . 
+		    "   on n.type=nta_reload_pool.type" . 
+		    " left outer join (select node_id,attrvalue from node_attributes" . 
+		    "   where attrkey='reload_daemon_pool') as na_reload_pool" . 
+		    "   on b.node_id=na_reload_pool.node_id" .
+		    " where ((b.node_id is null and $CLASSCLAUSE and l.pid!='') ".
+		    "or (b.pid='$RELOADPID' and b.eid='$PENDINGEID')) ". 
+		    " $tag_query " . 
 		    "order by a.node_id");
 
     if (! $query_result) {

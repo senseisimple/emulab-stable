@@ -1,26 +1,22 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Experiment;
 
 use strict;
 use Exporter;
+use SelfLoader ();
 use vars qw(@ISA @EXPORT $AUTOLOAD);
-
-@ISA    = "Exporter";
+@ISA    = qw(Exporter SelfLoader);
 @EXPORT = qw ( );
 
 use libdb;
+use EmulabConstants;
 use libtestbed;
-use User;
-use Project;
-use Group;
 use Node;
-use Interface;
-use VirtExperiment;
 use Logfile;
 use English;
 use Data::Dumper;
@@ -33,27 +29,58 @@ use vars qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPIN $EXPT_SWAPUPDATE
 	    $EXPT_FLAGS_NAMESONLY $EXPT_FLAGS_INCLUDEVIRT
 	    $EXPT_FLAGS_LOCALONLY
 	    $EXPT_GENIFLAGS_EXPT $EXPT_GENIFLAGS_COOKED
-	    @EXPORT_OK);
-
+	    @nodetable_fields %experiments
+	    $EXPT_STARTCLOCK $EXPT_RESOURCESHOSED
+	    @EXPORT_OK
+	    $TB $BOSSNODE $CONTROL $TBOPS $PROJROOT $STAMPS $TBBASE  
+	    $TEVC $DBCONTROL $RSYNC $MKEXPDIR $TBPRERUN $TBSWAP   
+	    $TBREPORT $TBEND $DU $MD5);
+	  
 # Configure variables
-my $TB		= "@prefix@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $CONTROL	= "@USERNODE@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $PROJROOT    = "@PROJROOT_DIR@";
-my $EVENTSYS    = @EVENTSYS@;
-my $STAMPS      = @STAMPS@;
-my $TBBASE      = "@TBBASE@";
-my $TEVC	= "$TB/bin/tevc";
-my $DBCONTROL   = "$TB/sbin/opsdb_control";
-my $RSYNC	= "/usr/local/bin/rsync";
-my $MKEXPDIR    = "$TB/libexec/mkexpdir";
-my $TBPRERUN    = "$TB/bin/tbprerun";
-my $TBSWAP      = "$TB/bin/tbswap";
-my $TBREPORT    = "$TB/bin/tbreport";
-my $TBEND       = "$TB/bin/tbend";
-my $DU          = "/usr/bin/du";
-my $MD5         = "/sbin/md5";
+$TB	     = "@prefix@";
+$BOSSNODE    = "@BOSSNODE@";
+$CONTROL     = "@USERNODE@";
+$TBOPS       = "@TBOPSEMAIL@";
+$PROJROOT    = "@PROJROOT_DIR@";
+$STAMPS      = @STAMPS@;
+$TBBASE      = "@TBBASE@";
+$TEVC	     = "$TB/bin/tevc";
+$DBCONTROL   = "$TB/sbin/opsdb_control";
+$RSYNC	     = "/usr/local/bin/rsync";
+$MKEXPDIR    = "$TB/libexec/mkexpdir";
+$TBPRERUN    = "$TB/bin/tbprerun";
+$TBSWAP      = "$TB/bin/tbswap";
+$TBREPORT    = "$TB/bin/tbreport";
+$TBEND       = "$TB/bin/tbend";
+$DU          = "/usr/bin/du";
+$MD5         = "/sbin/md5";
+
+# To avoid writting out all the methods.
+AUTOLOAD {
+    #print STDERR "$AUTOLOAD\n";
+
+    if (!ref($_[0])) {
+	$SelfLoader::AUTOLOAD = $AUTOLOAD;
+	return SelfLoader::AUTOLOAD(@_);
+    }
+    my $self  = $_[0];
+    my $name  = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    # A DB row proxy method call.
+    if (exists($self->{'EXPT'}->{$name})) {
+	return $self->{'EXPT'}->{$name};
+    }
+    elsif (exists($self->{'STATS'}->{$name})) {
+	return $self->{'STATS'}->{$name};
+    }
+    elsif (exists($self->{'RSRC'}->{$name})) {
+	return $self->{'RSRC'}->{$name};
+    }
+    $SelfLoader::AUTOLOAD = $AUTOLOAD;
+    my $ref = \&SelfLoader::AUTOLOAD;
+    goto &$ref;
+}
 
 # Swap Actions
 $EXPT_PRELOAD		= TBDB_STATS_PRELOAD();
@@ -72,8 +99,8 @@ $EXPT_GENIFLAGS_EXPT    = 0x01;
 $EXPT_GENIFLAGS_COOKED  = 0x02;
 
 # For stats gathering code.
-my $EXPT_STARTCLOCK;
-my $EXPT_RESOURCESHOSED = 0;
+$EXPT_STARTCLOCK        = undef;
+$EXPT_RESOURCESHOSED    = 0;
 
 # Why, why, why?
 @EXPORT_OK = qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPUPDATE
@@ -111,17 +138,22 @@ my $EXPT_RESOURCESHOSED = 0;
 		   "firewall_rules",
 		   "elabinelab_attributes",
 		   "virt_tiptunnels",
-		   "ipsubnets");
+		   "ipsubnets",
+		   "virt_blobs",
+		   "virt_client_service_ctl",
+		   "virt_client_service_hooks",
+		   "virt_client_service_opts");
 
 %physicalTables = ("delays"     => ["node_id", "vname", "vnode0", "vnode1"],
 		   "ipport_ranges" => undef,
 		   "v2pmap"        => ["node_id", "vname"],
 		   "linkdelays"    => ["node_id", "vlan", "vnode"],
 		   "traces"        => ["node_id", "idx"],
-		   "portmap"       => undef); 
+		   "portmap"       => undef,
+		   "bridges"       => ["node_id", "bridx", "iface"]); 
 
 # These are slots in the node table that need to be restored. 
-my @nodetable_fields = ("def_boot_osid",
+@nodetable_fields = ("def_boot_osid",
 			"def_boot_path",
 			"def_boot_cmd_line",
 			"temp_boot_osid",
@@ -150,26 +182,19 @@ my @nodetable_fields = ("def_boot_osid",
 			"sshdport",
 			"rtabid");
 
-# Hmm, this is silly. 
-if ($EVENTSYS) {
-    require event;
-    import event;
-}
-
 # Cache of instances to avoid regenerating them.
-my %experiments   = ();
-my $debug	  = 0;
+%experiments   = ();
 
 # Little helper and debug function.
 sub mysystem($)
 {
     my ($command) = @_;
 
-    my $cwd;
-    chomp($cwd = `/bin/pwd`);
-
-    print STDERR "Running '$command' in $cwd\n"
-	if ($debug);
+    if (0) {
+	my $cwd;
+	chomp($cwd = `/bin/pwd`);
+	print STDERR "Running '$command' in $cwd\n";
+    }
     return system($command);
 }
 
@@ -277,34 +302,6 @@ sub Lookup($$;$)
     return $self;
 }
 
-# To avoid writting out all the methods.
-sub AUTOLOAD {
-    my $self = shift;
-    my $type = ref($self) or die("$self is not an object\n");
-
-    my $name = $AUTOLOAD;
-    $name =~ s/.*://;   # strip fully-qualified portion
-
-    if (exists($self->{'EXPT'}->{$name})) {
-	return $self->{'EXPT'}->{$name};
-    }
-    elsif (exists($self->{'STATS'}->{$name})) {
-	return $self->{'STATS'}->{$name};
-    }
-    elsif (exists($self->{'RSRC'}->{$name})) {
-	return $self->{'RSRC'}->{$name};
-    }
-    print STDERR "$self: tried to access unknown slot $name\n";
-    return undef;
-}
-sub dbrow($$)     { return $_[0]->{'EXPT'}; }
-sub locked($)     { return $_[0]->expt_locked(); }
-sub elabinelab($) { return $_[0]->elab_in_elab(); }
-sub description($){ return $_[0]->expt_name(); }
-sub creator($)    { return $_[0]->expt_head_uid(); }
-sub created($)	  { return $_[0]->expt_created(); }
-sub swapper($)	  { return $_[0]->expt_swap_uid(); }
-
 # Break circular reference someplace to avoid exit errors.
 sub DESTROY {
     my $self = shift;
@@ -314,6 +311,48 @@ sub DESTROY {
     $self->{"RSRC"}     = undef;
     $self->{'VIRTEXPT'} = undef;
 }
+
+#
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($experiments{$self->idx()});
+}
+sub FlushAll($)
+{
+    my ($class) = @_;
+
+    %experiments = ();
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid   = $self->pid();
+    my $eid   = $self->eid();
+
+    return "[Experiment: $pid/$eid]";
+}
+# Keep this above @SELFLOADER_DATA@ ... elabinelab is a slot in
+# the stats stats record, but was not being updated
+sub elabinelab($) { return $_[0]->elab_in_elab(); }
+
+1;
+@SELFLOADER_DATA@
+
+sub dbrow($$)     { return $_[0]->{'EXPT'}; }
+sub locked($)     { return $_[0]->expt_locked(); }
+sub description($){ return $_[0]->expt_name(); }
+sub creator($)    { return $_[0]->expt_head_uid(); }
+sub created($)	  { return $_[0]->expt_created(); }
+sub swapper($)	  { return $_[0]->expt_swap_uid(); }
 
 #
 # For canceled, goto to the DB.
@@ -800,22 +839,6 @@ sub Delete($;$)
 }
 
 #
-# Flush from our little cache, as for the expire daemon.
-#
-sub Flush($)
-{
-    my ($self) = @_;
-
-    delete($experiments{$self->idx()});
-}
-sub FlushAll($)
-{
-    my ($class) = @_;
-
-    %experiments = ();
-}
-
-#
 # Add an input file to the template. The point of this is to reduce
 # duplication by taking an md5 of the input file, and sharing that
 # record/file.
@@ -1004,6 +1027,7 @@ sub GetInputFile($$$)
 sub GetVirtExperiment($)
 {
     my ($self) = @_;
+    require VirtExperiment;
 
     return undef
 	if (! ref($self));
@@ -1277,19 +1301,6 @@ sub SetBatchMode($$) {
 }
 
 #
-# Stringify for output.
-#
-sub Stringify($)
-{
-    my ($self) = @_;
-    
-    my $pid   = $self->pid();
-    my $eid   = $self->eid();
-
-    return "[Experiment: $pid/$eid]";
-}
-
-#
 # Generic function to look up some table values given a set of desired
 # fields and some conditions. Pretty simple, not widely useful, but it
 # helps to avoid spreading queries around then we need to. 
@@ -1356,8 +1367,8 @@ sub AccessCheck($$$)
     return 0
 	if (! ref($self));
 
-    if ($access_type < TB_EXPT_MIN ||
-	$access_type > TB_EXPT_MAX) {
+    if ($access_type < TB_EXPT_MIN() ||
+	$access_type > TB_EXPT_MAX()) {
 	die("*** Invalid access type: $access_type!");
     }
 
@@ -1378,11 +1389,11 @@ sub AccessCheck($$$)
     #
     my $mintrust;
     
-    if ($access_type == TB_EXPT_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
+    if ($access_type == TB_EXPT_READINFO()) {
+	$mintrust = PROJMEMBERTRUST_USER();
     }
     else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+	$mintrust = PROJMEMBERTRUST_LOCALROOT();
     }
 
     #
@@ -1391,7 +1402,7 @@ sub AccessCheck($$$)
     # those in groups they do not belong to.
     #
     return TBMinTrust($group->Trust($user), $mintrust) ||
-	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT);
+	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT());
 }
 
 #
@@ -1423,6 +1434,7 @@ sub CreateDirectory($)
 sub GetProject($)
 {
     my ($self) = @_;
+    require Project;
 
     # Must be a real reference. 
     return undef
@@ -1431,7 +1443,7 @@ sub GetProject($)
     my $project = Project->Lookup($self->pid_idx());
     
     if (! defined($project)) {
-	print("*** WARNING: Could not lookup project object for $self!", 1);
+	print("*** WARNING: Could not lookup project object for $self!\n");
 	return undef;
     }
     return $project;
@@ -1443,6 +1455,7 @@ sub GetProject($)
 sub GetGroup($)
 {
     my ($self) = @_;
+    require Group;
 
     # Must be a real reference. 
     return undef
@@ -1615,6 +1628,30 @@ sub WriteEnvVariables($)
 }
 
 #
+# Get value of a specific env variable
+#
+sub GetEnvVariable($$)
+{
+    my ($self, $var) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select value from virt_user_environment ".
+		    "where  pid='$pid' and eid='$eid' and name='$var'");
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($value) = $query_result->fetchrow_array();
+    return $value;
+}
+
+#
 # Experiment locking and state changes.
 #
 sub Unlock($;$)
@@ -1639,15 +1676,15 @@ sub Unlock($;$)
     }
     
     if (defined($newstate)) {
+	require event;
+	
 	$self->{'EXPT'}->{'state'} = $newstate;
 
-	if ($EVENTSYS) {
-	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
-			  objname   => "$pid/$eid",
-			  eventtype => $newstate,
-			  expt      => "$pid/$eid",
-			  host      => $BOSSNODE);
-	}
+	event::EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE(),
+			     objname   => "$pid/$eid",
+			     eventtype => $newstate,
+			     expt      => "$pid/$eid",
+			     host      => $BOSSNODE);
     }
     
     return 0;
@@ -1688,15 +1725,15 @@ sub Lock(;$$)
 	if ($unlocktables);
     
     if (defined($newstate)) {
+	require event;
+	
 	$self->{'EXPT'}->{'state'} = $newstate;
 
-	if ($EVENTSYS) {
-	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
-			  objname   => "$pid/$eid",
-			  eventtype => $newstate,
-			  expt      => "$pid/$eid",
-			  host      => $BOSSNODE);
-	}
+	event::EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE(),
+			     objname   => "$pid/$eid",
+			     eventtype => $newstate,
+			     expt      => "$pid/$eid",
+			     host      => $BOSSNODE);
     }
     return 0;
 }
@@ -1722,15 +1759,15 @@ sub SetState($$)
     }
     
     if (defined($newstate)) {
+	require event;
+	
 	$self->{'EXPT'}->{'state'} = $newstate;
 
-	if ($EVENTSYS) {
-	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
-			  objname   => "$pid/$eid",
-			  eventtype => $newstate,
-			  expt      => "$pid/$eid",
-			  host      => $BOSSNODE);
-	}
+	event::EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE(),
+			     objname   => "$pid/$eid",
+			     eventtype => $newstate,
+			     expt      => "$pid/$eid",
+			     host      => $BOSSNODE);
     }
     
     return 0;
@@ -1971,6 +2008,8 @@ sub PreRun($;$$)
 sub PreSwap($$$$)
 {
     my ($self, $swapper, $which, $estate) = @_;
+    # We know we need this later.
+    require User;
 
     # Must be a real reference. 
     return -1
@@ -1980,7 +2019,7 @@ sub PreSwap($$$$)
     my $rsrcidx  = $self->rsrcidx();
     my $lastrsrc = $rsrcidx;
     my $uid_idx  = $swapper->uid_idx();
-    my $isactive = ($estate eq EXPTSTATE_ACTIVE);
+    my $isactive = ($estate eq EXPTSTATE_ACTIVE());
 
     #
     # We should never get here with a lastrsrc in the stats record; it
@@ -2068,7 +2107,7 @@ sub PreSwap($$$$)
 
     # Old swap gathering stuff.
     $self->GatherSwapStats($swapper, $which, 0,
-			   libdb::TBDB_STATS_FLAGS_START()) == 0
+			   TBDB_STATS_FLAGS_START()) == 0
 	or goto failed;
 
     # We do these here since even failed operations implies activity.
@@ -2076,6 +2115,8 @@ sub PreSwap($$$$)
     $swapper->BumpActivity();
     $self->GetProject()->BumpActivity();
     $self->GetGroup()->BumpActivity();
+    $self->Refresh() == 0
+	or goto failed;
     return 0;
 
   failed:
@@ -2157,16 +2198,7 @@ sub SwapFail($$$$;$)
 		"where idx='$rsrcidx'")
 	or return -1;
 
-    if ($which eq $EXPT_SWAPMOD &&
-	$self->state() eq libdb::EXPTSTATE_ACTIVE()) {
-	DBQueryWarn("update experiment_resources set ".
-		    ($flags & libdb::TBDB_STATS_FLAGS_MODHOSED() ?
-		     "swapout_time=swapmod_time, " : " ") .
-		    "swapmod_time=0 ".
-		    "where idx='$lastrsrc'")
-	    or return -1;
-    }
-
+    # Delete it.
     DBQueryWarn("delete from experiment_resources ".
 		"where idx=$rsrcidx")
 	or return -1;
@@ -2225,9 +2257,24 @@ sub PostSwap($$$$)
     my $prev_swapper = $swapper;
     my $query_result;
 
+    #
+    # Need to update the previous record with the swapmod_time.
+    #
+    if ($which eq $EXPT_SWAPMOD) {
+	my $when = "UNIX_TIMESTAMP(now())";
+	# unless its active, in which case pick up swapin time.
+	$when = $self->swapin_time()
+	    if ($self->state() eq EXPTSTATE_ACTIVE());
+	
+	DBQueryWarn("update experiment_resources set ".
+		    "  swapmod_time=$when ".
+		    "where idx='$lastrsrc'")
+	    or return -1;
+    }
+
     if ($which eq $EXPT_SWAPOUT ||
 	($which eq $EXPT_SWAPMOD &&
-	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
+	 $self->state() eq EXPTSTATE_ACTIVE())) {
 	
 	#
 	# If this is a swapout, we use the current resource record. If this
@@ -2246,7 +2293,7 @@ sub PostSwap($$$$)
 		DBQueryWarn("select r.pnodes,r.vnodes,r.uid_idx, ".
 			    "  r.swapmod_time - r.swapin_time ".
 			    " from experiment_resources as r ".
-			    "where r.idx='$rsrcidx'");
+			    "where r.idx='$lastrsrc'");
 	}
 	return -1
 	    if (!$query_result);
@@ -2264,18 +2311,6 @@ sub PostSwap($$$$)
 	}
     }
 
-    if ($which eq $EXPT_SWAPMOD) {
-	my $when = "UNIX_TIMESTAMP(now())";
-	# unless its active, in which case pick up swapin time.
-	$when = $self->swapin_time()
-	    if ($self->state() eq libdb::EXPTSTATE_ACTIVE());
-	
-	DBQueryWarn("update experiment_resources set ".
-		    "  swapmod_time=$when ".
-		    "where idx='$lastrsrc'")
-	    or return -1;
-    }
-
     # Special case for initial record. Needs to be fixed.
     if ($which eq $EXPT_SWAPIN && !$self->lastidx()) {
 	DBQueryWarn("update experiment_resources set byswapin=1 ".
@@ -2288,7 +2323,7 @@ sub PostSwap($$$$)
     # if this fails, so do not worry about it.
     #
     if ($which eq $EXPT_SWAPOUT &&
-	$flags & libdb::TBDB_STATS_FLAGS_IDLESWAP()) {
+	$flags & TBDB_STATS_FLAGS_IDLESWAP()) {
 	DBQueryWarn("update experiment_stats ".
 		    "set idle_swaps=idle_swaps+1 ".
 		    "where exptidx=$exptidx");
@@ -2304,7 +2339,7 @@ sub PostSwap($$$$)
     if ($which eq $EXPT_START ||
 	$which eq $EXPT_SWAPIN ||
 	($which eq $EXPT_SWAPMOD &&
-	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
+	 $self->state() eq EXPTSTATE_ACTIVE())) {
 	$query_result =
 	    DBQueryWarn("select r.node_id,n.type,r.erole,r.vname, ".
 			"    n.phys_nodeid,nt.isremotenode,nt.isvirtnode ".
@@ -2426,7 +2461,7 @@ sub GatherSwapStats($$$;$$)
     # variable and return. This is cheezy, but the interface I'm providing
     # allows for fancier stuff later if desired.
     #
-    if ($flags & libdb::TBDB_STATS_FLAGS_START()) {
+    if ($flags & TBDB_STATS_FLAGS_START()) {
 	$EXPT_STARTCLOCK = time();
 	return 0;
     }
@@ -2586,8 +2621,8 @@ sub OldReservedNodeList($$)
     @$plist     = ();
     my @result  = ();
     my $exptidx = $self->idx();
-    my $oldreserved_pid = OLDRESERVED_PID;
-    my $oldreserved_eid = OLDRESERVED_EID;
+    my $oldreserved_pid = OLDRESERVED_PID();
+    my $oldreserved_eid = OLDRESERVED_EID();
 
     my $query_result =
 	DBQueryWarn("select r.node_id from reserved as r ".
@@ -2635,6 +2670,56 @@ sub NodeList($;$$)
 		    "left join nodes as n on n.node_id=r.node_id ".
 		    "left join node_types as nt on nt.type=n.type ".
 		    "where r.pid='$pid' and r.eid='$eid'");
+    return undef
+	if (!$query_result);
+    return ()
+	if (!$query_result->numrows);
+
+    while (my ($nodeid,$isvirt) = $query_result->fetchrow_array()) {
+	next
+	    if ($isvirt && !$includevirtual);
+	push(@nodenames, $nodeid);
+    }
+    return @nodenames
+	if ($namesonly);
+
+    my @nodes = ();
+
+    foreach my $nodeid (@nodenames) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    print STDERR "*** Could not map $nodeid to its object\n";
+	    return undef;
+	}
+	push(@nodes, $node);
+    }
+    return @nodes;
+}
+
+#
+# Return list of experiment switches (objects or just names)
+#
+sub SwitchList($;$$)
+{
+    my ($self, $namesonly, $includevirtual) = @_;
+    my @nodenames = ();
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+    $includevirtual = 0
+	if (!defined($includevirtual));
+    $namesonly = 0
+	if (!defined($namesonly));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select r.node_id,nt.isvirtnode from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where r.pid='$pid' and r.eid='$eid' and nt.isswitch=1");
     return undef
 	if (!$query_result);
     return ()
@@ -2710,7 +2795,7 @@ sub CleanLogFiles($)
 	    if ($file =~ /^.*\.ns$/);
 	
 	push(@delete, "${workdir}/$1")
-	    if ($file =~ /^(.*\.(log|ptop|top|assign|soln))$/);
+	    if ($file =~ /^(.*\.(log|ptop|top|vtop|assign|soln|xml|limits))$/);
 
 	push(@delete, "${workdir}/$1")
 	    if ($file =~ /^((swap|start|cancel|newrun).*\..*)$/);
@@ -2829,6 +2914,7 @@ sub SetSwapper($$)
 sub GetSwapper($)
 {
     my ($self) = @_;
+    require User;
 
     # Must be a real reference. 
     return undef
@@ -2845,6 +2931,7 @@ sub GetSwapper($)
 sub GetCreator($)
 {
     my ($self) = @_;
+    require User;
 
     # Must be a real reference. 
     return undef
@@ -3092,6 +3179,7 @@ sub ClearBackupState($)
 sub RemovePhysicalState($)
 {
     my ($self) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
@@ -3163,6 +3251,7 @@ sub RemovePhysicalState($)
 sub BackupPhysicalState($;$$)
 {
     my ($self, $directory, $regression) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
@@ -3268,6 +3357,7 @@ sub BackupPhysicalState($;$$)
 sub RestorePhysicalState($)
 {
     my ($self) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
@@ -3381,6 +3471,28 @@ sub ClearPortRegistration($)
 }
 
 #
+# The reserved_vlantags table is special, and needs to be cleared only
+# at certain times. See tbswap.
+#
+sub ClearReservedVlanTags($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (! DBQueryWarn("delete from reserved_vlantags ".
+			  "where pid='$pid' and eid='$eid'"));
+
+    return 0;
+}
+
+#
 # Does experiment have any program agents.
 #
 sub HaveProgramAgents($)
@@ -3450,6 +3562,135 @@ sub SetupProgramAgents($)
 }
 
 #
+# Convert virt_blobs into real blobs.  We go to some pain to keep the same
+# filenames associated with the same uuid to make sure caching doesn't get
+# needlessly broken on the client (on a modify).
+#
+sub UploadBlobs($$)
+{
+    my ($self,$update) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+    my $virtexp = $self->GetVirtExperiment();
+    return -1
+	if (!defined($virtexp));
+
+    my %blobs = ();
+    my %virt_blobs = ();
+
+    #
+    # Grab the existing blobs tied to our experiment
+    #
+    my $qres = DBQueryFatal("select uuid,filename,vblob_id" . 
+			    " from blobs where exptidx=$idx");
+    if (defined($qres) && $qres->numrows()) {
+	while (my ($uuid,$filename,$vblob_id) = $qres->fetchrow_array()) {
+	    $blobs{$vblob_id} = [ 0,$uuid,$filename ];
+	}
+    }
+
+    #
+    # Now grab our experiment virt blobs
+    #
+    my $virt_blobs_table = $virtexp->Table("virt_blobs");
+    foreach my $row ($virt_blobs_table->Rows()) {
+	my $vblob_id = $row->vblob_id();
+	my $filename = $row->filename();
+
+	$virt_blobs{$vblob_id} = $filename;
+    }
+
+    #
+    # Make sure each virt_blob is in the blobs table!
+    #
+    foreach my $vblob_id (keys(%virt_blobs)) {
+	my $vfilename = $virt_blobs{$vblob_id};
+
+	if (exists($blobs{$vblob_id}) 
+	    && $blobs{$vblob_id}->[2] eq $vfilename) {
+	    # this one is a keeper, so mark it!
+	    $blobs{$vblob_id}->[0] = 1;
+	}
+	else {
+	    my $found = 0;
+	    foreach my $rvblob_id (keys(%blobs)) {
+		# if this one's a keeper, skip it!
+		next 
+		    if ($blobs{$rvblob_id}->[0]);
+
+		# if the filenames match, we adjust the vblob_id field
+		# in the blobs table to match what we have -- this leaves
+		# the uuid<->filename mapping intact
+		if ($blobs{$rvblob_id}->[2] eq $vfilename) {
+		    my $uuid = $blobs{$rvblob_id}->[1];
+		    $blobs{$vblob_id} = [ 1,$blobs{$rvblob_id}->[1],
+					  $blobs{$rvblob_id}->[2] ];
+		    DBQueryFatal("replace into blobs (uuid,vblob_id)" . 
+				 " values ('$uuid','$vblob_id')");
+		    $found = 1;
+		    last;
+		}
+	    }
+
+	    if (!$found) {
+		# need to add this blob fresh!
+		my $swapperuid = $self->swapper();
+		DBQueryFatal("insert into blobs" . 
+			     " (uuid,filename,owner_uid,vblob_id,exptidx)" . 
+			     " values (UUID(),'$vfilename','$swapperuid'," . 
+			     "   '$vblob_id',$idx)");
+	    }
+	}
+    }
+
+    #
+    # Only remove real blobs if we're done using them (i.e., on a modify)
+    #
+    if ($update) {
+	foreach my $vblob_id (keys(%blobs)) {
+	    my ($keep,$uuid,$filename) = @{$blobs{$vblob_id}};
+	    if (!$keep) {
+		DBQueryFatal("delete from blobs" . 
+			     "  where exptidx=$idx and vblob_id='${vblob_id}'");
+	    }
+	}
+    }
+
+    return 0;
+}
+
+#
+# Remove any real blobs that were a result of a virt blob (i.e., those
+# blobs that have our exptidx and a valid vblob_id).
+#
+sub RemoveBlobs($$)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $qres = DBQueryFatal("delete from blobs using blobs" . 
+			    " left join virt_blobs as vblobs" . 
+			    "  on blobs.vblob_id=vblobs.vblob_id" . 
+			    " where blobs.exptidx=$idx" . 
+			    "  and vblobs.vblob_id is not NULL");
+
+    # XXX: probably should clean out blob_files stuff too!
+
+    return 0;
+}
+
+#
 # Seed the virt_agents table.  Each lan/link needs an agent to handle
 # changes to delays or other link parameters, and that agent (might be
 # several) will be running on more than one node. Delay node agent,
@@ -3475,7 +3716,7 @@ sub SetupNetworkAgents($)
     my $pid = $self->pid();
     my $eid = $self->eid();
     my $idx = $self->idx();
-    my $virtexp = VirtExperiment->Lookup($self);
+    my $virtexp = $self->GetVirtExperiment();
     return -1
 	if (!defined($virtexp));
 
@@ -4089,10 +4330,92 @@ sub UnBindNonLocalUsers($)
 
     my $idx = $self->idx();
 
-    DBQueryWarn("delete from nonlocal_user_bindings  ".
-		"where exptidx='$idx'")
+    #
+    # Need to delete the pubkeys, so need a list of current bindings.
+    #
+    my $query_result =
+	DBQueryWarn("select uid,uid_idx from nonlocal_user_accounts ".
+		    "where exptidx='$idx'");
+    return -1
+	if (!$query_result);
+
+    while (my ($uid, $uid_idx) = $query_result->fetchrow_array()) {
+	DBQueryWarn("delete from nonlocal_user_pubkeys  ".
+		    "where uid_idx='$uid_idx'")
+	    or return -1;
+	DBQueryWarn("delete from nonlocal_user_accounts  ".
+		    "where uid_idx='$uid_idx'")
+	    or return -1;
+    }
+    return 0;
+}
+
+#
+# Bind nonlocal user to experiment (slice, in Geni).
+#
+sub BindNonLocalUser($$$$$$)
+{
+    my ($self, $keys, $uid, $urn, $name, $email) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $exptidx    = $self->idx();
+    my $safe_urn   = DBQuoteSpecial($urn)
+	if (defined($urn));
+    my $safe_uid   = DBQuoteSpecial($uid);
+    my $safe_name  = DBQuoteSpecial($name);
+    my $safe_email = DBQuoteSpecial($email);
+    my $uid_idx;
+
+    #
+    # User may already exist, as for updating keys.
+    #
+    my $query_result =
+	DBQueryWarn("select uid_idx from nonlocal_user_accounts ".
+		    "where uid=$safe_uid and exptidx='$exptidx'");
+    return -1
+	if (!$query_result);
+    
+    if ($query_result->numrows) {
+	($uid_idx) = $query_result->fetchrow_array();
+    }
+    else {
+	my @insert_data = ();
+	
+	$uid_idx = User->NextIDX();
+	push(@insert_data, "created=now()");
+	push(@insert_data, "uid_idx='$uid_idx'");
+	push(@insert_data, "unix_uid=NULL");
+	push(@insert_data, "exptidx='$exptidx'");
+	push(@insert_data, "urn=$safe_urn")
+	    if (defined($urn));
+	push(@insert_data, "uid=$safe_uid");
+	push(@insert_data, "name=$safe_name");
+	push(@insert_data, "email=$safe_email");
+	push(@insert_data, "uid_uuid=uuid()");
+
+	# Insert into DB.
+	my $insert_result =
+	    DBQueryWarn("insert into nonlocal_user_accounts set " .
+			join(",", @insert_data));
+    }
+
+    #
+    # Always replace the entire key set; easier to manage.
+    #
+    DBQueryWarn("delete from nonlocal_user_pubkeys  ".
+		"where uid_idx='$uid_idx'")
 	or return -1;
     
+    foreach my $key (@{ $keys }) {
+	my $safe_key = DBQuoteSpecial($key);
+
+	DBQueryWarn("insert into nonlocal_user_pubkeys set ".
+		    "  uid=$safe_uid, uid_idx='$uid_idx', ".
+		    "  idx=NULL, stamp=now(), pubkey=$safe_key")
+	    or return -1;
+    }
     return 0;
 }
 
@@ -4103,6 +4426,7 @@ sub LinkInterfaces($$$)
 {
     my ($self, $linkname, $pref) = @_;
     my @result = ();
+    require Interface;
 
     my $idx = $self->idx();
 
@@ -4189,20 +4513,20 @@ sub SetPortRange($$)
 	if (!defined($range_result));
 
     if (!$range_result->num_rows) {
-	$newlow = TBDB_LOWVPORT;
+	$newlow = TBDB_LOWVPORT();
     }
     else {
 	($lastlow, $lasthigh) = $range_result->fetchrow_array();
 
 	# A hole at the bottom of the range ...
-	if ($lastlow >= TBDB_LOWVPORT + TBDB_PORTRANGE) {
-	    $newlow = TBDB_LOWVPORT;
+	if ($lastlow >= TBDB_LOWVPORT() + TBDB_PORTRANGE()) {
+	    $newlow = TBDB_LOWVPORT();
 	}
 	# Else, find a free hole. 
 	else {
 	    while (my ($thislow,$thishigh) = $range_result->fetchrow_array()) {
 		if ($thislow != $lasthigh + 1 &&
-		    $thislow - $lasthigh > TBDB_PORTRANGE) {
+		    $thislow - $lasthigh > TBDB_PORTRANGE()) {
 		    $newlow = $lasthigh + 1;
 		    last;
 		}
@@ -4214,11 +4538,11 @@ sub SetPortRange($$)
 	# No holes, tack onto the end. 
 	$newlow = $lasthigh + 1;
     }
-    if ($newlow >= TBDB_MAXVPORT) {
+    if ($newlow >= TBDB_MAXVPORT()) {
 	DBQueryWarn("unlock tables");
 	return undef;
     }
-    $newhigh = $newlow + TBDB_PORTRANGE - 1;
+    $newhigh = $newlow + TBDB_PORTRANGE() - 1;
 
     my $idx = $self->idx();
     my $pid = $self->pid();
@@ -4233,6 +4557,20 @@ sub SetPortRange($$)
     }
     DBQueryWarn("unlock tables");
     return ($newlow, $newhigh);
+}
+sub GetPortRange($)
+{
+    my ($self) = @_;
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select low,high from ipport_ranges where exptidx=$idx");
+    
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($low,$high) = $query_result->fetchrow_array();
+    return ($low, $high);
 }
 
 #
@@ -4310,6 +4648,10 @@ sub ReserveSharedBandwidth($;$$)
 	$query_result  = $previous_result;
 	$previous_result = $tmp;
     }
+    # Need to do this when we want to seek around inside the results.
+    $previous_result = $previous_result->WrapForSeek()
+	if (defined($previous_result));
+    $query_result = $query_result->WrapForSeek();
 
     #
     # This is how much we need to release.

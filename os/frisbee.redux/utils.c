@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -16,7 +16,9 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
+#if !defined(linux) && !defined(__CYGWIN__)
 #include <sys/sysctl.h>
+#endif
 #include <assert.h>
 
 #include "decls.h"
@@ -61,7 +63,7 @@ sleeptime(unsigned int usecs, char *str, int doround)
 	int nusecs;
 
 	if (clockres_us == 0) {
-#ifndef linux
+#if !defined(linux) && !defined(__CYGWIN__)
 		struct clockinfo ci;
 		size_t cisize = sizeof(ci);
 
@@ -151,15 +153,102 @@ sleeptil(struct timeval *nexttime)
 	return 0;
 }
 
+/*
+ * Deal with variable chunk/block sizes
+ */
+static int _ChunkSize, _BlockSize;
+static int _TotalChunks, _TotalBlocks;
+static int _LastChunkSize, _LastBlockSize;
+
+void
+InitSizes(int32_t chunksize, int32_t blocksize, int64_t bytes)
+{
+	/* XXX no support for multiple chunk/block sizes yet */
+	assert(chunksize == MAXCHUNKSIZE);
+	assert(blocksize == MAXBLOCKSIZE);
+
+	_ChunkSize = chunksize;
+	_BlockSize = blocksize;
+	_TotalBlocks = (bytes + _BlockSize-1) / _BlockSize;
+	_TotalChunks = (_TotalBlocks + _ChunkSize-1) / _ChunkSize;
+
+	/* how many bytes in last block (zero means full) */
+	_LastBlockSize = bytes % _BlockSize;
+	/* how many blocks in last chunk (zero means full) */
+	_LastChunkSize = _TotalBlocks % _ChunkSize;
+}
+ 
+int
+TotalChunks(void)
+{
+	return _TotalChunks;
+}
+
+/*
+ * Return the size of a specific chunk.
+ * Always the image chunk size (_ChunkSize) except possibly for a
+ * final partial chunk.
+ * If called with -1, return the image chunk size.
+ */
+int
+ChunkSize(int chunkno)
+{
+	assert(chunkno < _TotalChunks);
+
+	if (chunkno < _TotalChunks-1 || _LastChunkSize == 0)
+		return _ChunkSize;
+	return _LastChunkSize;
+}
+
+/*
+ * Return the number of bytes in the indicated chunk.
+ * Always the image chunk size in bytes (_ChunkSize * _BlockSize) except
+ * possibly for a final partial chunk.
+ */
+int
+ChunkBytes(int chunkno)
+{
+	assert(chunkno < _TotalChunks);
+
+	if (chunkno < _TotalChunks-1 || _LastChunkSize == 0)
+		return (_ChunkSize * _BlockSize);
+	return ((_LastChunkSize-1) * _BlockSize + _LastBlockSize);
+}
+
+int
+TotalBlocks(void)
+{
+	return _TotalBlocks;
+}
+
+/*
+ * Return the size of a specific block.
+ * Always the image block size (_BlockSize) except possibly for a
+ * final partial block in the final chunk.
+ * If called with -1, return the image block size.
+ */
+int
+BlockSize(int chunkno, int blockno)
+{
+	int imageblock;
+
+	assert(chunkno < _TotalChunks && blockno < _BlockSize);
+
+	imageblock = chunkno * _ChunkSize + blockno;
+	if (chunkno < 0 || imageblock < _TotalBlocks-1 || _LastBlockSize == 0)
+		return _BlockSize;
+	return _LastBlockSize;
+}
+
 void
 BlockMapInit(BlockMap_t *blockmap, int block, int count)
 {
 	assert(block >= 0);
 	assert(count > 0);
-	assert(block < CHUNKSIZE);
-	assert(block + count <= CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
 
-	if (count == CHUNKSIZE) {
+	if (count == MAXCHUNKSIZE) {
 		memset(blockmap->map, ~0, sizeof(blockmap->map));
 		return;
 	}
@@ -174,8 +263,8 @@ BlockMapAdd(BlockMap_t *blockmap, int block, int count)
 
 	assert(block >= 0);
 	assert(count > 0);
-	assert(block < CHUNKSIZE);
-	assert(block + count <= CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
 
 	i = block / CHAR_BIT;
 	off = block % CHAR_BIT;
@@ -194,6 +283,33 @@ BlockMapAdd(BlockMap_t *blockmap, int block, int count)
 	}
 }
 
+void
+BlockMapClear(BlockMap_t *blockmap, int block, int count)
+{
+	int i, off;
+
+	assert(block >= 0);
+	assert(count > 0);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
+
+	i = block / CHAR_BIT;
+	off = block % CHAR_BIT;
+	while (count > 0) {
+		if (off == 0 && count >= CHAR_BIT) {
+			blockmap->map[i++] = 0;
+			count -= CHAR_BIT;
+		} else {
+			blockmap->map[i] &= ~(1 << off);
+			if (++off == CHAR_BIT) {
+				i++;
+				off = 0;
+			}
+			count--;
+		}
+	}
+}
+
 /*
  * Mark the specified block as allocated and return the old value
  */
@@ -203,7 +319,7 @@ BlockMapAlloc(BlockMap_t *blockmap, int block)
 	int i, off;
 
 	assert(block >= 0);
-	assert(block < CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
 
 	i = block / CHAR_BIT;
 	off = block % CHAR_BIT;
@@ -268,8 +384,8 @@ BlockMapIsAlloc(BlockMap_t *blockmap, int block, int count)
 
 	assert(block >= 0);
 	assert(count > 0);
-	assert(block < CHUNKSIZE);
-	assert(block + count <= CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
 
 	i = block / CHAR_BIT;
 	off = block % CHAR_BIT;
@@ -333,14 +449,14 @@ BlockMapMerge(BlockMap_t *frommap, BlockMap_t *tomap)
 
 /*
  * Return the block number of the first block allocated in the map.
- * Returns CHUNKSIZE if no block is set.
+ * Returns MAXCHUNKSIZE if no block is set.
  */
 int
 BlockMapFirst(BlockMap_t *blockmap)
 {
 	int block, i;
 
-	assert(sizeof(blockmap->map) * CHAR_BIT == CHUNKSIZE);
+	assert(sizeof(blockmap->map) * CHAR_BIT == MAXCHUNKSIZE);
 
 	/*
 	 * Skip empty space at the front quickly
@@ -476,6 +592,164 @@ ClientStatsDump(unsigned int id, ClientStats_t *stats)
 
 	default:
 		log("Unknown stats version %d", stats->version);
+		break;
+	}
+}
+#endif
+
+#ifdef MASTER_SERVER
+#include "configdefs.h"
+
+char *
+GetMSError(int error)
+{
+	char *err;
+
+	switch (error) {
+	case 0:
+		err = "no error";
+		break;
+	case MS_ERROR_FAILED:
+		err = "server authentication error";
+		break;
+	case MS_ERROR_NOHOST:
+		err = "unknown host";
+		break;
+	case MS_ERROR_NOIMAGE:
+		err = "unknown image";
+		break;
+	case MS_ERROR_NOACCESS:
+		err = "access not allowed";
+		break;
+	case MS_ERROR_NOMETHOD:
+		err = "not available via specified method";
+		break;
+	case MS_ERROR_INVALID:
+		err = "invalid argument";
+		break;
+	case MS_ERROR_TRYAGAIN:
+		err = "image busy, try again later";
+		break;
+	default:
+		err = "unknown error";
+		break;
+	}
+
+	return err;
+}
+
+char *
+GetMSMethods(int methods)
+{
+	static char mbuf[256];
+
+	mbuf[0] = '\0';
+	if (methods & MS_METHOD_UNICAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "unicast");
+	}
+	if (methods & MS_METHOD_MULTICAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "multicast");
+	}
+	if (methods & MS_METHOD_BROADCAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "broadcast");
+	}
+	if (mbuf[0] == '\0')
+		strcat(mbuf, "UNKNOWN");
+
+	return mbuf;
+}
+
+/*
+ * Print the contents of a GET reply to stdout.
+ * The reply struct fields should be in HOST order; i.e., as returned
+ * by ClientNetFindServer.
+ */
+void
+PrintGetInfo(char *imageid, GetReply *reply, int raw)
+{
+	struct in_addr in;
+	uint64_t isize;
+	int len;
+
+	if (raw) {
+		printf("imageid=%s\n", imageid);
+		printf("error=%d\n", reply->error);
+		if (reply->error)
+			return;
+
+		printf("method=0x%x\n", reply->method);
+		isize = ((uint64_t)reply->hisize << 32) | reply->losize;
+		printf("size=%llu\n", isize);
+		printf("sigtype=0x%x\n", reply->sigtype);
+		switch (reply->sigtype) {
+		case MS_SIGTYPE_MTIME:
+			printf("sig=0x%x\n", *(uint32_t *)reply->signature);
+			len = 0;
+			break;
+		case MS_SIGTYPE_MD5:
+			len = 16;
+			break;
+		case MS_SIGTYPE_SHA1:
+			len = 20;
+			break;
+		default:
+			len = 0;
+			break;
+		}
+		if (len > 0) {
+			char sigbuf[MS_MAXSIGLEN*2+1], *sbp;
+			int i;
+
+			sbp = sigbuf;
+			for (i = 0; i < len; i++) {
+				sprintf(sbp, "%02x", reply->signature[i]);
+				sbp += 2;
+			}
+			*sbp = '\0';
+			printf("sig=0x%s\n", sigbuf);
+		}
+		printf("running=%d\n", reply->isrunning);
+		if (reply->isrunning) {
+			in.s_addr = htonl(reply->servaddr);
+			printf("servaddr=%s\n", inet_ntoa(in));
+			in.s_addr = htonl(reply->addr);
+			printf("addr=%s\n", inet_ntoa(in));
+			printf("port=%d\n", reply->port);
+		}
+		return;
+	}
+
+	if (reply->error) {
+		printf("%s: server denied access: %s\n",
+		    imageid, GetMSError(reply->error));
+		return;
+	}
+
+	if (reply->isrunning) {
+		in.s_addr = htonl(reply->addr);
+		printf("%s: access OK, server running at %s:%d using %s\n",
+		    imageid, inet_ntoa(in), reply->port,
+		    GetMSMethods(reply->method));
+	} else
+		printf("%s: access OK, available methods=%s\n",
+		    imageid, GetMSMethods(reply->method));
+
+	isize = ((uint64_t)reply->hisize << 32) | reply->losize;
+	printf("  size=%llu\n", isize);
+
+	switch (reply->sigtype) {
+	case MS_SIGTYPE_MTIME:
+	{
+		time_t mt = *(time_t *)reply->signature;
+		printf("  modtime=%s\n", ctime(&mt));
+	}
+	default:
 		break;
 	}
 }

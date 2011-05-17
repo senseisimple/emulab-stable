@@ -59,12 +59,6 @@ static int dumpchunk(char *name, char *buf, int chunkno, int checkindex);
 static void dumpchunkhash(char *name, char *buf, int chunkno, int checkindex);
 #endif
 
-#ifdef WITH_SHD
-void add_shdrange(u_int32_t start, u_int32_t size);
-int write_shd(char *shddev);
-int debug = 0;
-#endif
-
 #define SECTOBYTES(s)	((unsigned long long)(s) * SECSIZE)
 
 int
@@ -334,13 +328,6 @@ dumpfile(char *name, int fd)
 		}
 	}
  done:
-
-#ifdef WITH_SHD
-	if (chkpointdev && write_shd(chkpointdev)) {
-		fprintf(stderr, "Could not record SHD alloc block info\n");
-		exit(1);
-	}
-#endif
 
 	if (filesize == 0)
 		filesize = (off_t)(chunkno + 1) * CHUNKSIZE;
@@ -621,14 +608,6 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 				fmax = count;
 			franges++;
 		}
-
-#ifdef WITH_SHD
-		/*
-		 * Accumulate SHD allocated list info
-		 */
-		if (chkpointdev)
-			add_shdrange(reg->start, reg->size);
-#endif
 
 		count = reg->size;
 		sectinuse += count;

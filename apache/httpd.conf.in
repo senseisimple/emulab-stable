@@ -428,18 +428,7 @@ DocumentRoot "@prefix@/www"
 <Directory @prefix@>
     Order allow,deny
     deny from all
-    allow from 155.99.212.
     allow from 155.98.60.
-    allow from 69.59.212.104
-    allow from 18.31.0.114
-    allow from 18.31.0.144
-    allow from 24.254.69.120
-    # Jay's machines.
-    allow from 207.173.21.122
-    allow from 207.173.21.123
-    allow from 207.173.21.126
-    # Tim Stack
-    allow from 66.219.220.49
 </Directory>
 
 <Directory @prefix@/webglimpse>
@@ -512,7 +501,7 @@ DocumentRoot "@prefix@/www"
 # directory index.  Separate multiple entries with spaces.
 #
 <IfModule mod_dir.c>
-    DirectoryIndex index.php3 index.html
+    DirectoryIndex index.php3 index.php index.html
 </IfModule>
 
 #
@@ -1344,13 +1333,8 @@ SSLVerifyDepth  10
 SSLRequire ( %{SSL_CLIENT_S_DN_OU} ne "sslxmlrpc" )
 </Location>
 
-ScriptAlias /protogeni/xmlrpc/ch @prefix@/protogeni/xmlrpc/protogeni-ch.pl
-ScriptAlias /protogeni/xmlrpc/cm @prefix@/protogeni/xmlrpc/protogeni-cm.pl
-ScriptAlias /protogeni/xmlrpc/sa @prefix@/protogeni/xmlrpc/protogeni-sa.pl
-ScriptAlias /protogeni/xmlrpc/ses @prefix@/protogeni/xmlrpc/protogeni-ses.pl
-<IfDefine GENI_AM>
-ScriptAlias /protogeni/xmlrpc/am @prefix@/protogeni/xmlrpc/geni-am.pl
-</IfDefine>
+ScriptAlias /protogeni/xmlrpc @prefix@/protogeni/xmlrpc/protogeni-wrapper.pl
+
 <Directory "@prefix@/www/protogeni">
 	SSLRequireSSL
 	Order deny,allow

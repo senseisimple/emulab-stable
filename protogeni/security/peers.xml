@@ -1,0 +1,20 @@
+<peers xmlns="http://www.protogeni.net/resources/ca-permits/1">
+  <authority name="urn:publicid+emulab.net+authority+ch"
+	     url="https://www.emulab.net/protogeni/xmlrpc/ch"
+             permit="ch" />
+  <authority name="urn:publicid+emulab.net+authority+cm"
+	     url="https://www.emulab.net/protogeni/xmlrpc/cm"
+	     permit="cm" />
+  <authority name="urn:publicid+emulab.net+authority+cm"
+	     url="https://www.emulab.net/protogeni/xmlrpc/am"
+	     permit="am" />
+  <authority name="urn:publicid+emulab.net+authority+sa"
+	     url="https://www.emulab.net/protogeni/xmlrpc/sa"
+             permit="sa" />
+  <authority name="urn:publicid+emulab.net+authority+sa"
+	     url="https://www.emulab.net/protogeni/xmlrpc/sa"
+             permit="idp" />
+  <authority name="urn:publicid+flybynight.com+authority+cm"
+	     url="https://flybynight.com/protogeni/xmlrpc/cm"
+             permit="cm" />
+</permits>

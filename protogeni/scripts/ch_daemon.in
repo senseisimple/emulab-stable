@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -14,10 +14,11 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print "Usage: ch_daemon [-d] [-n]\n";
+    print "Usage: ch_daemon [-s] [-d] [-n]\n";
     exit(1);
 }
-my $optlist   = "dn";
+my $optlist   = "dns";
+my $oneshot   = 0;
 my $debug     = 0;
 my $impotent  = 0;
 
@@ -30,6 +31,7 @@ my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
+my $ADDIR         = "$TB/www/protogeni/advertisements";
 my $LOGFILE       = "$TB/log/ch_daemon.log";
 my $EMULAB_PEMFILE = "$TB/etc/genich.pem";
 my $SLEEP_INTERVAL = 60;
@@ -77,6 +79,9 @@ if (defined($options{"d"})) {
 if (defined($options{"n"})) {
     $impotent = 1;
 }
+if (defined($options{"s"})) {
+    $oneshot = 1;
+}
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME);
@@ -89,8 +94,10 @@ require GeniUtil;
 require GeniCertificate;
 require GeniAuthority;
 require libGeni;
+require GeniSlice;
 use libtestbed;
 use emutil;
+use libEmulab;
 use POSIX qw(strftime ceil);
 
 #
@@ -101,21 +108,23 @@ if (!defined($certificate)) {
     fatal("Could not get uuid/urn from $EMULAB_PEMFILE\n");
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
-Genixmlrpc->SetTimeout(10);
+Genixmlrpc->SetTimeout(60);
 $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+ch";
 
-if (CheckDaemonRunning("ch_daemon")) {
-    fatal("Not starting another ch daemon!");
-}
-# Go to ground.
-if (! $debug) {
-    if (TBBackGround($LOGFILE)) {
-	exit(0);
+if (!$oneshot) {
+    if (CheckDaemonRunning("ch_daemon")) {
+	fatal("Not starting another ch daemon!");
     }
-}
-if (MarkDaemonRunning("ch_daemon")) {
-    fatal("Could not mark daemon as running!");
+    # Go to ground.
+    if (! $debug) {
+	if (TBBackGround($LOGFILE)) {
+	    exit(0);
+	}
+    }
+    if (MarkDaemonRunning("ch_daemon")) {
+	fatal("Could not mark daemon as running!");
+    }
 }
 #
 # Setup a signal handler for newsyslog.
@@ -129,12 +138,9 @@ sub handler()
     $EUID = $SAVEEUID;
 }
 $SIG{HUP} = \&handler
-    if (!$debug);
+    if (! ($debug || $oneshot));
 
 GeniUtil::FlipToGeniUser();
-
-# Do not wait long.
-Genixmlrpc->SetTimeout(10);
 
 #
 # Probe CMs
@@ -145,6 +151,7 @@ sub ProbeCMs()
     my $up	    = "Up:\n";
     my $down        = "Down:\n";
     my $disabled    = "Disabled:\n";
+    my %ads         = ();
     
     if (GeniAuthority->ListAll(\@authorities)) {
 	fatal("Could not get authorities list from the DB");
@@ -165,16 +172,128 @@ sub ProbeCMs()
 	if (!defined($version)) {
 	    print "Error getting version from $urn\n";
 	    $down .= "$urn\n";
+	    next;
 	}
-	else {
-	    print "  Running version $version\n";
-	    $up .= "$urn, version $version\n";
+	print "  Running version $version\n";
+	$up .= "$urn, version $version\n";
+
+	#
+	# Discover resources and cache; for the map client.
+	# Returns a string of xml.
+	#
+	my $resources = $authority->DiscoverResources(undef, 0);
+	if (defined($resources)) {
+	    if (open(OUT, "> $ADDIR/$urn")) {
+		print OUT $resources;
+		print OUT "\n";
+		close(OUT);
+
+		# Save the name so we can write the text file at the end.
+		$ads{$urn} = $urn;
+	    }
+	    else {
+		notify("Could not open $ADDIR/$urn for output\n");
+		next;
+	    }
 	}
+	elsif (-e "$ADDIR/$urn" && -s "$ADDIR/$urn") {
+	    # Reuse the old one.
+	    $ads{$urn} = $urn;
+	}
+    }
+    if (open(MAP, "> $ADDIR/list.txt")) {
+	foreach my $urn (keys(%ads)) {
+	    print MAP "$urn\n";
+	}
+	close(MAP);
+    }
+    else {
+	notify("Could not open $ADDIR/list.txt for output\n");
+	next;
     }
     SENDMAIL("geni-dev-utah\@flux.utah.edu",
 	     "ClearingHouse Daemon Message",
 	     "This is an automated message from the ClearingHouse Daemon\n\n".
 	     $up . "\n" . $down . "\n" . $disabled . "\n", $TBOPS);
+}
+
+#
+# Look for slices that have expired.  In theory this shouldn't be
+# necessary, since SAs should tell the CH when they unregister expired
+# slices and nobody should care about stale slice entries at the CH
+# anyway, but in practice it's helpful to expire stale CH records
+# because (a) we don't want to collect junk indefinitely from misbehaving
+# SAs and (b) old versions of the SA treated CH registration failure
+# as fatal and so wouldn't be able to reuse slice names if a stale
+# entry somehow survived at the CH.
+#
+sub ExpireSlices()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_slices ".
+			    "where UNIX_TIMESTAMP(now()) > ".
+			    "      UNIX_TIMESTAMP(expires) and ".
+			    "      shutdown is null");
+    # Catch it next time.
+    return
+	if (!$query_result);
+
+    #
+    # XXX We need to lock the slice ... but that requires changes in
+    # the CH code, which currently does no locking. 
+    #
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	my $urn = $slice->urn();
+	
+	print STDERR "Slice $urn has expired.\n";
+    }
+	
+    if (!$impotent) {
+	GeniDB::DBQueryWarn("delete from geni_slices ".
+			    "where UNIX_TIMESTAMP(now()) > ".
+			    "      UNIX_TIMESTAMP(expires) and ".
+			    "      shutdown is null");
+    }
+
+    # We've only updated the database and not cleaned out the stale
+    # entries from our cache, but that is about to be flushed anyway
+    # (see below).
+}
+
+sub GenerateFederatesList()
+{
+    my @authorities = ();
+    my %federates   = ();
+    
+    if (GeniAuthority->ListAll(\@authorities)) {
+	fatal("Could not get authorities list from the DB");
+    }
+    foreach my $authority (@authorities) {
+	my $urn = $authority->urn();
+    }
+
+    if (open(MAP, "> $ADDIR/list.txt")) {
+#	foreach my $urn (keys(%ads)) {
+#	    print MAP "$urn\n";
+#	}
+	close(MAP);
+    }
+    else {
+	notify("Could not open $ADDIR/list.txt for output\n");
+	next;
+    }
+}
+
+if ($oneshot) {
+    ProbeCMs();
+    ExpireSlices();
+    exit(0);
 }
 
 while (1) {
@@ -189,6 +308,7 @@ while (1) {
     $probe_countdown -= $SLEEP_INTERVAL;
     if ($probe_countdown <= 0) {
 	ProbeCMs();
+	ExpireSlices();
 	$probe_countdown = $PROBE_INTERVAL;
     }
 
@@ -211,7 +331,9 @@ sub fatal($)
 	     $msg,
 	     $TBOPS);
 
-    MarkDaemonStopped("ch_daemon");
+    MarkDaemonStopped("ch_daemon")
+	if (!$oneshot);
+    
     die("*** $0:\n".
 	"    $msg\n");
 }

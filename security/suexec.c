@@ -650,7 +650,7 @@ int main(int argc, char *argv[])
 #else
     if ((dir_info.st_mode & S_IWOTH) || (dir_info.st_mode & S_IWGRP)) {
 #endif
-	log_err("error: directory is writable by others: (%s)\n", cwd);
+	log_err("error: directory is writable by group or other: (%s)\n", cwd);
 	exit(116);
     }
 
@@ -666,7 +666,7 @@ int main(int argc, char *argv[])
      * Error out if the program is writable by others.
      */
     if ((prg_info.st_mode & S_IWOTH) || (prg_info.st_mode & S_IWGRP)) {
-	log_err("error: file is writable by others: (%s/%s)\n", cwd, cmd);
+	log_err("error: file is writable by group or other: (%s/%s)\n", cwd, cmd);
 	exit(118);
     }
 

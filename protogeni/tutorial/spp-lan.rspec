@@ -1,0 +1,44 @@
+<rspec xmlns="http://protogeni.net/resources/rspec/0.1">
+ <node virtual_id="spp1" 
+       virtualization_type="emulab-vnode" 
+       virtualization_subtype="emulab-spp" 
+       > 
+   <interface virtual_id="spp1:0"/> 
+ </node>
+ <node virtual_id="spp2" 
+       virtualization_type="emulab-vnode" 
+       virtualization_subtype="emulab-spp" 
+       > 
+   <interface virtual_id="spp2:0"/> 
+ </node>
+ <node virtual_id="spp3" 
+       virtualization_type="emulab-vnode" 
+       virtualization_subtype="emulab-spp" 
+       > 
+   <interface virtual_id="spp3:0"/> 
+ </node>
+ <link virtual_id="lan0"> 
+  <bandwidth>1000000</bandwidth>
+  <latency>0</latency>
+  <link_type type_name="ethernet" />
+  <packet_loss>0</packet_loss>
+  <interface_ref 
+            virtual_interface_id="spp1:0" 
+            virtual_node_id="spp1" 
+            /> 
+  <interface_ref 
+            virtual_interface_id="spp2:0" 
+            virtual_node_id="spp2" 
+            /> 
+  <interface_ref 
+            virtual_interface_id="spp3:0" 
+            virtual_node_id="spp3" 
+            /> 
+ </link> 
+  <node exclusive="1" virtual_id="lan/lan0" virtualization_type="raw">
+    <interface virtual_id="spp1:0" />
+    <interface virtual_id="spp2:0" />
+    <interface virtual_id="spp3:0" />
+    <node_type type_name="lan" type_slots="1" />
+  </node>
+</rspec>

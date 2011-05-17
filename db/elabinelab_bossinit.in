@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -102,8 +102,8 @@ my @PIDONLYTABLES = ("os_info");
 my $q = DBQueryFatal("select pid_idx from projects ".
 		     "where pid='$TBOPSPID'");
 my ($npid) = $q->fetchrow_array();
-my $q = DBQueryFatal("select gid_idx from groups ".
-		     "where pid='$TBOPSPID' and gid=pid");
+$q = DBQueryFatal("select gid_idx from groups ".
+		  "where pid='$TBOPSPID' and gid=pid");
 my ($ngid) = $q->fetchrow_array();
 
 foreach my $table (@PIDGIDTABLES) {
@@ -137,6 +137,10 @@ my $users_result =
     DBQueryFatal("select distinct u.uid,u.uid_idx,u.admin,u.status ".
 		 "   from group_membership as m ".
 		 "left join users as u on u.uid_idx=m.uid_idx ");
+
+# Need to do this we want to seek around inside the results.
+$users_result = $users_result->WrapForSeek();
+
 while (my ($uid,$uid_idx,$admin,$status) = $users_result->fetchrow_array()) {
     next
 	if ($uid eq "elabman");

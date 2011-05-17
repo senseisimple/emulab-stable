@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -101,7 +101,7 @@ static char	 chunkbuf[CHUNKSIZE];
 #endif
 int		 readmbr(int slice);
 int		 fixmbr(int slice, int dtype);
-static int	 write_subblock(int, const char *);
+static int	 write_subblock(int, const char *, int);
 static int	 inflate_subblock(const char *);
 void		 writezeros(off_t offset, off_t zcount);
 void		 writedata(off_t offset, size_t count, void *buf);
@@ -857,7 +857,7 @@ main(int argc, char *argv[])
 			foff  += cc;
 		}
 		if (nodecompress) {
-			if (write_subblock(chunkno, chunkbuf))
+			if (write_subblock(chunkno, chunkbuf, CHUNKSIZE))
 				break;
 		} else {
 			if (inflate_subblock(chunkbuf))
@@ -997,14 +997,17 @@ ImageUnzipSetMemory(unsigned long _writebufmem)
 }
 
 int
-ImageWriteChunk(int chunkno, char *chunkdata)
+ImageWriteChunk(int chunkno, char *chunkdata, int chunksize)
 {
-	return write_subblock(chunkno, chunkdata);
+	return write_subblock(chunkno, chunkdata, chunksize);
 }
 
 int
-ImageUnzipChunk(char *chunkdata)
+ImageUnzipChunk(char *chunkdata, int chunksize)
 {
+	/* XXX cannot handle partial chunks yet */
+	assert(chunksize == CHUNKSIZE);
+
 	return inflate_subblock(chunkdata);
 }
 
@@ -1168,13 +1171,13 @@ DiskWriter(void *arg)
  * Just write the raw, compressed chunk data to disk
  */
 static int
-write_subblock(int chunkno, const char *chunkbufp)
+write_subblock(int chunkno, const char *chunkbufp, int chunksize)
 {
 	writebuf_t	*wbuf;
 	off_t		offset, size, bytesleft;
-
-	offset = chunkno * CHUNKSIZE;
-	bytesleft = CHUNKSIZE;
+	
+	offset = (off_t)chunkno * CHUNKSIZE;
+	bytesleft = chunksize;
 	while (bytesleft > 0) {
 		size = (bytesleft >= OUTSIZE) ? OUTSIZE : bytesleft;
 		wbuf = alloc_writebuf(offset, size, 1, 1);

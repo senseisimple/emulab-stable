@@ -1,0 +1,151 @@
+diff -ru src.release/sys/conf/options src/sys/conf/options
+--- src.release/sys/conf/options	2010-02-09 17:26:20.000000000 -0700
++++ src/sys/conf/options	2010-10-05 17:21:07.000000000 -0600
+@@ -772,3 +772,6 @@
+ 
+ # Interrupt filtering
+ INTR_FILTER             opt_global.h
++
++# Emulab Ping of Death
++ICMP_PINGOFDEATH	opt_icmp_pingofdeath.h
+diff -ru src.release/sys/netinet/ip_icmp.c src/sys/netinet/ip_icmp.c
+--- src.release/sys/netinet/ip_icmp.c	2010-02-09 17:26:20.000000000 -0700
++++ src/sys/netinet/ip_icmp.c	2010-07-06 15:14:25.000000000 -0600
+@@ -134,6 +134,11 @@
+ static void	icmp_reflect(struct mbuf *);
+ static void	icmp_send(struct mbuf *, struct mbuf *);
+ 
++#include "opt_icmp_pingofdeath.h"
++#ifdef ICMP_PINGOFDEATH
++static void icmp_pingofdeath(struct icmp *, struct ip *, int);
++#endif
++
+ extern	struct protosw inetsw[];
+ 
+ /*
+@@ -593,6 +598,12 @@
+ #endif
+ 		break;
+ 
++#ifdef ICMP_PINGOFDEATH
++	case ICMP_PINGOFDEATH:
++		icmp_pingofdeath(icp, ip, hlen);
++		break;
++#endif
++
+ 	/*
+ 	 * No kernel processing for the following;
+ 	 * just fall through to send to raw listener.
+@@ -926,3 +937,112 @@
+ 	return 0;			/* okay to send packet */
+ #undef N
+ }
++
++#ifdef ICMP_PINGOFDEATH
++#include <machine/cpu.h>
++#include <sys/syslog.h>
++
++SYSCTL_NODE(_net_inet_icmp, OID_AUTO, ipod, CTLFLAG_RW, 0,
++	"ICMP Ping of Death (IPoD)");
++
++static int ipod_version = 2;
++SYSCTL_INT(_net_inet_icmp_ipod, OID_AUTO, version, CTLFLAG_RD,
++	&ipod_version, 0, "IPoD version");
++
++static int ipod_enabled = 0;
++SYSCTL_INT(_net_inet_icmp_ipod, OID_AUTO, enabled, CTLFLAG_RW,
++	&ipod_enabled, 0, "Enable IPoD");
++
++static unsigned long ipod_host = 0xffffffff;
++SYSCTL_ULONG(_net_inet_icmp_ipod, OID_AUTO, host, CTLFLAG_RW,
++	&ipod_host, 0, "IPv4 address of valid IPoD sender");
++static unsigned long ipod_mask = 0xffffffff;
++SYSCTL_ULONG(_net_inet_icmp_ipod, OID_AUTO, mask, CTLFLAG_RW,
++	&ipod_mask, 0, "IPv4 netmask of valid IPoD sender");
++
++static char ipod_key[32+1] = { "SETMETOSOMETHINGTHIRTYTWOBYTES!!" };
++#define IPOD_CHECK_KEY \
++	(ipod_key[0] != 0)
++#define IPOD_VALID_KEY(d) \
++	(strncmp(ipod_key, (char *)(d), strlen(ipod_key)) == 0)
++
++static int
++ipod_getkey(SYSCTL_HANDLER_ARGS)
++{
++	int error;
++
++	/* XXX fake up a result */
++	error = SYSCTL_OUT(req, "XXXX", 4+1);
++	if (error || !req->newptr)
++		return (error);
++
++	if ((req->newlen - req->newidx) >= sizeof(ipod_key))
++		return (EINVAL);
++
++	arg2 = (req->newlen - req->newidx);
++	error = SYSCTL_IN(req, ipod_key, arg2);
++	memset(&ipod_key[arg2], 0, sizeof(ipod_key) - arg2);
++
++	return (error);
++}
++
++SYSCTL_PROC(_net_inet_icmp_ipod, OID_AUTO, key, CTLTYPE_STRING | CTLFLAG_RW,
++	NULL, 0, ipod_getkey, "A", "");
++
++#if defined(SMP)
++#include <sys/proc.h>
++#include <sys/sched.h>
++#endif
++
++static void
++icmp_pingofdeath(struct icmp *icp, struct ip *ip, int hlen)
++{
++	int doit = 0;
++
++	/*
++	 * If IPOD not enabled or wrong ICMP code, ignore.
++	 */
++	if (!ipod_enabled || icp->icmp_code != 6)
++		return;
++
++	/*
++	 * First check the source address info.
++	 * If host not set, ignore.
++	 */
++	if (ipod_host != 0xffffffff &&
++	    (ntohl(ip->ip_src.s_addr) & ipod_mask) == ipod_host) {
++		/*
++		 * Now check the key if enabled.
++		 * If packet doesn't contain enough data or key
++		 * is otherwise invalid, ignore.
++		 */
++		if (IPOD_CHECK_KEY) {
++			if (ip->ip_len >= strlen(ipod_key) &&
++			    IPOD_VALID_KEY(icp->icmp_data))
++				doit = 1;
++		} else {
++			doit = 1;
++		}
++	}
++
++	if (doit) {
++		ipod_enabled = 0;
++		printf("IPOD: reboot forced by %x...\n",
++		       ntohl(ip->ip_src.s_addr));
++#if defined(SMP)
++		/*
++		 * Bind us to CPU 0 so that all shutdown code runs there.  Some
++		 * systems don't shutdown properly (i.e., ACPI power off) if we
++		 * run on another processor.
++		 */
++		thread_lock(curthread);
++		sched_bind(curthread, 0);
++		thread_unlock(curthread);
++#endif
++		cpu_reset();
++	} else {
++		log(LOG_ERR, "IPOD: from %x rejected\n",
++		    ntohl(ip->ip_src.s_addr));
++	}
++}
++#endif

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # deletenode - a script for deleting a node from the database
@@ -60,7 +60,7 @@ my $result = DBQueryFatal("select role from nodes where node_id='$node'");
 if ($result->num_rows() != 1) {
     die "Node $node does not exist!\n";
 }
-my ($role) = $result->fetch_row();
+my ($role) = $result->fetchrow_array();
 if ($role ne "testnode") {
     die "Node $node is not a testnode!\n";
 }
@@ -90,7 +90,7 @@ my @subnodes;
 $result = DBQueryFatal("select node_id from nodes where ".
 		       "node_id!=phys_nodeid and phys_nodeid='$node' ".
 		       "and role='testnode'");
-while (my ($subnode) = $result->fetch_row()) {
+while (my ($subnode) = $result->fetchrow_array()) {
     push(@subnodes, $subnode);
 }
 if (@subnodes > 0) {

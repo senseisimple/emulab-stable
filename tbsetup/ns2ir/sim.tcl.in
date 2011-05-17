@@ -424,7 +424,20 @@ Simulator instproc run {} {
     var_import ::GLOBALS::optarray_order
     var_import ::GLOBALS::optarray_count
     var_import ::GLOBALS::dpdb
-    
+   
+#for oml begin
+    var_import ::TBCOMPAT::oml_use_control
+    if { $oml_use_control == 0 } {
+        set ::TBCOMPAT::nodelist [list]
+        foreach node [lsort [array names node_list]] {
+          lappend ::TBCOMPAT::nodelist $node
+        }
+        uplevel #0 { set omllan [$ns make-lan ${::TBCOMPAT::nodelist} 100Mb 0ms] }
+    }
+
+    begin_oml_code_generator
+#for oml end
+ 
     if {$ran == 1} {
 	perror "The Simulator 'run' statement can only be run once."
 	return
@@ -735,6 +748,41 @@ Simulator instproc run {} {
 	    set fields [list "role" "attrkey" "attrvalue" "ordering"]
 	    set values [split $attr ","]
 	    $self spitxml_data "elabinelab_attributes" $fields $values
+	}
+    }
+
+    if [info exists ::TBCOMPAT::tarfiles] {
+	foreach tarfile $::TBCOMPAT::tarfiles {
+	    set path [lindex $tarfile 1]
+	    set dest [lindex $tarfile 0]
+	    $self spitxml_data "experiment_blobs" [list "path" "action"] [list $path "unpack:$dest"]
+	}
+    }
+
+    if [info exists ::TBCOMPAT::virt_blobs] {
+	set fields [list "vblob_id" "filename"]
+	foreach vallist $::TBCOMPAT::virt_blobs {
+	    $self spitxml_data "virt_blobs" $fields $vallist
+	}
+    }
+
+    if [info exists ::TBCOMPAT::virt_service_ctls] {
+	set fields [list "vnode" "service_idx" "env" "whence" "alt_vblob_id" \
+			"enable" "enable_hooks" "fatal"]
+	foreach key [array names ::TBCOMPAT::virt_service_ctls] {
+	    $self spitxml_data "virt_client_service_ctl" \
+		$fields $::TBCOMPAT::virt_service_ctls($key)
+	}
+    }
+
+    if [info exists ::TBCOMPAT::virt_service_hooks] {
+	set fields [list "vnode" "service_idx" "env" "whence" "hook_vblob_id" \
+			"hook_op" "hook_point" "argv" "fatal"]
+	foreach key [array names ::TBCOMPAT::virt_service_hooks] {
+	    foreach vallist $::TBCOMPAT::virt_service_hooks($key) {
+		$self spitxml_data "virt_client_service_hooks" \
+		    $fields $vallist
+	    }
 	}
     }
 

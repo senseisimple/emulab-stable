@@ -44,8 +44,11 @@ sub GENI_PURGEFLAG()	{ return 1; }
 # there is an emulab user context, or many of the scripts we invoke
 # will complain and croak.
 #
-sub FlipToGeniUser()
+sub FlipToGeniUser(;$)
 {
+    my ($default_gid) = @_;
+    my $glist;
+    
     my $unix_uid = getpwnam("$user") or
 	die("*** $0:\n".
 	    "    No such user $user\n");
@@ -53,12 +56,27 @@ sub FlipToGeniUser()
 	die("*** $0:\n".
 	    "    No such group $group\n");
 
-    $GID            = $unix_gid;
-    $EGID           = "$unix_gid $unix_gid";
+    if (defined($default_gid) && $default_gid != $unix_gid) {
+	$glist = "$default_gid $default_gid $unix_gid";
+    }
+    else {
+	$default_gid = $unix_gid;
+	$glist = "$unix_gid $unix_gid";
+    }
+    $GID            = $default_gid;
+    $EGID           = $glist;
     $EUID = $UID    = $unix_uid;
     $ENV{'USER'}    = $user;
     $ENV{'LOGNAME'} = $user;
     return 0;
+}
+
+sub ResetGroups($)
+{
+    my ($default_gid) = @_;
+    
+    $EUID = 0;
+    return FlipToGeniUser($default_gid);
 }
 
 #
@@ -104,6 +122,7 @@ sub NewUUID()
 sub LookupNode($)
 {
     my ($nodeid) = @_;
+    require Node;
 
     if( GeniHRN::IsValid( $nodeid ) ) {
 	# Looks like a URN.
@@ -136,6 +155,25 @@ sub FindHostname($)
 	$prefix = $1;
     }
     return $nodeid . "." . $prefix;    
+}
+
+#
+# Run a command, being sure to capture all output. 
+#
+sub ExecQuiet($)
+{
+    #
+    # Use a pipe read, so that we save away the output
+    #
+    my ($command) = @_;
+    my $output    = "";
+    
+    open(PIPE,"$command 2>&1 |") or return -1;
+    while (<PIPE>) {
+	$output .= $_;
+    }
+    close(PIPE);
+    return $output;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

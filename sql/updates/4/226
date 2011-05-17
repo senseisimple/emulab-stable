@@ -1,0 +1,49 @@
+#
+# Create the frisbee_index table.  We used to do this on the fly in
+# frisbeelauncher, but that is overkill and I don't want to port that
+# logic forward to the frisbeelauncher replacement.
+#
+use Socket;
+use strict;
+use libdb;
+use EmulabConstants;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    my $result;
+
+    $result = DBQueryFatal("SELECT name FROM emulab_indicies ".
+			   "WHERE name='frisbee_index'");
+    if ($result->numrows != 0) {
+	return 0;
+    }
+
+    DBQueryFatal("LOCK TABLES emulab_indicies WRITE");
+
+    my $idx = 0;
+    if ($EmulabConstants::TBDB_FRISBEEMCBASEADDR =~ /^(\d+\.\d+\.\d+):\d+$/) {
+	my $BASEADDR = $1;
+	my $result = DBQueryFatal("SELECT idx FROM emulab_indicies ".
+				  "WHERE name='frisbee_mcastaddr'");
+	if ($result->numrows) {
+	    ($idx) = $result->fetchrow_array();
+	    my $orig = unpack("N", inet_aton("${BASEADDR}.1"));
+	    $idx -= $orig;
+	    # absolutely anal: we didn't use 2 of every 256 addresses
+	    my $tweak = int($idx / 256) * 2;
+	    $idx -= $tweak;
+	    if ($idx < 0 || $idx > 1000000) {
+		$idx = 0;
+	    }
+	}
+    }
+    $idx++;
+
+    DBQueryFatal("INSERT INTO emulab_indicies (name, idx) ".
+		 " VALUES ('frisbee_index', $idx)");
+
+    DBQueryFatal("UNLOCK TABLES");
+    return 0;
+}
+1;

@@ -13,12 +13,16 @@ use Exporter;
 use vars qw(@EXPORT $TOP_OBJDIR $TOP_SRCDIR
 	    $TBROOT $LOGDIR $MAINSITE $PGENISUPPORT $GMAKE $PKG_INFO
 	    $PORTSDIR $VARRUN $RCDIR $MYSQL $DBNAME
-	    $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION);
+	    $PROJROOT $PROTOUSER $WAP
+	    $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION
+	    $HAVE_XERCES);
 
 @EXPORT = qw($TOP_OBJDIR $TOP_SRCDIR
 	     $TBROOT $LOGDIR $MAINSITE $PGENISUPPORT $GMAKE $PKG_INFO
 	     $PORTSDIR $VARRUN $RCDIR $MYSQL $DBNAME
-	     $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION);
+	     $PROJROOT $PROTOUSER $WAP
+	     $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION
+	     $HAVE_XERCES);
 
 # Configure variables
 
@@ -29,12 +33,16 @@ $MAINSITE      = @TBMAINSITE@;
 $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 $GMAKE         = "/usr/local/bin/gmake";
 $PKG_INFO      = "/usr/sbin/pkg_info";
+$WAP           = "$TBROOT/sbin/withadminprivs";
 $PORTSDIR      = "/usr/ports";
 $VARRUN        = "/var/run";
 $RCDIR         = "/usr/local/etc/rc.d";
+$PROJROOT      = "@PROJROOT_DIR@";
+$PROTOUSER     = "elabman";
 
 $DBNAME        = "@TBDBNAME@";
 $MYSQL         = "/usr/local/bin/mysql";
+$HAVE_XERCES   = "@HAVE_XERCES@";
 
 # Change these if the major numbers in sql/updates or install/updates
 # are changed.
@@ -66,6 +74,7 @@ sub SET_TESTBED_VERSION($)  { $updatemode = $MAGIC_TESTBED_VERSION = $_[0]; }
 my $impotent   = 0;
 my $logfp;
 sub SET_IMPOTENT_MODE($)	    { $impotent = 1; $logfp = $_[0]; };
+sub IMPOTENT_MODE()		    { return $impotent; }
 
 #
 # Some programs we may call
@@ -79,6 +88,10 @@ my $FETCH = "/usr/bin/fetch";
 $TOP_OBJDIR = `/usr/bin/dirname $0`;
 chomp $TOP_OBJDIR;
 $TOP_OBJDIR = "$TOP_OBJDIR/..";
+
+# Real path to the source dir.
+$TOP_SRCDIR = `realpath $TOP_SRCDIR`;
+chomp $TOP_SRCDIR;
 
 #
 # Let's pretend perl's exception mechanism has a sane name for the function
@@ -148,6 +161,7 @@ sub Phase($$$) {
     #
     my $message = "";
     my $die = 0;
+    my $stop = 0;
     if ($hasSubPhase) {
 	print  "| " x ($depth -1) . "+-" . "--" x (24 - $depth) . "> ";
     }
@@ -176,6 +190,28 @@ sub Phase($$$) {
 		# Propagate failure up the tree
 		#
 		PhaseFail($libinstall::reason);
+	    }
+	    last SWITCH;
+	};
+
+	(/^stop$/) && do {
+	    print "[ Stopped    ]\n";
+	    print $logfp "[ Stopped ($libinstall::reason) ]\n"
+		if ($impotent && defined($logfp));
+	    $$parentNonSkipped++;
+	    $message = "$libinstall::reason";
+	    if ($impotent) {
+		$libinstall::phaseResults{$name} = "succeed";
+	    }
+	    else {
+		$libinstall::phaseResults{$name} = $_;
+		$stop = 1;
+		if ($isSubPhase) {
+		    #
+		    # Propagate failure up the tree
+		    #
+		    PhaseStop($libinstall::reason);
+		}
 	    }
 	    last SWITCH;
 	};
@@ -230,6 +266,18 @@ sub Phase($$$) {
     }
 
     #
+    # If we decided that we need to stop, do that now
+    #
+    if ($stop) {
+	print "\n";
+	print "############################################################\n";
+	print "Installation stopped in phase $name. The reason is:\n";
+	print "$message\n";
+	print "############################################################\n";
+	exit -1;
+    }
+
+    #
     # If we decided that we need to die, do that now
     #
     if ($die) {
@@ -266,6 +314,14 @@ sub PhaseSucceed(;$) {
 sub PhaseFail($) {
     ($libinstall::reason) = (@_);
     throw "fail";
+}
+
+#
+# Signal that the current phase needs to stop so the user can do something.
+#
+sub PhaseStop($) {
+    ($libinstall::reason) = (@_);
+    throw "stop";
 }
 
 #
@@ -379,7 +435,7 @@ sub DoneIfIdentical($$) {
 #
 sub DoneIfPackageInstalled($) {
     my ($pname) = @_;
-    my $foo = `$PKG_INFO -x $pname`;
+    my $foo = `$PKG_INFO -x $pname 2>&1`;
     if (! $?) {
 	PhaseSkip("already installed");
     }
@@ -559,7 +615,8 @@ sub ExecQuiet(@) {
 #
 sub ExecQuietFatal(@) {
     if (ExecQuiet(@_)) {
-	PhaseFail("Unable to execute: ");
+	my $msg = join(' ', @_);
+	PhaseFail("Unable to execute: '$msg'");
     }
 }
 

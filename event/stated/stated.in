@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -45,6 +45,9 @@ use Getopt::Std;
 use English;
 use POSIX;			# for strftime, and sigprocmask and friends
 use Fcntl;			# file constants for pidfile
+use POSIX ":sys_wait_h";
+use IO::Poll qw(POLLIN);
+use POSIX qw(:errno_h);
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
@@ -57,6 +60,14 @@ my %msgs = ();
 my $reload_time = 600;
 my $last_reload = time;
 
+# For startup and reload: maximum time in the past for which we will schedule
+# a timeout. Anything older is assumed to be ancient history and is ignored.
+# Note it is a negative value.
+my $maxpasttimeout = -(2 * 24 * 60 * 60);	# 2 days
+
+# Handling of SECVIOLATIONS, eventually controlled by a sitevar
+my $soft_secviolation = 1;
+
 # Command line opts.
 my $dbtag = "";
 my $debug = 0;
@@ -64,6 +75,7 @@ my $server = "localhost";
 my $port   = @BOSSEVENTPORT@;
 my $lockfile;
 my $pidfile;
+my $eventchild;
 
 # Process command-line arguments
 
@@ -140,6 +152,9 @@ my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 # Special PXEBOOT state machine that all local nodes use.
 my $PXEKERNEL	 = "PXEKERNEL";
 
+# Even special-er SECUREBOOT state machine that local nodes may use.
+my $SECUREBOOT	 = "SECUREBOOT";
+
 # Protos.
 sub debug(@);
 sub fatal($);
@@ -152,6 +167,8 @@ sub getTriggers();
 sub readStates(;@);
 sub handleCtrlEvent($$);
 sub reload();
+sub StartEvents();
+sub PollEvents($$);
     
 if (!$debug) {
     if ( $TB eq $REALTB ) {
@@ -194,29 +211,14 @@ if (defined($pidfile)) {
 # Change my $0 so that it is easier to see in a ps/top
 $0 = "$0";
 
-my $URL = "elvin://$server";
-if ($port) {
-    $URL .= ":$port";
+#
+# Start up the event system interface.
+#
+if (StartEvents() != 0) {
+    fatal("Error starting events");
 }
-
-# Connect to the event system, and subscribe the the events we want
-my $handle = event_register($URL,0);
-if (!$handle) {
-    fatal("Unable to register with event system\n");
-}
-
-my $tuple = address_tuple_alloc();
-if (!$tuple) {
-    fatal("Could not allocate an address tuple\n");
-}
-
-%$tuple = ( objtype => join(",",
-			    $TBNODESTATE, $TBNODEOPMODE,
-			    $TBCONTROL, $TBCOMMAND) );
-
-if (!event_subscribe($handle,\&handleEvent,$tuple)) {
-    fatal("Could not subscribe to events\n");
-}
+# We want to exit on any warning. 
+$SIG{__WARN__} = sub { print STDERR $_[0]; exit(-1); };
 
 # Read in the pre-existing node states, and timeout and valid transition
 # information from the database
@@ -230,6 +232,7 @@ if ($debug) { qshow(); }
 
 # Gets set if a reload of state from the database should happen.
 my $do_reload = 0;
+my $do_reopen = 0;
 my $sigrestart= 0;
 my $sigcleanup= 0;
 my $exiting   = 0;
@@ -238,7 +241,7 @@ my $exiting   = 0;
 # about what would happen if we tried to do this mid-loop. So, we'll
 # just set a flag and do it when we're done with our current pass.
 $SIG{HUP}  = sub { info("SIGHUP - Reloading DB state\n"); $do_reload = 1; };
-$SIG{USR2} = sub { info("SIGUSR2 - Reopening logfile\n"); ReOpenLog($LOGFILE); };
+$SIG{USR2} = sub { info("SIGUSR2 - Reopening logfile\n"); $do_reopen = 1; };
 
 # Set up other signals.
 $SIG{USR1} = \&restart_wrap;
@@ -262,7 +265,7 @@ sub process_event_queue() {
     my $lastcount=-1;
     my $wait;
     my $now = time();
-    debug("Polling - mq=$mailqueue bw=$blockwait\n");
+    debug("Polling at $now - mq=$mailqueue bw=$blockwait ndl=$nextdeadline\n");
     if ( $mailqueue == 0) {
 	# no messages waiting...
 	if ($blockwait) {
@@ -285,22 +288,22 @@ sub process_event_queue() {
     if ($wait < 0) { debug("Wait was $wait!\n"); $wait=0; }
     my $finish = $now + $wait;
     while (($event_count != $lastcount || $wait > 0) &&
-	   !($sigrestart || $sigcleanup || $do_reload)) {
+	   !($sigrestart || $sigcleanup || $do_reload || $do_reopen)) {
 	$lastcount = $event_count;
 	# Don't block if we got a signal!
-	if ($wait<=0 || $sigrestart || $sigcleanup || $do_reload) {
-	    event_poll($handle);
+	if ($wait<=0 || $sigrestart || $sigcleanup || $do_reload || $do_reload){
+	    PollEvents(0, 0);
 	} else {
 	    #debug("Using blocking event poll - $wait seconds\n");
 	    # timeout param is in milliseconds, so multiply
-	    event_poll_blocking($handle, $wait*1000);
+	    PollEvents(1, $wait*1000);
 	    $now = time();
 	    # subtract seconds elapsed from my wait time
 	    $wait = $finish - $now;
 	    #debug("Finished blocking event poll - $wait seconds remain\n");
 	    if ($event_count > 0 &&
 		(qsize() > 0 || $mailqueue ||
-		 $sigrestart || $sigcleanup || $do_reload)) {
+		 $sigrestart || $sigcleanup || $do_reload || $do_reopen)) {
 		$blockwait=0;
 		$wait=0;
 		#debug("Cancelling wait - timeouts/msgs waiting, or HUP'd\n");
@@ -325,7 +328,19 @@ while (1) {
 	while ($now >= $deadline && $node ne "") {
 	    qpop($deadline,$node);
 	    info("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
-	    handleCtrlEvent($node,$TBTIMEOUT);
+	    #
+	    # If the node is no longer in the nodes array, it was most
+	    # likely a dynamic virtual node which is now gone. Ignore.
+	    # Need to look at reload() to see if we can catch this earlier. 
+	    #
+	    if (exists($nodes{$node})) {
+		handleCtrlEvent($node,$TBTIMEOUT);
+	    }
+	    else {
+		info("POP: $node is no longer in the nodes array. Skipping\n");
+		delete($timeout_tag{$node})
+		    if (exists($timeout_tag{$node}));
+	    }
 	    if (0) { qshow(); }
 	    if (qhead($deadline,$node)) {
 		$deadline=0; $node="";
@@ -336,14 +351,14 @@ while (1) {
     }
     $nextdeadline = $deadline;
 
-    if (qsize()==0) {
-	$blockwait=1;
-	debug("---Blocking wait okay---\n");
-    }
-
     if ($do_reload || ($now - $last_reload > $reload_time)) {
 	reload();
 	$do_reload = 0;
+    }
+
+    if (qsize()==0) {
+	$blockwait=1;
+	debug("---Blocking wait okay---\n");
     }
 
     # Send any messages in the queue if it is time
@@ -351,7 +366,13 @@ while (1) {
 
     if ($sigrestart) { restart(); }
     if ($sigcleanup) { cleanup(); }
-
+    if ($do_reopen)  {
+	ReOpenLog($LOGFILE);
+	if (! kill('USR2', $eventchild)) {
+	    fatal("Could not signal(USR2) event reader child\n");
+	}
+	$do_reopen = 0;
+    }
     process_event_queue;
 }
 
@@ -360,6 +381,7 @@ exit(0);
 # Read the current states of nodes from the database
 sub readStates(;@) {
     my %oldnodes = @_;
+    my $now = time();
 
     # Guard against undefined variable warnings
     if (! %oldnodes) {
@@ -407,8 +429,14 @@ sub readStates(;@) {
 	    $nodes{$node_id}{timedout}       = 0;
 	    $nodes{$node_id}{noretry}        = 0;
 	    # Is there a timeout? If so, set it up!
-	    if ($dbtag eq $nodes{$node_id}{"tag"}) {
-		setTimeout($mode,$state,$node_id,$timestamp);
+	    if (defined($timestamp) && $dbtag eq $nodes{$node_id}{"tag"}) {
+		my $TO = $timestamp - $now;
+		if ($TO > $maxpasttimeout) {
+		    setTimeout($mode,$state,$node_id,$timestamp);
+		} else {
+		    debug("Ignoring ancient timeout $TO for ",
+			  "($node_id,$mode,$state)\n");
+		}
 	    }
 	}
     }
@@ -526,11 +554,7 @@ sub getTriggers() {
 # Gets called for every event that we recieve
 #
 sub handleEvent($$$) {
-    my ($handle,$notification,$data) = @_;
-    my $objtype = event_notification_get_objtype($handle,$notification);
-    my $objname = event_notification_get_objname($handle,$notification);
-    my $eventtype = event_notification_get_eventtype($handle,$notification);
-
+    my ($objtype,$objname,$eventtype) = @_;
     $event_count++;
 
     #
@@ -625,6 +649,34 @@ sub stateTransition($$) {
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
 	       "to $newstate\n");
+	#
+	# Machines in the secure boot path are not allowed to jump
+	# willy-nilly into unknown states.
+	#
+        if ($mode eq TBDB_NODEOPMODE_SECUREBOOT ||
+	    $mode eq TBDB_NODEOPMODE_SECURELOAD) {
+            $newstate = TBDB_NODESTATE_SECVIOLATION;
+            notify("Moving $node to $newstate because it's in $mode\n");
+        }
+    }
+    #
+    # Nodes that are in the SECVIOLATION state are not allowed to leave!
+    #
+    if ($oldstate eq TBDB_NODESTATE_SECVIOLATION &&
+	$newstate ne TBDB_NODESTATE_SECVIOLATION) {
+	#
+	# Allow transitions to SHUTDOWN.
+	# This allows someone to reboot a node in the SECVIOLATION state
+	# getting it back to MINIMAL/SHUTDOWN.
+	#
+	# XXX DEBUG ONLY!
+	# 
+	if ($soft_secviolation && $newstate eq TBDB_NODESTATE_SHUTDOWN) {
+	    notify("$node allowed to transition: SECVIOLATION => SHUTDOWN\n");
+	} else {
+	    notify("$node tried to leave SECVIOLATION (to $newstate)\n");
+	    $newstate = TBDB_NODESTATE_SECVIOLATION;
+	}
     }
 
     my $now = time();
@@ -718,6 +770,32 @@ sub stateTransition($$) {
 		}
 		next;
 	    };
+	    /^$SECUREBOOT$/ && do {
+		#
+		# Force machine into the SECUREBOOT/LOAD op_mode.
+		# Currently triggered by receipt of GPXEBOOTING state.
+		# This could come from any state as it just indicates that
+		# a machine with a gPXE dongle has rebooted.
+		#
+		# To differentiate BOOT from LOAD we check next_op_mode.
+		# It will be set to SECURELOAD when we need to go there,
+		# otherwise we force it to SECUREBOOT.
+		#
+		debug("Running $SECUREBOOT trigger\n");
+		my $query_result =
+		    DBQueryWarn("select next_op_mode from nodes ".
+				"where node_id='$node'");
+		my ($nextmode) = $query_result->fetchrow();
+		if (!$nextmode || $nextmode ne TBDB_NODEOPMODE_SECURELOAD) {
+		    $nextmode = TBDB_NODEOPMODE_SECUREBOOT;
+		}
+		if ($mode ne $nextmode) {
+		    info("$node: Forcing mode transition to $nextmode!\n");
+		    opModeTransition($node, $nextmode, 1);
+		    $mode=$nextmode;
+		}
+		next;
+	    };
 	    /^$BOOTING$/ && do {
 		#
 		# See if we are in the right mode/osid.
@@ -802,7 +880,13 @@ sub stateTransition($$) {
 		my $r = DBQueryWarn("select osid,def_boot_osid from nodes ".
 				    "where node_id='$node'");
 		my ($osid,$defosid) = $r->fetchrow();
-		if ($osid ne $defosid) {
+		if (! (defined($osid) && defined($defosid))) {
+		    info("$node: osid not defined\n")
+			if (!defined($osid));
+		    info("$node: def_boot_osid not defined\n")
+			if (!defined($defosid));
+		}
+		elsif ($osid ne $defosid) {
 		    handleCtrlEvent($node,$trig);
 		}
 		next;
@@ -819,10 +903,28 @@ sub stateTransition($$) {
 			      objname   => $node);
 		next;
 	    };
-	    (/^$TBPOWERCYCLE$/) && do {
-		handleCommand($node,$TBPOWERCYCLE);
+	    (/^$TBREBOOT$/ || /^$TBPOWERCYCLE$/ || /^$TBPOWEROFF$/) && do {
+		handleCommand($node,$trig);
 		next;
 	    };
+            (/^EMAILNOTIFY$/) && do {
+		my $msg = "$node entered state $mode/$newstate from " .
+		    "$mode/$oldstate";
+		my $dest = $REALTBOPS;
+		if ($newstate eq TBDB_NODESTATE_SECVIOLATION) {
+		    if ($soft_secviolation) {
+			$msg .= "\n\nNode $node was allowed to continue.\n";
+			$dest = $TBOPS;
+		    } else {
+			$msg .= "\n\nNode $node has been powered off.\n" .
+			        "You must address the cause of the violation ".
+				"and reset the eventstate before powering on.";
+		    }
+		}
+		SENDMAIL($dest, "STATED: $node entered state $newstate",
+			 $msg, "Stated Daemon <".$TBOPS.">");
+		next;
+            };
 	    /^RELOADOLDMFS$/ && do {
 		my $frisbee_osid = TBNodeDiskloadOSID($node);
 		my $frisbee_name = DBQuerySingleFatal("select osname from os_info where osid=$frisbee_osid");
@@ -1010,8 +1112,7 @@ sub handleCtrlEvent($$) {
 		}
 		my $cmd = "$nodereboot -r $optarg $node";
 		debug("$cmd\n");
-		system("date 2>&1 >> $rebootlog");
-		system("$cmd 2>&1 >> $rebootlog &") and
+		system("(date; $cmd) >>$rebootlog 2>&1 &") and
 		    notify("$PXEWAKEUP retry: ".
 			   "Command '$cmd' failed, error $?: $!\n");
 
@@ -1041,6 +1142,11 @@ sub handleCtrlEvent($$) {
 		/^$TBTIMEOUTNOTIFY/ && do {
 		    notify("Node $node has timed out in state $mode/$state\n");
 		    last; };
+                /^STATE:([-\w\/]+)$/ && do {
+                    my $newstate = $1;
+                    # Force the node into a new state
+                    stateTransition($node,$newstate);
+                    last; };
 		notify("$node: Unknown Timeout Action: $action\n");
 	    }
 	    next;
@@ -1084,6 +1190,7 @@ sub handleCommand($$;$$) {
 		    debug("Checking rebooting: $node, $nodes{$node}, ".
 			  "$nodes{$node}{state}, $nodes{$node}{noretry}\n");
 		    if (($nodes{$node}{state} ne TBDB_NODESTATE_ISUP) &&
+			($nodes{$node}{state} ne TBDB_NODESTATE_TBFAILED) &&
 			(!$nodes{$node}{noretry}) ) {
 			# This node shouldn't be rebooted now...
 			# XXX Send feedback here somehow!
@@ -1102,14 +1209,11 @@ sub handleCommand($$;$$) {
 	    info("Rebooting nodes: $nodelist\n");
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
-
 	    my $cmd = "$nodereboot -r $nodelist";
-	    my $redir = " 2>&1 >> $rebootlog &";
-	    debug("$cmd $redir\n");
-	    system("date $redir");
-	    system($cmd.$redir) and
-	      notify("$params/$command: ".
-		     "Command '$cmd' failed, error $?: $!\n");
+	    debug("$cmd\n");
+	    system("(date; $cmd) >>$rebootlog 2>&1 &") and
+		notify("$params/$command: ".
+		       "Command '$cmd' failed, error $?: $!\n");
 
 	    # Set up a timeout, so we retry if we don't get SHUTDOWN in time
 	    foreach $node (@nodes) {
@@ -1130,12 +1234,22 @@ sub handleCommand($$;$$) {
 			    $TBPOWERON    => "on",
 			    $TBPOWEROFF   => "off");
 	    my $func = $funcmap{$command};
+
+	    if ($soft_secviolation && $func eq "off" && @nodes > 0 &&
+		$nodes{$nodes[0]}{state} eq TBDB_NODESTATE_SECVIOLATION) {
+		info("soft SECVIOLATION: NOT powering off $params\n");
+		next;
+	    }
+
 	    info("Sending power $func for nodes: $nodelist\n");
+	    #
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
-
-	    my $cmd = "$power $func $nodelist &";
-	    debug("$cmd\n") and
+	    # We do invoke with -e to prevent power from sending a
+	    # further SHUTDOWN event.
+	    #
+	    my $cmd = "$power -e $func $nodelist &";
+	    debug("$cmd\n");
 	    system($cmd) and
 	      notify("$params/$command: ".
 		     "Command '$cmd' failed, error $?: $!\n");
@@ -1260,7 +1374,7 @@ sub CheckPortRegistration($) {
 
     my $exptidx;
     if (!TBExptIDX($pid, $eid, \$exptidx)) {
-	print "*** WARNING: No such experiment $pid/$eid!\n";
+	debug("*** WARNING: No such experiment $pid/$eid!\n");
 	return;
     }
 
@@ -1275,16 +1389,29 @@ sub CheckPortRegistration($) {
 		    "      sync_server='$vname'");
 
     if ($query_result && $query_result->num_rows) {
+	# exptidx+service is the primary key, must lookup based on that
 	$query_result =
-	    DBQueryWarn("select port from port_registration ".
-			"where pid='$pid' and eid='$eid' and ".
-			"      node_id='$node' and service='emulab_syncd'");
-	
-	if ($query_result && !$query_result->num_rows) {
-	    DBQueryWarn("insert into port_registration set ".
-			"     exptidx='$exptidx', pid='$pid', eid='$eid', ".
-			"     service='emulab_syncd', ".
-			"     node_id='$node', port='16534'");
+	    DBQueryWarn("select pid,eid,node_id from port_registration ".
+			"where exptidx='$exptidx' and service='emulab_syncd'");
+	if ($query_result) {
+	    if (!$query_result->num_rows) {
+		DBQueryWarn("insert into port_registration set ".
+			    "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
+			    "  service='emulab_syncd', ".
+			    "  node_id='$node', port='16534'");
+	    } else {
+		#
+		# XXX check for an existing entry that doesn't match us.
+		# Some could register as a syncserver from another node
+		# in the experiment.  If so, we just warn for now.
+		#
+		my ($p,$e,$n) = $query_result->fetchrow();
+		if ($p ne $pid || $e ne $eid || $n ne $node) {
+		    info("*** WARNING: portregister sync_server ".
+			 "inconsistancy: $p/$e/$n should be ".
+			 "$pid/$eid/$node\n");
+		}
+	    }
 	}
     }
 }
@@ -1568,9 +1695,6 @@ sub restart {
     $blockwait=0;
     process_event_queue;
     info("Restarting from '$prog".($params ne "" ? " $params" : "")."'\n");
-    if ($handle && event_unregister($handle) == 0) {
-	warn "Unable to unregister with event system\n";
-    }
     if (defined($lockfile) && $lockfile ne "") {
 	unlink $lockfile;
     }
@@ -1605,9 +1729,9 @@ END {
 	info("Recursive call to END block. Returning ...\n");
 	return;
     }
-    if (!defined($handle)) {
+    if (!defined($eventchild)) {
 	#
-	# No handle, nothing interesting happening. 
+	# No eventchild, nothing interesting happening. 
 	#
 	return;
     }
@@ -1624,13 +1748,10 @@ END {
 	info("Stated child exiting\n");
     }
     debug("Announced. Cleaning up...\n");
-    if ($handle) {
-	debug("Unregistering w/event system...\n");
-	if (event_unregister($handle) == 0) {
-	    info("Unable to unregister with event system\n");
-	}
-	else {
-	    debug("Unregistered.\n");
+    if ($eventchild) {
+	debug("Killing event reader child ...\n");
+	if (! kill('TERM', $eventchild)) {
+	    info("Could not kill event reader child\n");
 	}
     }
     debug("Cleaned up. Bye!\n");
@@ -1638,3 +1759,175 @@ END {
     $? = $stat;
 }
 
+#
+# Start up a child to talk to the event system. 
+#
+my $childpipe;
+my $eventpoll;
+
+sub StartEvents()
+{
+    my $URL = "elvin://$server";
+    if ($port) {
+	$URL .= ":$port";
+    }
+    local *PIPE;
+
+    $eventchild = open(PIPE, "-|");
+    if (!defined($eventchild)) {
+	fatal("could not fork event child");
+    }
+    if ($eventchild) {
+	#
+	# Hang out a bit, to make sure the child gets started okay.
+	#
+	sleep(2);
+	my $foo = waitpid($eventchild, &WNOHANG);
+	if ($foo) {
+	    my $status = $?;
+	
+	    fatal("Failed to start event child: $foo $status!\n");
+	}
+	if (0) {
+	    fcntl(PIPE, F_SETFL, O_NONBLOCK)
+		or fatal("cannot set event descriptor to non blocking: $!");
+	}
+	# Save the handle to read from later.
+	$childpipe = *PIPE;
+
+	$eventpoll = new IO::Poll;
+	$eventpoll->mask($childpipe => POLLIN);
+	return 0;
+    }
+
+    # Connect to the event system, and subscribe the the events we want
+    my $handle = event_register($URL,0);
+    if (!$handle) {
+	fatal("Unable to register with event system\n");
+    }
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) {
+	fatal("Could not allocate an address tuple\n");
+    }
+    %$tuple = ( objtype => join(",",
+				$TBNODESTATE, $TBNODEOPMODE,
+				$TBCONTROL, $TBCOMMAND) );
+
+    if (!event_subscribe($handle, \&StubHandleEvent, $tuple)) {
+	fatal("Could not subscribe to events\n");
+    }
+
+    # We want to exit on any warning. Let the caller notice.
+    $SIG{__WARN__} = sub { print STDERR $_[0]; exit(-1); };
+
+    # Make sure this child starts writing into the new logfile.
+    $SIG{USR2} = sub {
+	print STDERR "Caught a USR2 in child\n";
+	# Only STDERR can be redirected to the newfile. STDOUT is writing
+	# to the parent process.
+	close(STDERR);
+	open(STDERR, ">> $LOGFILE") or fatal("reopening $LOGFILE: $!");	
+	select STDERR;
+	$OUTPUT_AUTOFLUSH = 1;
+	# restore default output.
+	select STDOUT;
+	print STDERR "Opened new logfile in child\n";
+    };
+
+    #
+    # Just read events and print them to stdout. Parent gets them.
+    #
+    while (1) {
+	event_poll_blocking($handle, 5000);
+    }
+}
+
+sub StubHandleEvent($$$) {
+    my ($handle,$notification,$data) = @_;
+
+    my $objtype   = event_notification_get_objtype($handle,$notification);
+    my $objname   = event_notification_get_objname($handle,$notification);
+    my $eventtype = event_notification_get_eventtype($handle,$notification);
+
+    #
+    # Print the stuff we care about to stdout for the parent to pick up.
+    #
+    print "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
+    if (1) {
+	print STDERR
+	    "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
+    }
+    return 0;
+}
+
+sub PollEvents($$)
+{
+    my ($blocking, $timeout) = @_;
+    my $pollval;
+
+    #
+    # Always check for a dead child.
+    #
+    my $foo = waitpid($eventchild, &WNOHANG);
+    if ($foo) {
+	my $status = $?;
+	
+	fatal("Event reader exited prematurely: $foo $status!\n");
+    }
+    if ($blocking) {
+	$timeout = undef
+	    if (!$timeout);
+	
+	$pollval = $eventpoll->poll($timeout);
+    }
+    else {
+	$pollval = $eventpoll->poll(0);
+    }
+    if ($pollval > 0) {
+	my $buf;
+	my $lastline = "";
+	
+	while (sysread($childpipe, $buf, 8192)) {
+	    #
+	    # It is possible that we will get multiple lines of output
+	    # in one read, so we split the input and loop over that.
+	    # It is also possible that we will read a partial line at
+	    # the end. We make a less-than heroic attempt to catch these
+	    # by remembering any unrecognized line that starts with "O"
+	    # and prepending that to the next set of lines read.
+	    #
+	    my @foo = split(/^/m, $buf);
+	    if ($lastline ne "") {
+		$foo[0] = $lastline . $foo[0];
+		debug("reconstruct split line: '" . $foo[0] . "'\n");
+		$lastline = "";
+	    }
+	    foreach my $line (@foo) {
+		if ($line =~
+		    /^OBJTYPE='([^\']*)', OBJNAME='([^\']*)', EVENTTYPE='([^\']*)'$/) {
+		    handleEvent($1, $2, $3);
+		}
+		elsif ($lastline eq "" && $line =~ /^O/) {
+		    # probably an incomplete read
+		    debug("remembering possible split line: '$line'\n");
+		    $lastline = $line;
+		}
+		else {
+		    fatal("unrecognizable line '$line' from event reader");
+		}
+	    }
+	    #
+	    # If there is still more immediately available, loop back
+	    # and read again. Otherwise stop.
+	    #
+	    if ($eventpoll->poll(0) <= 0) {
+		last;
+	    }
+	}
+    }
+    elsif ($pollval < 0) {
+	fatal("Error in nonblocking poll: $!\n")
+	    if ($! != EINTR);
+    }
+    return undef;
+}

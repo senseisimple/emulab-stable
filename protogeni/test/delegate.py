@@ -16,6 +16,7 @@
 import datetime
 import getopt
 import os
+import random
 import re
 import sys
 import tempfile
@@ -122,14 +123,14 @@ def SimpleNode( d, elem, body ):
     n.appendChild( d.createTextNode( body ) );
     return n;
 
-mycredential = get_self_credential()
-
+mycredential = None
 slice_urn = None
 slice_uuid = None
 
 if is_urn( args[ 0 ] ): slice_urn = args[ 0 ]
 elif is_uuid( args[ 0 ] ): slice_uuid = args[ 0 ]
 elif is_hrn( args[ 0 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "Slice", 
@@ -139,6 +140,7 @@ elif is_hrn( args[ 0 ] ):
 
 if slice_urn:
     # we were given a URN, and can request credentials from the SA
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "GetCredential", 
                                 dict( credential = mycredential, 
                                       type = "Slice", 
@@ -150,6 +152,7 @@ if slice_urn:
 elif slice_uuid:
     # we were given a UUID, or a slice HRN which resolved to one: use
     # that UUID to request credentials from the SA (deprecated)
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "GetCredential", 
                                 dict( credential = mycredential, 
                                       type = "Slice", 
@@ -166,6 +169,7 @@ else:
 delegate = None
 
 if is_urn( args[ 1 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "User", 
@@ -173,6 +177,7 @@ if is_urn( args[ 1 ] ):
     if not rval and "value" in response and "gid" in response[ "value" ]:
         delegate = response[ "value" ][ "gid" ]
 if is_uuid( args[ 1 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "User", 
@@ -180,6 +185,7 @@ if is_uuid( args[ 1 ] ):
     if not rval and "value" in response and "gid" in response[ "value" ]:
         delegate = response[ "value" ][ "gid" ]
 elif is_hrn( args[ 1 ] ):
+    if not mycredential: mycredential = get_self_credential()
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
                                       type = "User", 
@@ -200,11 +206,14 @@ old = Lookup( doc.documentElement, "credential" )
 
 c = doc.createElement( "credential" )
 
-id = 1
-while filter( lambda x: x.getAttribute( "xml:id" ) == "ref" + str( id ),
-              doc.getElementsByTagName( "credential" ) ):    
-    id = id + 1
-c.setAttribute( "xml:id", "ref" + str( id ) )
+# I really want do loops in Python...
+while True:
+    id = "ref" + '%016X' % random.getrandbits( 64 )
+    if not filter( lambda x: x.getAttribute( "xml:id" ) == "ref" + str( id ),
+                   doc.getElementsByTagName( "credential" ) ):
+        break
+
+c.setAttribute( "xml:id", str( id ) )
 c.appendChild( Lookup( old, "type" ).cloneNode( True ) )
 
 c.appendChild( SimpleNode( doc, "serial", "1" ) )
@@ -258,7 +267,7 @@ p.appendChild( old )
 c.appendChild( p )
 
 signature = doc.createElement( "Signature" );
-signature.setAttribute( "xml:id", "Sig_ref" + str( id ) )
+signature.setAttribute( "xml:id", "Sig_" + str( id ) )
 signature.setAttribute( "xmlns", "http://www.w3.org/2000/09/xmldsig#" )
 Lookup( doc.documentElement, "signatures" ).appendChild( signature )
 signedinfo = doc.createElement( "SignedInfo" )
@@ -272,7 +281,7 @@ sigmeth.setAttribute( "Algorithm",
                       "http://www.w3.org/2000/09/xmldsig#rsa-sha1" )
 signedinfo.appendChild( sigmeth )
 reference = doc.createElement( "Reference" );
-reference.setAttribute( "URI", "#ref" + str( id ) )
+reference.setAttribute( "URI", "#" + str( id ) )
 signedinfo.appendChild( reference )
 transforms = doc.createElement( "Transforms" )
 reference.appendChild( transforms )
@@ -309,8 +318,8 @@ doc.writexml( tmpfile )
 tmpfile.flush()
 
 ret = os.spawnlp( os.P_WAIT, XMLSEC1, XMLSEC1, "--sign", "--node-id",
-                  "Sig_ref" + str( id ), "--privkey-pem",
-                  CERTIFICATE + "," + CERTIFICATE, tmpfile.name )
+                  "Sig_" + str( id ), "--privkey-pem",
+                  CERTIFICATE, tmpfile.name )
 if ret == 127:
     print >> sys.stderr, XMLSEC1 + ": invocation error\n"
 

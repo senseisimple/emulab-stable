@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -203,7 +203,8 @@ my %packlist =
      "p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay",
      "p5-Crypt-OpenSSL-X509" => "/usr/ports/security/p5-Crypt-OpenSSL-X509",
      "p5-Crypt-X509"         => "/usr/ports/security/p5-Crypt-X509",
-     "xerces-c2>=2.7.0"      => "/usr/ports/textproc/xerces-c2"
+     "xerces-c2>=2.7.0"      => "/usr/ports/textproc/xerces-c2",
+     "p5-XML-SemanticDiff"   => "/usr/ports/textproc/p5-XML-SemanticDiff",
      );
 my $needpkgs = 0;
 
@@ -594,6 +595,14 @@ system("$ADDAUTHORITY $CMCERT cm") == 0
     or fatal("Could not add CM certificate");
 system("$ADDAUTHORITY $SESCERT ses") == 0
     or fatal("Could not add SES certificate");
+
+#
+# Add certs to the local CM database.
+#
+system("$ADDAUTHORITY -a $SACERT sa") == 0
+    or fatal("Could not add SA certificate to CM DB");
+system("$ADDAUTHORITY -a $CMCERT cm") == 0
+    or fatal("Could not add CM certificate to CM DB");
 
 #
 # Register our certs at the clearinghouse.

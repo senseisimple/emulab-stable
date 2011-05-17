@@ -49,6 +49,7 @@ require GeniCertificate;
 require GeniAuthority;
 require GeniSlice;
 require GeniUser;
+require GeniComponent;
 
 my $authority = GeniAuthority->Lookup($uuid);
 if (!defined($authority)) {
@@ -69,6 +70,9 @@ elsif ($authority->type() eq "sa") {
     GeniCertificate->DeleteCRL($authority);
 }
 elsif ($authority->type() eq "ses") {
+    # Nothing to do.
+}
+elsif ($authority->type() eq "am") {
     # Nothing to do.
 }
 else {

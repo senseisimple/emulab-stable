@@ -17,7 +17,7 @@ SUBDIRS		= nsgen
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
                   setdest loghole webcopy linkmon_ctl snmp-if-deref.sh \
 		  template_record spewevents \
-		  wbts_dump
+		  wbts_dump mkblob rmblob
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog daemon_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
@@ -25,7 +25,8 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  spewconlog opsdb_control newnode suchown archive_list \
                   wanodecheckin wanodecreate spewimage \
                   anonsendmail epmodeset fixexpinfo node_traffic \
-		  dumpdescriptor subboss_tftpboot_sync testbed-control
+		  dumpdescriptor subboss_tftpboot_sync testbed-control \
+		  archive-expinfo grantfeature emulabfeature addblob readblob
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
                   webwanodecheckin webspewimage
@@ -39,7 +40,7 @@ CTRLSBIN_SCRIPTS= opsdb_control.proxy daemon_wrapper
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
 SETUID_SBIN_SCRIPTS  = grabwebcams checkquota spewconlog opsdb_control suchown \
-                       anonsendmail
+                       anonsendmail readblob
 SETUID_LIBX_SCRIPTS  = xlogin
 
 #

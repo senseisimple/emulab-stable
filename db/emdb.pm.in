@@ -1,13 +1,14 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package emdb;
 use strict;
 use File::Basename;
 use English;
+use Carp;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
@@ -41,6 +42,8 @@ sub TBDBConnect($)	{ return emdbi::TBDBConnect($_[0], $DBNAME); }
 sub TBDBReconnect($)    { return emdbi::TBDBReconnect($_[0]); }
 sub TBDBDisconnect()    { return emdbi::TBDBDisconnect(); }
 sub NewTBDBHandle()     { return emdbi::NewTBDBHandle($DBNAME); }
+sub DBHandle()		{ return emdbi::DBHandleN(0); }
+sub DBHandleN($)	{ return emdbi::DBHandleN($_[0]); }
 sub DBQueryN($$)	{ return emdbi::DBQueryN($_[0], $_[1]); }
 sub DBQuery($)		{ return emdbi::DBQuery($_[0]); }
 sub DBQueryFatalN($$)   { return emdbi::DBQueryFatalN($_[0], $_[1]); }
@@ -66,7 +69,8 @@ sub DBError($$;$)
     if (! defined($nomail)) {
 	libtestbed::SENDMAIL($TBOPS, "DBError - $message",
 			     "$message - In $SCRIPTNAME\n".
-			     "$emdbi::DBErrorString\n");
+			     "$emdbi::DBErrorString\n" .
+			     Carp::longmess() . "\n");
     }
 
     $f->({cause=>'software'}, "$message:\n$emdbi::DBErrorString");

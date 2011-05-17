@@ -139,6 +139,35 @@ namespace eval TBCOMPAT {
     variable EINEVALUE {^([-\w\.\+\,\s\/]+)$}
     variable EINEORDER {^\d+$}
 
+    # virt blobs stuff
+    variable vblob_id_count 0
+    variable virt_blobs {}
+    variable vblobmap
+    array set vblobmap {}
+
+    # client service/hook control stuff
+    variable servicenames
+    array set servicenames {}
+    variable servicepoints
+    array set servicepoints {}
+    variable virt_service_ctls
+    array set virt_service_ctls {}
+    variable virt_service_hooks
+    array set virt_service_hooks {}
+
+    # OML measurement stuff.
+    set oml_mps {}
+
+    # OML-server listening port.
+    set oml_server_port 8000
+
+    # OML-server node.
+    set omlserver omlserver
+
+    # flag to identify which network is used to send measurement data
+    # by default, use control network.
+    set oml_use_control 1
+
     # Mapping of "resource classes" and "reservation types" to bootstrap
     # values, where a resource class is a symbolic string provided by the user
     # (e.g. Client, Server), and a reservation type is a resource name provided
@@ -348,6 +377,179 @@ proc tb-set-netmask {lanlink netmask} {
     $lanlink set netmask $netmask
 }
 
+proc tb-set-node-service {service args} {
+    var_import ::TBCOMPAT::servicenames
+    var_import ::TBCOMPAT::servicepoints
+    var_import ::TBCOMPAT::virt_service_ctls
+    var_import ::TBCOMPAT::vblob_id_count
+    var_import ::TBCOMPAT::virt_blobs
+    var_import ::TBCOMPAT::vblobmap
+
+    set cmd "tb-set-node-service"
+
+    # these defaults should match the default value for each DB field
+    # in virt_client_service* tables
+    ::GLOBALS::named-args $args {
+	-node "" -env "boot" -whence "every" -script "" -scriptblob ""
+	-enable 1 -enablehooks 1 -fatal 1
+    }
+
+    if { $(-script) != "" && $(-scriptblob) != "" } {
+	perror "\[$cmd] you cannot define both a script ($(-script)) and a scriptblob ($(-scriptblob))!"
+	return
+    }
+
+    if {![info exists servicenames("$service:$(-env):$(-whence)")]} {
+	if {[info exists servicepoints($service)]} {
+	    perror "\[$cmd] service $service can only be controlled for the following whence and env tuples: $servicepoints($service); $service:$(-env):$(-whence)."
+	    return
+	}
+	perror "\[$cmd] Invalid service $service."
+	return
+    }
+
+    set mykey "$(-node):$service:$(-env):$(-whence)"
+    if {[info exists virt_service_ctls($mykey)]} {
+	perror "\[$cmd] service $service has already been controlled once for node $(-node) at $(-whence):$(-env)"
+	return
+    } else {
+	set vblobid $(-scriptblob)
+	if { $(-script) != "" && [info exists vblobmap($(-script))]} {
+	    # try to reuse virt blobs that already have been created
+	    set vblobid $vblobmap($(-script))
+	} elseif { $(-script) != "" } {
+	    # if we need to make a virt blob, do so now
+
+	    # Check the script to make sure it exists, is readable, etc...
+	    if {[string match "*://*" $(-script)]} {
+		perror "\[$cmd] '$(-script)' cannot be a URL!"
+		return
+		# It is a URL, check for a valid protocol.
+		#if {![::TBCOMPAT::verify-url $(-script)]} {
+		#    perror "\[$cmd] '$(-script)' is not an http, https, or ftp URL."
+		#    return
+		#}
+	    } elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $(-script)] &&
+		      ![string match "${::TBCOMPAT::GROUPROOT}/*" $(-script)] &&
+		      ![string match "${::TBCOMPAT::USERROOT}/*" $(-script)] &&
+		      (${::TBCOMPAT::SCRATCHROOT} == "" ||
+		       ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $(-script)])} {
+		perror "\[$cmd] '$(-script)' is not in an allowed directory"
+		return
+	    } elseif {![file exists $(-script)]} {
+		perror "\[$cmd] '$(-script)' does not exist."
+		return
+	    } elseif {![file isfile $(-script)]} {
+		perror "\[$cmd] '$(-script)' is not a file."
+		return
+	    } elseif {![file readable $(-script)]} {
+		perror "\[$cmd] '$(-script)' is not readable."
+		return
+	    }
+
+	    # finally, make the virt blob!
+	    lappend virt_blobs [list $vblob_id_count $(-script)]
+	    set vblobid $vblob_id_count
+	    set vblobmap($(-script)) $vblob_id_count
+
+	    incr vblob_id_count
+	}
+
+	set serviceidx $servicenames("$service:$(-env):$(-whence)")
+	set virt_service_ctls($mykey) \
+	    [list $(-node) $serviceidx $(-env) $(-whence) \
+		 $vblobid $(-enable) $(-enablehooks) $(-fatal)]
+    }
+}
+
+proc tb-add-node-service-hook {service args} {
+    var_import ::TBCOMPAT::servicenames
+    var_import ::TBCOMPAT::servicepoints
+    var_import ::TBCOMPAT::virt_service_hooks
+    var_import ::TBCOMPAT::vblob_id_count
+    var_import ::TBCOMPAT::virt_blobs
+    var_import ::TBCOMPAT::vblobmap
+
+    set cmd "tb-add-node-service-hook"
+
+    # these defaults should match the default value for each DB field
+    # in virt_client_service* tables
+    ::GLOBALS::named-args $args {
+	-node "" -env "boot" -whence "every" -script "" -scriptblob ""
+	-op "boot" -point "post" -argv "" -fatal 1
+    }
+
+    if { $(-script) != "" && $(-scriptblob) != "" } {
+	perror "\[$cmd] you cannot define both a script ($(-script)) and a scriptblob ($(-scriptblob))!"
+	return
+    } elseif { $(-script) == "" && $(-scriptblob) == "" } {
+	perror "\[$cmd] you must define either a script or a scriptblob!"
+	return
+    }
+
+    if {![info exists servicenames("$service:$(-env):$(-whence)")]} {
+	if {[info exists servicepoints($service)]} {
+	    perror "\[$cmd] service $service can only be controlled for the following whence and env tuples: $servicepoints($service); $service:$(-env):$(-whence)."
+	    return
+	}
+	perror "\[$cmd] Invalid service $service."
+	return
+    }
+
+    set mykey "$(-node):$service:$(-env):$(-whence)"
+    if {![info exists virt_service_ctls($mykey)]} {
+	set virt_service_ctls($mykey) {}
+    }
+
+    set vblobid $(-scriptblob)
+    if { $(-script) != "" && [info exists vblobmap($(-script))]} {
+	# try to reuse virt blobs that already have been created
+	set vblobid $vblobmap($(-script))
+    } elseif { $(-script) != "" } {
+	# if we need to make a virt blob, do so now
+
+	# Check the script to make sure it exists, is readable, etc...
+	if {[string match "*://*" $(-script)]} {
+	    perror "\[$cmd] '$(-script)' cannot be a URL!"
+	    return
+	    # It is a URL, check for a valid protocol.
+	    #if {![::TBCOMPAT::verify-url $(-script)]} {
+	    #    perror "\[$cmd] '$(-script)' is not an http, https, or ftp URL."
+	    #    return
+	    #}
+	} elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $(-script)] &&
+		  ![string match "${::TBCOMPAT::GROUPROOT}/*" $(-script)] &&
+		  ![string match "${::TBCOMPAT::USERROOT}/*" $(-script)] &&
+		  (${::TBCOMPAT::SCRATCHROOT} == "" ||
+		   ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $(-script)])} {
+	    perror "\[$cmd] '$(-script)' is not in an allowed directory"
+	    return
+	} elseif {![file exists $(-script)]} {
+	    perror "\[$cmd] '$(-script)' does not exist."
+	    return
+	} elseif {![file isfile $(-script)]} {
+	    perror "\[$cmd] '$(-script)' is not a file."
+	    return
+	} elseif {![file readable $(-script)]} {
+	    perror "\[$cmd] '$(-script)' is not readable."
+	    return
+	}
+
+	# finally, make the virt blob!
+	lappend virt_blobs [list $vblob_id_count $(-script)]
+	set vblobid $vblob_id_count
+	set vblobmap($(-script)) $vblob_id_count
+
+	incr vblob_id_count
+    }
+
+    # finally, add the hook!
+    set serviceidx $servicenames("$service:$(-env):$(-whence)")
+    lappend virt_service_hooks($mykey) \
+	[list $(-node) $serviceidx $(-env) $(-whence) \
+	     $vblobid $(-op) $(-point) $(-argv) $(-fatal)]
+}
+
 # Node state routines.
 proc tb-set-hardware {node type args} {
     var_import ::TBCOMPAT::hwtypes
@@ -429,17 +631,18 @@ proc tb-set-node-rpms {node args} {
 proc tb-set-node-startup {node cmd} {
     $node set startup $cmd
 }
-proc tb-set-node-tarfiles {node args} {
-    if {$args == {}} {
-	perror "\[tb-set-node-tarfiles] tb-set-node-tarfiles <node> (<dir> <tar>)+"
-	return
-    }
+proc tb-proc-tarfiles {cmd args0} { ; # args has special meaning that we
+				      # don't want here
+    set SHAREDNFS [expr {! "@NOSHAREDFS@"}]
+    set args $args0
+
     # Lets assume that a single argument is a string and break it up.
     if {[llength $args] == 1} {
 	set args [split [lindex $args 0] " "]
     }
+
     if {[expr [llength $args] % 2] != 0} {
-	perror "\[tb-set-node-tarfiles] Arguments should be node and series of pairs."
+	perror "\[$cmd] Arguments should be node and series of pairs."
 	return
     }
     set tarfiles {}
@@ -458,16 +661,17 @@ proc tb-set-node-tarfiles {node args} {
 	# XXX This is a hack check because they can specify '/' and have
 	# "proj/foo/..." in the tarball and still clobber themselves.
 	#
-	if {[string match "${::TBCOMPAT::PROJROOT}/*" $dir] ||
-	    [string match "${::TBCOMPAT::GROUPROOT}/*" $dir] ||
-	    [string match "${::TBCOMPAT::USERROOT}/*" $dir] ||
-	    [string match "${::TBCOMPAT::SHAREROOT}/*" $dir] ||
-	    (${::TBCOMPAT::SCRATCHROOT} != "" &&
-	     [string match "${::TBCOMPAT::SCRATCHROOT}/*" $dir])} {
-	    perror "\[tb-set-node-tarfiles] '$dir' refers to an NFS directory instead of the node's local disk."
+	if {$SHAREDNFS && 
+	    ([string match "${::TBCOMPAT::PROJROOT}/*" $dir] ||
+	     [string match "${::TBCOMPAT::GROUPROOT}/*" $dir] ||
+	     [string match "${::TBCOMPAT::USERROOT}/*" $dir] ||
+	     [string match "${::TBCOMPAT::SHAREROOT}/*" $dir] ||
+	     (${::TBCOMPAT::SCRATCHROOT} != "" &&
+	      [string match "${::TBCOMPAT::SCRATCHROOT}/*" $dir]))} {
+	    perror "\[$cmd] '$dir' refers to an NFS directory instead of the node's local disk."
 	    return
 	} elseif {![string match "/*" $dir]} {
-	    perror "\[tb-set-node-tarfiles] '$dir' is not an absolute path."
+	    perror "\[$cmd] '$dir' is not an absolute path."
 	    return
 	}
 
@@ -480,23 +684,24 @@ proc tb-set-node-tarfiles {node args} {
 	if {[string match "*://*" $tarfile]} {
 	    # It is a URL, check for a valid protocol.
 	    if {![::TBCOMPAT::verify-url $tarfile]} {
-		perror "\[tb-set-node-tarfiles] '$tarfile' is not an http, https, or ftp URL."
+		perror "\[$cmd] '$tarfile' is not an http, https, or ftp URL."
 		return
 	    }
 	} elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $tarfile] &&
 	          ![string match "${::TBCOMPAT::GROUPROOT}/*" $tarfile] &&
+	          ![string match "${::TBCOMPAT::USERROOT}/*" $tarfile] &&
 	          (${::TBCOMPAT::SCRATCHROOT} == "" ||
 	           ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $tarfile])} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not in an allowed directory"
+	    perror "\[$cmd] '$tarfile' is not in an allowed directory"
 	    return
 	} elseif {![file exists $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' does not exist."
+	    perror "\[$cmd] '$tarfile' does not exist."
 	    return
 	} elseif {![file isfile $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not a file."
+	    perror "\[$cmd] '$tarfile' is not a file."
 	    return
 	} elseif {![file readable $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not readable."
+	    perror "\[$cmd] '$tarfile' is not readable."
 	    return
 	}
 
@@ -506,13 +711,36 @@ proc tb-set-node-tarfiles {node args} {
 	    ![string match "*.tar.gz" $tarfile] &&
 	    ![string match "*.tgz" $tarfile] &&
 	    ![string match "*.tar.bz2" $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' does not have a valid extension (e.g. *.tar, *.tar.Z, *.tar.gz, *.tgz)."
+	    perror "\[$cmd] '$tarfile' does not have a valid extension (e.g. *.tar, *.tar.Z, *.tar.gz, *.tgz)."
 	    return
 	}
-	lappend tarfiles "$dir $tarfile"
+	lappend tarfiles [list $dir $tarfile]
 	set args [lrange $args 2 end]
     }
+    return $tarfiles
+}
+proc tb-set-node-tarfiles {node args} {
+    if {$args == {}} {
+	perror "\[tb-set-node-tarfiles] tb-set-node-tarfiles <node> (<dir> <tar>)+"
+	return
+    }
+    set tarfiles {}
+    foreach el [tb-proc-tarfiles "tb-set-node-tarfiles" $args] {
+	lappend tarfiles [join $el " "]
+    }
     $node set tarfiles [join $tarfiles ";"]
+}
+proc tb-set-tarfiles {args} {
+    if {$args == {}} {
+	perror "\[tb-set-tarfiles] tb-set-tarfiles (<dir> <tar>)+"
+	return
+    }
+    set tarfiles [tb-proc-tarfiles "tb-set-tarfiles" $args]
+    if [info exists ::TBCOMPAT::tarfiles] {
+	set ::TBCOMPAT::tarfiles [concat $::TBCOMPAT::tarfiles $tarfiles]
+    } else {
+	set ::TBCOMPAT::tarfiles $tarfiles
+    }
 }
 proc tb-set-ip-routing {type} {
     var_import ::GLOBALS::default_ip_routing_type
@@ -569,8 +797,8 @@ proc tb-set-link-loss {srclink args} {
 }
 
 # This takes two possible formats:
-# tb-set-link-est-bandwidth <link> <loss>
-# tb-set-link-est-bandwidth <src> <dst> <loss>
+# tb-set-link-est-bandwidth <link> <bandwidth>
+# tb-set-link-est-bandwidth <src> <dst> <bandwidth>
 proc tb-set-link-est-bandwidth {srclink args} {
     if {[llength $args] == 2} {
 	set dst [lindex $args 0]
@@ -811,6 +1039,18 @@ proc tb-set-node-failure-action {node type} {
 	return
     }
     $node set failureaction $type
+}
+
+proc tb-set-link-failure-action {lanlink type} {
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+	perror "\[tb-set-link-failure-action] $lanlink is not a link or a lan."
+	return
+    }
+    if {[lsearch -exact {fatal nonfatal} $type] == -1} {
+	perror "\[tb-set-link-failure-action] must be one of fatal|nonfatal"
+	return
+    }
+    $lanlink set failureaction $type
 }
 
 proc tb-fix-node {vnode pnode} {
@@ -1964,11 +2204,262 @@ proc tb-set-link-layer {link mylayer} {
 	perror "\[tb-set-link-layer] $link is not a link."
 	return
     }
-    if {$mylayer != 1} {
-	perror "\[tb-set-link-layer] Only layer 1 is allowed."
-	return
-    }
     $link instvar layer
     $link set layer $mylayer
+}
+
+# The following codes are written, in order to use OML to send data to a server
+# in an Emulab experiment. It will define a node to run OML server and create
+# two files (MP.c and MP.h) for users. (mp represents measurement point in
+# context of OML.)
+
+# This procedure is to define a node to run omlserver.
+# It will allocate an additional machine from Emulab and configure it
+# (OS and set a start-command to start a oml2-server process).
+# The name for this server will always be omlserver.
+proc tb-set-use-oml {args} {
+    var_import ::TBCOMPAT::omlserver
+    var_import ::TBCOMPAT::oml_server_port
+
+    uplevel #0 {set omlserver [$ns node]}
+    uplevel #0 {set oml_server_port ${::TBCOMPAT::oml_server_port} }
+    uplevel #0 {tb-set-node-os $omlserver UBUNTU10-OML}
+    uplevel #0 {set omlserverstartcmd "/usr/bin/oml2-server -l $oml_server_port --logfile=/local/logs/oml-server.log --data-dir=/local/logs"}
+    uplevel #0 {tb-set-node-startcmd $omlserver $omlserverstartcmd}
+}
+
+
+# This procedure will assign a user-defined node to be omlserver.
+# Configure OS and start-command for this machine.
+proc tb-set-oml-server {node} {
+    var_import ::TBCOMPAT::oml_server_port
+    var_import ::TBCOMPAT::omlserver
+    if { $node == {} } {
+        perror "\[tb-set-oml-serve\] tb-set-oml-server <server_node>"
+        perror "No parameters are provided"
+        return
+    }
+
+    if { [$node info class] != "Node" } {
+        perror "\[tb-set-oml-serve\] tb-set-oml-server <server_node>"
+        perror "The parameter is not a node"
+        return
+    }
+
+    #puts "oml server name: $node\n"
+    $node set osid UBUNTU10-OML
+
+    set command "/usr/bin/oml2-server -l $oml_server_port --logfile=/local/logs/oml-server.log --data-dir=/local/logs"
+    set omlcommand "($command ; /usr/local/etc/emulab/startcmddone \$?)"
+    $node start-command $omlcommand
+
+    set omlserver $node
+}
+
+# set the flag. New lan will be constructed at sim.run()
+proc tb-set-oml-use-control {flag} {
+        var_import ::TBCOMPAT::oml_use_control
+        set oml_use_control $flag
+}
+
+# add a mp to the global variable
+proc tb-set-oml-mp {args} {
+    var_import ::TBCOMPAT::oml_mps
+
+    if { $args == {} } {
+        perror "\[tb-set-oml-mp\] please specify parameters."
+        return
+    }
+
+    set mp $args
+
+    # check the parameters
+    set metrics [split $mp " "]
+    set count [llength $metrics]
+    set metrics_c [expr (($count-1)/2)]
+
+    #check format
+    if { $count ==0 || $count ==1 ||$count%2==0 || $metrics_c == 0 } {
+        perror "\[tb-set-oml-mp\] tb-set-oml-mp <mp_name> (<metric_id> <metric_type>)+"
+        return
+    }
+
+    set oml_mps [linsert $oml_mps [llength $oml_mps] $mp]
+}
+
+# write "#include <>" into files
+proc oml_write_include {h_fd s_fd} {
+    set h_include "#include <oml2/omlc.h>\n#include <ocomm/o_log.h>\n#include <stdio.h>\n\n"
+    puts $h_fd $h_include
+    set s_include "#include \"MP.h\"\n"
+    puts $s_fd $s_include
+}
+
+# analyze one mp and write into files
+# tb-analyze-store-mp mp_name <metric_id metric_type>...
+proc tb-analyze-store-mp {mp h_fd s_fd} {
+    var_import ::TBCOMPAT::expdir
+
+    puts "tb-analyze-store-mp is called"
+    puts $mp
+    puts stderr $mp
+    #set mp [string range $arg1 1 [expr [string length $arg1] - 2 ] ]
+    #puts $mp
+
+    set metrics [split $mp " "]
+    set count [llength $metrics]
+    set metrics_c [expr (($count-1)/2)]
+
+    # get the name of this mp.
+    set mp_name [lindex $metrics 0]
+    set struct_def [format "static OmlMP* oml_%s_mp = NULL;\n" $mp_name]
+    set fun_def [format "void oml_%s(" $mp_name]
+    set fun_body [format "\tOmlValueU v\[%d\];\n" $metrics_c]
+    append struct_def \
+        [format "static OmlMPDef oml_%s_def \[\] = \{\n" $mp_name]
+
+    # get metrics in this mp
+    set i 0
+    while { $i < $metrics_c } {
+        set metric_name [lindex $metrics [expr $i*2+1]]
+        set type [lindex $metrics [expr $i*2+2]]
+        if { [string compare $type "STRING"] == 0
+            || [string compare $type "string"] == 0 } {
+                set oml_type "OML_STRING_VALUE"
+                append fun_def [format "char* %s, " $metric_name]
+                append fun_body \
+                        [format "\tomlc_set_const_string(v\[%d\], %s);\n" $i $metric_name]
+        } elseif { [string compare $type "INT"] == 0
+            || [string compare $type "int"] == 0 } {
+                set oml_type "OML_LONG_VALUE"
+                append fun_def [format "int %s, " $metric_name]
+                append fun_body \
+                        [format "\tomlc_set_long(v\[%d\], %s);\n" $i $metric_name]
+        } elseif { [string compare $type "DOUBLE"] == 0
+            || [string compare $type "double"] == 0 } {
+                set oml_type "OML_DOUBLE_VALUE"
+                append fun_def [format "double %s, " $metric_name]
+                append fun_body \
+                        [format "\tomlc_set_double(v\[%d\], %s);\n" $i $metric_name]
+        } else {
+                set struct_def [format "type \"%s\" not support\n" $type]
+                perror "\[tb-analyze-store-mp\] ${struct_def}"
+                return
+        }
+        append struct_def [format "\t\{\"%s\", %s\},\n" $metric_name $oml_type]
+
+        incr i 1
+    };#end of while
+    append struct_def "\t\{NULL, (OmlValueT)0\},\n\};\n\n"
+
+
+    puts $s_fd $struct_def
+    set fun_def [string trimright $fun_def ", "]
+
+    # write declaration into the header file
+    set fun_dec [format "%s);\n" $fun_def]
+    puts $h_fd $fun_dec
+
+ # write definition and body into the source file
+    append fun_def ") \{"
+    puts $s_fd $fun_def
+    append fun_body \
+        [format "\tomlc_inject(oml_%s_mp, v);\n\}\n\n" $mp_name]
+    puts $s_fd $fun_body
+}
+
+# write oml initialization into MP.c and MP.h
+proc oml_write_init {h_fd s_fd} {
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+    var_import ::TBCOMPAT::oml_mps
+    var_import ::TBCOMPAT::omlserver
+    var_import ::TBCOMPAT::oml_server_port
+    var_import ::TBCOMPAT::oml_use_control
+
+    set init_def "void initialize_oml()"
+    set init_dec [format "%s;" $init_def]
+    puts $h_fd $init_dec
+
+    append init_def " {\n\tint argc = 7;\n"
+    append init_def "\tconst char *argv\[\] = \{\"emulab_oml\", \"--oml-id\", \"emulab_oml\","
+
+    set oml_server "${omlserver}"
+    if {$oml_use_control == 1} {
+        # if use control network, then use long name
+        set oml_server "${omlserver}.${eid}.${pid}"
+    }
+    append init_def "\"--oml-exp-id\", \"$eid\", \"--oml-server\", \"tcp:$oml_server:$oml_server_port\"\};\n"
+    append init_def "\tomlc_init(argv\[0\], &argc, argv, o_log);\n"
+    set i 0
+    while { $i < [llength $oml_mps] } {
+        set mp [lindex $oml_mps $i]
+        #puts $mp
+        set mp_name [lindex [split $mp " "] 0]
+        set cmd [format "\toml_%s_mp = omlc_add_mp(\"%s\", oml_%s_def);\n" $mp_name $mp_name $mp_name ]
+        append init_def $cmd
+        incr i 1
+    }
+    append init_def "\tomlc_start();\n}\n"
+    puts $s_fd $init_def
+}
+
+
+# called by sim.run()
+# create MP.c and MP.h and analyze measurement points and write definitions to
+# these two files. The location for these two files is /proj/pid/exp/eid/.
+
+proc begin_oml_code_generator {} {
+    var_import ::TBCOMPAT::oml_mps
+
+    # If users do not define any measurement points. Just return
+    # It will not create MP.c and MP.h
+    if { $oml_mps == {} } {
+        return
+    }
+
+    # puts "begin oml code generator\n"
+    # create and open MP.c and MP.h at /proj/pid/exp/eid/
+    if { [string compare ${::TBCOMPAT::expdir} "/proj/PID/exp/EID/"] == 0 } {
+        puts stderr "\[oml_code_generator\] expdir is not initialized"
+        return
+    }
+
+    if { ![file isdirectory ${::TBCOMPAT::expdir}] } {
+        perror "\[oml_code_generator\] ${::TBCOMPAT::expdir} is not a directory"
+        return
+    }
+
+    if { [catch {open "${::TBCOMPAT::expdir}MP.c" w} s_fd] } {
+        perror "\[oml_code_generator\] could not open MP.c\n$s_fd"
+        return
+    }
+    if { [catch {open "${::TBCOMPAT::expdir}MP.h" w} h_fd] } {
+        perror  "\[oml_code_generator\] could not open MP.h\n$h_fd"
+        return
+    }
+
+    # Make header C++ compatible
+    puts $h_fd "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
+
+    # write "#includes" into MP.c and MP.h
+    oml_write_include $h_fd $s_fd
+
+    # write definitions of measurement points.
+    set i 0
+    while { $i < [llength $oml_mps] } {
+        set mp [lindex $oml_mps $i]
+        #puts $mp
+        tb-analyze-store-mp $mp $h_fd $s_fd
+        incr i 1
+    }
+
+    # write initialization
+    oml_write_init $h_fd $s_fd
+
+    puts $h_fd "\n#ifdef __cplusplus\n}\n#endif\n"
+
+    close $h_fd
+    close $s_fd
 }
 

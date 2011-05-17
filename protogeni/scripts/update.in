@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -13,10 +13,15 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: update\n";
+    print "Usage: update [-q] [-v] [-d] [-p path]\n";
     exit(1);
 }
-my $optlist = "";
+my $optlist = "dvp:q";
+my $debug   = 0;
+my $verify  = 0;
+my $quiet   = 0;
+my $path;
+my $args    = "";
 
 #
 # Configure variables
@@ -33,6 +38,7 @@ my $CMCERT	  = "$TB/etc/genicm.pem";
 my $geniuserid    = "geniuser";
 my $geniprojid    = "GeniSlices";
 my $SUDO	  = "/usr/local/bin/sudo";
+my $MYSQLSHOW	  = "/usr/X11R6/bin/mysqlshow";
 my $BATCHEXP      = "$TB/bin/batchexp";
 
 # un-taint path
@@ -48,17 +54,21 @@ sub OneShot();
 #
 $| = 1; 
 
+#
+# Do not modify the include path if it was specified when invoked.
+# This allows update to run from the build tree.
+#
+BEGIN
+{
+    eval "require emutil";
+    if ($@) {
+	unshift(@INC, "@prefix@/lib");
+    }
+}
 # Load the Testbed support stuff.
-use lib "@prefix@/lib";
 use libtestbed;
 use libdb qw(TBSetSiteVar TBSiteVarExists TBGetSiteVar);
 use Experiment;
-use GeniDB;
-use GeniCertificate;	  
-
-if ($UID != 0) {
-    fatal("Must be root to run this script\n");
-}
 
 #
 # Check args.
@@ -67,21 +77,56 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"d"})) {
+    $debug = 1;
+    $args .= "-d ";
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
+    $args .= "-q ";
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+    $args .= "-v ";
+}
+if (defined($options{"p"})) {
+    $path = $options{"p"};
+    $args .= "-p $path ";
+}
 usage()
     if (@ARGV);
 
-OneShot();
+if (!$verify && $UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# If the DBs are not built yet (initsite not run) just exit.
+# We will be back here later.
+#
+system("$MYSQLSHOW geni >/dev/null 2>&1");
+if ($?) {
+    print "Protogeni DB does not exist yet. Skipping ...\n";
+    exit(0);
+}
+require GeniDB;
+import GeniDB;
+require GeniCertificate;	  
+
+OneShot()
+    if (!$verify);
 
 #
 # Apply the dbupdates using the Emulab utility, to all three DBs.
 #
-system("$DBUPDATE " . GENISA_DBNAME()) == 0
-    or fatal("Could not apply updates to SA DB");
-system("$DBUPDATE " . GENICM_DBNAME()) == 0
-    or fatal("Could not apply updates to CM DB");
-system("$DBUPDATE " . GENICH_DBNAME()) == 0
-    or fatal("Could not apply updates to CH DB");
-
+foreach my $name (GENISA_DBNAME(), GENICM_DBNAME(), GENICH_DBNAME()) {
+    system("$DBUPDATE $args $name");
+    if ($?) {
+	exit(1)
+	    if ($verify);
+	fatal("Could not apply updates to $name DB");
+    }
+}
 exit(0);
 
 #

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 from Mailman import mm_cfg
@@ -9,7 +9,7 @@ from Mailman import Utils
 from Mailman import Message
 from Mailman import Errors
 from Mailman import UserDesc
-import sha
+import hashlib
 import sys
 
 def addmember(mlist, addr, name, passwd):
@@ -51,7 +51,7 @@ def modmember(mlist, oldaddr, newaddr, name, passwd):
 def setadmin(mlist, addr, passwd):
     try:
         mlist.owner = [addr]
-        mlist.password = sha.new(passwd).hexdigest()
+        mlist.password = hashlib.sha1(passwd).hexdigest()
         mlist.Save()
     except:
         print 'Error resetting name/password for list'

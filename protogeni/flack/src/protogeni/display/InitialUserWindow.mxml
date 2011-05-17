@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx"
+						xmlns:display="protogeni.display.*"
+						title="Initial User Settings" close="closeWindow()"
+						defaultButton="{okButton}"
+						contentCreationComplete="onCreationComplete()">
+	<fx:Script>
+		<![CDATA[
+			import com.mattism.http.xmlrpc.JSLoader;
+			
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			
+			import protogeni.Util;
+			import protogeni.display.skins.CheckBoxSkin;
+			import protogeni.display.skins.TextAreaSkin;
+			import protogeni.resources.SliceAuthority;
+
+			private var certLoader:URLLoader;
+			private var closeAfter:Boolean = false;
+			
+			private static var certLocation:String = "/protogeni/getsslcert.php3";
+			private static var loginLocation:String = "/login.php3";
+			
+			[Bindable]
+			private var selectedAuthority:SliceAuthority;
+			
+			public function onCreationComplete():void
+			{
+				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
+				this.authorities.setFocus();
+				if(Main.useJavascript) {
+					this.retrieveCertCheckbox.selected = sslPem.text.length == 0;
+					this.passwordField.textInput.text = Main.geniHandler.CurrentUser.getPassword();
+				} else {
+					this.height = 130;
+					this.width = 250;
+				}
+					
+			}
+			
+			public function trySubmit():void
+			{
+				if(Main.useJavascript) {
+					if(passwordField.textInput.text.length == 0) {
+						Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as flack);
+						return;
+					}
+					if(retrieveCertCheckbox.selected && selectedAuthority.workingCertGet) {
+						closeAfter = true;
+						tryLoadCert(certLocation);
+						return;
+					} else if(sslPem.text.length == 0) {
+						Alert.show("You must suply an SSL Cert");
+						return;
+					}
+				}
+				saveAndClose();
+			}
+			
+			public function saveAndClose():void
+			{
+				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
+				if(Main.useJavascript) {
+					Main.geniHandler.CurrentUser.sslPem = sslPem.text;
+					if(!Main.geniHandler.CurrentUser.setPassword(passwordField.textInput.text, cacheCheckbox.selected)) {
+						Alert.show("Incorrect password", "It appears that the password is incorrect");
+						return;
+					}
+				}
+
+				FlexGlobals.topLevelApplication.saveLocalUserData();
+				Main.geniHandler.mapHandler.clearAll();
+				Main.geniHandler.unauthenticatedMode = false;
+				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
+				closeWindow();
+			}
+			
+			public function visitLogin():void
+			{
+				var url:String = Util.tryGetBaseUrl(selectedAuthority.Url) + loginLocation;
+				Main.checkLoadCrossDomain(url);
+				Util.openWebsite( url );
+			}
+			
+			public function checkCloseAfter():void
+			{
+				if(closeAfter && sslPem.text.length > 0 && (!retrieveCertCheckbox.selected || certSuccess)){
+					saveAndClose();
+				} else
+					closeAfter = false;
+			}
+			
+			private var certUrl:String;
+			private var certSuccess:Boolean = false;
+			private var asked:Boolean = false;
+			public function tryLoadCert(url:String):void
+			{
+				certUrl = url;
+				Main.checkLoadCrossDomain(url, true, true);
+				
+				var request:URLRequest = new URLRequest(url); 
+				certLoader = new URLLoader(); 
+				certLoader.addEventListener(Event.COMPLETE, completeHandler);
+				certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+				certLoader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatusHandler);
+				certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
+				try
+				{
+					waitingIcon.visible = true;
+					getLabel.styleName = "inprogressStyle";
+					getLabel.text = "Waiting...";
+					LogHandler.appendMessage(new LogMessage(url, "Getting SSL Cert", "Attempting to load user SSL certificate", false, LogMessage.TYPE_START));
+					certSuccess = false;
+					asked = false;
+					certLoader.load(request);
+				}
+				catch (e : Error)
+				{
+					waitingIcon.visible = false;
+					LogHandler.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
+						+ e.toString() + "\n\n", true));
+					checkCloseAfter();
+				}
+			}
+			
+			private function completeHandler(event:Event):void {
+				if(certLoader.data != null && (certLoader.data as String).indexOf("-----BEGIN RSA PRIVATE KEY-----") != -1) {
+					certSuccess = true;
+					sslPem.text = certLoader.data;
+					getLabel.text = "Success!"
+					getLabel.styleName = "validStyle";
+					LogHandler.appendMessage(new LogMessage(certUrl, "Got SSL Cert", certLoader.data, false, LogMessage.TYPE_END));
+					this.retrieveCertCheckbox.selected = false;
+					checkCloseAfter();
+				} else {
+					LogHandler.appendMessage(new LogMessage(certUrl, "Error", event.toString(), true, LogMessage.TYPE_END));
+					askToLogin();
+				}
+				waitingIcon.visible = false;
+				
+			}
+			
+			private function askToLogin():void
+			{
+				if(asked)
+					return;
+				asked = true;
+				getLabel.text = "Failed! Most likely not logged in.";
+				getLabel.styleName = "failedStyle";
+				waitingIcon.visible = false;
+				checkCloseAfter();
+				Alert.show("You must be logged in on the authority's website in order to automatically retrieve your SSL Cert.  Visit the login page? After login, come back here and try again.", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
+					function handleAction(e:CloseEvent):void {
+						if(e.detail == Alert.YES)
+							visitLogin();
+					});
+			}
+			
+			private function securityErrorHandler(event:SecurityErrorEvent):void {
+				getLabel.text = "Security Error!"
+				getLabel.styleName = "failedStyle";
+				LogHandler.appendMessage(new LogMessage(certUrl, "Security Error", event.toString(), true, LogMessage.TYPE_END));
+				askToLogin();
+			}
+			
+			private function ioErrorHandler(event:IOErrorEvent):void {
+				getLabel.text = "IO Error!"
+				getLabel.styleName = "failedStyle";
+				LogHandler.appendMessage(new LogMessage(certUrl, "IO Error", event.toString(), true, LogMessage.TYPE_END));
+				askToLogin();
+			}
+			
+			private function httpStatusHandler(event:HTTPStatusEvent):void{
+				if(event.status != 200) {
+					LogHandler.appendMessage(new LogMessage(certUrl, "HTTP Status", "HTTP Status returned: "
+						+ event.status, true, LogMessage.TYPE_END));
+					askToLogin();
+				}
+					
+			}
+
+		]]>
+	</fx:Script>
+
+	<s:Label text="Which authority are you registered with?" />
+	<s:DropDownList id="authorities" labelField="Name"  width="100%" height="24" requireSelection="true" 
+					dataProvider="{Main.geniHandler.GeniAuthorities}"
+					selectedItem="@{selectedAuthority}" />
+	<s:VGroup width="100%" height="100%" visible="{Main.useJavascript}" includeInLayout="{Main.useJavascript}">
+		<s:Label text="SSL Certificate Password" />
+		<s:HGroup width="100%" verticalAlign="middle">
+			<display:KeyboardTextInput id="passwordField" width="100%" creationComplete="passwordField.textInput.displayAsPassword = true;" />
+			<s:CheckBox id="cacheCheckbox" label="Cache?" />
+		</s:HGroup>
+		<s:HGroup verticalAlign="middle">
+			<s:CheckBox id="retrieveCertCheckbox" enabled="{selectedAuthority.workingCertGet}"
+						label="Automatically retrieve SSL Certificate? If not signed in, please sign in to"
+						selected="true" />
+			<mx:Button label="{selectedAuthority.Authority}"  height="24" click="visitLogin();" />
+		</s:HGroup>
+		<s:HGroup verticalAlign="middle">
+			<mx:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
+					  icon="{DisplayUtil.sslIcon}"
+					  click="this.tryLoadCert(Util.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
+			<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
+			<s:Label id="getLabel" text="" />
+		</s:HGroup>
+		<s:Label text="If the automatic SSL Certificate retrieval doesn't work, copy and paste it here" />
+		<s:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}"
+					width="100%" height="100%" />
+	</s:VGroup>
+	<display:controlBarLayout>
+		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
+	</display:controlBarLayout>
+	<display:controlBarContent>
+		<mx:Button id="okButton" label="OK" icon="{DisplayUtil.availableIcon}" height="24"
+				  click="trySubmit();" />
+		<mx:Button label="Cancel" icon="{DisplayUtil.crossIcon}" height="24"
+				  click="closeWindow()" />
+	</display:controlBarContent>
+</display:DefaultWindow>

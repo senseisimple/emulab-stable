@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniSES;
@@ -18,7 +18,6 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
 use User;
 use Genixmlrpc;
@@ -43,6 +42,7 @@ my $OURDOMAIN      = "@OURDOMAIN@";
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $HAVE_XERCES    = "@HAVE_XERCES@";
 my $ASSIGN	   = "$TB/libexec/assign";
+my $ADVT_MERGE = "$TB/protogeni/scripts/advt-merge.py";
 
 my $API_VERSION = 1;
 
@@ -88,31 +88,67 @@ sub Map($)
     return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED )
 	unless $HAVE_XERCES eq "yes";
 
-    # If the ad is Binary typed (and therefore base64 encoded), assume
-    # it is compressed.
-    if( Scalar::Util::blessed( $ad ) && $ad->isa( "Frontier::RPC2::Base64" ) ) {
-	$ad = uncompress( decode_base64( $ad->value ) );
+    my $multipleads = 0;
+    my @adfiles;
+    my @adfilenames;
+    my ( $merged_adfile, $merged_adfilename ) = tempfile();
+    my $mergeCmdString = "$ADVT_MERGE $merged_adfilename";
+    # If the input is an array reference, multiple advertisements have 
+    # been passed and they need to be merged
+    if (ref($ad) eq "ARRAY") {
+	$multipleads = 1;
+	for(my $i = 0; $i < (@{$ad}); $i++) {
+	    my $advt = $$ad[$i];
+	    # If the ad is Binary typed (and therefore base64 encoded), 
+	    # assume it is compressed.
+	    if( Scalar::Util::blessed( $advt ) 
+		&& $advt->isa( "Frontier::RPC2::Base64" ) ) {
+		$advt = uncompress( decode_base64( $advt->value ) );
+	    }
+	    
+	    ( $adfiles[$i], $adfilenames[$i] ) = tempfile();
+	    
+	    return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+					 "Could not store advertisement" )
+		unless defined $adfiles[$i];
+	    print { $adfiles[$i] } $advt;
+	    close $adfiles[$i];
+	    
+	    $mergeCmdString .= " $adfilenames[$i]";
+	}
+	
+	my $result = system($mergeCmdString);
+	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				     "Could not merge advertisements" )
+	    unless $result == 0;
+    }
+    # It is not an array and it must be a single file that was passed
+    else {
+	# If the ad is Binary typed (and therefore base64 encoded), assume
+	# it is compressed.
+	if( Scalar::Util::blessed( $ad ) 
+	    && $ad->isa( "Frontier::RPC2::Base64" ) ) {
+	    $ad = uncompress( decode_base64( $ad->value ) );
+	}
+	
+	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				     "Could not store advertisement" )
+	    unless defined $merged_adfile;
+	print $merged_adfile $ad;
+	close $merged_adfile;
     }
 
     #
     # Use assign in xml mode to spit back an xml file. 
     #
-    my ( $adfile, $adfilename ) = tempfile();
     my ( $reqfile, $reqfilename ) = tempfile();
-
-    return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
-				 "Could not store advertisement" )
-	unless defined $adfile;
-    print $adfile $ad;
-    close $adfile;
-
     return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
 				 "Could not store request" )
 	unless defined $reqfile;
     print $reqfile $req;
     close $reqfile;
 
-    open( ASSIGN, "$ASSIGN -P -q $adfilename -w $reqfilename 2>&1 |" )
+    open( ASSIGN, "$ASSIGN -P -f rspec -x $merged_adfilename -y $reqfilename 2>&1 |" )
 	or return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
 					"Assign process failed" );
 
@@ -122,7 +158,13 @@ sub Map($)
     }
     close ASSIGN;
 
-    unlink $adfilename;
+    if ($multipleads == 1) {
+	my $adfilename;
+	foreach $adfilename (@adfilenames) {
+	    unlink $adfilename;
+	}
+    }
+    unlink $merged_adfilename;
     unlink $reqfilename;
 
     $reqfilename =~ m{(.*/)([^/]+)};

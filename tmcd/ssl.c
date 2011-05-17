@@ -28,7 +28,9 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <openssl/engine.h>
+#include <openssl/rsa.h>
 #include <openssl/ssl.h>
+#include <openssl/sha.h>
 #include <openssl/err.h>
 #include "decls.h"
 #include "ssl.h"
@@ -90,6 +92,7 @@ static char		nosslbuf[MAXTMCDPACKET];
 static int		nosslbuflen, nosslbufidx;
 static void		tmcd_sslerror();
 static void		tmcd_sslprint(const char *fmt, ...);
+static RSA *		 convpubkey(struct pubkeydata *);
 
 /*
  * Init our SSL context. This is done once, in the parent.
@@ -647,6 +650,89 @@ tmcd_sslrowtocert(char *in, char *nid)
 	}
 
 	return local;
+}
+
+/*
+ * SHA1 hashes src of length len and stores the result at dst.  dst must be at
+ * least 20 bytes long.
+ */
+int
+tmcd_quote_hash(void *src, size_t len, void *dst)
+{
+	if (SHA1(src, len, dst) == NULL)
+		return 1;
+	return 0;
+}
+
+/*
+ * Verifies that buffer sig of length siglen is indeed the buffer final
+ * encrypted with the private key to pubkey (or checks the signature of buffer
+ * sig).
+ *
+ * Returns 1 if the signature verified, 0 if it failed
+ */
+int
+tmcd_quote_verifysig(void *final, void *sig, size_t siglen, void *pubkey)
+{
+	struct keydata k;
+	RSA *rsa;
+	int ret;
+
+	if (!pubkey) {
+		error("NULL pubkey to %s\n", __FUNCTION__);
+		return 0;
+	}
+	if (!final) {
+		error("NULL final to %s\n", __FUNCTION__);
+		return 0;
+	}
+	if (!sig) {
+		error("NULL sig to %s\n", __FUNCTION__);
+		return 0;
+	}
+
+	/* Cannot fail */
+	tpm_extract_key((unsigned char *)pubkey, &k);
+	rsa = convpubkey(&k.pub);
+	if (!rsa) {
+		error("Error extracting and converting key\n");
+		return 0;
+	}
+
+	ret = RSA_verify(NID_sha1, final, 20, sig, siglen, rsa);
+	RSA_free(rsa);
+
+	return ret;
+}
+
+static RSA *
+convpubkey(struct pubkeydata *k)
+{
+	RSA *rsa;
+	BIGNUM *mod;
+	BIGNUM *exp;
+
+	/* create the necessary structures */
+	rsa = RSA_new();
+	mod = BN_new();
+	exp = BN_new();
+	if (rsa == NULL || mod == NULL || exp == NULL) {
+		if (rsa)
+			RSA_free(rsa);
+		if (mod)
+			BN_free(mod);
+		if (exp)
+			BN_free(exp);
+
+		return NULL;
+	}
+	/* convert the raw public key values to BIGNUMS */
+	BN_bin2bn(k->modulus, k->keylength, mod);
+	BN_bin2bn(k->exponent, k->expsize, exp);
+	/* set up the RSA public key structure */
+	rsa->n = mod;
+	rsa->e = exp;
+	return rsa;
 }
 
 /*

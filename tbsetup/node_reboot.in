@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -28,12 +28,13 @@ sub usage()
 	  "Use the -b option to reboot nodes in PXEWAIT mode\n" .
 	  "Use the -a option to reboot all free nodes\n".
 	  "Use the -c option to reconfig nodes instead of rebooting\n".
-	  "Use the -f option to power cycle (and not wait for nodes to die)\n");
+	  "Use the -f option to power cycle (and not wait for nodes to die)\n".
+	  "Use the -F option to reboot even if the type is marked nonrebootable\n");
     exit(-1);
 }
 # The hidden -r option runs this in "realmode", ie don't send an event, but
 # really do the work instead.  Hidden -W option specifies the waittime. 
-my $optlist     = "dfe:wrkacbpsW:";
+my $optlist     = "dfe:wrkacbpsW:F";
 my $debug       = 0;
 my $silent      = 0;
 my $powercycle  = 0;
@@ -43,6 +44,7 @@ my $killmode    = 0;
 my $reconfig    = 0;
 my $rebootmode  = 0;
 my $prepare     = 0;
+my $force       = 0;
 my $waittime;
 
 #
@@ -129,6 +131,9 @@ if (defined($options{"c"})) {
 if (defined($options{"W"})) {
     $waittime = $options{"W"};
 }
+if (defined($options{"F"})) {
+    $force = 1;
+}
 
 if (defined($options{"a"})) {
     usage()
@@ -181,7 +186,7 @@ elsif (defined($options{"e"})) {
 	die("*** $0:\n".
 	    "    You not have permission to reboot nodes in $experiment!\n");
     }
-    my @nodelist = $experiment->NodeList();
+    my @nodelist = $experiment->NodeList(0, 1);
     if (! @nodelist) {
 	die("*** $0:\n".
             "    There are no nodes reserved in $experiment\n");
@@ -253,6 +258,7 @@ $args{'killmode'}    = $killmode;
 $args{'reconfig'}    = $reconfig;
 $args{'prepare'}     = $prepare;
 $args{'waittime'}    = $waittime     if defined $waittime;
+$args{'force'}       = $force;
 $args{'nodelist'}    = [ @nodes ];
 
 exit(nodereboot(\%args, \%status));

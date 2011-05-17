@@ -19,7 +19,7 @@ sub usage()
 	"Use the -d option to prevent daemonization\n";
     exit(-1);
 }
-my $optlist = "dne1";
+my $optlist = "dne1fs";
 my $debug    = 0;
 my $impotent = 0;
 my $killme   = 0;
@@ -27,6 +27,8 @@ my $nofree   = 1;
 my $gotlock  = 0;
 my $mailsent = 0;
 my $oneshot  = 0;
+my $swapin   = 0;
+my $force    = 0;
 my $nsfile;
 
 #
@@ -99,8 +101,19 @@ if (defined($options{"1"})) {
 if (defined($options{"n"})) {
     $impotent = 1;
 }
+if (defined($options{"f"})) {
+    $force = 1;
+}
 if (defined($options{"e"})) {
     $nofree = 1;
+}
+if (defined($options{"s"})) {
+    $swapin = 1;
+}
+# Temporary disable until I feel more confident.
+if (!$force) {
+    print "Pool daemon is currently disabled. Exiting.\n";
+    exit(0);
 }
 usage()
     if (@ARGV > 1);
@@ -188,6 +201,7 @@ $SIG{TERM} = \&sigterm;
 
 while (!$killme) {
     my $disabled;
+    my $didsomething = 0;
     
     print "Pool Daemon running at ".`date`;
 
@@ -222,7 +236,7 @@ while (!$killme) {
 		notify("Cannot get the lock after a really long time");
 		$tries = 0;
 	    }
-	    chat("Waiting for pool daemon lock ...\n");
+	    print "Waiting for pool daemon lock ...\n";
 	    sleep(10);
 	}
     }
@@ -231,7 +245,7 @@ while (!$killme) {
     $experiment->Refresh() == 0
 	or fatal("Could not reload $experiment");
 
-    if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
+    if ($experiment->state() eq EXPTSTATE_SWAPPED() && !$swapin) {
 	print "Skipping this loop cause the experiment is swapped\n";
 	goto loop;
     }
@@ -253,6 +267,15 @@ while (!$killme) {
     my $maxpoolsize  = TBGetSiteVar("general/maxpoolsize");
     my $minpoolsize  = TBGetSiteVar("general/minpoolsize");
     my $poolnodetype = TBGetSiteVar("general/poolnodetype");
+
+    #
+    # Sanity check the nodetype to make sure it has been set.
+    #
+    my $typeinfo = NodeType->Lookup("pc", $poolnodetype);
+    if (!defined($typeinfo)) {
+	fatal("$poolnodetype is not a valid pc type. Please set the ".
+	      "'general/poolnodetype' site variable");
+    }
 
     #
     # Look to see how each of the nodes is packed. This is
@@ -317,6 +340,8 @@ while (!$killme) {
 	    exit(0)
 		if ($impotent);
 	    goto loop;
+	    # This counts as doing something.
+	    $didsomething = 1;
 	}
     }
 
@@ -391,6 +416,7 @@ while (!$killme) {
 	my $exitval = $?;
 	print "Swap modify done at " . `date`;
 	$experiment->LockDown(1);
+	$didsomething = 1;
 	if ($exitval) {
 	    my $error_data = tblog_lookup_error();
 
@@ -420,7 +446,7 @@ while (!$killme) {
 	$gotlock = 0;
     }
     last
-	if ($oneshot);
+	if ($oneshot && $didsomething);
     
     # Use a long period; we do not want the pool to change too fast.
     sleep(120);

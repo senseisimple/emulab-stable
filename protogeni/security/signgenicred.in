@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -237,6 +237,17 @@ if ($root->nodeName eq "credential") {
     #print $root->toString(1) . "\n";
 }
 else {
+    #
+    # Must be consistent about namespaces or else the signature does
+    # not verify later. 
+    #
+    $root->setNamespace($GeniUtil::XSI_NS, "xsi", 0);
+    $root->setAttributeNS($GeniUtil::XSI_NS, "noNamespaceSchemaLocation"
+			  , $GeniUtil::CREDENTIAL_SCHEMA_LOCATION);
+    $root->setAttributeNS($GeniUtil::XSI_NS, "schemaLocation"
+			  , $GeniUtil::EXTENSIONS_NS . " " 
+			  . $GeniUtil::EXTENSIONS_SCHEMA_LOCATION);
+    
     ($credentials_node) = $root->getElementsByTagName("credential");
     ($signatures_node)  = $root->getElementsByTagName("signatures");
 

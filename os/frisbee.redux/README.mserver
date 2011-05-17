@@ -1,0 +1,206 @@
+The Frisbee "Master Server".
+
+I. Overview:
+
+Frisbee now has a "master" server that listens on a fixed port (64494)
+and acts as a rendezvous for all frisbee client requests.  The frisbee
+client no longer needs to know an address/port in advance, it can
+request an image (or file) by name and the master server will authenticate
+the request, fire off a frisbee server, and return the address/port to
+the client so it can continue as always.
+
+As a result of this, the way frisbee is integrated into Emulab has changed
+a bit.  Boss now runs the mfrisbeed process at boot time via
+/usr/local/etc/rc.d/3.mfrisbeed.sh.  The master server is built with the
+"Emulab configuration" which allows it to query the Emulab DB to authenticate
+requests based on the calling IP address.
+
+The frisbeelauncher program is gone.  This program used to be called at
+swapin time to start up any frisbeed's well in advance of the nodes booting
+and checking in for reload info.  Now, frisbeed processes can be started
+"just in time" when they contact the master server.
+
+The diskloader ("frisbee") MFS has to be updated to use this.  A new tmcc
+binary (bumped version number), rc.frisbee (support for calling frisbee
+with image name), and frisbee client binary (support for master server)
+are needed.
+
+When the MFS makes a "loadinfo" call, tmcd now returns the imagename
+rather than address/port info and invokes the frisbee client with that
+name.  The client contacts the master server with that name, gets back
+the address/port and goes on as usual.
+
+II. But, why a master server?
+
+Mostly to eliminate the need for an out-of-band coordination channel for
+connecting the client and server.  This makes it more useful for transferring
+arbitrary files from the server at arbitrary times.  Look for more use of
+this in the future.
+
+It will also enable uploading of images to the "image repository".  This
+part is largely done, but hasn't been merged in yet.
+
+Finally this makes frisbee more usable outside of the Emulab context.
+Or should..in theory..sometime.
+
+III. How to upgrade and backward compatibility:
+
+You should be able to just clean, reconfigure, rebuild and reinstall your
+Emulab software.  The update script will remove some old binaries and tell
+you how to upgrade your frisbee MFS.
+
+It is not necessary to immediately update your MFS.  When an old MFS makes
+a "tmcc loadinfo" call, tmcd will see the old version number and invoke a
+helper program ("frisbeehelper", duh!) to make a proxy request to the
+master server on behalf of the node.  This will fire off a frisbeed if
+necessary and return the address/port, which tmcd then returns to the node.
+There will soon be an MFS update (containing only tmcc, rc.frisbee, frisbee)
+and a completely new MFS tarball available.
+
+You can also update your MFS in advance of installing the new frisbee setup
+(well, you could, if the updates were actually available).  The rc.frisbee
+script knows how to deal with the old tmcd loadinfo.
+
+IV. Emulab-in-Emulab support:
+
+An Emulab-in-Emulab boss node is setup with an mfrisbeed configured for
+Emulab and also with real boss as its "parent".  If the inner boss does
+not have an image, it will attempt to fetch it from its parent.
+
+For compatibility purposes, the XMLRPC interface used to fire off a frisbeed
+on real boss has been modified to make a proxy request to the master server.
+So you do not need to upgrade existing elabinelab experiments right away. 
+
+V. Emulab sub-boss support:
+
+An Emulab sub-boss also runs an instance of the master server, also
+configured with real boss as its parent.  But the sub-boss mfrisbeed
+acts as a mirror for real boss: all requests are passed to real boss for
+authentication, and then a local copy is returned if present and up-to-date,
+otherwise it fetches from real boss.
+
+There is no backward compat for sub-bosses since we are the only people
+running one.
+
+VI. Random tidbits and excruciating detail:
+
+1. Running the master server on boss.  Just use the Emulab config (-C):
+
+      mfrisbeed -C emulab
+
+   For debugging, I turn on debugging as well:
+
+      ./mfrisbeed -C emulab -d
+
+2. Running the master server on an inner boss.  Use the Emulab config (-C),
+   use real boss or subboss as our parent server (-S):
+
+      mfrisbeed -C emulab -S boss.emulab.net
+      mfrisbeed -C emulab -S pc404.emulab.net
+
+   and for debugging (-d), also use unicast to request images from that
+   parent (-X) since I was having issues to my inner boss:
+
+      ./mfrisbeed -C emulab -S boss.emulab.net -d -X ucast
+      ./mfrisbeed -C emulab -S pc404.emulab.net -d -X ucast
+
+3. Running the master server on sub-boss.  Use the default (null) config,
+   telling it where to cache images (-I), name real boss as the parent
+   server (-S), pass on child authinfo to parent (-A) since the subboss has
+   no experiment context and serves all experiments, run in mirror
+   mode (-M) where we are strictly a read-only ache for images from our
+   parent, and allow redirection of sub-boss clients to the real boss when
+   sub-boss is downloading the image for the first time (-R):
+
+      mfrisbeed -S boss.emulab.net -I /z/image_cache -A -M -R
+
+   debugging:
+
+      ./mfrisbeed -S boss.emulab.net -I /z/tmp/mike/images -A -M -R -d
+
+So a client running on my inner elab node would make a request from its boss
+(-S) to download an image with the given ID (-F), trying again every 10 seconds
+(-B) if the server reports "try again" (i.e., it is downloading the parent
+from its parent):
+
+   frisbee -S boss -B 10 -F emulab-ops/FBSD73-STD /dev/da0
+
+or for debugging (write to /dev/null):
+
+   ./frisbee -S boss -B 10 -F emulab-ops/FBSD73-STD /dev/null
+
+So in the initial case where only real boss has the image:
+  N1 Node asks inner-boss for image.
+
+    I1 Inner-boss gets the request and checks its DB to ensure node can access
+      the image.  It can, but inner-boss doesn't have the image and thus
+      makes a "getstatus" request about it to its frisbee server, which is
+      sub-boss.
+
+      S1 Sub-boss gets the request and asks real-boss if inner-boss has
+        permission to access the image.
+
+        R1 Real-boss gets the request, verifies that sub-boss can make
+	  proxied requests and verifies that inner-boss can then access
+	  the image. It can, so real-boss returns image info (size,
+	  signature) to sub-boss.
+
+      S2 Sub-boss sees that inner-boss can access the image, but sub-boss
+        does not have the image cached and so makes a "get" request to
+	real-boss.
+
+        R2 Real-boss starts up a frisbeed to feed the image and returns
+	  addr/port info.
+
+      S3 Sub-boss starts up a frisbee to catch the image using that info,
+        and returns a TRYAGAIN message to inner-boss (and any other
+	subsequent request, until the download is complete).
+
+    I2 Inner-boss gets the TRYAGAIN and return that status to the node.
+
+  N2 The node gets the TRYAGAIN, waits awhile and then we start again.
+
+    I3 Inner-boss will ask sub-boss again.
+
+      S4 If sub-boss' download of the image from real boss has completed,
+         it returns addr/port info to inner-boss.  Otherwise it returns
+	 TRYAGAIN.
+
+    I4 If it gets back TRYAGAIN, it returns that to the node.
+       Otherwise it uses the addr/port info to fire up a frisbee to
+       download the image from sub-boss, and returns TRYAGAIN to the node.
+
+  N3 The node gets the TRYAGAIN, waits awhile and then we start again.
+
+    I5 If inner-boss' download of the image from sub-boss has completed,
+         it returns addr/port info to the node.  Otherwise it returns
+	 TRYAGAIN.
+
+  N4 If the node gets TRYAGAIN, it waits awhile and then we start again.
+     Otherwise, it uses the addr/port info and downloads the image.
+
+A couple of things to note that were glossed over.  One is that the actual
+"getstatus" calls are synchronous.  They never return TRYAGAIN, so if the
+node does a getstatus, it will result in a series of getstatus calls up the
+chain until someone returns actual status.  The status that matters is the
+size of the image and its signature. Currently the only signature type is
+an MTIME which is the modtime of the file. So the recipient of the status
+can use this to determine if any copy it has might be out of date.
+
+The "get" calls are asynchronous. If the mserver has the image, it starts
+a frisbeed and returns the info.  If it doesn't, and it has a parent, it
+returns TRYAGAIN to the client and starts the process of fetching the image.
+When the download completes, it is done, it doesn't try to inform any
+interested clients of that fact.  It waits for clients to re-contact it.
+
+This makes it relatively stateless. Excessively so at the moment.  Right
+now if a frisbee server dies and restarts, it will not attempt to restart
+any frisbeed's or frisbees that were running. The latter doesn't matter
+since it'll just start the download from its parent over again when someone 
+requests the image again.  The former is not good.  It will leave its active
+clients hung out to dry.  They will continue to send messages to the addr/port
+that no longer has a server.  The client should (but currently doesn't)
+timeout eventually and start the download again. Or mserver should record
+in persistent state what servers are running and with what addr/port so that
+it can restart them.  This is, I believe what the frisbeelaucher does today
+(saving state in the DB).

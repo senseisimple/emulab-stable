@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Implements the libvnode API for OpenVZ support in Emulab.
@@ -315,7 +315,7 @@ sub makeBridgeMaps() {
     shift(@lines);
     my $curbr = '';
     foreach my $line (@lines) {
-	if ($line =~ /^([\w\d\-]+)\s+/) {
+	if ($line =~ /^([\w\d\-\.]+)\s+/) {
 	    $curbr = $1;
 	    $bridges{$curbr} = [];
 	}
@@ -380,7 +380,25 @@ sub downloadImage($$$) {
     my $FRISBEE = "/usr/local/etc/emulab/frisbee";
     my $IMAGEUNZIP = "/usr/local/bin/imageunzip";
 
-    if ($addr =~/^(\d+\.\d+\.\d+\.\d+):(\d+)$/) {
+    if (!defined($addr) || $addr eq "") {
+	# frisbee master server world
+	my ($server, $imageid);
+
+	if ($reload_args_ref->{"SERVER"} =~ /^(\d+\.\d+\.\d+\.\d+)$/) {
+	    $server = $1;
+	}
+	if ($reload_args_ref->{"IMAGEID"} =~ /^([-\d\w]+),([-\d\w]+),([-\d\w]+)$/) {
+	    $imageid = "$1/$3";
+	}
+	if ($server && $imageid) {
+	    mysystem("$FRISBEE -S $server -B 30 -F $imageid $imagepath");
+	}
+	else {
+	    print STDERR "Could not parse frisbee loadinfo\n";
+	    return -1;
+	}
+    }
+    elsif ($addr =~/^(\d+\.\d+\.\d+\.\d+):(\d+)$/) {
 	my $mcastaddr = $1;
 	my $mcastport = $2;
 

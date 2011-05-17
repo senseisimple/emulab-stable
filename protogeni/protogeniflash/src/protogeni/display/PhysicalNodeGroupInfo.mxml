@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="140" height="150"
+ horizontalAlign="center" verticalGap="0" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0">
+	
+	<mx:Script>
+		<![CDATA[
+			import protogeni.resources.PhysicalNodeGroup;
+		
+			[Bindable]
+			public var city:String = "";
+		
+			[Bindable]
+			public var nodesCount:String = "";
+		
+			[Bindable]
+			public var nodesAvailable:String = "";
+		
+			[Bindable]
+			public var linksInternal:String = "";
+		
+			[Bindable]
+			public var linksExternal:String = "";
+			
+			public var group:PhysicalNodeGroup = null;
+			
+			public function Load(g:PhysicalNodeGroup):void 
+			{
+				group = g;
+				nodesCount = g.collection.length.toString();
+				nodesAvailable = g.Available().toString();
+				if(g.links != null)
+					linksInternal = g.links.collection.length.toString();
+				else
+					linksInternal = "0";
+				linksExternal = g.ExternalLinks().toString();
+			}	
+		]]>
+	</mx:Script>
+	<mx:Label text="{city}" id="txtLabel" maxWidth="{this.width}" />
+	<mx:Label text="Nodes" fontWeight="bold"/>
+	<mx:Grid width="100%" horizontalGap="0" verticalGap="0">
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="Count" fontStyle="italic"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="Available" fontStyle="italic"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="{nodesCount}" id="txtNodesCount"/>
+			</mx:GridItem>
+			<mx:GridItem height="100%" horizontalAlign="center">
+				<mx:Label text="{nodesAvailable}" id="txtNodesAvailable"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+	<mx:Label text="Links" fontWeight="bold"/>
+	<mx:Grid width="100%" horizontalGap="0" verticalGap="0">
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="Internal" fontStyle="italic"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="External" fontStyle="italic"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="{linksInternal}" id="txtLinksInternal"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="{linksExternal}" id="txtLinksExternal"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+	<mx:Button label="More Info" click="if(group.collection.length > 1) DisplayUtil.viewNodeGroup(group); else DisplayUtil.viewPhysicalNode(group.collection[0]);"/>
+	
+</mx:VBox>

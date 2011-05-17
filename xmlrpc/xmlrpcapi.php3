@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -47,24 +47,14 @@ need, please send us email.
 </p>
 
 <p>
-The Emulab XMLRPC server can be accessed via two different transport layers.
-
-<ul>
-<li> SSH: Yes, this is a little different then other RPC servers, but
-     since all registered Emulab users already have accounts on Emulab
-     and are required to use SSH to
-     log in (and thus have provided us with their public keys), we decided
-     this was any easy way to handle authentication.
-
-<li> SSL: A more traditional SSL based server is also available. You
-     need to request a certificate from the Emulab website in order to
-     the SSL based server. Go to the "My Emulab" portion of the Emulab
-     website, and click on the "Create SSL Certificate" link. You will
-     be prompted for a passphrase to use to encrypt the private key.
-     Once the key has been created, you will be given a link to
-     download a text version (PEM format). Simply provide this
-     certificate as an input to your SSL client.
-</ul>
+The Emulab XMLRPC server can be accessed via an SSL based server. 
+You need to request a certificate from the Emulab website in order to
+use the SSL based server. Go to the "My Emulab" portion of the Emulab
+website, and click on the "Create SSL Certificate" link. You will
+be prompted for a passphrase to use to encrypt the private key.
+Once the key has been created, you will be given a link to
+download a text version (PEM format). Simply provide this
+certificate as an input to your SSL client.
 
 <p>
 The API is described in detail below. A demonstration client written in
@@ -72,52 +62,42 @@ Python is also available that you can use on your desktop to invoke
 commands from the shell. For example:
 
     <code><pre>
-    sshxmlrpc_client.py startexp batch=false wait=true proj="myproj" exp="myexp" nsfilestr="`cat ~/nsfile.ns`"</code></pre>
+    sslxmlrpc_client.py startexp batch=false wait=true proj="myproj" exp="myexp" nsfilestr="`cat ~/nsfile.ns`"</code></pre>
 
 which says to create an experiment called "myexp" in the "myproj" project,
 swap it in immediately, wait for the exit status (instead of running
 asynchronously), passing inline the contents of <tt>nsfile.ns</tt> in your
 home directory on your desktop.  By default, the client will contact the RPC
 server at <tt><?php echo $BOSSNODE ?></tt>, but you can override that by
-using the <tt>-s hostname</tt> option.. If your login ID on the local
-machine is different then your login ID on Emulab, you can use the <tt>-l
-login</tt> option. For example:
+using the <tt>-s hostname</tt> option. For example:
 
     <code><pre>
-    sshxmlrpc_client.py -s boss.emulab.net -l rellots startexp ...</code></pre>
+    sslxmlrpc_client.py -s boss.emulab.net startexp ...</code></pre>
 
-which would invoke the RPC server on <tt>boss.emulab.net</tt>, using the
-login ID <tt>rellots</tt> (for the purposes of SSH authentication).  You
-will be prompted for your SSH passphrase, unless you are running an SSH
-agent and the key you have uploaded to Emulab has been added to your local
-agent.
+which would invoke the RPC server on <tt>boss.emulab.net</tt>.
+You will be prompted for your SSL passphrase.
 </p>
 
 <p>
-The <a href="downloads/xmlrpc/"><tt>sshxmlrpc_client</tt></a>
+The <a href="downloads/xmlrpc/"><tt>sslxmlrpc_client</tt></a>
 python program is a simple demonstration of how to use Emulab's RPC
 server. If you do not provide a method and arguments on the command
 line, it will enter a command loop where you can type in commands (method
 and arguments) and wait for responses from the server. It converts your
 command lines into RPCs to the server, and prints out the results that the
 server sends back (exiting with whatever status code the server
-returned). You can use this client program as is, or you can write your own
-client program in whatever language you like, as long as you speak to the
-server over an SSH connection.
-
-<p> You may also use the SSL version of the client program, <a
-href="downloads/xmlrpc/"><tt>sslxmlrpc_client</tt></a> as long as you
-request an SSL certificate as described above. Once you have a
-certificate, use the <tt>--cert=</tt> option to tell the demonstration
+returned).f You can use this client program as is, or you can write your own
+client program in whatever language you like. Remember to
+use the <tt>--cert=</tt> option to tell the demonstration
 client where to find your certificate. You will be prompted for the
 private key passphrase when it attempts to contact the server.
 
 <p>
 A more sophisticated client called
 <a href="downloads/xmlrpc/"><tt>script_wrapper.py</tt></a> provides a
-traditional command line interface to Emulab, using the SSH transport
+traditional command line interface to Emulab, using the SSL transport
 described above. The client should run on any machine that has Python
-and SSH (or Putty) installed. For example, to swap the <tt>myexp</tt>
+installed. For example, to swap the <tt>myexp</tt>
 experiment in the <tt>testbed</tt> project in:
 
     <code><pre>

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -13,7 +13,6 @@ sub usage ()
     print STDERR " -p   - pre-assign mode, as from tbprerun\n";
     print STDERR " -v   - Enables verbose output\n";
     print STDERR " -u   - Enables update mode\n";
-    print STDERR " -x   - XML output\n";
     print STDERR " -o   - Send output to file instead of stdout\n";
     print STDERR " -f   - Fix current resources during update mode\n";
     exit(1);
@@ -24,7 +23,6 @@ my $fixmode  = 0;
 my $updating = 0;
 my $warnings = 0;
 my $preassign= 0;
-my $xml      = 0;
 my $rspec    = 0;
 my $output   = *STDOUT;
 my $retval   = 0;
@@ -45,6 +43,7 @@ use libtestbed;
 use User;
 use libtblog;
 use libvtop;
+use Experiment;
 
 # Protos
 sub fatal($);
@@ -76,9 +75,6 @@ if (defined($options{"u"})) {
 if (defined($options{"f"})) {
     $fixmode = 1;
 }
-if (defined($options{"x"})) {
-    $xml = 1;
-}
 if (defined($options{"r"})) {
     $rspec = 1;
 }
@@ -99,6 +95,8 @@ my $this_user = User->ThisUser();
 if (! defined($this_user)) {
     tbdie("You ($UID) do not exist!");
 }
+
+libvtop::Init($this_user, $experiment->GetGroup(), $experiment);
 
 my $flags = 0;
 $flags |= $libvtop::VTOP_FLAGS_VERBOSE
@@ -134,9 +132,6 @@ if ($preassign) {
 
 if ($rspec && defined($vtop->rspec())) {
     $retval = $vtop->PrintRspec($output);
-}
-elsif ($xml) {
-    $retval = $vtop->PrintXML($output);
 }
 else {
     $retval = $vtop->PrintTop($output);

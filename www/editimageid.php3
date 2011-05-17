@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -263,38 +263,6 @@ function SPITFORM($image, $formfields, $errors)
           </tr>\n";
 
     echo "<tr>
-            <td>Load Address: </td>
-            <td class=left>\n";
-
-    if ($isadmin) {
-	echo "  <input type=text
-                       name=\"formfields[load_address]\"
-                       value=\"" . $formfields["load_address"] . "\"
-	               size=20 maxlength=256>";
-    }
-    else {
-	echo $defaults["load_address"];
-    }
-    echo "  </td>
-          </tr>\n";
-
-    echo "<tr>
-            <td>Frisbee pid: </td>
-            <td class=left>\n";
-
-    if ($isadmin) {
-	echo "  <input type=text
-                       name=\"formfields[frisbee_pid]\"
-                       value=\"" . $formfields["frisbee_pid"] . "\"
-	               size=6 maxlength=10>";
-    }
-    else {
-	echo $defaults["frisbee_pid"];
-    }
-    echo "  </td>
-          </tr>\n";
-
-    echo "<tr>
               <td align=center colspan=2>
                  <b><input type=submit name=submit value=Submit></b>
               </td>
@@ -381,16 +349,6 @@ foreach ($mtypes_array as $type) {
     if ($checked != array_search("mtype_$type", $mtypes_array)) {
 	$args["mtype_$type"] = $checked ? "1" : "0";
     }
-}
-
-if (isset($formfields["load_address"]) && $formfields["load_address"] != "" &&
-    ($formfields["load_address"] != $image->load_address())) {
-    $args["load_address"] = $formfields["load_address"];
-}
-
-if (isset($formfields["frisbee_pid"]) && $formfields["frisbee_pid"] != "" &&
-    ($formfields["frisbee_pid"] != $image->frisbee_pid())) {
-    $args["frisbee_pid"] = $formfields["frisbee_pid"];
 }
 
 #

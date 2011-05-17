@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Optional flag argument says "do not reboot"
@@ -50,6 +50,7 @@ tweakmbr()
 {
 	local disk=$1
 	local new_mbr_ver=$2
+	local always=$3
 	local cur_mbr_ver=''
 
 	if ! dd if=$disk of=/dev/null bs=512 count=1 2>/dev/null; then
@@ -72,9 +73,13 @@ tweakmbr()
 			echo "Found no MBR on $disk, installing version $new_mbr_ver"
 			;;
 		*)
-			echo "WARNING: custom MBR on $disk, not changed"
-			return 0
-			;;
+			if [ $always -eq 1 ]; then
+			    echo "WARNING: overwriting unknown MBR on $disk with version $new_mbr_ver"
+			else
+			    echo "WARNING: custom MBR on $disk, not changed"
+			    return 0
+			fi
+    			;;
 	esac
 
 	if [ "$cur_mbr_ver" = $new_mbr_ver ]; then
@@ -88,6 +93,19 @@ tweakmbr()
 
 	echo "Installing MBR version $new_mbr_ver ..."
 	dd if=$MBR_PATH/mbr${new_mbr_ver}.dd of=$disk bs=512 count=1
+
+	# Zero out the partition type bytes for FreeBSD and Linux partitions
+	# so that if the user tries to make a whole-disk image later it will
+	# work without imagezip complaining about filesystem-specific errors
+	# when the partition offsets have been adjusted.  Frisbee/imagezip
+	# will write the correct type byte when it writes the image.
+	#
+	# The Linux swap partition is left alone because imagezip currently
+	# blindly includes just the first portion of the swap partition without
+	# checking to ensure it is valid.
+	for i in 0 1; do
+		dd if=/dev/zero of=$disk bs=1 count=1 seek=$(( $i * 16 + 450 )) > /dev/null 2>&1
+	done
 
 	# Linux won't re-read the partition table unless told to do so.
 	# hdparm could be used for this, but it may not be installed.
@@ -134,7 +152,7 @@ write_image()
 	local zfill=$4
 	local ptype=$5
 	local server=$6
-	local port=""
+	local imageid=""
 	local imagefile=""
 	local frisbee_opts="$FRISBEE_OPTS"
 	local imageunzip_opts="$IMAGEUNZIP_OPTS"
@@ -157,8 +175,9 @@ write_image()
 	local protocol=${address%%://*}
 	if [ $protocol = $address ]; then
 		case $address in
-			/*) protocol=file ;;
-			*) protocol=frisbee ;;
+			/*)  protocol=file ;;
+			*,*) protocol=mfrisbee ;;
+			*)   protocol=frisbee ;;
 		esac
 	fi
 
@@ -170,6 +189,17 @@ write_image()
 				return 1
 			fi
 			address=${address%%:*}
+			imageid="-m $address -p $port"
+			;;
+		mfrisbee)
+			# address is of the form pid,gid,imagename
+			pid=${address%%,*}
+			imagename=${address##*,}
+			if [ $pid = $address -o $imagename = $address ]; then
+				echo "*** WARNING: could not parse imageid spec: $address"
+				return 1
+			fi
+			imageid="-B 30 -F $pid/$imagename"
 			;;
 		http|https)
 			server=${address%%/*}
@@ -207,10 +237,10 @@ write_image()
 
 	$BINDIR/tmcc state RELOADING
 
-	if [ $protocol = frisbee ]; then
+	if [ $protocol = frisbee -o $protocol = mfrisbee ]; then
 		[ -n "$server" ] || server=$BOSSIP
-		echo "$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk"
-		$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk
+		echo "$BINDIR/frisbee -S $server $imageid $frisbee_opts $disk"
+		$BINDIR/frisbee -S $server $imageid $frisbee_opts $disk
 		rc=$?
 
 		if [ $rc -ne 0 ]; then
@@ -240,6 +270,7 @@ handle_loadinfo()
 	local PARTOS=`get_value "$LOADINFO" PARTOS`
 	local PARTITION=`get_value "$LOADINFO" PART`
 	PARTITION=${PARTITION:-'0'}
+	local IMAGEID=`get_value "$LOADINFO" IMAGEID`
 
 	local FREEBSD_DISK=''
 	local DISK=`get_value "$LOADINFO" DISK`
@@ -255,8 +286,11 @@ handle_loadinfo()
 	local PTYPE=''
 
 	if [ -z "$ADDRESS" ]; then
-		echo "Unable to get address for loading image"
-		return 1
+		if [ -z "$IMAGEID" ]; then
+		    echo "Unable to get imageid or address for loading image"
+		    return 1
+		fi
+		ADDRESS=$IMAGEID
 	fi
 
 	FREEBSD_DISK=$DISK
@@ -283,7 +317,7 @@ handle_loadinfo()
 	# and replace if not.
 	if [ -z "$FIRSTMBR" ]; then
 		if [ "$PARTITION" != "0" ]; then
-		    tweakmbr /dev/$DISK $MBR
+		    tweakmbr /dev/$DISK $MBR $PREPARE
 		    echo "Resizing final disk partition"
 		    growdisk -vW /dev/$DISK
 		fi
@@ -309,7 +343,7 @@ handle_loadinfo()
 		zapsuperblocks /dev/$DISK
 	fi
 
-	write_image $ADDRESS /dev/$DISK $PARTITION $ZFILL $PTYPE $SERVER
+	write_image "$ADDRESS" "/dev/$DISK" "$PARTITION" "$ZFILL" "$PTYPE" "$SERVER"
 	rc=$?
 	if [ $rc -ne 0 ]; then
 		echo "Failed to write image to disk, status $rc"

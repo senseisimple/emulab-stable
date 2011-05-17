@@ -24,7 +24,7 @@ SCRIPTS		= $(addprefix $(SRCDIR)/, \
 		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
 		    rc.startcmd rc.simulator rc.topomap rc.firewall \
 		    rc.tiptunnels rc.trace rc.motelog rc.fakejail \
-		    rc.tpmsetup)
+		    rc.tpmsetup rc.blobs)
 
 SUBBOSS_SCRIPTS	= $(addprefix $(SRCDIR)/, \
                     rc.config rc.misc rc.route \
@@ -33,7 +33,7 @@ SUBBOSS_SCRIPTS	= $(addprefix $(SRCDIR)/, \
 		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
 		    rc.startcmd rc.simulator rc.firewall \
 		    rc.tiptunnels rc.trace rc.motelog rc.fakejail \
-		    rc.tpmsetup rc.mksubboss)
+		    rc.tpmsetup rc.mksubboss) # XXX: Add rc.blobs?
 
 include $(OBJDIR)/Makeconf
 

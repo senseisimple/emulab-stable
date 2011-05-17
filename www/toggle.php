@@ -146,12 +146,22 @@ elseif ($type == "lockdown") {
     $experiment->SetLockDown($value);
 }
 elseif ($type == "skipvlans") {
-    # must be admin
-    if (! $isadmin) {
+    # Must validate the pid,eid since we allow non-admins to do this.
+    if (! TBvalid_pid($pid)) {
+	PAGEARGERROR("Invalid characters in $pid");
+    }
+    if (! TBvalid_eid($eid)) {
+	PAGEARGERROR("Invalid characters in $eid");
+    }
+    if (! ($isadmin || STUDLY() || OPSGUY())) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
     if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
 	PAGEARGERROR("Experiment $pid/$eid is not a valid experiment!");
+    }
+    if (!$isadmin &&
+	! TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_LOCALROOT)) {
+	USERERROR("You do not have permission to toggle $type!", 1);
     }
     $zapurl = CreateURL("showexp", $experiment);
     $experiment->SetSkipVlans($value);

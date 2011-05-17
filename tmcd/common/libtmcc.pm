@@ -17,8 +17,8 @@ use Exporter;
 @EXPORT = qw(configtmcc tmcc tmccbossname tmccgetconfig tmccclrconfig
 	     tmcccopycache tmccbossinfo
 	     TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_STATE TMCCCMD_IFC
-	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_HOSTS TMCCCMD_RPM
-	     TMCCCMD_TARBALL TMCCCMD_STARTUP TMCCCMD_STARTSTAT
+	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_BRIDGES TMCCCMD_HOSTS TMCCCMD_RPM
+	     TMCCCMD_TARBALL TMCCCMD_BLOBS TMCCCMD_STARTUP TMCCCMD_STARTSTAT
 	     TMCCCMD_READY TMCCCMD_MOUNTS TMCCCMD_ROUTING TMCCCMD_TRAFFIC
 	     TMCCCMD_BOSSINFO TMCCCMD_TUNNEL TMCCCMD_NSECONFIGS
 	     TMCCCMD_VNODELIST TMCCCMD_SUBNODELIST TMCCCMD_ISALIVE
@@ -34,12 +34,13 @@ use Exporter;
              TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
 	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT TMCCCMD_ROOTPSWD
 	     TMCCCMD_LTMAP TMCCCMD_LTPMAP TMCCCMD_TOPOMAP TMCCCMD_LOADINFO
-	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB TMCCCMD_DHCPDCONF
+	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB TMCCCMD_DHCPDCONF TMCCCMD_MANIFEST
 	     );
 
 # Must come after package declaration!
 use English;
 use Data::Dumper;
+use Fcntl qw(:DEFAULT :seek);
 
 #
 # Turn off line buffering on output
@@ -87,7 +88,7 @@ my $beproxy     = 0;
       "noproxy"         => 0,
       "nossl"           => 0,
       "cachedir"        => undef,
-      "urn"             => undef,
+      "idkey"           => undef,
       "usetpm"          => 0,
     );
 
@@ -134,9 +135,11 @@ my %commandset =
       "ifconfig"	=> {TAG => "ifconfig"},
       "accounts"	=> {TAG => "accounts"},
       "delay"		=> {TAG => "delay"},
+      "bridges"		=> {TAG => "bridges"},
       "hostnames"	=> {TAG => "hostnames"},
       "rpms"		=> {TAG => "rpms"},
       "tarballs"	=> {TAG => "tarballs"},
+      "blobs"		=> {TAG => "blobs"},
       "startupcmd"	=> {TAG => "startupcmd"},
       "startstatus"	=> {TAG => "startstatus"},
       "ready"		=> {TAG => "ready"},
@@ -192,6 +195,7 @@ my %commandset =
       "tpmpubkey"       => {TAG => "tpmpubkey"},
       "loadinfo"        => {TAG => "loadinfo"},
       "dhcpdconf"       => {TAG => "dhcpdconf"},
+      "manifest"        => {TAG => "manifest"},
     );
 
 #
@@ -203,9 +207,11 @@ sub TMCCCMD_STATE()	{ $commandset{"state"}->{TAG}; }
 sub TMCCCMD_IFC()	{ $commandset{"ifconfig"}->{TAG}; }
 sub TMCCCMD_ACCT()	{ $commandset{"accounts"}->{TAG}; }
 sub TMCCCMD_DELAY()	{ $commandset{"delay"}->{TAG}; }
+sub TMCCCMD_BRIDGES()	{ $commandset{"bridges"}->{TAG}; }
 sub TMCCCMD_HOSTS()	{ $commandset{"hostnames"}->{TAG}; }
 sub TMCCCMD_RPM()	{ $commandset{"rpms"}->{TAG}; }
 sub TMCCCMD_TARBALL()	{ $commandset{"tarballs"}->{TAG}; }
+sub TMCCCMD_BLOBS()	{ $commandset{"blobs"}->{TAG}; }
 sub TMCCCMD_STARTUP()	{ $commandset{"startupcmd"}->{TAG}; }
 sub TMCCCMD_STARTSTAT()	{ $commandset{"startstatus"}->{TAG}; }
 sub TMCCCMD_READY()	{ $commandset{"ready"}->{TAG}; }
@@ -259,6 +265,7 @@ sub TMCCCMD_TPMBLOB()  { $commandset{"tpmblob"}->{TAG}; }
 sub TMCCCMD_TPMPUB()  { $commandset{"tpmpubkey"}->{TAG}; }
 sub TMCCCMD_LOADINFO()  { $commandset{"loadinfo"}->{TAG}; }
 sub TMCCCMD_DHCPDCONF()  { $commandset{"dhcpdconf"}->{TAG}; }
+sub TMCCCMD_MANIFEST()  { $commandset{"manifest"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
@@ -364,8 +371,8 @@ sub runtmcc ($;$$%)
 	if (%optconfig);
 
     # Must be last option, before command
-    if (defined($config{"urn"})) {
-	$options .= " URN=" . $config{"urn"};
+    if (defined($config{"idkey"})) {
+	$options .= " IDKEY=" . $config{"idkey"};
     }
 
     if (!defined($args)) {
@@ -653,6 +660,245 @@ sub tmccgetconfig()
 	}
     }
     return 0;
+}
+
+# 
+package libtmcc::blob;
+
+my $NICKNAMEFILE = "$BOOTDIR/nickname";
+my $KEYHASHFILE = "$BOOTDIR/keyhash";
+
+##
+## This method returns the keyhash that other things (i.e., fetching blobs after
+## a call to getmanifest returns) depend on.  And since getmanifest is called
+## first, we need the keyhash quick.  So we steal this method from rc.keys.
+##
+
+#
+# Get the hashkey
+# 
+sub dokeyhash()
+{
+    my $keyhash;
+    my @tmccresults;
+
+    if (libtmcc::tmcc(libtmcc::TMCCCMD_KEYHASH, undef, \@tmccresults) < 0) {
+	fatal("Could not get keyhash from server!");
+    }
+    unlink $KEYHASHFILE;
+    return 0
+	if (! @tmccresults);
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults[0] =~ /KEYHASH HASH=\'([\w]*)\'/) {
+	$keyhash = $1;
+    }
+    else {
+	fatal("Bad keyhash line: $tmccresults[0]");
+    }
+
+    #
+    # Write a file so the node knows the key.
+    #
+    my $oldumask = umask(0222);
+    
+    if (system("echo '$keyhash' > ". $KEYHASHFILE)) {
+	fatal("Could not write " . $KEYHASHFILE);
+    }
+    umask($oldumask);
+    return 0;
+}
+
+# Load up the paths. Done like this in case init code is needed.
+BEGIN
+{
+    if (! -e "/etc/emulab/paths.pm") {
+	die("Yikes! Could not require /etc/emulab/paths.pm!\n");
+    }
+    require "/etc/emulab/paths.pm";
+    import emulabpaths;
+}
+
+sub hash($) {
+    my ($struct) = @_;
+
+    return $struct->{'hash'} if defined( $struct->{'hash'} );
+
+    return undef unless defined( $struct->{'existing'} );
+
+    my $digest = Digest::SHA1->new;
+    my $hex;
+
+    $digest->addfile( $struct->{'existing'} );
+
+    $hash = $digest->hexdigest;
+
+    print "Computed hash $struct->{hash}\n" if( $debug );
+
+    return $hash;
+}
+
+sub http_common($$) {
+    my ($struct,$prefix) = @_;
+
+    my $cachedhash = hash($struct);
+
+    my $URL = $prefix . "://" . $struct->{'server'} . "/blob/read/" . 
+	$struct->{'key'} . "/" . $struct->{'blobid'};
+
+    print "Attempting to retrieve $URL\n" if( $debug );
+
+    $URL .= "?hash=" . $cachedhash if( defined( $cachedhash ) );
+
+    my $ua = LWP::UserAgent->new;
+    my $request = HTTP::Request->new( GET => $URL );
+
+    # setup a callback
+    my $callback = sub {
+	my $cstruct = $struct;
+	my ($chunk, $response, $protocol) = @_;
+
+	print { $cstruct->{'output'} } $chunk;
+
+	# FIXME would be nice to hash as we go
+    };
+
+    my $response = $ua->request( $request, $callback );
+
+    if( $response->code == 304 ) { # Not modified
+	print "Cached copy is current.\n" if( $debug );
+
+	unlink( $struct->{'tempfilename'} ) if( exists( $struct->{'tempfilename'} ) );
+
+	close ( $struct->{'output'} );
+	return 1;
+    }
+
+    if( $response->is_success ) {
+	print "Retrieved successfully.\n" if( $debug );
+
+	if( exists( $struct->{'tempfilename'} ) ) {
+	    rename( $struct->{'tempfilename'}, $struct->{'finalfilename'} )
+		or die( "$struct->{finalfilename}: $!" );
+	}
+
+	close ( $struct->{'output'} );
+	return 0;
+    }
+
+    print $response->status_line . "\n" if( $debug );
+
+    return -1;
+}
+
+sub http($) {
+    http_common( $_[0],"http" );
+}
+
+sub https($) {
+    http_common( $_[0],"https" );
+}
+
+sub getblob($$;\@$) {
+    my ($blobid,$outputfilename,$transport,$options) = @_;
+    if (!defined($transport)) {
+	$transport = [ 'https','http' ];
+    }
+
+    #
+    # Build a struct so we're reentrant.
+    #
+    my %struct = ( 'blobid' => $blobid,
+		   'outputfilename' => $outputfilename
+	);
+
+    $debug = 1 if( $options ); # the only option right now
+    require Digest::SHA1;
+    require LWP::UserAgent;
+
+    open NICKNAME, $NICKNAMEFILE or die "$NICKNAMEFILE: $!";
+    <NICKNAME> =~ /.+[.].+[.](.+)/;
+    my $project = $1;
+    $struct{'project'} = $project;
+    close NICKNAME;
+    
+    #
+    # We need the keyhash for any blobs we grab!
+    #
+    if (! -e $KEYHASHFILE) {
+	dokeyhash();
+    }
+    open KEYHASH, $KEYHASHFILE or die "$KEYHASHFILE: $!";
+    <KEYHASH> =~ /^([-\w\d]+)$/;
+    my $key = $1;
+    $struct{'key'} = $key;
+    close KEYHASH;
+    
+    (undef,$struct{'server'}) = libtmcc::tmccbossinfo();
+    
+    if( $debug ) {
+        $, = " ";
+        print "Blob ID: $blobid\n";
+        print "Key: $key\n";
+        print "Output: " .
+    	( $outputfilename ? $outputfilename : "(standard output)" ) . "\n";
+        print "Project: $project\n";
+        print "Transports: @$transport\n";
+    }
+
+    my $tempfilename;
+    if( defined( $outputfilename ) ) {
+        $tempfilename = $outputfilename . ".$$";
+	$struct{'finalfilename'} = $outputfilename;
+	$struct{'tempfilename'} = $tempfilename;
+    
+        open( OUTPUT, $outputfilename )
+	and $struct{'existing'} = *OUTPUT{IO};
+        
+        if (!open( TEMP, ">$tempfilename" )) {
+	    print STDERR "ERROR(getblob): $tempfilename: $!\n";
+	    return -1;
+	}
+    
+        $struct{'output'} = *TEMP{IO};
+        $struct{'canhash'} = 1;
+    } else {
+        $struct{'output'} = *STDOUT{IO};
+        $struct{'canhash'} = 0;
+    }
+    
+    my $retval = 0;
+    foreach my $t ( @$transport ) {
+        print "Attempting transport $t...\n" if( $debug );
+    
+        if( $t =~ /^http$/i ) {
+	    $retval = http(\%struct);
+        } elsif( $t =~ /^https$/i ) {
+	    $retval = https(\%struct);
+        } else {
+	    $retval = -1;
+	    print STDERR "ERROR(getblob): unknown transport $t\n";
+	    next;
+        }
+
+	if ($retval == 1 || $retval == 0) {
+	    # success!
+	    unlink( $tempfilename ) if( defined( $tempfilename ) );
+	    return 0;
+	}
+	else {
+	    print STDERR "ERROR(getblob): transport $t failed!\n";
+	}
+    }
+    
+    # nothing worked.
+    print STDERR "ERROR(getblob): failed to retrieve blob $blobid\n";
+    
+    unlink( $tempfilename ) if( defined( $tempfilename ) );
+
+    return -1;
 }
 
 1;

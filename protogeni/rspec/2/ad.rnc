@@ -46,6 +46,14 @@ NodeContents &=
     }*
   }*
 
+SliverType &=
+  element disk_image {
+    DiskImageContents &
+    attribute default { text }?
+  }* &
+  attribute default { text }?
+
+
 RelationContents &=
   attribute component_id { text }
 
@@ -64,7 +72,11 @@ InterfaceContents &=
   attribute component_id { text } &
   attribute component_name { text }? &
   element monitoring { MonitoringContents }? &
-  attribute role { "control" | "experimental" | "mixed" }? &
+  # role should usually be one of:
+  #  'control' (interface used to communicate with CM and/or the world)
+  #  'experimental' (interface used to communicate within the topology
+  #  'mixed' (interface used for both of the above
+  attribute role { text }? &
   attribute public_ipv4 { text }?
 
 MonitoringContents &=
@@ -93,12 +105,15 @@ ServiceContents &=
 InstallServiceContents &=
   AnyExtension &
   # Type(s) of archives supported
-  attribute file_type { "tar.gz" | "tar.bz2" }
+  # file_type should usually be one of 'tar.gz' or 'tar.bz2' for tarballs
+  attribute file_type { text }
 
 ExecuteServiceContents &=
   AnyExtension &
   # Shell environment allowed
-  attribute shell { "sh" }
+  # Should usually be 'sh' to indicate a generic unix shell
+  #   environment for the script.
+  attribute shell { text }
 
 TypeRelationContents &=
   AnyExtension &

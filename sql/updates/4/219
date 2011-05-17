@@ -1,0 +1,21 @@
+#
+# Add sitevariables to indicate that the testbed is shutdown.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 " ('general/testbed_shutdown',NULL,'0', ".
+		 "  'Non-zero value indicates that the testbed is shutdown ".
+		 "and scripts should not do anything when they run. ".
+		 "DO NOT SET THIS BY HAND!', 0)")
+	if (!TBSiteVarExists("general/testbed_shutdown"));
+
+    return 0;
+}
+1;
+

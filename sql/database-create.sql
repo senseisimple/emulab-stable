@@ -109,6 +109,51 @@ CREATE TABLE `archives` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `blob_files`
+--
+
+DROP TABLE IF EXISTS `blob_files`;
+CREATE TABLE `blob_files` (
+  `filename` varchar(255) NOT NULL,
+  `hash` varchar(64) default NULL,
+  `hash_mtime` datetime default NULL,
+  PRIMARY KEY  (`filename`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `blobs`
+--
+
+DROP TABLE IF EXISTS `blobs`;
+CREATE TABLE `blobs` (
+  `uuid` varchar(40) NOT NULL,
+  `filename` tinytext,
+  `owner_uid` varchar(8) NOT NULL default '',
+  `vblob_id` varchar(40) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `bridges`
+--
+
+DROP TABLE IF EXISTS `bridges`;
+CREATE TABLE `bridges` (
+  `pid` varchar(32) default NULL,
+  `eid` varchar(32) default NULL,
+  `exptidx` int(11) NOT NULL default '0',
+  `node_id` varchar(32) NOT NULL default '',
+  `bridx` mediumint(8) unsigned NOT NULL default '0',
+  `iface` varchar(8) NOT NULL default '',
+  `vname` varchar(32) NOT NULL default '',
+  `vnode` varchar(32) default NULL,
+  PRIMARY KEY  (`node_id`,`bridx`,`iface`),
+  KEY `pid` (`pid`,`eid`),
+  KEY `exptidx` (`exptidx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `buildings`
 --
 
@@ -207,6 +252,59 @@ CREATE TABLE `checkups_temp` (
   `type` varchar(64) NOT NULL default '',
   `next` datetime default NULL,
   PRIMARY KEY  (`object`,`type`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `client_service_ctl`
+--
+
+DROP TABLE IF EXISTS `client_service_ctl`;
+CREATE TABLE `client_service_ctl` (
+  `obj_type` enum('node_type','node','osid') NOT NULL default 'node_type',
+  `obj_name` varchar(64) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `alt_blob_id` varchar(40) NOT NULL default '',
+  `enable` tinyint(1) NOT NULL default '1',
+  `enable_hooks` tinyint(1) NOT NULL default '1',
+  `fatal` tinyint(1) NOT NULL default '1',
+  `user_can_override` tinyint(1) NOT NULL default '1',
+  PRIMARY KEY  (`obj_type`,`obj_name`,`service_idx`,`env`,`whence`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `client_service_hooks`
+--
+
+DROP TABLE IF EXISTS `client_service_hooks`;
+CREATE TABLE `client_service_hooks` (
+  `obj_type` enum('node_type','node','osid') NOT NULL default 'node_type',
+  `obj_name` varchar(64) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `hook_blob_id` varchar(40) NOT NULL default '',
+  `hook_op` enum('boot','shutdown','reconfig','reset') NOT NULL default 'boot',
+  `hook_point` enum('pre','post') NOT NULL default 'post',
+  `argv` varchar(255) NOT NULL default '',
+  `fatal` tinyint(1) NOT NULL default '0',
+  `user_can_override` tinyint(1) NOT NULL default '1',
+  PRIMARY KEY  (`obj_type`,`obj_name`,`service_idx`,`env`,`whence`,`hook_blob_id`,`hook_op`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `client_services`
+--
+
+DROP TABLE IF EXISTS `client_services`;
+CREATE TABLE `client_services` (
+  `idx` int(10) NOT NULL default '0',
+  `service` varchar(64) NOT NULL default 'isup',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `hooks_only` int(1) NOT NULL default '0',
+  PRIMARY KEY  (`idx`,`service`,`env`,`whence`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -425,6 +523,7 @@ CREATE TABLE `deltas` (
 -- Table structure for table `elabinelab_attributes`
 --
 
+DROP TABLE IF EXISTS `elabinelab_attributes`;
 CREATE TABLE `elabinelab_attributes` (
   `pid` varchar(12) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
@@ -450,6 +549,20 @@ CREATE TABLE `elabinelab_vlans` (
   `stack` enum('Control','Experimental') NOT NULL default 'Experimental',
   PRIMARY KEY  (`exptidx`,`inner_id`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`inner_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `emulab_features`
+--
+
+DROP TABLE IF EXISTS `emulab_features`;
+CREATE TABLE `emulab_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `description` mediumtext,
+  `added` datetime NOT NULL,
+  `enabled` tinyint(1) NOT NULL default '0',
+  `disabled` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`feature`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -595,7 +708,7 @@ DROP TABLE IF EXISTS `event_triggertypes`;
 CREATE TABLE `event_triggertypes` (
   `idx` smallint(5) unsigned NOT NULL,
   `type` tinytext NOT NULL,
-  PRIMARY KEY (`idx`)
+  PRIMARY KEY  (`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -621,6 +734,36 @@ CREATE TABLE `eventlist` (
   PRIMARY KEY  (`exptidx`,`idx`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`idx`),
   KEY `vnode` (`vnode`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `experiment_blobs`
+--
+
+DROP TABLE IF EXISTS `experiment_blobs`;
+CREATE TABLE `experiment_blobs` (
+  `idx` int(11) unsigned NOT NULL auto_increment,
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `path` varchar(255) NOT NULL default '',
+  `action` varchar(255) NOT NULL default '',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `exptidx` (`exptidx`,`path`,`action`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `experiment_features`
+--
+
+DROP TABLE IF EXISTS `experiment_features`;
+CREATE TABLE `experiment_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `added` datetime NOT NULL,
+  `exptidx` int(11) NOT NULL default '0',
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  PRIMARY KEY  (`feature`,`exptidx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1163,6 +1306,7 @@ CREATE TABLE `experiments` (
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `pideid` (`pid`,`eid`),
   UNIQUE KEY `pididxeid` (`pid_idx`,`eid`),
+  UNIQUE KEY `keyhash` (`keyhash`),
   KEY `batchmode` (`batchmode`),
   KEY `state` (`state`),
   KEY `eid_uuid` (`eid_uuid`)
@@ -1190,6 +1334,21 @@ CREATE TABLE `exppid_access` (
   PRIMARY KEY  (`exp_eid`,`exp_pid`,`pid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+--
+-- Table structure for table `external_networks`
+--
+
+DROP TABLE IF EXISTS `external_networks`;
+CREATE TABLE `external_networks` (
+  `network_id` varchar(32) NOT NULL default '',
+  `node_id` varchar(32) NOT NULL default '',
+  `node_type` varchar(30) NOT NULL default '',
+  `min_vlan` int(11) NOT NULL default '256',
+  `max_vlan` int(11) NOT NULL default '1000',
+  PRIMARY KEY  (`network_id`),
+  UNIQUE KEY `node_id` (`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+  
 --
 -- Table structure for table `firewall_rules`
 --
@@ -1257,6 +1416,23 @@ CREATE TABLE `foreign_keys` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `frisbee_blobs`
+--
+
+DROP TABLE IF EXISTS `frisbee_blobs`;
+CREATE TABLE `frisbee_blobs` (
+  `idx` int(11) unsigned NOT NULL auto_increment,
+  `path` varchar(255) NOT NULL default '',
+  `imageid` int(8) unsigned default NULL,
+  `load_address` text,
+  `frisbee_pid` int(11) default '0',
+  `load_busy` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `path` (`path`),
+  UNIQUE KEY `imageid` (`imageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `fs_resources`
 --
 
@@ -1295,6 +1471,21 @@ CREATE TABLE `global_vtypes` (
   `weight` float NOT NULL default '0.5',
   `types` text NOT NULL,
   PRIMARY KEY  (`vtype`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `group_features`
+--
+
+DROP TABLE IF EXISTS `group_features`;
+CREATE TABLE `group_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `added` datetime NOT NULL,
+  `pid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `gid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `pid` varchar(12) NOT NULL default '',
+  `gid` varchar(12) NOT NULL default '',
+  PRIMARY KEY  (`feature`,`gid_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1457,24 +1648,9 @@ CREATE TABLE `image_history` (
   PRIMARY KEY  (`history_id`),
   KEY `node_id` (`node_id`,`history_id`),
   KEY `stamp` (`stamp`),
-  KEY `rsrcidx` (`rsrcidx`)
+  KEY `rsrcidx` (`rsrcidx`),
+  KEY `node_history_id` (`node_history_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
--- Table structure for table `subboss_images`
---
-
-DROP TABLE IF EXISTS `subboss_images`;
-CREATE TABLE `subboss_images` (
-  `subboss_id` varchar(32) NOT NULL default '',
-  `imageid` int(8) unsigned NOT NULL default '0',
-  `load_address` text,
-  `frisbee_pid` int(11) default '0',
-  `load_busy` tinyint(4) NOT NULL default '0',
-  `sync` tinyint(4) NOT NULL default '0',
-  PRIMARY KEY  (`subboss_id`,`imageid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
 
 --
 -- Table structure for table `images`
@@ -1503,15 +1679,15 @@ CREATE TABLE `images` (
   `default_osid` int(8) unsigned NOT NULL default '0',
   `path` tinytext,
   `magic` tinytext,
-  `load_address` text,
-  `frisbee_pid` int(11) default '0',
-  `load_busy` tinyint(4) NOT NULL default '0',
   `ezid` tinyint(4) NOT NULL default '0',
   `shared` tinyint(4) NOT NULL default '0',
   `global` tinyint(4) NOT NULL default '0',
   `mbr_version` varchar(50) NOT NULL default '1',
   `updated` datetime default NULL,
   `access_key` varchar(64) default NULL,
+  `auth_uuid` varchar(64) default NULL,
+  `auth_key` varchar(512) default NULL,
+  `decryption_key` varchar(256) default NULL,
   PRIMARY KEY  (`imageid`),
   UNIQUE KEY `pid` (`pid`,`imagename`),
   KEY `gid` (`gid`),
@@ -1601,6 +1777,7 @@ CREATE TABLE `interfaces` (
   `whol` tinyint(4) NOT NULL default '0',
   `trunk` tinyint(1) NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
+  `logical` tinyint(1) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`card`,`port`),
   KEY `mac` (`mac`),
   KEY `IP` (`IP`),
@@ -2114,9 +2291,10 @@ CREATE TABLE `node_hostkeys` (
   `sshrsa_v1` mediumtext,
   `sshrsa_v2` mediumtext,
   `sshdsa_v2` mediumtext,
+  `sfshostid` varchar(128) default NULL,
   `tpmblob` mediumtext,
   `tpmx509` mediumtext,
-  `sfshostid` varchar(128) default NULL,
+  `tpmidentity` mediumtext,
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2384,6 +2562,53 @@ CREATE TABLE `nologins` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `nonces`
+--
+
+DROP TABLE IF EXISTS `nonces`;
+CREATE TABLE `nonces` (
+  `node_id` varchar(32) NOT NULL,
+  `purpose` varchar(64) NOT NULL,
+  `nonce` mediumtext,
+  `expires` int(10) NOT NULL,
+  PRIMARY KEY  (`node_id`,`purpose`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `nonlocal_user_accounts`
+--
+
+DROP TABLE IF EXISTS `nonlocal_user_accounts`;
+CREATE TABLE `nonlocal_user_accounts` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `uid_uuid` varchar(40) NOT NULL default '',
+  `unix_uid` smallint(5) unsigned NOT NULL auto_increment,
+  `created` datetime default NULL,
+  `urn` tinytext,
+  `name` tinytext,
+  `email` tinytext,
+  `exptidx` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`unix_uid`),
+  KEY `uid` (`uid`),
+  KEY `urn` (`urn`(255)),
+  KEY `uid_uuid` (`uid_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `nonlocal_user_bindings`
+--
+
+DROP TABLE IF EXISTS `nonlocal_user_bindings`;
+CREATE TABLE `nonlocal_user_bindings` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `exptidx` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`uid_idx`,`exptidx`),
+  KEY `uid` (`uid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `nonlocal_user_pubkeys`
 --
 
@@ -2400,19 +2625,6 @@ CREATE TABLE `nonlocal_user_pubkeys` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
--- Table structure for table `nonlocal_user_bindings`
---
-
-DROP TABLE IF EXISTS `nonlocal_user_bindings`;
-CREATE TABLE `nonlocal_user_bindings` (
-  `uid` varchar(8) NOT NULL default '',
-  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `exptidx` int(11) NOT NULL default '0',
-   PRIMARY KEY  (`uid_idx`,`exptidx`),
-   KEY `uid` (`uid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
 -- Table structure for table `nonlocal_users`
 --
 
@@ -2424,9 +2636,9 @@ CREATE TABLE `nonlocal_users` (
   `created` datetime default NULL,
   `name` tinytext,
   `email` tinytext,
-   PRIMARY KEY  (`uid_idx`),
-   KEY `uid` (`uid`),
-   UNIQUE KEY `uid_uuid` (`uid_uuid`)
+  PRIMARY KEY  (`uid_idx`),
+  UNIQUE KEY `uid_uuid` (`uid_uuid`),
+  KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3137,6 +3349,7 @@ CREATE TABLE `reserved` (
   `genisliver_idx` int(10) unsigned default NULL,
   `external_resource_index` int(10) unsigned default NULL,
   `external_resource_id` tinytext,
+  `external_resource_key` tinytext,
   `tmcd_redirect` tinytext,
   `sharing_mode` varchar(32) default NULL,
   PRIMARY KEY  (`node_id`),
@@ -3144,6 +3357,27 @@ CREATE TABLE `reserved` (
   UNIQUE KEY `vname2` (`exptidx`,`vname`),
   KEY `old_pid` (`old_pid`,`old_eid`),
   KEY `old_exptidx` (`old_exptidx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `scheduled_reloads`
+--
+DROP TABLE IF EXISTS `reserved_vlantags`;
+CREATE TABLE `reserved_vlantags` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `lanid` int(11) NOT NULL default '0',
+  `vname` varchar(128) NOT NULL default '',
+  `tag` smallint(5) NOT NULL default '0',
+  `reserve_time` datetime default NULL,  
+  `locked` datetime default NULL,
+  `state` varchar(32) NOT NULL default '',
+  PRIMARY KEY (`exptidx`,`lanid`,`tag`),
+  UNIQUE KEY `vname` (`pid`,`eid`,`vname`,`tag`),
+  UNIQUE KEY `lanid` (`pid`,`eid`,`lanid`,`tag`),
+  UNIQUE KEY `tag` (`tag`),
+  KEY `id` (`lanid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3236,6 +3470,21 @@ CREATE TABLE `state_triggers` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `subboss_images`
+--
+
+DROP TABLE IF EXISTS `subboss_images`;
+CREATE TABLE `subboss_images` (
+  `subboss_id` varchar(32) NOT NULL default '',
+  `imageid` int(8) unsigned NOT NULL default '0',
+  `load_address` text,
+  `frisbee_pid` int(11) default '0',
+  `load_busy` tinyint(4) NOT NULL default '0',
+  `sync` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`subboss_id`,`imageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `subbosses`
 --
 
@@ -3245,6 +3494,21 @@ CREATE TABLE `subbosses` (
   `service` varchar(20) NOT NULL default '',
   `subboss_id` varchar(20) NOT NULL default '',
   PRIMARY KEY  (`node_id`,`service`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `sw_configfiles`
+--
+
+DROP TABLE IF EXISTS `sw_configfiles`;
+CREATE TABLE `sw_configfiles` (
+  `id` int(11) NOT NULL auto_increment,
+  `node_id` varchar(32) NOT NULL,
+  `connection_id` int(11) NOT NULL default '0',
+  `file` varchar(4) NOT NULL,
+  `data` text,
+  `swid` varchar(20) NOT NULL,
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3258,21 +3522,6 @@ CREATE TABLE `switch_paths` (
   `vname` varchar(32) default NULL,
   `node_id1` varchar(32) default NULL,
   `node_id2` varchar(32) default NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
--- Table structure for table `openvpn_config`
---
-
-DROP TABLE IF EXISTS `sw_configfiles`;
-CREATE TABLE `sw_configfiles` (
-  `id` int(11) NOT NULL auto_increment,
-  `node_id` varchar(32) NOT NULL,
-  `connection_id` int(11) NOT NULL default '0',
-  `file` varchar(4) NOT NULL,
-  `data` text,
-  `swid` varchar(20) NOT NULL,
-   PRIMARY KEY(`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3301,6 +3550,9 @@ CREATE TABLE `switch_stacks` (
   `node_id` varchar(32) NOT NULL default '',
   `stack_id` varchar(32) NOT NULL default '',
   `is_primary` tinyint(1) NOT NULL default '1',
+  `snmp_community` varchar(32) default NULL,
+  `min_vlan` int(11) default NULL,
+  `max_vlan` int(11) default NULL,
   KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -3325,6 +3577,7 @@ CREATE TABLE `table_regex` (
 -- Table structure for table `template_stamps`
 --
 
+DROP TABLE IF EXISTS `template_stamps`;
 CREATE TABLE `template_stamps` (
   `guid` varchar(16) NOT NULL default '',
   `vers` smallint(5) unsigned NOT NULL default '0',
@@ -3356,7 +3609,9 @@ CREATE TABLE `testbed_stats` (
   `log_session` int(10) unsigned default NULL,
   PRIMARY KEY  (`idx`),
   KEY `rsrcidx` (`rsrcidx`),
-  KEY `exptidx` (`exptidx`)
+  KEY `exptidx` (`exptidx`),
+  KEY `uid_idx` (`uid_idx`),
+  KEY `idxdate` (`end_time`,`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3408,6 +3663,20 @@ CREATE TABLE `tmcd_redirect` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `tpm_quote_values`
+--
+
+DROP TABLE IF EXISTS `tpm_quote_values`;
+CREATE TABLE `tpm_quote_values` (
+  `node_id` varchar(32) NOT NULL default '',
+  `op_mode` varchar(20) NOT NULL,
+  `state` varchar(20) NOT NULL,
+  `pcr` int(11) NOT NULL,
+  `value` mediumtext,
+  PRIMARY KEY  (`node_id`,`op_mode`,`state`,`pcr`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `traces`
 --
 
@@ -3455,6 +3724,19 @@ CREATE TABLE `unixgroup_membership` (
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid` varchar(16) NOT NULL default '',
   PRIMARY KEY  (`uid`,`gid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `user_features`
+--
+
+DROP TABLE IF EXISTS `user_features`;
+CREATE TABLE `user_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `added` datetime NOT NULL,
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `uid` varchar(8) NOT NULL default '',
+  PRIMARY KEY  (`feature`,`uid_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3610,10 +3892,10 @@ CREATE TABLE `users` (
   `wikionly` tinyint(1) default '0',
   `mailman_password` tinytext,
   PRIMARY KEY  (`uid_idx`),
-  KEY `uid` (`uid`),
   KEY `unix_uid` (`unix_uid`),
   KEY `status` (`status`),
-  KEY `uid_uuid` (`uid_uuid`)
+  KEY `uid_uuid` (`uid_uuid`),
+  KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3734,6 +4016,76 @@ CREATE TABLE `virt_agents` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `virt_blobs`
+--
+
+DROP TABLE IF EXISTS `virt_blobs`;
+CREATE TABLE `virt_blobs` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vblob_id` varchar(40) NOT NULL default '',
+  `filename` tinytext,
+  PRIMARY KEY  (`exptidx`,`vblob_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_client_service_ctl`
+--
+
+DROP TABLE IF EXISTS `virt_client_service_ctl`;
+CREATE TABLE `virt_client_service_ctl` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vnode` varchar(32) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `alt_vblob_id` varchar(40) NOT NULL default '',
+  `enable` tinyint(1) NOT NULL default '1',
+  `enable_hooks` tinyint(1) NOT NULL default '1',
+  `fatal` tinyint(1) NOT NULL default '1',
+  PRIMARY KEY  (`exptidx`,`vnode`,`service_idx`,`env`,`whence`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_client_service_hooks`
+--
+
+DROP TABLE IF EXISTS `virt_client_service_hooks`;
+CREATE TABLE `virt_client_service_hooks` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vnode` varchar(32) NOT NULL default '',
+  `service_idx` int(10) NOT NULL default '0',
+  `env` enum('load','boot') NOT NULL default 'boot',
+  `whence` enum('first','every') NOT NULL default 'every',
+  `hook_vblob_id` varchar(40) NOT NULL default '',
+  `hook_op` enum('boot','shutdown','reconfig','reset') NOT NULL default 'boot',
+  `hook_point` enum('pre','post') NOT NULL default 'post',
+  `argv` varchar(255) NOT NULL default '',
+  `fatal` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`vnode`,`service_idx`,`env`,`whence`,`hook_vblob_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_client_service_opts`
+--
+
+DROP TABLE IF EXISTS `virt_client_service_opts`;
+CREATE TABLE `virt_client_service_opts` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vnode` varchar(32) NOT NULL default '',
+  `opt_name` varchar(32) NOT NULL default '',
+  `opt_value` varchar(64) NOT NULL default '',
+  PRIMARY KEY  (`exptidx`,`vnode`,`opt_name`,`opt_value`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `virt_firewalls`
 --
 
@@ -3761,6 +4113,7 @@ CREATE TABLE `virt_lan_lans` (
   `exptidx` int(11) NOT NULL default '0',
   `idx` int(11) NOT NULL auto_increment,
   `vname` varchar(32) NOT NULL default '',
+  `failureaction` enum('fatal','nonfatal') NOT NULL default 'fatal',
   PRIMARY KEY  (`exptidx`,`idx`),
   UNIQUE KEY `vname` (`pid`,`eid`,`vname`),
   UNIQUE KEY `idx` (`pid`,`eid`,`idx`)
@@ -3811,11 +4164,12 @@ CREATE TABLE `virt_lans` (
   `vname` varchar(32) NOT NULL default '',
   `vnode` varchar(32) NOT NULL default '',
   `vport` tinyint(3) NOT NULL default '0',
+  `vindex` int(11) NOT NULL default '-1',
   `ip` varchar(15) NOT NULL default '',
   `delay` float(10,2) default '0.00',
   `bandwidth` int(10) unsigned default NULL,
-  `est_bandwidth` int(10) unsigned default NULL,
   `backfill` int(10) unsigned default '0',
+  `est_bandwidth` int(10) unsigned default NULL,
   `lossrate` float(10,8) default NULL,
   `q_limit` int(11) default '0',
   `q_maxthresh` int(11) default '0',
@@ -3834,8 +4188,8 @@ CREATE TABLE `virt_lans` (
   `mask` varchar(15) default '255.255.255.0',
   `rdelay` float(10,2) default NULL,
   `rbandwidth` int(10) unsigned default NULL,
-  `rest_bandwidth` int(10) unsigned default NULL,
   `rbackfill` int(10) unsigned default '0',
+  `rest_bandwidth` int(10) unsigned default NULL,
   `rlossrate` float(10,8) default NULL,
   `cost` float NOT NULL default '1',
   `widearea` tinyint(4) default '0',
@@ -4377,13 +4731,14 @@ DROP TABLE IF EXISTS `wires`;
 CREATE TABLE `wires` (
   `cable` smallint(3) unsigned default NULL,
   `len` tinyint(3) unsigned NOT NULL default '0',
-  `type` enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl') NOT NULL default 'Node',
+  `type` enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl','Unused') NOT NULL default 'Node',
   `node_id1` char(32) NOT NULL default '',
   `card1` tinyint(3) unsigned NOT NULL default '0',
   `port1` tinyint(3) unsigned NOT NULL default '0',
   `node_id2` char(32) NOT NULL default '',
   `card2` tinyint(3) unsigned NOT NULL default '0',
   `port2` tinyint(3) unsigned NOT NULL default '0',
+  `logical` tinyint(1) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id1`,`card1`,`port1`),
   KEY `node_id2` (`node_id2`,`card2`),
   KEY `dest` (`node_id2`,`card2`,`port2`),
@@ -4398,6 +4753,4 @@ CREATE TABLE `wires` (
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
-
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -67,6 +67,15 @@ $ENV{'PATH'} = "/tmp:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
+# Determine if we should use the "geom" tools to make everything happen.
+# Empirically, this seems to only be needed for FreeBSD 8 and above.
+#
+my $usegeom = 0;
+if (`uname -r` =~ /^(\d+)\./ && $1 > 7) {
+    $usegeom = $1;
+}
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
@@ -79,9 +88,6 @@ if (defined($options{"f"})) {
 }
 if (defined($options{"s"})) {
     $slice = $options{"s"};
-}
-if (defined($options{"c"})) {
-    $checkit = 1;
 }
 if (defined($options{"c"})) {
     $checkit = 1;
@@ -229,6 +235,17 @@ if (!$forceit) {
     }
 } elsif ($stype && $stype != 165) {
     warn("*** $0: WARNING: changing partition type from $stype to 165\n");
+}
+
+#
+# Dark magic to allow us to modify the open boot disk
+#
+if ($usegeom && $slice != 0) {
+    if ($stype != 0) {
+	mysystem("gpart delete -i $slice $disk");
+    }
+    mysystem("gpart add -i $slice -t freebsd $disk");
+    $stype = 165;
 }
 
 #

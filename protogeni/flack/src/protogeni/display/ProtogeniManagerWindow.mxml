@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						title="ProtoGENI Manager Information"
+						height="250">
+	<fx:Script>
+		<![CDATA[
+			import protogeni.resources.ProtogeniComponentManager;
+			
+			[Bindable]
+			private var gm:ProtogeniComponentManager = null;
+			
+			public function load(n:ProtogeniComponentManager):void {
+				gm = n;
+				this.geniManagerInfo.load(n);
+				switch(gm.Level) {
+					case ProtogeniComponentManager.LEVEL_FULL:
+						levelText.text = "Full";
+						break;
+					case ProtogeniComponentManager.LEVEL_MINIMAL:
+						levelText.text = "Minimal";
+						break;
+				}
+			}
+		]]>
+	</fx:Script>
+	
+	<display:GeniManagerInfo id="geniManagerInfo" />
+	
+	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" id="cmInfo">
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<s:Label text="Level" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<s:Label id="levelText" />
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<s:Label text="RSPECs" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<s:HGroup>
+					<s:Label text="Output: " />
+					<s:Label text="{gm.outputRspecVersion}" />
+					<display:DefaultLine height="14" />
+					<s:Label text="Input: " />
+					<s:Label text="{gm.inputRspecMinVersion}" />
+					<s:Label text="~" />
+					<s:Label text="{gm.inputRspecMaxVersion}" />
+				</s:HGroup>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+</display:DefaultWindow>

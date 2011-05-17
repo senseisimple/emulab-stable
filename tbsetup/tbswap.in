@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -60,14 +60,11 @@ use libtestbed;
 use libadminctrl;
 use libadminmfs;
 use libtblog;
-use libArchive;
+use EmulabFeatures;
 use Experiment;
 use User;
 use Lan;
 use Firewall;
-if ($PGENISUPPORT) {
-    require libGeni;
-}
 
 #
 # Actual swap-in and swap-out functions, defined below.
@@ -108,7 +105,6 @@ my $noswapout      = 0;
 my $genimode       = 0;
 my $errors         = 0;
 my $updatehosed    = 0;
-my $state;
 my $canceled;
 my $os_setup_pid;
 my $nextState;
@@ -197,27 +193,18 @@ my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not lookup experiment object!")
 }
-my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "geni" ||
-	       $pid eq "emulab-ops" || $pid eq "utahstud" ||
-               $pid eq "ResiliNets" || $pid eq "gec8tutorial");
-my $newsetup = $special;
 
 #
 # Print starting message.
 #
-my $exptidx;
-TBExptIDX($pid, $eid, \$exptidx);
+my $exptidx = $experiment->idx();
+my $state   = $experiment->state();
+my $group   = $experiment->GetGroup();
 
 print "Beginning swap-$swapop for $pid/$eid ($exptidx). " .
     TBTimeStampWithDate() . "\n";
 TBDebugTimeStamp("tbswap $swapop started");
 
-#
-# Get experiment state; verify that experiment exists.
-#
-if (! ($state = ExpState($pid, $eid))) {
-    tbdie "No such experiment $pid/$eid";
-}
 # Sanity check the current state. 
 if (!$force) {
     if ($swapop eq "in") {
@@ -248,6 +235,14 @@ if ($elabinelab && $plabinelab) {
     TBDebugTimeStamp("tbswap $swapop finished (failed)");
     exit(1);
 }
+
+#
+# See if we use the new version of SyncVlans.
+#
+my $syncvlans =
+    (EmulabFeatures->FeatureEnabled("SyncVlans",
+				    $this_user, $group, $experiment)
+     || $pid eq "emulab-ops");
 
 #
 # See if the experiment is firewalled
@@ -297,14 +292,6 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
     # adding nodes only.
     #
     $errors = ($swapop eq "modify" ? doSwapout(MODIFY) : 0);
-
-    if (0) {
-	print STDERR "Doing a swapmodswapout on the experiment archive ...\n";
-	if (libArchive::TBExperimentArchiveSwapModSwapOut($pid, $eid) < 0) {
-	    tberror("Failed swapmodswapout on the experiment archive!");
-	    $errors = 1;
-	}
-    }
 
     if ($errors) {
 	#
@@ -510,7 +497,7 @@ sub doSwapout($) {
 		#
 		# Stop the location piper.
 		#
-		if (-x $piper) {
+		if (0 && -x $piper) {
 		    print "Stopping the location piper\n";
 		    if (system("$piper -k $pid $eid")) {
 			tberror({type => 'secondary', severity => SEV_SECONDARY,
@@ -538,6 +525,17 @@ sub doSwapout($) {
 	}
 
 	#
+	# Grab our per-experiment switch stack name.
+	#
+	my @expswitches = $experiment->SwitchList(1);
+	my ($perexpstack,$leader,@curswitches) = \
+	    GetPerExperimentSwitchStack($experiment);
+	my $stackarg = "";
+	if (defined($perexpstack) && (@expswitches || @curswitches)) {
+	    $stackarg = "-S $perexpstack --skip-supplied";
+	}
+
+	#
 	# Clean up any VLANs in experiment.
 	#
 	# When modifying an elabinelab experiment, leave the vlans intact
@@ -545,9 +543,11 @@ sub doSwapout($) {
 	#
 	if ($type != MODIFY ||
 	    ($type == MODIFY && $ELABINELAB && Lan->GotTrunks($experiment))) {
+	    # Kill tag reservations on actual swapout.
+	    my $tagopt = ($type != MODIFY ? "-C" : "");
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
-	    if (system("snmpit -r $pid $eid")) {
+	    if (system("snmpit $stackarg --redirect-err $tagopt -r $pid $eid")) {
 		tberror({type => 'secondary', severity => SEV_SECONDARY,
 			 error => ['vlan_reset_failed']},
 			"Failed to reset VLANs");
@@ -569,7 +569,8 @@ sub doSwapout($) {
 	    }
 	    if (@stale) {
 		print "Removing stale vlans @stale\n";
-		system("snmpit -f ". join(" ", map("-o $_", @stale)));
+		system("snmpit $stackarg --redirect-err -f -C ".
+                    join(" ", map("-o $_", @stale)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_reset_failed']},
@@ -578,11 +579,25 @@ sub doSwapout($) {
 		}
 	    }
 	}
+
+	#
+	# Remove per-experiment switch stacks -- don't bother to check if there
+	# are any; it's cheap.
+	#
+	if ($type >= RETRY && defined($perexpstack)) {
+	    print STDERR "Removing per-experiment switch stack.\n";
+	    DeletePerExperimentSwitchStack($experiment);
+	}
     }
 	
     if ($type >= MODIFY) {
 	# XXX Do this before releasing the nodes. Needs more thought.
 	$experiment->DeleteInternalProgramAgents();
+    }
+
+    if ($type >= RETRY) {
+	print "Removing dynamic blobs.\n";
+	$experiment->RemoveBlobs();
     }
 
     if ($type >= CLEANUP) {
@@ -656,10 +671,22 @@ sub doSwapout($) {
 	# Clear away Geni slivers. Do not proceed if this fails.
 	#
 	if ($PGENISUPPORT) {
+	    require libGeni;
+	    
 	    if (libGeni::DeleteAllSlivers($experiment, $this_user)) {
 		tberror("Could not delete slivers\n");
 		return 1;
 	    }
+	}
+
+	#
+	# Clear logical interfaces and wires. This might move to support
+	# swapmod.
+	#
+	print "Removing logical wires.\n";
+	if (Interface::Wire->DeleteLogicalWires($experiment)) {
+	    tberror("Could not delete logical wires and interfaces\n");
+	    return 1;
 	}
 
 	#
@@ -912,7 +939,9 @@ sub doSwapin($) {
 	#
 	my $exitcode;
 	my $cmd = "$wrapper";
-	if ($special || $this_user->stud() || $experiment->virtnode_count()) {
+	if (EmulabFeatures->FeatureEnabled("NewMapper",
+					   $this_user, $group, $experiment) ||
+	    $this_user->stud() || $experiment->virtnode_count()) {
 	    $cmd = "$mapper";
 	}
 	$cmd .= " -f"
@@ -948,6 +977,30 @@ sub doSwapin($) {
     }
 
     #
+    # Create/update per-experiment switch stacks if necessary.
+    # Still haven't done any vlan synch for modify.
+    #
+    my @expswitches = $experiment->SwitchList(1);
+    my ($perexpstack,$leader,@curswitches) = \
+	GetPerExperimentSwitchStack($experiment);
+    my $stackarg = "";
+    if (($type > MODIFY && @expswitches)
+	|| ($type == MODIFY && (!defined($perexpstack) && @expswitches))) {
+	print STDERR "Creating per-experiment switch stack.\n";
+	AddPerExperimentSwitchStack($experiment,@expswitches);
+	$perexpstack = GetPerExperimentSwitchStackName($experiment);
+    }
+    elsif ($type == MODIFY && defined($perexpstack)
+	   && (@expswitches || @curswitches)) {
+	print STDERR "Updating per-experiment switch stack.\n";
+	UpdatePerExperimentSwitchStack($experiment,@expswitches);
+    }
+    if (defined($perexpstack) && (@expswitches || @curswitches)) {
+	print STDERR "Will configure per-experiment switch stack ($perexpstack) later.\n";
+	$stackarg = "-S $perexpstack --skip-supplied";
+    }
+
+    #
     # When doing a modify, we have to compare vlans to determine which
     # vlans actually changed and need to be deleted, before processing
     # the new vlans for the experiment. Note that vlans that already
@@ -962,7 +1015,7 @@ sub doSwapin($) {
 	my @same = ();
 	my $ret;
 
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    $ret = Lan->CompareVlansWithSwitches($experiment, \@diff, \@same);
 	}
 	else {
@@ -974,26 +1027,46 @@ sub doSwapin($) {
 		    "Failed to compare old vlans");
 	    return 1;
 	}
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    if (@diff) {
 		print "Removing obsolete vlans @diff\n";
-		system("snmpit -f ". join(" ", map("-o $_", @diff)));
+		system("snmpit $stackarg --redirect-err -f -C ".
+		       join(" ", map("-o $_", @diff)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_setup_failed']},
 			    "Failed to remove obsolete VLANs.");
 		    return 1;
 		}
+		if (defined($perexpstack)) {
+		    system("snmpit -S $perexpstack --redirect-err -f -C ".
+			   join(" ", map("-o $_", @diff)));
+		    if ($?) {
+			tberror({type => 'summary', severity => SEV_SECONDARY,
+				 error => ['vlan_setup_failed']},
+				"Failed to remove obsolete per-experiment VLANs.");
+			return 1;
+		    }
+		}
 	    }
 	}
 	else {
 	    print "Synchronizing VLANs.\n";
-	    system("snmpit -X $pid $eid");
+	    system("snmpit $stackarg --redirect-err -X $pid $eid");
 	    if ($?) {
 		tberror({type => 'summary', severity => SEV_SECONDARY,
 			 error => ['vlan_setup_failed']},
 			"Failed to synchronize VLANs.");
 		return 1;
+	    }
+	    if (defined($perexpstack)) {
+		system("snmpit -S $perexpstack --redirect-err -X $pid $eid");
+		if ($?) {
+		    tberror({type => 'summary', severity => SEV_SECONDARY,
+			     error => ['vlan_setup_failed']},
+			    "Failed to synchronize per-experiment VLANs.");
+		    return 1;
+		}
 	    }
 	}
     }
@@ -1029,7 +1102,7 @@ sub doSwapin($) {
 		if ($isvirt) {
 		    push(@virtnodes, $node);
 		}
-		elsif (!$isrem) {
+		else {
 		    push(@physnodes, $node);
 		}
 	    }
@@ -1105,6 +1178,18 @@ sub doSwapin($) {
 	return 1;
     }
     TBDebugTimeStamp("tarfiles_setup finished");
+
+    #
+    # Handle virt blobs.
+    #
+    if ($type >= RETRY) {
+	print "Creating dynamic blobs.\n";
+	$experiment->UploadBlobs(0);
+    }
+    elsif ($type == MODIFY) {
+	print "Updating dynamic blobs.\n";
+	$experiment->UploadBlobs(1);
+    }
 
     #
     # If there are any Plab dslice nodes in the experiment, create the
@@ -1242,16 +1327,19 @@ sub doSwapin($) {
 			 "where r.pid='$pid' and r.eid='$eid'");
 
 	while (my ($node,$allocstate) = $db_result->fetchrow_array) {
+	    print STDERR "A: $node, $allocstate\n";
+	    
 	    #
-	    # If the node is INIT_CLEAN, leave it alone. It will still get
-	    # rebooted, but will not falsely be tagged as dirty. This is
-	    # important for vnodes too, where INIT_CLEAN indicated the vnode
-	    # does not even exist yet (plab nodes).
+	    # INIT_CLEAN and INIT_DIRTY indicate brand new nodes. Leave
+	    # the state alone for os_setup so it knows. REBOOT means libvtop
+	    # knows something we do not, so do not change that either.
 	    #
-	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN() &&
+		$allocstate ne TBDB_ALLOCSTATE_RES_INIT_DIRTY() &&
+		$allocstate ne TBDB_ALLOCSTATE_RES_REBOOT()) {
 		TBSetNodeAllocState($node,
 				    ($needreboot ?
-				     TBDB_ALLOCSTATE_RES_INIT_DIRTY() :
+				     TBDB_ALLOCSTATE_RES_REBOOT() :
 				     TBDB_ALLOCSTATE_RES_RECONFIG()));
 	    }
 	}
@@ -1288,8 +1376,11 @@ sub doSwapin($) {
     print "Resetting OS and rebooting.\n";
     TBDebugTimeStamp("launching os_setup");
     if (!($os_setup_pid = fork())) {
-	my $oscmd = ($newsetup ? "os_setup_new" : "os_setup");
-	
+	my $oscmd = "os_setup";
+	if (EmulabFeatures->FeatureEnabled("NewOsSetup",
+					   $this_user, $group, $experiment)) {
+	    $oscmd = "os_setup_new";
+	}
 	exec("$oscmd $pid $eid") or return 1;
     } elsif ($os_setup_pid == -1) {
 	tberror "Fork failed.";
@@ -1304,10 +1395,10 @@ sub doSwapin($) {
     # parallel with os_setup (no DB dependencies, etc.)
     #
     if (!$experiment->skipvlans() &&
-	($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special))) {
+	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
-	if (system("snmpit -t $pid $eid")) {
+	if (system("snmpit $stackarg --redirect-err -t $pid $eid")) {
 	    tberror({type => 'summary', severity => SEV_SECONDARY,
 		     error => ['vlan_setup_failed']},
 		    "Failed to set up VLANs.");
@@ -1336,7 +1427,7 @@ sub doSwapin($) {
     if ($type >= RETRY) {
 	print "Clearing port counters.\n";
 	TBDebugTimeStamp("portstats started");
-	if (system("portstats -z -a -q $pid $eid")) {
+	if (system("portstats $stackarg -z -a -q $pid $eid")) {
 	    tbwarn "Failed to clear port counters.";
 	    #
 	    # This is a non-fatal error.
@@ -1391,6 +1482,22 @@ sub doSwapin($) {
     }
 
     #
+    # Run snmpit on the per-experiment switch stacks if os_setup didn't fail!
+    #
+    if (defined($perexpstack) && !$experiment->skipvlans() &&
+	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
+	print "Setting up per-experiment VLANs.\n";
+	TBDebugTimeStamp("snmpit started");
+	if (system("snmpit -S $perexpstack --redirect-err -t $pid $eid")) {
+	    tberror({type => 'summary', severity => SEV_SECONDARY,
+		     error => ['vlan_setup_failed']},
+		    "Failed to set up per-experiment VLANs.");
+	    return 1;
+	}
+	TBDebugTimeStamp("snmpit finished");
+    }
+
+    #
     # Okay, start the event system now that we know all the nodes have
     # rebooted (os_setup is done). This only takes a moment (puts itself
     # in the background), so its not enough of a delay to worry about.
@@ -1402,7 +1509,7 @@ sub doSwapin($) {
 	# For the robot testbed, start the location piper *before* the event
 	# system.
 	#
-	if (-x $piper && ($type != MODIFY && $type != MODIFY_RECOVER)) {
+	if (0 && -x $piper && ($type != MODIFY && $type != MODIFY_RECOVER)) {
 	    print "Starting the location piper.\n";
 	    if (system("$piper $pid $eid")) {
 		tberror "Failed to start the location piper.";

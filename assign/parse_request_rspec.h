@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2009-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -24,9 +24,8 @@
 #include <xercesc/dom/DOM.hpp>
 #include <xercesc/parsers/XercesDOMParser.hpp>
 #include <xercesc/sax/HandlerBase.hpp>
-XERCES_CPP_NAMESPACE_USE
 
-int parse_vtop_rspec(tb_vgraph &VG, char *filename);
+int parse_request(tb_vgraph &VG, char *filename);
 
 #endif // for __PARSE_REQUEST_RSPEC_H
 

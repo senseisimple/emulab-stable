@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2010 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -251,6 +251,19 @@ class GeniUser
 	}
 	$this->dblink = $dblink;
 	$this->user  = mysql_fetch_array($query_result);
+
+	#
+	# And get the urn.
+	#
+	$uuid = $this->user['uuid'];
+	$query_result =
+	    DBQueryWarn("select urn from geni_certificates where uuid='$uuid'",
+			$dblink);
+	if ($query_result && mysql_num_rows($query_result)) {
+	    $foo = mysql_fetch_array($query_result);
+	    $this->user['urn'] = $foo['urn'];
+	    return;
+	}
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -273,6 +286,7 @@ class GeniUser
     }
     function idx()	    { return $this->field('idx'); }
     function hrn()	    { return $this->field('hrn'); }
+    function urn()	    { return $this->field('urn'); }
     function uuid()	    { return $this->field('uuid'); }
     function exptidx()	    { return $this->field('exptidx'); }
     function created()	    { return $this->field('created'); }

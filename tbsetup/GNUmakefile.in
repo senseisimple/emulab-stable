@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,12 +16,12 @@ SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir nseparse checkup template_cvsroot
+SUBDIRS		= checkpass ns2ir nseparse checkup template_cvsroot snmpit_test
 ifeq ($(NSVERIFY),1)
 SUBDIRS		+= nsverify
 endif
 
-BIN_STUFF	= power snmpit tbend tbprerun tbreport \
+BIN_STUFF	= power snmpit snmpit_new tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
 		  node_reboot nscheck node_update savelogs node_control \
 		  portstats checkports eventsys_control os_select tbrestart \
@@ -35,20 +35,19 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
-		  console_reset db2ns bwconfig frisbeelauncher \
-		  frisbeeimage rmgroup mkgroup setgroups mkproj modgroups \
+		  console_reset db2ns bwconfig frisbeehelper \
+		  rmgroup mkgroup setgroups mkproj modgroups \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
 		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
 		  rmproj snmpit.proxynew snmpit.proxyv2 pool_daemon \
-		  checknodes_daemon subboss_frisbeelauncher_wrapper
+		  checknodes_daemon snmpit.proxyv3
+
 ifeq ($(ISMAINSITE),1)
 SBIN_STUFF     += repos_daemon
 endif
-
-SUBBOSS_SBIN_STUFF = subboss_frisbeelauncher subboss_frisbeeimage
 
 CTRLSBIN_STUFF  = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
@@ -83,19 +82,23 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
 		  snmpit_cisco_stack.pm snmpit_intel_stack.pm power_sgmote.pm \
 		  snmpit_foundry.pm snmpit_stack.pm snmpit_remote.pm \
-		  snmpit_nortel.pm snmpit_hp.pm \
+		  snmpit_nortel.pm snmpit_hp.pm snmpit_apcon.pm\
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
-		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm
+		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm \
+		  power_ipmi.pm libosload_new.pm libosload_switch.pm \
+		  libossetup_switch.pm power_icebox.pm \
+		  libvtop_stable.pm libvtop_test.pm
+
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
 			tbrsync
-SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeelauncher frisbeeimage \
+SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeehelper \
 			rmuser idleswap named_setup exports_setup \
 			sfskey_update setgroups newnode_reboot vnode_setup \
-			elabinelab nfstrace rmproj subboss_frisbeelauncher_wrapper
+			elabinelab nfstrace rmproj
 SETUID_LIBX_SCRIPTS  = console_setup spewlogfile
 
 ifeq ($(SYSTEM),FreeBSD)
@@ -118,12 +121,14 @@ SETUID_BIN_SCRIPTS  =
 SETUID_SBIN_SCRIPTS =
 SETUID_LIBX_SCRIPTS = 
 endif
+#COMPILED_TARGETS    = $(filter %.pm, $(TARGETS))
+COMPILED_TARGETS    = 
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(TARGETS)
+all:	$(TARGETS) $(addprefix compiled/, $(COMPILED_TARGETS))
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -229,12 +234,8 @@ endif
 	chmod u+s $(INSTALL_SBINDIR)/rmgroup
 	chown root $(INSTALL_SBINDIR)/mkgroup
 	chmod u+s $(INSTALL_SBINDIR)/mkgroup
-	chown root $(INSTALL_SBINDIR)/frisbeelauncher
-	chmod u+s $(INSTALL_SBINDIR)/frisbeelauncher
-	chown root $(INSTALL_SBINDIR)/subboss_frisbeelauncher_wrapper
-	chmod u+s $(INSTALL_SBINDIR)/subboss_frisbeelauncher_wrapper
-	chown root $(INSTALL_SBINDIR)/frisbeeimage
-	chmod u+s $(INSTALL_SBINDIR)/frisbeeimage
+	chown root $(INSTALL_SBINDIR)/frisbeehelper
+	chmod u+s $(INSTALL_SBINDIR)/frisbeehelper
 	chown root $(INSTALL_SBINDIR)/rmuser
 	chmod u+s $(INSTALL_SBINDIR)/rmuser
 	chown root $(INSTALL_SBINDIR)/idleswap
@@ -269,11 +270,6 @@ endif
 	chmod u+s $(INSTALL_BINDIR)/tbrsync
 	chown root $(INSTALL_SBINDIR)/nfstrace
 	chmod u+s $(INSTALL_SBINDIR)/nfstrace
-
-#
-# Subboss installation
-#
-subboss-install:	$(addprefix $(INSTALL_SBINDIR)/, $(SUBBOSS_SBIN_STUFF))
 
 #
 # Control node installation (okay, plastic)
@@ -357,3 +353,8 @@ $(INSTALL_DIR)/opsdir/sbin/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL) $< $@
+
+compiled/%: %
+	@echo "Compiling $< to $@"
+	-mkdir -p compiled
+	perlcc -I $(INSTALL_LIBDIR) -B -o $@ $<

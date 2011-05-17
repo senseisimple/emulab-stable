@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -151,7 +151,9 @@ event_register_withkeydata_withretry(char *name, int threaded,
 			   unsigned char *keydata, int keylen,
 			   int retrycount)
 {
+#ifndef __CYGWIN__
     extern int pubsub_is_threaded[] __attribute__ ((weak));
+#endif
     
     event_handle_t	handle;
     pubsub_handle_t    *server;
@@ -218,11 +220,15 @@ event_register_withkeydata_withretry(char *name, int threaded,
     handle->disconnect = pubsub_disconnect;
 #ifdef THREADED
     assert(threaded == 1);
+#ifndef __CYGWIN__
     assert(pubsub_is_threaded != NULL);
+#endif
     handle->mainloop = NULL; /* no mainloop for mt programs */
 #else
     assert(threaded == 0);
+#ifndef __CYGWIN__
     assert(pubsub_is_threaded == NULL);
+#endif
     handle->mainloop = pubsub_mainloop;
 #endif
     handle->notify = pubsub_notify;
@@ -873,8 +879,9 @@ event_notification_get_opaque(event_handle_t handle,
 /*
  * Get the string attribute with name NAME from the event
  * notification NOTIFICATION.
- * Writes LENGTH bytes into *BUFFER and returns non-zero if the named
+ * Writes up to LENGTH bytes into *BUFFER and returns non-zero if the named
  * attribute is found, 0 otherwise.
+ * The returned value will always be null terminated.
  */
 
 int
@@ -896,6 +903,17 @@ event_notification_get_string(event_handle_t handle,
     }
 
     strncpy(buffer, v, length);
+
+    /*
+     * We never documented whether returned strings for values whose
+     * length is >= "length" are null-terminated or not.  Previously,
+     * there were not, but most of our callers never checked.  Hence,
+     * as of 1/25/11 we force null termination.
+     *
+     * Note that if someone passes a bogus length value, this will
+     * now blow up where it formerly might not have.
+     */
+    buffer[length-1] = '\0';
 
     return 1;
 }
@@ -1415,7 +1433,7 @@ notify_callback(pubsub_handle_t *server,
 	handle->keydata &&
 	event_notification_check_hmac(handle, &notification)) {
 	    ERROR("bad hmac\n");
-        return;
+	    return;
     }
 
     if (0) {
@@ -1423,7 +1441,8 @@ notify_callback(pubsub_handle_t *server,
 	    
 	    gettimeofday(&now, NULL);
 
-	    INFO("note arrived at %ld:%ld\n", now.tv_sec, now.tv_usec);
+	    INFO("note arrived at %ld:%ld\n",
+		 (long)now.tv_sec, (long)now.tv_usec);
     }
 	
     callback = arg->callback;
@@ -1568,13 +1587,27 @@ hmac_fill_hash(void *rock, char *name,
 }
 #endif
 
+static void
+hmac_dump(char *msg, unsigned char *mac, int len)
+{
+	unsigned char *up;
+	int i;
+		
+	fprintf(stderr, "%s: ", msg);
+	up = (unsigned char *)mac;
+	for (i = 0; i < len; i++, up++) {
+		fprintf(stderr, "%02hhx", *up);
+	}		
+	fprintf(stderr, "\n");
+}
+
 int
 event_notification_insert_hmac(event_handle_t handle,
 			       event_notification_t notification)
 {
 	HMAC_CTX	ctx;
 	unsigned char	mac[EVP_MAX_MD_SIZE];
-	int		i, len = EVP_MAX_MD_SIZE;
+	unsigned int	len = EVP_MAX_MD_SIZE;
 
 	if (0)
 		INFO("event_notification_insert_hmac (key): %s\n",
@@ -1608,22 +1641,16 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
-	if (1) {
-		unsigned char   *up;
-		
-		INFO("event_notification_insert_hmac: ");
-		up = (unsigned char *) mac;
-		for (i = 0; i < len; i++, up++) {
-			fprintf(stderr, "%02hhx", *up);
-		}		
-		fprintf(stderr, "\n");
+	if (0) {
+		hmac_dump("event_notification_insert_hmac", mac, len);
 	}
 
 	/*
 	 * Okay, now insert the MAC into the notification as an opaque field.
 	 */
 	if (pubsub_notification_add_opaque(notification->pubsub_notification,
-				"__hmac__", mac, len, &handle->status) != 0) {
+					   "__hmac__", (char *)mac, (int)len,
+					   &handle->status) != 0) {
 		ERROR("pubsub_notification_add_opaque failed: ");
 		pubsub_error_fprintf(stderr, &handle->status);
 		return 1;
@@ -1713,8 +1740,8 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_CTX	ctx;
 	unsigned char	srcmac[EVP_MAX_MD_SIZE], mac[EVP_MAX_MD_SIZE];
 	char		*pmac;
-	int		i, srclen, len = EVP_MAX_MD_SIZE;
-	int		tmp, elvin, elvin_ordered;
+	unsigned int	srclen, len = EVP_MAX_MD_SIZE;
+	int		tmp, elvin, elvincompat, elvin_ordered;
 	pubsub_notification_t *pubsub_notification;
 #ifdef ELVIN_COMPAT
 	struct elvin_hashtable  *hashtable;
@@ -1729,7 +1756,8 @@ event_notification_check_hmac(event_handle_t handle,
 	 * Pull out the MAC from the notification so we can compare it.
 	 */
 	if (pubsub_notification_get_opaque(pubsub_notification,
-			"__hmac__", &pmac, &srclen, &handle->status) != 0) {
+					   "__hmac__", &pmac, (int *)&srclen,
+					   &handle->status) != 0) {
 		ERROR("MAC not present!\n");
 		notification->has_hmac = 0;
 		return -1;
@@ -1737,15 +1765,9 @@ event_notification_check_hmac(event_handle_t handle,
 	assert(srclen <= EVP_MAX_MD_SIZE);
 	memcpy(srcmac, pmac, srclen);
 
-	if (1) {
-		unsigned char   *up;
-		
-		INFO("event_notification_check_hmac __hmac__: ");
-		up = (unsigned char *) srcmac;
-		for (i = 0; i < srclen; i++, up++) {
-			fprintf(stderr, "%02hhx", *up);
-		}		
-		fprintf(stderr, "\n");
+	if (0) {
+		hmac_dump("event_notification_check_hmac (__hmac__)",
+			  srcmac, srclen);
 	}
 	
 	/*
@@ -1753,7 +1775,10 @@ event_notification_check_hmac(event_handle_t handle,
 	 * client. These would always be a version 0 version of this
 	 * code since we do not generate the elvin HMACs anymore.
 	 */
-	elvin = elvin_ordered = 0;
+	elvin = elvincompat = elvin_ordered = 0;
+#ifdef ELVIN_COMPAT
+	elvincompat = 1;
+#endif
 	
 	if (! pubsub_notification_get_int32(pubsub_notification,
 					    "___PUBSUB___",
@@ -1813,15 +1838,9 @@ event_notification_check_hmac(event_handle_t handle,
 		HMAC_Final(&ctx, mac, &len);
 		HMAC_cleanup(&ctx);
 
-		if (1) {
-		    unsigned char   *up;
-		
-		    INFO("event_notification_check_hmac (elvin): ");
-		    up = (unsigned char *) mac;
-		    for (i = 0; i < len; i++, up++) {
-		        fprintf(stderr, "%02hhx", *up);
-		    }		
-		    fprintf(stderr, "\n");
+		if (0) {
+			hmac_dump("event_notification_check_hmac (elvin)",
+				  mac, len);
 		}
 		goto docmp;
 	    }
@@ -1847,22 +1866,38 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
-	if (1) {
-		unsigned char   *up;
-		
-		INFO("event_notification_check_hmac plain: ");
-		up = (unsigned char *) mac;
-		for (i = 0; i < len; i++, up++) {
-			fprintf(stderr, "%02hhx", *up);
-		}		
-		fprintf(stderr, "\n");
+	if (0) {
+		hmac_dump("event_notification_check_hmac (plain)", mac, len);
 	}
+#ifdef ELVIN_COMPAT
  docmp:
+#endif
 	if (srclen == len && memcmp(srcmac, mac, len) == 0) {
 	    notification->has_hmac = 1;
 	    return 0;
 	}
-	ERROR("MAC mismatch! elvin=%d, ordered=%d\n", elvin, elvin_ordered);
+	ERROR("MAC mismatch! myelvincompat=%d, elvin=%d, ordered=%d\n",
+	      elvincompat, elvin, elvin_ordered);
+	if (1) {
+		char _obj[128];
+		char _evt[128];
+		char _args[1024];
+
+		if (!event_notification_get_objname(handle, notification,
+						    _obj, sizeof(_obj)))
+			strncpy(_obj, "<UNKNOWN>", sizeof(_obj));
+		if (!event_notification_get_eventtype(handle, notification,
+						      _evt, sizeof(_evt)))
+			strncpy(_evt, "<UNKNOWN>", sizeof(_evt));
+		event_notification_get_arguments(handle, notification,
+						 _args, sizeof(_args));
+		fprintf(stderr,
+			"  object=%s, event=%s, args=%s\n", _obj, _evt, _args);
+		if (0) {
+			hmac_dump("     inmsg", srcmac, srclen);
+			hmac_dump("  computed", mac, len);
+		}
+	}
 	return 1;
 }
 

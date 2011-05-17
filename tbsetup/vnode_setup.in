@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -65,9 +65,7 @@ use libtestbed;
 use libtblog;
 use Experiment;
 use Node;
-if ($PGENISUPPORT) {
-    require libGeni;
-}
+use User;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -174,7 +172,7 @@ if (defined($this_user) && !$this_user->IsAdmin() &&
 #
 my @nodes = $experiment->NodeList(1, 1);
 if (! @nodes) {
-    tbwarn("No allocated nodes in experiment $pid/$eid.");
+    # Silent.
     exit(0);
 }
 
@@ -325,7 +323,8 @@ foreach my $node (@nodes) {
 		    print "$node is already set up on $pnode\n";
 		    next;
 		}
-		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_DIRTY()) {
+		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_DIRTY() ||
+		       $allocstate eq TBDB_ALLOCSTATE_RES_REBOOT()) {
 		    print "$node needs a reboot on $pnode\n";
 		    $mode = "reboot";
 		}

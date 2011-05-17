@@ -1,0 +1,214 @@
+Some notes about the TPM-enforced boot path (SECURELOAD state machine).
+
+The current implementation requires that we boot from a flash device
+BEFORE we network boot (see the paper for details).  Unfortunately,
+there is a lot of magic associated with the PXEBOOTING state, which is
+assumed to always be the first state we will see when a node boots.
+
+However, in the secure boot path the first thing we see is a secure
+transition to the GPXEBOOTING state, so magic had to be added for that!
+
+In particular:
+
+ * When stated gets a transition to GPXEBOOTING, it forces the node into
+   the SECURELOAD op_mode.  This is a new trigger called SECURELOAD and
+   a new trigger table entry:
+
+   insert into state_triggers values \
+       ('*','*','GPXEBOOTING','SECURELOAD');
+
+ * Later, when we do get a PXEBOOTING state, we DON'T push the machine
+   into the PXEBOOT op_mode.  We do this with an override trigger:
+
+   insert into state_triggers values \
+       ('*','SECURELOAD','PXEBOOTING','SECURELOAD');
+
+   This is supposed to override the more general any ('*') op_mode trigger
+   for the PXEBOOTING state and will just make sure we state in SECURELOAD.
+
+
+Updates on 9/7/10:
+
+We need two secure state machines, one for loading and one for booting.
+The latter will be used for all boots on machines which have gPXE dongles,
+regardless of what they are booting.  So we need to amend the above to
+account for:
+
+ * some nodes will always see GPXEBOOTING first
+
+ * nodes which have just undergone the secure load will then reboot into
+   the secure boot path
+
+ * if a node was in the SECURELOAD op_mode but didn't finish, it cannot
+   be allowed to SECUREBOOT (which shouldn't happen, it should wind up in
+   SECVIOLATION).
+
+I think what we needs is a SECUREBOOT op_mode which is entered whenever
+a node transitions to GPXEBOOTING.  This is allowed from any op_mode/state
+except from */SECVIOLATION.
+
+SECURELOAD consists of:
+
+  !SECVIOLATION -- "quote ok"     --> GPXEBOOTING
+  GPXEBOOTING -- "DHCP"         --> PXEBOOTING
+  PXEBOOTING  -- "bootinfo"     --> BOOTING
+  BOOTING     -- "quote ok"     --> RELOADSETUP
+  RELOADSETUP -- "reload ready" --> RELOADING
+  RELOADING   -- "image ok"     --> RELOADDONE
+  RELOADDONE  -- "quote ok"     --> TPMSIGNOFF
+
+SECUREBOOT consists of:
+
+  !SECVIOLATION -- "quote ok" --> GPXEBOOTING
+  GPXEBOOTING -- "DHCP"     --> PXEBOOTING
+  PXEBOOTING  -- "bootinfo" --> BOOTING
+  BOOTING     -- "quote ok" --> TPMSIGNOFF
+
+How do we differentiate the two op_modes when they arrive at GPXEBOOTING?
+Well, os_load should have set the next_op_mode to SECURELOAD (assuming the
+MFS is listed with that as its op_mode), so we check that in the SECUREBOOT
+trigger used by a transition to GPXEBOOTING.
+
+For a regular "untrusted" node boot through gPXE, we will arrive at
+GPXEBOOTING from some arbitrary state, get forced into SECUREBOOT and
+go through the steps.  We neuter the actions that PXEBOOTING and BOOTING
+normally take.  As part of the TPMSIGNOFF, we perform those actions,
+which include putting the node into PXEKERNEL op_mode (PXEBOOT action) and
+then setting the nodes.op_mode as appropriate for the next boot (BOOTING
+action).
+
+For a secure load, we again arrive at GPXEBOOTING from any state, get
+forced into SECURELOAD, and work through the state machine.  Again we
+perform none of the normal triggers along the way: PXEBOOTING, BOOTING,
+RELOADDONE.  SIGNOFF, does the RELOADDONE triggers (RESET, RELOADDONEV2)
+which leave the node in SECURELOAD/TPMSIGNOFF.  Now we have a problem
+because next_op_mode is still set to SECURELOAD which will tell the
+SECUREBOOT trigger to keep us in the SECURELOAD op_mode.  Hmm...I think
+next_op_mode will get set by the os_select in RESET.
+
+
+How do we do this?  If we associate the SECUREBOOT trigger with
+SECURELOAD/TPMSIGNOFF, then as soon as we get the TPMSIGNOFF event
+(from the MFS?) it will get to step #5 below where it will trigger
+RESET (clear the one-time boot info), RELOADDONEV2 (send apod), and
+then SECUREBOOT.  The last should:
+ * set DB next_op_mode to SECUREBOOT?
+ * directly change op_mode?
+to get the opmode from SECURELOAD/TPMSIGNOFF to SECUREBOOT/SHUTDOWN.
+
+What happens if a node in a secure reload reboots in the middle?
+stated will see a transition from SECURELOAD/!TPMSIGNOFF -> GPXEBOOTING
+which is okay; since the op_mode is still SECURELOAD we will just restart.
+
+
+For nodes that have a gPXE dongle, should we allow them to boot via the
+"standard" boot path or require that they always boot via the dongle?
+If the latter, we would have to be a bit more rigerous about making sure
+they boot through GPXEBOOTING.
+
+Notes on state transitions:
+
+If a node state transition is reported, stated:
+
+1. Check for invalid state transitions, reporting them if so
+   NEW: if mode==SECURELOAD, set state to SECVIOLATION
+
+2. Update nodes.eventstate in DB
+
+3. Check to see if there is a TBCOMMAND "timeout" for this node.
+   If so and command is REBOOT, see if we have rebooted and report if so.
+   NOTE: this step appears to just report and not ever do anything else.
+
+4. Queue any per-node timeout associated with the current mode and new state
+   (from state_timeouts).  This removes old timeouts for the node queued by
+   the previous state.
+
+5. Check for per-node triggers associated with the current mode and new state
+   (from state_triggers) and execute them.  Several of these triggers can
+   force op_mode transitions: PXEBOOT (to PXEBOOT), SECURELOAD (to
+   SECURELOAD), BOOTING (to DB bootopmode if in PXEKERNEL op_mode, to DB
+   nodes.next_op_mode if curstate==ISUP).
+
+6. Check if current mode and new state should trigger an op_mode transition
+   (allowed transitions from mode_transitions).  The actual next op_mode
+   comes from nodes.next_op_mode which is cleared afterward.
+
+Notes on triggers:
+
+"PXEBOOT":
+  * Transitions node into PXEKERNEL op_mode
+
+"BOOTING":
+  Queries DB to find what opmode/osid to boot next, order is: next, temp, def.
+  Updates DB nodes table with osid.  Update op_mode of node:
+  * if current mode is PXEKERNEL, transition into new mode
+  * else if came from ISUP state, transition into mode nodes.next_op_mode (?)
+  * else if next mode is RELOAD, update DB and stated state to make current
+    mode be RELOAD (does not do an opModeTransition like the others)
+
+"RESET":
+  Marks end of successful boot. Resets internal stated flags, calls osselect
+  to clear DB one-time (next) boot info.
+
+"RELOADDONE","RELOADDONEV2":
+  Marks end of reload and reboots machine (V2 only).  Clears DB reload state
+  and sends an apod (V2 only).
+
+"CHECKGENISUP":
+  Sends ISUP if node cannot.
+  * if nodes.osfeatures includes "isup", do nothing
+  * else if includes "ping", fire off "eventping" to send ISUP when node pings
+  * else generate an ISUP event for the node
+
+"ISUP":
+  Always generates an ISUP event, regardless of osfeatures
+  (used by the ALWAYSUP op_mode).
+
+"CHECKPORTREG":
+  Ensures that certain DB port_registration entries exist (backward compat
+  for older images).  Right now: if emulab_syncd port is not registered,
+  insert an entry with the default port.
+
+"POWERCYCLE","POWEROFF":
+  Invokes the "power" command to perform the appropriate action.
+
+"EMAILNOTIFY":
+  Send an email notification to testbed-ops informing them that the node
+  has entered a particular op_mode/state.
+
+"SCRIPT:<path>":
+  Invokes the given script in the background, not waiting for the result.
+  If <path> is not absolute, use /usr/testbed/sbin/<path>.
+
+"RELOADOLDMFS":
+  Special hack to detect old diskload MFSes that cannot load multiple images,
+  and sends email to testbed-ops.
+
+Notes on timeouts.
+
+Timeouts define the length of time a node should stay in a particular
+op_mode/state combo.  If the node is in that state longer, the associated
+action is triggered.
+
+Actions are:
+
+"REBOOT":
+  Reboot the node.  This doesn't really do anything right now, it just sends
+  email to testbed-ops that a reboot was requested.  According to the comment,
+  os_load and os_setup are still doing the actual reboots.
+
+"NOTIFY":
+  Send email that node has timed out in a particular state, to testbed-ops.
+
+"STATE:<state>":
+  Transition node into a particular state.  Does not change the op_mode.
+
+Timeouts can also be associated with commands that stated is performing,
+indicated by the op_mode being "TBCOMMAND" and state being a command,
+instead of a real op_mode/state.  The only recognized action is CMDRETRY
+to retry the command.  This is only used for rebooting and power "events",
+so that those actions can be retried if necessary.
+
+
+
+

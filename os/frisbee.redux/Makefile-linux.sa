@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -38,7 +38,7 @@ IUZLIBS		+= -lcrypto
 endif
 
 CFLAGS		= -O2 -g -Wall -fno-builtin-log -static \
-		  $(PTHREADCFLAGS) $(LINUXOPTS) -DSTATS
+		  $(PTHREADCFLAGS) $(LINUXOPTS) -DSTATS -DMASTER_SERVER
 LDFLAGS		= -static
 
 #

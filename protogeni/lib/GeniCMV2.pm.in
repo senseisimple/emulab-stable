@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCMV2;
@@ -18,42 +18,28 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
-use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
 use GeniCredential;
 use GeniCertificate;
+use GeniComponent;
 use GeniSlice;
 use GeniAggregate;
-use GeniAuthority;
 use GeniSliver;
-use GeniUser;
-use GeniRegistry;
 use GeniUtil;
 use GeniCM;
 use GeniHRN;
 use GeniXML;
-use libtestbed qw(SENDMAIL);
 use emutil;
-# Hate to import all this crap; need a utility library.
-use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
-	     TBDB_NODESTATE_TBFAILED);
-use User;
-use Node;
-use OSinfo;
-use Image;
-use Interface;
 use English;
 use Data::Dumper;
 use XML::Simple;
 use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
-use Experiment;
-use VirtExperiment;
 use Compress::Zlib;
+use File::Temp qw(tempfile);
 use MIME::Base64;
 
 # Configure variables
@@ -64,6 +50,7 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $ELABINELAB     = "@ELABINELAB@";
 my $CREATEEXPT     = "$TB/bin/batchexp";
 my $ENDEXPT        = "$TB/bin/endexp";
 my $NALLOC	   = "$TB/bin/nalloc";
@@ -80,10 +67,12 @@ my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
 my $MAPPER         = "$TB/bin/mapper";
 my $VTOPGEN        = "$TB/bin/vtopgen";
 my $SNMPIT         = "$TB/bin/snmpit";
+my $XMLLINT	   = "/usr/local/bin/xmllint";
 my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
-
-my $API_VERSION = 2;
+# Just one of these, at Utah.
+my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
+my $API_VERSION    = 2;
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -92,15 +81,17 @@ my $API_VERSION = 2;
 #
 sub GetVersion()
 {
-    my @input_rspec_versions = ( "0.1", "2" );
+    my @input_rspec_versions = ( "0.1", "0.2", "2", "PG 0.1", "PG 0.2", "PG 2" );
+    my @ad_rspec_versions = ( "0.1", "0.2", "2", "PG 0.1", "PG 0.2", "PG 2" );
     my $blob = {
 	"api" => $API_VERSION,
 	"level" => 1,
 	"input_rspec" => \@input_rspec_versions,
-	"output_rspec" => "0.1"
+	"output_rspec" => "0.2",
+	"ad_rspec" => \@ad_rspec_versions
     };
 
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob);
 }
 
 #
@@ -112,6 +103,7 @@ sub Resolve($)
     my $credentials = $argref->{'credentials'};
     my $urn         = $argref->{'urn'};
     my $admin       = 0;
+    my $isauth	    = 0;
 
     if (! (defined($credentials) && defined($urn))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
@@ -130,32 +122,77 @@ sub Resolve($)
     #
     # This is a convenience for testing. If a local user and that
     # user is an admin person, then do whatever it says. This is
-    # easier then trying to do this with credential privs.
+    # easier then trying to do this with credential privs. But,
+    # watch for credentials from authorities instead of users.
     #
-    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (defined($user) && $user->IsLocal() && $user->admin()) {
-	$admin = 1;
+    my (undef,$callertype,$callerid) = GeniHRN::Parse($credential->owner_urn());
+    if ($callertype eq "user") {
+	my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+	if (!GeniResponse::IsResponse($user) &&
+	    $user->IsLocal() && $user->admin()) {
+	    $admin = 1;
+	}
+    }
+    elsif ($callertype eq "authority" && $callerid eq "cm") {
+	$isauth = 1;
     }
     
     if ($type eq "node") {
 	my $node  = $object;
-	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id(), "0.1");
+	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id(), "0.1", undef);
 	if (! defined($rspec)) {
+	    print STDERR "Could not get advertisement for $node!\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Error getting advertisement");
 	}
+	my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+	if (!defined($me)) {
+	    print STDERR
+		"Could not find local authority object for $ENV{'MYURN'}\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Error getting advertisement");
+	}
+	my $myurn = GeniHRN::Generate($OURDOMAIN, "node", $node->node_id());
+	my $myhrn = "${PGENIDOMAIN}." . $node->node_id();
+
+	#
+	# See if the component object exists; if not create it.
+	#
+	my $component = GeniComponent->Lookup($node->uuid());
+	if (!defined($component)) {
+	    my $certificate = GeniCertificate->Lookup($node->uuid());
+	    if (!defined($certificate)) {
+		$certificate =
+		    GeniCertificate->Create({'urn'  => $myurn,
+					     'hrn'  => $myhrn,
+					     'email'=> $TBOPS,
+					     'uuid' => $node->uuid(),
+					     'url'  => $me->url()});
+		if (!defined($certificate)) {
+		    print STDERR "Could not generate certificate for $node\n";
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Error getting advertisement");
+		}
+	    }
+	    $component = GeniComponent->Create($certificate, $me);
+	    if (!defined($component)) {
+		print STDERR "Could not create component for $node\n";
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Error getting advertisement");
+	    }
+	}
 	# Return a blob.
-	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
+	my $blob = { "hrn"          => $myhrn,
 		     "uuid"         => $node->uuid(),
 		     "role"	    => $node->role(),
 		     "hostname"     =>
 			 GeniUtil::FindHostname($node->node_id()),
 		     "physctrl"     => 
 			 Interface->LookupControl($node->phys_nodeid())->IP(),
-		     "urn"          => GeniHRN::Generate($OURDOMAIN,
-							 "node",
-							 $node->node_id()),
-		     "rspec"        => $rspec
+		     "urn"          => $myurn,
+		     "rspec"        => $rspec,
+		     "url"          => $me->url(),
+		     "gid"          => $component->cert(),
 		   };
 
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
@@ -167,7 +204,8 @@ sub Resolve($)
 	# In this implementation, the caller must hold a valid slice
 	# credential for the slice being looked up. 
 	#
-	if (! ($admin || $slice->urn() eq $credential->target_urn())) {
+	if (! ($isauth || $admin ||
+	       $slice->urn() eq $credential->target_urn())) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
 	}
 	# Return a blob.
@@ -176,6 +214,10 @@ sub Resolve($)
 	my $aggregate = GeniAggregate->SliceAggregate($slice);
 	if (defined($aggregate)) {
 	    $blob->{'sliver_urn'} = $aggregate->urn();
+	    my $manifest = $aggregate->GetManifest(1);
+	    if (defined($manifest)) {
+		$blob->{'manifest'}   = $manifest;
+	    }
 	}
 	my $ticket = GeniTicket->SliceTicket($slice);
 	if (defined($ticket)) {
@@ -242,6 +284,7 @@ sub DiscoverResources($)
     my $credentials = $argref->{'credentials'};
     my $available   = $argref->{'available'} || 0;
     my $compress    = $argref->{'compress'} || 0;
+    my $version     = $argref->{'rspec_version'} || undef;
 
     if (! (defined($credentials))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
@@ -257,7 +300,7 @@ sub DiscoverResources($)
             if(!GeniResponse::IsResponse($cred));
     }
     return GeniCM::DiscoverResourcesAux($available, $compress,
-        $credential_objects);
+        $version, $credential_objects);
 }
 
 #
@@ -271,6 +314,10 @@ sub CreateSliver($)
     my $credentials  = $argref->{'credentials'};
     my $keys         = $argref->{'keys'};
     my $impotent     = $argref->{'impotent'} || 0;
+    require Node;
+    require Experiment;
+    require libtestbed;
+    require libaudit;
     
     # For now, I am not worrying about the slice_urn argument.
     if (! (defined($credentials) &&
@@ -297,6 +344,34 @@ sub CreateSliver($)
 	if ($slice_urn ne $slice->urn()) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
 					"Credential does not match the URN");
+	}
+	#
+	# Watch for a placeholder slice and update it.
+	#
+	if ($slice->isplaceholder()) {
+	    if ($slice->Lock() != 0) {
+		return GeniResponse->BusyResponse();
+	    }
+	    #
+	    # Confirm that the slice certificate is the same.
+	    #
+	    if ($slice->cert() ne $credential->target_cert()->cert()) {
+		$slice->UnLock();
+		return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+					    "Slice certificate mismatch");
+	    }
+	    my $user =
+		GeniCM::CreateUserFromCertificate($credential->owner_cert());
+	    if (GeniResponse::IsResponse($user)) {	    
+		$slice->UnLock();
+		return $user;
+	    }
+	    if ($slice->ConvertPlaceholder($user) != 0) {
+		$slice->UnLock();
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Could not convert placeholder");
+	    }
+	    $slice->UnLock();
 	}
 	if (defined($aggregate)) {
 	    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
@@ -330,6 +405,7 @@ sub CreateSliver($)
 	if (defined($slice)) {
 	    GeniCM::CleanupDeadSlice($slice, 1);
 	}
+	return $response;
     }
     my ($sliver_credential, $sliver_manifest) = @{ $response->{'value'} };
     
@@ -353,25 +429,31 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Internal Error");
     }
+    #
+    # At this point we want to return and let the startsliver proceed
+    # in the background
+    #
+    my $mypid = fork();
+    if ($mypid) {
+	# Let the child get going.
+	sleep(1);
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				    [$sliver_credential, $sliver_manifest]);
+    }
+    # This switches the file that we are writing to. 
+    libaudit::AuditFork();
+    
     # Make sure that the next phase sees all changes.
     Experiment->FlushAll();
     Node->FlushAll();
 
     if ($aggregate->Start($API_VERSION, 0) != 0) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not start sliver");
+	$slice->UnLock();
+	print STDERR "Could not start sliver\n";
+	return -1;
     }
-    GeniCM::UpdateManifest($slice);
-    $sliver_manifest = $aggregate->GetManifest(1);
-    if (!defined($sliver_manifest)) {
-	print STDERR "CreateSliver: Could not get manifest for $aggregate\n";
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Internal Error");
-    }
-    
     $slice->UnLock();
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS,
-				[$sliver_credential, $sliver_manifest]);
+    return 0;
 }
 
 #
@@ -421,9 +503,8 @@ sub DeleteSliver($)
     # We need the user to sign the new ticket to. 
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
     
     my $response = GeniCM::DeleteSliverAux($credential, $impotent, 1);
     return $response
@@ -595,7 +676,7 @@ sub SliverAction($$$$$)
 {
     my ($action, $slice_urn, $sliver_urns, $credentials, $manifest) = @_;
     my $response;
-    
+
     if (! (defined($credentials) &&
 	   (defined($slice_urn) || defined($sliver_urns)))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
@@ -700,24 +781,21 @@ sub SliverAction($$$$$)
     my $PerformAction = sub {
 	my ($object, $action) = @_;
 
+	my $exitval = 0;
+
 	if ($action eq "start") {
-	    if ($object->Start($API_VERSION, 0) != 0) {
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not start sliver");
-	    }
+	    $exitval = $object->Start($API_VERSION, 0);
 	}
 	elsif ($action eq "stop") {
-	    if ($object->Stop($API_VERSION) != 0) {
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not stop sliver");
-	    }
+	    $exitval = $object->Stop($API_VERSION);
 	}
 	elsif ($action eq "restart") {
-	    if ($object->Start($API_VERSION, 1) != 0) {
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not restart sliver");
-	    }	    
+	    $exitval = $object->Start($API_VERSION, 1);
 	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR, 
+				    "Could not $action sliver")
+	    if ($exitval);
+	
 	return 0;
     };
 
@@ -740,7 +818,7 @@ sub SliverAction($$$$$)
 	    if (GeniResponse::IsResponse($response));
 
 	if ($action eq "start" || $action eq "restart") {
-	    GeniCM::UpdateManifest($slice);
+	    # GeniCM::UpdateManifest($slice);
 	}
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
@@ -816,7 +894,7 @@ sub SliverStatus($)
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
     if (! (defined($slice) && defined($aggregate))) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice or aggregate here");
     }
     if ($slice_urn ne $slice->urn()) {
@@ -888,16 +966,75 @@ sub Shutdown($)
     my $slice_urn    = $argref->{'slice_urn'};
     my $clear        = $argref->{'clear'} || 0;
     my $credentials  = $argref->{'credentials'};
+    require libtestbed;
 
-    # For now, I am not worrying about the slice_urn argument.
-    if (! (defined($credentials))) {
+    if (! (defined($credentials) && defined($slice_urn))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my $credential = CheckCredentials($credentials);
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    return GeniCM::ShutdownAux($credential, $clear);
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    #
+    # The clearinghouse generates a different credential to do this.
+    #
+    if ($slice_urn ne $credential->target_urn()) {
+	my $certificate = GeniCertificate->LoadFromFile($GENICH_PEMFILE);
+	if (!defined($certificate)) {
+	    print STDERR "Could not load certificate from $GENICH_PEMFILE\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+
+	# The caller has to match the clearinghouse.
+	if ($credential->owner_urn() ne $certificate->urn()) {
+	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+					"Insufficient privilege");
+	}
+    }
+
+    #
+    # No slice here? Done.
+    #
+    my $slice = GeniSlice->Lookup($slice_urn);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+    }
+    #
+    # Do not worry about locking when setting the shutdown time.
+    # This can lead to race though, if a clear shutdown comes in first.
+    # Seems unlikely though. 
+    #
+    if (!$clear) {
+	# Do not overwrite original shutdown time
+	$slice->SetShutdown(1)
+	    if (!defined($slice->shutdown()) || $slice->shutdown() eq "");
+    }
+    else {
+	$slice->SetShutdown(0);
+    }
+    # Always make sure the slice is shutdown.
+    if ($slice->shutdown()) {
+	# The expire daemon is going to look for this, so it will get
+	# taken care of shortly.
+	if ($slice->Lock() != 0) {
+	    return GeniResponse->BusyResponse();
+	}
+	if (GeniCM::CleanupDeadSlice($slice, 0) != 0) {
+	    libtestbed::SENDMAIL($TBOPS, "Emergency Shutdown failed",
+				 "Emergency shutdown failed on $slice\n");
+	    print STDERR "Could not shutdown $slice!\n";
+	    # Lets call this a non-error since the local admin person
+	    # is going to have to deal with it anyway. 
+	}
+	$slice->UnLock();
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 #
@@ -973,6 +1110,36 @@ sub GetTicket($)
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
 					"Credential does not match the URN");
 	}
+
+	#
+	# Watch for a placeholder slice and update it.
+	#
+	if ($slice->isplaceholder()) {
+	    if ($slice->Lock() != 0) {
+		return GeniResponse->BusyResponse();
+	    }
+	    #
+	    # Confirm that the slice certificate is the same.
+	    #
+	    if ($slice->cert() ne $credential->target_cert()->cert()) {
+		$slice->UnLock();
+		return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+					    "Slice certificate mismatch");
+	    }
+	    my $user =
+		GeniCM::CreateUserFromCertificate($credential->owner_cert());
+	    if (GeniResponse::IsResponse($user)) {
+		$slice->UnLock();
+		return $user;
+	    }
+	    if ($slice->ConvertPlaceholder($user) != 0) {
+		$slice->UnLock();
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Could not convert placeholder");
+	    }
+	    $slice->UnLock();
+	}
+	
 	#
 	# GetTicket applies only to slices that are not active. Must
 	# use UpdateSliver() for an active sliver.
@@ -1087,9 +1254,9 @@ sub UpdateTicket($)
     # We need the user to sign the new ticket to. 
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     my $credential_objects = [];
     foreach my $credstr (@$credentials) {
         my $cred = CheckCredential($credstr);
@@ -1161,9 +1328,9 @@ sub UpdateSliver($)
     # Any user can update the sliver. The ticket is signed to that user.
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     my $credential_objects = [];
     foreach my $credstr (@$credentials) {
         my $cred = CheckCredential($credstr);
@@ -1258,12 +1425,9 @@ sub BindToSlice($)
     # Find or create the user.
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
-    if (!$user->IsLocal() && defined($keys)) {
-	$user->Modify(undef, undef, $keys);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
@@ -1273,11 +1437,12 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Error binding slice to user");
     }
-    # Bind for existing slivers. 
-    if ($user->BindToSlice($slice) != 0) {
-	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Error binding user to slice");
+    if (defined($keys)) {
+	my $response = GeniCM::AddKeys($slice, $user, $keys);
+	if (GeniResponse::IsResponse($response)) {
+	    $slice->UnLock();
+	    return $response;
+	}
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
@@ -1308,7 +1473,7 @@ sub ReleaseTicket($)
 
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
     if (! (defined($slice))) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice here");
     }
     if ($slice_urn ne $slice->urn()) {
@@ -1335,6 +1500,10 @@ sub ReleaseTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This ticket is for another slice");
     }
+    #
+    # XXX Need to do a restore backup state operation if this ticket
+    # was the result of an update.
+    #
     if ($ticket->Lock() != 0) {
 	return GeniResponse->BusyResponse("ticket");
     }
@@ -1354,7 +1523,7 @@ sub ListUsage($)
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my @credentials = @{ $credentials };
-    return GeniCM::ListUsage({"credentials" => $credentials[0]});
+    return GeniCM::ListUsage({"credential" => $credentials[0]});
 }
 
 sub ListHistory($)
@@ -1367,8 +1536,333 @@ sub ListHistory($)
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my @credentials = @{ $credentials };
-    return GeniCM::ListHistory({"credentials" => $credentials[0],
-				  "type"        => $type});
+    return GeniCM::ListHistory({"credential" => $credentials[0],
+				"type"       => $type});
+}
+
+sub ReserveVlanTags($)
+{
+    my ($argref)    = @_;
+    my $credentials = $argref->{'credentials'};
+    my $slice_urn   = $argref->{'slice_urn'};
+    my $slice_cert  = $argref->{'slice_cert'};
+    my $rspecstr    = $argref->{'rspec'};
+    my $linkname    = $argref->{'linkname'};
+    my $taglist     = $argref->{'taglist'};
+    my $response;
+    my $actualtag;
+    # List of vlans to delete after getting the tags.
+    my @delete      = ();
+    my %linkmap     = ();
+
+    require Lan;
+
+    my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($me)) {
+	print STDERR
+	    "Could not find local authority object for $ENV{'MYURN'}\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if (! (defined($credentials) && defined($slice_cert) &&
+	   defined($taglist) &&
+	   defined($linkname) && defined($slice_urn) && defined($rspecstr))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    if (! ($linkname =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse("Bad linkname");
+    }
+    foreach my $tag (@{ $taglist }) {
+	if (! ($tag =~ /^\d*$/)) {
+	    return GeniResponse->MalformedArgsResponse("Bad tag in list");
+	}
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "bind" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    my (undef,$callertype,$callerid) = GeniHRN::Parse($credential->owner_urn());
+    if (! ($callertype eq "authority" && $callerid eq "cm")) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef, "Not a CM");
+    }
+    my $slice_certificate = GeniCertificate->LoadFromString($slice_cert);
+    if (!defined($slice_certificate)) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Bad slice certificate");
+    }
+    if ($slice_urn ne $slice_certificate->urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Slice URN mismatch");
+    }
+    my $slice = GeniSlice->Lookup($slice_urn);
+    if (defined($slice)) {
+	#
+	# Already exists locally. 
+	#
+        if ($slice->StitchLock() != 0) {
+	    return GeniResponse->BusyResponse();
+	}
+    }
+    else {
+	#
+	# Create a placeholder slice. Have to watch for a concurrent
+	# slice creation through the normal path, in which case the code
+	# needs to see if the slice was first created on this path.
+	#
+	my ($auth,$type,$id) = GeniHRN::Parse($slice_urn);
+	my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
+	my $authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
+	if (!defined($authority)) {
+	    print STDERR "Could not create authority from registry\n";
+	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	    goto done;
+	}
+	$slice = GeniSlice->Create($slice_certificate, undef, $authority);
+	if (!defined($slice)) {
+	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	    goto done;
+	}
+	#
+	# Concurrency requires that we try for the lock after we create
+	# it, since in fact it might not be us that created it. 
+	#
+        if ($slice->StitchLock() != 0) {
+	    return GeniResponse->BusyResponse();
+	}
+    }
+    #
+    # Confirm that the certificate is the same.
+    #
+    if ($slice->cert() ne $slice_cert) {
+	$response = GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+					 "Slice certificate mismatch");
+	goto done;
+    }
+    
+    my $slice_experiment = GeniCM::GeniExperiment($slice);
+    if (!defined($slice_experiment)) {
+	print STDERR "Could not create new Geni slice experiment!\n";
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	goto done;
+    }
+    my $pid = $slice_experiment->pid();
+    my $eid = $slice_experiment->eid();
+    
+    #
+    # Run xmllint on the rspec to catch format errors.
+    #
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    if (!defined($fh)) {
+	print STDERR "Could not create temp file for rspec\n";
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	goto done;
+    }
+    print $fh $rspecstr;
+    close($fh);
+    my $xmlerrors = `$XMLLINT --noout $filename 2>&1`;
+    unlink($filename);
+    if ($?) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS,
+					 $xmlerrors,
+					 "rspec is not well formed");
+	goto done;
+    }
+    my $rspec = GeniXML::Parse($rspecstr);
+    if (! defined($rspec)) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "Error Parsing rspec XML");
+	goto done;
+    }
+
+    #
+    # Find the linkref for the one link we care about. 
+    #
+    my $linkref;
+    
+    foreach my $ref (GeniXML::FindNodes("n:link", $rspec)->get_nodelist()){
+	my $vname  = GeniXML::GetVirtualId($ref);
+
+	if ($vname eq $linkname) {
+	    $linkref = $ref;
+	    last;
+	}
+    }
+    if (!defined($linkref)) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "Could not find link in rspec");
+	goto done;
+    }
+
+    #
+    # Go through the component hops and find the one that refers to us.
+    # This is our external network point.
+    #
+    my $hopref;
+    foreach my $ref (GeniXML::FindNodes("n:component_hop",
+					$linkref)->get_nodelist()) {
+	my $component_urn = GeniXML::GetNodeId($ref);
+	my ($domain,undef,undef) = GeniHRN::Parse($component_urn);
+	if (defined($domain) and $domain eq $me->domain()) {
+	    $hopref = $ref;
+	    last;
+	}
+    }
+    if (!defined($hopref)) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "Could not find hop in link");
+	goto done;
+    }
+    my $hop_urn = GeniXML::GetNodeId($hopref);
+    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+
+    my $network = ExternalNetwork->Lookup($network_id);
+    if (!defined($network)) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				 "$hop_urn is not an external network");
+	goto done;
+    }
+    
+    my $vlan = VLan->Lookup($slice_experiment, $linkname);
+    if (!defined($vlan)) {
+	#
+	# The point of this is to create the VLan object, just
+	# long enough to get a lanid and a tag assigned. 
+	#
+	$vlan = VLan->Create($slice_experiment, $linkname);
+	if (!defined($vlan)) {
+	    print STDERR "Could not create vlan for $linkname\n";
+	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	    goto done;
+	}
+	push(@delete, $vlan);
+    }
+
+    #
+    # If there is already a reservation, it better be one of the
+    # tags we got.
+    #
+    my $tag = $vlan->GetReservedVlanTag();
+    if ($tag) {
+	print STDERR "$vlan already had tag $tag.\n";
+	if (! (grep {$_ == $tag} @{ $taglist })) {
+	    print STDERR "  but the tag is not in the list we got.\n";
+	    #
+	    # Tell the caller about the tag; it is the only choice.
+	    #
+	    my @okaytags = ($tag);
+	    $response = GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					     \@okaytags,
+					     "Could not find a suitable tag");
+	    goto done;
+	}
+	$actualtag = $tag;
+    }
+    else {
+	#
+	# Check to see what tags are valid for us. 
+	#
+	my @tags = ();
+	foreach my $tag (@{ $taglist }) {
+	    push(@tags, $tag)
+		if ($network->VlanTagOkay($tag));
+	}
+	if (!@tags) {
+	    #
+	    # Return a list of okay tags. 
+	    #
+	    my @okaytags = ();
+	    for (my $i = $network->min_vlan();
+		 $i < $network->max_vlan(); $i++) {
+		push(@okaytags, $i);
+	    }
+	    $response = GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					     \@okaytags,
+					     "Could not find a suitable tag");
+	    goto done;
+	}
+	
+	#
+	# This is a debugging hack; Inside an elabinelab, it might be
+	# an other local elabinelab or the outer boss. In this case,
+	# there is no need to ask the outer boss to reserve a vlan, since
+	# we already know that will fail (already reserved by the other).
+	# In this case, we can just stipulate that one of the tags is good.
+	#
+	if ($ELABINELAB) {
+	    my ($hisauth,undef,undef) = GeniHRN::Parse($slice_urn);
+
+	    my @tmp = split('\.', $OURDOMAIN);
+	    # Get the last two tokens. Not always the right thing to do. 
+	    my $dom = join('.', splice(@tmp, -2, 2));
+
+	    if ($me->domain() =~ /$dom$/ && $hisauth =~ /$dom$/) {
+		print STDERR "ElabInElab clause is true\n";
+
+		my $tag = pop(@tags);
+		if ($vlan->ReserveVlanTag($tag)) {
+		    $actualtag = $tag;
+		    goto gottag;
+		}
+		print STDERR "But could not allocate tag $tag\n";
+		$response =
+		    GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+					 "Could not find a suitable tag");
+		goto done;
+	    }
+	}
+	
+	#
+	# Find a tag that we think is free. Snmpit will be the one to
+	# say for sure, since it will also check the switches.
+	#
+	my $vlanid = $vlan->lanid();
+	my $tag = undef;
+	my @tmp = @tags;
+	while (@tmp) {
+	    $tag = pop(@tmp);
+	    if ($vlan->ReserveVlanTag($tag, 1)) {
+		#
+		# Have snmpit do actual reservation.
+		#
+		system("$SNMPIT -A $pid $eid $vlanid,$tag");
+		if ($?) {
+		    print STDERR "Could not reserve $vlanid,$tag\n";
+		    next;
+		}
+		$actualtag = $vlan->GetReservedVlanTag();
+		if (! $actualtag || $actualtag != $tag) {
+		    print STDERR "No tag reserved for $vlan\n";
+		    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
+		    goto done;
+		}
+		$actualtag = $tag;
+		last;
+	    }
+	}
+    }
+    if (!defined($actualtag)) {
+	$response = GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+					 "Could not find a suitable tag");
+	goto done;
+    }
+  gottag:
+    GeniXML::SetText("vlantag", $linkref, $actualtag);
+    $response = GeniResponse->Create(GENIRESPONSE_SUCCESS, 
+				     GeniXML::Serialize($rspec));
+  done:
+    foreach my $vlan (@delete) {
+	$vlan->ClearReservedVlanTag()
+	    if (GeniResponse::IsError($response));
+
+	$vlan->Destroy();
+    }
+    $slice->StitchUnLock()
+	if (defined($slice));
+    return $response;
 }
 
 #
@@ -1376,13 +1870,18 @@ sub ListHistory($)
 #
 sub CheckCredentials($)
 {
+    if (ref($_[0]) ne "ARRAY") {
+	return
+	    GeniResponse->MalformedArgsResponse("Credentials should be a ".
+						"array not a singleton");
+    }
+    
     my @credentials = @{ $_[0] };
-
     if (scalar(@credentials) != 1) {
 	return
 	    GeniResponse->MalformedArgsResponse("Wrong number of credentials");
     }
-    my $credential = GeniCredential->CreateFromSigned($credentials[0]);
+    my $credential  = GeniCredential->CreateFromSigned($credentials[0]);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create credential object");
@@ -1489,6 +1988,13 @@ sub Credential2SliceAggregate($)
         $slice = GeniSlice->Lookup($target_uuid);
     }
     if (defined($slice)) {
+	if( $credential->expires() gt $slice->expires() ) {
+	    # The credential presented lasts longer than we though the
+	    # slice did: our expiry date must have been stale.  This can
+	    # happen because the SA is always free to extend the lifetime
+	    # of a slice, and is not required to tell us.
+	    $slice->SetExpiration( $credential->expires() );
+	}
 	$aggregate = GeniAggregate->SliceAggregate($slice);
     }
     else {

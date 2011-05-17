@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -269,8 +269,8 @@ int parse_ptop(tb_pgraph &pg, tb_sgraph &sg, istream& input)
       for (int cur = 0;cur<num;++cur) {
 	pedge pe = (add_edge(srcv,dstv,pg)).first;
 	tb_plink *pl = new
-	    tb_plink(name,tb_plink::PLINK_NORMAL,link_type,srcmac,dstmac,
-		     srciface,dstiface);
+	    tb_plink(name,tb_plink::PLINK_NORMAL,link_type,srcnode->name,srcmac,
+		     srciface,dstnode->name,dstmac,dstiface);
 	put(pedge_pmap,pe,pl);
 	pl->delay_info.bandwidth = ibw;
 	pl->delay_info.delay = idelay;
@@ -322,7 +322,13 @@ int parse_ptop(tb_pgraph &pg, tb_sgraph &sg, istream& input)
 #ifdef PER_VNODE_TT
 	  srcnode->total_bandwidth += ibw;
 #endif
-	}
+	} else {
+          // Neither is a switch - a direct node->node link
+#ifdef PER_VNODE_TT
+          dstnode->total_bandwidth += ibw;
+          srcnode->total_bandwidth += ibw;
+#endif
+        }
       }
     } else if (command == "set-type-limit") {
       if (parsed_line.size() != 3) {

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						title="Link Group Information"
+						close="closeWindow()">
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import protogeni.resources.PhysicalLinkGroup;
+			
+			[Bindable]
+			public var links:ArrayCollection;
+			
+			public function loadCollection(group:ArrayCollection):void {
+				links = group;
+				
+				if(links.length > 1) {
+					listLinks.selectedIndex = 0;
+				} else {
+					listLinks.visible = false;
+					listLinks.includeInLayout = false;
+					linkInfo.percentWidth = 100;
+					title = "Link Information";
+				}
+				
+				linkInfo.load(links[0]);
+			}
+			
+			public function loadGroup(group:PhysicalLinkGroup):void {
+				loadCollection(group.collection);
+			}
+		]]>
+	</fx:Script>
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:List width="35%" height="100%" id="listLinks"
+				 dataProvider="{links}"
+				 labelField="name" change="linkInfo.load(event.target.selectedItem)" />
+		<display:PhysicalLinkInfo  height="100%" width="65%" id="linkInfo"/>
+	</mx:HDividedBox>
+</display:DefaultWindow>

@@ -10,7 +10,7 @@ use English;
 use Getopt::Std;
 use Socket;
 use File::Basename;
-    
+
 #
 # Parse an ns file. Since the parser runs arbitrary NS file for the user,
 # this cannot be safely done on boss without jumping through huge hoops
@@ -249,6 +249,7 @@ else {
 # Also echo the results to the non-captured stderr (SERR).  This is
 # needed because parse.proxy may be run on ops, not boss.
 #
+my $errs;
 {
     my $old_env = \%ENV;
     local %ENV;
@@ -265,6 +266,7 @@ else {
     # assume any output indicates an error
     while (<ERR>) {
 	print SERR $_;
+	$errs .= $_;
 	if (/^\s*\*\*\*\s*(.+)/) {
 	    parse_error($err);
 	    dblog(TBLOG_ERR, {}, $err) if $err; # flush any previous errors
@@ -292,6 +294,28 @@ close ERR;
 
 if ($?) {
     my $exit_status = $? >> 8;
+    
+    if ($exit_status > 128) {
+	# The POSIX module doesn't create constants for valid signals
+	# (including SIGBUS), thus we have to do it the hard way.
+
+	# Get the mapping from signal num. to name
+	use Config;
+	my (%sig_num, @sig_name);
+	my @names = split ' ', $Config{sig_name};
+	@sig_num{@names} = split ' ', $Config{sig_num};
+	foreach (@names) {$sig_name[$sig_num{$_}] ||= $_}
+
+	my $signal = $exit_status - 128;
+	my $signame = $sig_name[$signal];
+	
+	if (grep {$_ eq $signame} qw(ILL TRAP EMT FPE BUS SEGV SYS)) {
+	    SENDMAIL($TBOPS, "Parser Crashed",
+		     "$errs\n",
+		     undef, undef, 
+		     $nsfile);
+	}
+    }
     
     tbdie({cause => 'user', type => 'extra', severity => SEV_ERROR,
 	   error => ['ns_parse_failed']},
@@ -604,14 +628,14 @@ sub GenDefsFile($)
     #
     my %defvalues = (
 	"elabinelab/singlenet" => 0,
-	"elabinelab/boss_osid" => "FBSD63-STD",
-	"elabinelab/ops_osid"  => "FBSD63-STD",
-	"elabinelab/fs_osid"   => "FBSD63-STD"
+	"elabinelab/boss_osid" => "FBSD73-STD",
+	"elabinelab/ops_osid"  => "FBSD73-STD",
+	"elabinelab/fs_osid"   => "FBSD73-STD"
     );
     while (my ($var, $def) = each(%defvalues)) {
 	if (!exists($sitevars{$var})) {
-	    print "*** WARNING: sitevar $var does not exist or has no value, ",
-	          "defaulting to $def\n";
+	    ## don't be so alarmist
+	    #print "*** WARNING: sitevar $var does not exist or has no value, defaulting to $def\n";
 	    print TCL "set sitevariables($var) $def\n";
 	    $sitevars{$var} = $def;
 	}
@@ -674,6 +698,22 @@ sub GenDefsFile($)
 
     while (($node_id,$type) = $query_result->fetchrow_array()) {
 	print TCL "set physnodes($node_id) \"$type\"\n";
+    }
+
+    print TCL "# Client side service names that can be controlled, and when\n";
+    $query_result =
+	DBQueryFatal("select idx,service,env,whence from client_services");
+
+    while (my ($idx,$service,$env,$whence) = $query_result->fetchrow_array()) {
+	print TCL "set servicenames(\"${service}:${env}:${whence}\") \"$idx\"\n";
+    }
+    print TCL "# Client side service control points: whence and env\n";
+    $query_result =
+	DBQueryFatal("select service," . 
+		     " group_concat(concat_ws(' ',whence,env) separator ', ')" .
+		     " from client_services group by service");
+    while (my ($service,$points) = $query_result->fetchrow_array()) {
+	print TCL "set servicepoints($service) \"$points\"\n";
     }
 
     print TCL "# Location info\n";

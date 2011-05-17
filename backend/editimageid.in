@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -139,8 +139,7 @@ my %xmlfields =
      "description"	=> ["description",	$SLOT_OPTIONAL],
      "path"		=> ["path",		$SLOT_OPTIONAL],
      "mtype_*"		=> ["mtype",		$SLOT_OPTIONAL],
-     "load_address"	=> ["load_address",	$SLOT_ADMINONLY],
-     "frisbee_pid"	=> ["frisbee_pid",	$SLOT_ADMINONLY]);
+    );
 #
 # Need a list of node types. We join this over the nodes table so that
 # we get a list of just the nodes that are currently in the testbed, not
@@ -373,31 +372,6 @@ foreach $key (@mtype_keys) {
 }
 UserError("Node Types: Must select at least one node type")
     if ($node_types_selected == 0);
-
-#
-# Only admins can edit the load_address or the frisbee pid.
-# 
-if ($isadmin) {
-    if (exists($editimageid_args{"load_address"}) &&
-	$editimageid_args{"load_address"} ne "") {
-	$foo = escapeshellarg($editimageid_args{"load_address"});
-
-	if ($editimageid_args{"load_address"} ne $foo) {
-	    UserError("Load Address: Contains illegal characters!");
-	}
-    }
-   # Frisbee_pid has already been checked to be a valid int coming from XML.
-}
-else { # Not isadmin.
-    if (exists($editimageid_args{"load_address"}) &&
-	$editimageid_args{"load_address"} ne $image->load_address()) {
-	UserError("Load Address: No permission, admin-only");
-    }
-    if (exists($editimageid_args{"frisbee_pid"}) &&
-	$editimageid_args{"frisbee_pid"} ne $image->frisbee_pid()) {
-	UserError("Frisbee PID: No permission, admin-only");
-    }
-}
 
 #
 # Mereusers are not allowed to create more than one osid/imageid mapping

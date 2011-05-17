@@ -1,0 +1,31 @@
+=================================
+ ProtoGENI Map External Resources
+=================================
+
+MIT License
+-----------
+* src/com/probertson.utils.*
+
+Apache License, Version 2.0
+---------------------------
+* src/TooltipOverlay.as
+
+No license provided
+-------------------
+* src/ResizeWindow.as
+ - http://flexdevtips.blogspot.com/2008/12/resizable-window.html
+* libs/map_flex_1_16.swc
+ - http://code.google.com/apis/maps/documentation/flash/
+* images/waiting.swf
+ - http://www.ajaxload.info/
+ 
+Creative Commons Attribution 3.0 License
+ ----------------------------------------
+ * images/*
+  - http://www.fatcow.com/free-icons/index.bml
+  
+  GNU Library or Lesser General Public License (LGPL)
+  ---------------------------------------------------
+  XML-RPC
+   - http://sf.net/projects/xmlrpcflash
+   - http://www.osflash.org/doku.php?id=xmlrpcflash

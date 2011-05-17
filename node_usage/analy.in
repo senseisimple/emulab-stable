@@ -17,6 +17,7 @@ require "@prefix@/etc/node_usage.conf";
 chdir "@prefix@/data/node_usage";
 
 my $TOLERANCE = 0.05;
+#my $TOLERANCE = 0.10;
 my $TOLERANCE_INTERVAL = 1/3;
 
 my $interval = 60*60;
@@ -26,12 +27,21 @@ my $start = ceil($START / $interval) * $interval;
 
 my @idxs = (0 .. $#to_plot);
 
+my @start;
+foreach (@idxs) {
+    if (defined $to_plot[$_][2]) {
+	$start[$_] = ceil($to_plot[$_][2] / $interval) * $interval;
+    } else {
+	$start[$_] = $start;
+    }
+}
+
 my $prev_time = 0;
 my @prev_data = map {0} @idxs;
 my @total_so_far = map {0} @idxs;
 my $next_cutoff = $start;
 
-my $error_frac = 0;
+my @error_frac = map {0} @idxs;
 
 open F, "node_usage.raw";
 open O, ">node_usage-$interval_name.dat";
@@ -52,6 +62,11 @@ sub sum_usage_stats ($) {
     return @res;
 }
 
+sub filter_w_start ($@) {
+    my $time = shift @_;
+    return map {$time >= $start[$_] ? $_[$_] : 'NaN'} @idxs;
+}
+
 while (<F>) {
     chop;
     s/^(\d+) (\d+) // or die;
@@ -67,19 +82,20 @@ while (<F>) {
     my @data = sum_usage_stats(1);
     my @error = sum_usage_stats(2);
     @data = map {$data[$_] + $error[$_]/2} @idxs;
-    if (any map {$error[$_] > $num[$_]*$TOLERANCE} @idxs) {
-	#print STDERR "ERROR $time: $error\n";
-	@data = map {'NaN'} @idxs;
-    }
+    @data = map {$error[$_] > $num[$_]*$TOLERANCE 
+		     ? 'NaN' : $data[$_]} @idxs;
+#    if (any map {$error[$_] > $num[$_]*$TOLERANCE} @idxs) {
+#	print STDERR "ERROR $time: ", join ('   ', map {"$error[$_] > ".$num[$_]*$TOLERANCE} @idxs), "\n";
+#    }
     use warnings;
     
     my $combine = sub {
 	my ($t) = (@_);
 	my $frac = ($t - $prev_time)/$interval;
-	if ($prev_data[0] != $prev_data[0]) { # ie NaN
-	    $error_frac += $frac;
-	} else {
-	    foreach my $i (@idxs) {
+	foreach my $i (@idxs) {
+	    if ($prev_data[$i] != $prev_data[$i]) { # ie NaN 
+		$error_frac[$i] += $frac;
+	    } else {
 		$total_so_far[$i] += $prev_data[$i] * $frac;
 	    }
 	}
@@ -88,20 +104,20 @@ while (<F>) {
     while ($time >= $next_cutoff) {
 	&$combine($next_cutoff);
 	my @free = @total_so_far;
-	if ($error_frac > $TOLERANCE_INTERVAL) {
-	    foreach my $i (@idxs) {
-		$free[0] = 'NaN';
-	    }
-	} else {
-	    foreach my $i (@idxs) {
-		$free[$i] /= (1 - $error_frac);
+	foreach my $i (@idxs) {
+	    if ($error_frac[$i] > $TOLERANCE_INTERVAL) {
+		$free[$i] = 'NaN';
+	    } else {
+		$free[$i] /= (1 - $error_frac[$i]);
 	    }
 	}
 	my @alloc = map {$num[$_] - $free[$_]} @idxs;
 	my $dtime = $next_cutoff - $interval;
+	@free = filter_w_start $dtime, @free;
+	@alloc = filter_w_start $dtime, @alloc;
 	print O join(' ', $dtime, map {sprintf("%.1f", $_)} (@free, @alloc)),"\n" 
 	    if $dtime >= $start;
-	$error_frac = 0;
+	@error_frac = map {0} @idxs;
 	@total_so_far = map {0} @idxs;
 	$prev_time = $next_cutoff;
 	$next_cutoff += $interval;

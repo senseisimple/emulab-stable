@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniAM;
@@ -17,12 +17,22 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniCMV2;
 use GeniResponse;
+use GeniCredential;
+use GeniRegistry;
+use emutil;
+
+use Compress::Zlib;
+use MIME::Base64;
+use XML::LibXML;
+use Data::Dumper;
+
+# Disable UUID checks in GeniCredential.
+$GeniCredential::CHECK_UUID = 0;
 
 my $API_VERSION = 1;
+my $MAINSITE    = @TBMAINSITE@;
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -31,37 +41,239 @@ my $API_VERSION = 1;
 #
 sub GetVersion()
 {
-    my $blob = {
-	"geni_api" => $API_VERSION
+    my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($me)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    my $commithash = VersionInfo("commithash") || "";
+    my $hostname   = `hostname`;
+    chomp($hostname);
+    my $peers      = {};
+
+    #
+    # Ask the Clearinghouse for the peers info.
+    #
+    if ($MAINSITE) {
+	my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+	if (!defined($clearinghouse)) {
+	    print STDERR "Could not create clearinghouse object.\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	my $versioninfo;
+	if ($clearinghouse->GetVersion(\$versioninfo)) {
+	    print STDERR "Could not get peers from clearinghouse.\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	$peers = $versioninfo->{"peers"};
+
+	foreach my $urn (keys(%{ $peers })) {
+	    my $url = $peers->{$urn};
+	    $url =~ s/cm$/am/;
+	    $peers->{$urn} = $url;
+	}
+    }
+
+    #
+    # We have some confusion here. This is the AM interface, and the
+    # URL is different, but the URN and HRN are that of the CM.
+    #
+    my $url = $me->url();
+    $url =~ s/cm$/am/;
+
+    my $default_ad = {
+	"type" => "ProtoGENI",
+	"version" => "0.1" };
+    my $request_0_1 = {
+	"type" => "ProtoGENI",
+	"version" => "0.1",
+	"schema" => "http://www.protogeni.net/resources/rspec/0.1/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/0.1",
+	"extensions" => []
+    };
+    my $request_0_2 = {
+	"type" => "ProtoGENI",
+	"version" => "0.2",
+	"schema" => "http://www.protogeni.net/resources/rspec/0.2/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/0.2",
+	"extensions" => []
+    };
+    my $request_2 = {
+	"type" => "ProtoGENI",
+	"version" => "2",
+	"schema" => "http://www.protogeni.net/resources/rspec/2/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/2",
+	"extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
+    };
+    my $ad_0_1 = {
+        "type" => "ProtoGENI",
+        "version" => "0.1",
+        "schema" => "http://www.protogeni.net/resources/rspec/0.1/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/0.1",
+        "extensions" => []
+    };
+    my $ad_0_2 = {
+        "type" => "ProtoGENI",
+        "version" => "0.2",
+        "schema" => "http://www.protogeni.net/resources/rspec/0.2/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/0.2",
+        "extensions" => []
+    };
+    my $ad_2 = {
+        "type" => "ProtoGENI",
+        "version" => "2",
+        "schema" => "http://www.protogeni.net/resources/rspec/2/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/2",
+        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1\
+"]
     };
 
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
+    my $blob = {
+	"geni_api"   => $API_VERSION,
+	"urn"        => $me->urn(),
+	"hrn"        => $me->hrn(),
+	"url"        => $url,
+	"interface"  => "aggregate",
+	"code_tag"   => $commithash,
+	# XXX
+	"hostname"   => $hostname,
+	"request_rspec_versions" => [$request_0_1, $request_0_2, $request_2],
+	"ad_rspec_versions" => [$ad_0_1, $ad_0_2, $ad_2],
+	"default_ad_rspec" => $default_ad
+    };
+    $blob->{"peers"} = $peers
+	if ($MAINSITE);
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
-# List this aggregates resources. Invokes DiscoverResources.
-# XXX Still need to handle the slice urn code path.
+# List this aggregates resources. Invokes GeniCMV2::Resolve or
+# GeniCMV2::DiscoverResources.
 sub ListResources()
 {
-    # my ($argref) = @_;
-    # my $credentials = $argref->{'credentials'};
-    # my $options = $argref->{'options'};
-
     my ($credentials, $options) = @_;
-    my $available = $options->{'geni_available'} || 0;
-    my $compress = $options->{'geni_compress'} || 0;
+    my $available = $options->{'geni_available'};
+    my $compress = $options->{'geni_compressed'};
     my $slice_urn = $options->{'geni_slice_urn'};
+    my $version    = $options->{'rspec_version'} || undef;
 
-    # If $slice_urn is defined, this turns into a Resolve call.  We
-    # need to resolve twice: once to get the sliver urn from the
-    # slice, then to get the resources associated with the sliver (a
-    # manifest rspec).
+    my $xml = undef;
+    if ($slice_urn) {
 
-    my $discover_args = {
-        'credentials' => $credentials,
-        'available' => $available,
-        'compress' => $compress
-    };
-    return GeniCMV2::DiscoverResources($discover_args);
+        # If $slice_urn is defined, this turns into a Resolve call.  We
+        # need to resolve twice: once to get the sliver urn from the
+        # slice, then to get the resources associated with the sliver (a
+        # manifest rspec).
+        my $resolve_args = {
+            'urn' => $slice_urn,
+            'credentials' => $credentials
+        };
+        my $response = GeniCMV2::Resolve($resolve_args);
+        if (GeniResponse::IsError($response)) {
+            return $response;
+        }
+        # Get the hash out of the response
+        my $slice_hash = GeniResponse::value($response);
+        my $sliver = $slice_hash->{'sliver_urn'};
+        # Resolve the sliver to get the manifest RSpec
+        $resolve_args->{'urn'} = $sliver;
+        $response = GeniCMV2::Resolve($resolve_args);
+        if (GeniResponse::IsError($response)) {
+            return $response;
+        }
+        $xml = GeniResponse::value($response)->{'manifest'};
+
+    } else {
+
+        # No slice was specified, so get the advertisement RSpec.
+        my $discover_args = {
+            'credentials' => $credentials,
+            'available' => $available,
+	    'rspec_version' => $version,
+        };
+        my $response = GeniCMV2::DiscoverResources($discover_args);
+        if (GeniResponse::IsError($response)) {
+            return $response;
+        } else {
+            $xml = GeniResponse::value($response)
+        }
+
+    }
+
+    # Was compression requested?
+    if (defined($compress) && ref($compress) eq 'Frontier::RPC2::Boolean') {
+	$compress = $compress->value;
+    }
+    # If compression was requested, do it. The result is a String
+    # whose contents are a base64 encoding of a zlib compressed RSpec.
+    if ($compress) {
+        my $coder = Frontier::RPC2->new();
+        $xml = encode_base64( compress( $xml ) );
+    }
+    # Finally, return the RSpec
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $xml);
+}
+
+sub auto_add_sa($)
+{
+    my ($cred_str) = @_;
+    my $verify_sig = 1;
+    my $cred = GeniCredential->CreateFromSigned($cred_str, $verify_sig);
+    my $signers = $cred->signer_certs();
+
+    # The credential has been verified, so the signer derives from a
+    # trusted root.
+    my $sa_cert = @$signers[0];
+
+    # These are borrowed from protogeni/scripts/addauthority
+    my $certificate = GeniCertificate->LoadFromString($sa_cert);
+    if (!defined($certificate)) {
+        print STDERR "auto_add_sa: could not get certificate from $sa_cert\n";
+        return;
+    }
+    if (! ($certificate->uuid() =~ /\w*-(\w*)$/)) {
+        print STDERR "auto_add_sa: could not get prefix from uuid\n";
+        return;
+    }
+    my $url = $certificate->URL();
+    if (!defined($url)) {
+        print STDERR "auto_add_sa: certificate does not have a URI extension";
+        return;
+    }
+    my $urn = $certificate->urn();
+    if (!defined($urn)) {
+        print STDERR "auto_add_sa: certificate does not have a URN extension";
+        return;
+    }
+    # Look to see if already registered.
+    my $authority = GeniAuthority->Lookup($urn);
+    if (defined($authority)) {
+	#
+	# See if the certificate has changed. If so we want to replace it.
+	#
+	return
+	    if ($certificate->SameCert($authority->GetCertificate()));
+
+	#
+	# Do nothing; needs more thought. The problem is that the caller
+	# could be from a conforming PG authority, and so setting the url
+	# to undef in the code below is wrong. We should probably probe the
+	# SA here, to see if it is conforming. Or maybe set the URL and not
+	# worry of the sliver registration throws an error. 
+	#
+	return;
+    }
+
+    # if we're auto adding an authority, set the url to null
+    # so the PG/Emulab machinery does not try to contact the
+    # dynamic sa. It probably won't respond to the PG/Emulab
+    # protocols.
+    $url = undef;
+    if (!GeniAuthority->Create($certificate, $url, "sa")) {
+        print STDERR "auto_add_sa: unable to add authority\n";
+        return;
+    }
+    return $certificate;
 }
 
 # Create a sliver by allocating and starting resources.
@@ -69,37 +281,33 @@ sub CreateSliver()
 {
     my ($slice_urn, $credentials, $rspec, $users) = @_;
 
-    print STDERR "CreateSliver\n";
-
-    # circulate through the users and bind them to the slice
-    my $caller_urn = $ENV{'GENIURN'};
-    my $caller_keys = undef;
-    foreach my $user (@$users) {
-        my $user_urn = $user->{'urn'};
-        # Skip if it is not the caller
-        next if ($user_urn ne $caller_urn);
-        $caller_keys = $user->{keys};
+    foreach my $cred (@$credentials) {
+        # If we want to remove the SA(s) after this call, push them
+        # onto a list here and remove them at the end of this
+        # function. The other AM calls do not need the dynamically
+        # added SA.
+        auto_add_sa($cred);
     }
 
     # Package the caller_keys in a list of hashes the way the CM wants
     # it. Each hash has two keys ('type' and 'key'). 'type' is always
     # 'ssh' for us, and 'key' is the key.
-
     my $sliver_keys = undef;
-    if (defined($caller_keys)) {
-        $sliver_keys = [];
-        foreach my $key (@$caller_keys) {
-            # The CMV2 does not like newlines at the end of the keys.
-            chomp($key);
-            push(@$sliver_keys, {'type' => 'ssh', 'key' => $key});
-        }
+    if (@$users) {
+	$sliver_keys = [];
+	foreach my $user (@$users) {
+	    my $user_urn  = $user->{'urn'};
+	    my @user_keys = ();
+
+	    foreach my $key (@{ $user->{keys} }) {
+		# The CMV2 does not like newlines at the end of the keys.
+		chomp($key);
+		push(@user_keys, {'type' => 'ssh', 'key' => $key});
+	    }
+	    push(@{$sliver_keys}, {'urn'  => $user_urn,
+				   'keys' => \@user_keys});
+	}
     }
-
-    # This only gets us part of the way there. For users that are not
-    # *this* user, we need to somehow add their keys, which also
-    # requires adding them as a user *without* their certificate. Not
-    # sure we'll be able to do that.
-
     # Invoke CreateSliver
     my $create_args = {
         'slice_urn' => $slice_urn,
@@ -107,8 +315,12 @@ sub CreateSliver()
         'credentials' => $credentials,
         'keys' => $sliver_keys
     };
-
     my $response = GeniCMV2::CreateSliver($create_args);
+    if (!ref($response)) {
+	# This is cause GeniCMV2::CreateSliver does a fork, and the child
+	# returns plain status code, which should go to our caller. 
+	return $response;
+    }
     if (GeniResponse::IsError($response)) {
         # The create failed, so return the response.
         return $response
@@ -120,37 +332,53 @@ sub CreateSliver()
     return GeniResponse->Create( GENIRESPONSE_SUCCESS, $manifest_rspec );
 }
 
+# Just delegate to CMV2::DeleteSlice. If we ever change to sliver_urns
+# for this call, we'll probably want to call CMV2::DeleteSliver
+# instead.
 sub DeleteSliver()
 {
     my ($slice_urn, $credentials) = @_;
 
-    # Invoke StopSliver
-    my $stop_args = {
-        'slice_urn' => $slice_urn,
-        'credentials' => $credentials
-    };
-
-    my $response = GeniCMV2::StopSliver($stop_args);
-    # Ignore refused error, it means the sliver was not started yet.
-    # A better way to go might be to check the sliver state and only
-    # invoke stop sliver if the sliver is started.
-    if (GeniResponse::IsError($response)
-        && GeniResponse::code($response) != GENIRESPONSE_REFUSED()) {
-        # The stop failed, so return the response.
-        return $response
-    }
-
-    # The sliver is stopped, now delete it.
     my $delete_args = {
         'slice_urn' => $slice_urn,
         'credentials' => $credentials
     };
-    # XXX Open question: Call "DeleteSlice" or "DeleteSliver"?
-    $response = GeniCMV2::DeleteSlice($delete_args);
+    my $response = GeniCMV2::DeleteSlice($delete_args);
     if (GeniResponse::IsError($response)) {
-        return $response
+        return $response;
+    } else {
+        # Return an XML-RPC boolean
+        my $coder = Frontier::RPC2->new();
+        return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+# No prototype because it is recursive and as such, the prototype
+# causes a warning.
+#
+# Return a hash containing a JSONish representation of the given node.
+sub XmlToJson
+{
+    my ($node) = @_;
+ 
+    my $attrs = {};
+    foreach my $attr ($node->attributes) {
+        $attrs->{$attr->nodeName()} = $attr->nodeValue();
+    }
+
+    my $children = [];
+    foreach my $child ($node->childNodes) {
+        if ($child->nodeType() == XML_ELEMENT_NODE) {
+            push(@$children, XmlToJson($child));
+        }
+    }
+
+    my $result = {
+        "name" => $node->nodeName(),
+        "attributes" => $attrs,
+        "children" => $children
+    };
+    return $result;
 }
 
 # Get the status of the sliver associated with the given slice. This
@@ -171,9 +399,7 @@ sub SliverStatus()
     my $pgstatus = GeniResponse::value($response);
     my $status = {};
 
-    # How do we determine the sliver URN? Is there one for the whole
-    # sliver, or just for each individual sliver?
-    $status->{'geni_urn'} = 'Unknown';
+    $status->{'geni_urn'} = $slice_urn;
 
     # Determine geni_status. XXX how to determine 'configuring'?
     if ($pgstatus->{'status'} eq 'ready') {
@@ -184,15 +410,44 @@ sub SliverStatus()
         $status->{'geni_status'} = 'unknown';
     }
 
+    # include the pg status
+    $status->{'pg_status'} = $pgstatus->{'status'};
+
+    # include the expiration
+    my $slice = GeniSlice->Lookup($slice_urn);
+    $status->{'pg_expires'} = $slice->expires();
+
     my $details = $pgstatus->{'details'};
     my @children = ();
     while ( my ($pgurn, $pgrstat) = each(%$details) ) {
+        # Look up the sliver so we can extract info from the manifest.
+        my $sliver = GeniSliver->Lookup($pgurn);
         my $child = {
             'geni_urn' => $pgurn,
             # XXX Need to massage status to one of the AM status values
             'geni_status' => $pgrstat->{'status'},
             'geni_error' => $pgrstat->{'error'},
+            'pg_status' => $pgrstat->{'status'},
         };
+
+        # Put manifest info in...
+        my $manifest = $sliver->GetManifest(0);
+        if (0) {
+            # An example of how to include a single element from the
+            # manifest. Abondoned this approach and went to XmlToJson
+            # instead. Finds the "login", then the "hostname" inside
+            # the rspec
+            my $login = GeniXML::FindNodes(".//n:services//n:login", $manifest);
+            if (defined($login)) {
+                my $login = @$login[0];
+                my $host = GeniXML::GetText("hostname", $login);
+                if (defined($host)) {
+                    $child->{'pg_hostname'} = $host;
+                }
+            }
+        }
+        $child->{'pg_manifest'} = XmlToJson($manifest);
+        #$child->{'pg_xml_manifest'} = GeniXML::Serialize($manifest);
         push @children, $child;
     }
     $status->{'geni_resources'} = \@children;
@@ -211,11 +466,10 @@ sub RenewSliver()
     };
     my $response = GeniCMV2::RenewSlice($renew_args);
     if (GeniResponse::IsError($response)) {
-        return $response
+        return $response;
     }
 
-    # Well this is ugly. We want to return True, so we must encode it
-    # as an XMLRPC Boolean via an encoder.
+    # Return an XML-RPC boolean
     my $coder = Frontier::RPC2->new();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
 }
@@ -224,7 +478,18 @@ sub Shutdown()
 {
     my ($slice_urn, $credentials) = @_;
 
-    return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED );
+    my $shutdown_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials
+    };
+    my $response = GeniCMV2::Shutdown($shutdown_args);
+    if (GeniResponse::IsError($response)) {
+        return $response;
+    }
+
+    # Return an XML-RPC boolean
+    my $coder = Frontier::RPC2->new();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

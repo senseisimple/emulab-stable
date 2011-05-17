@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -14,7 +14,12 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDERR "Usage: update-testbed [-v] [-f]\n";
+    print STDERR "Usage: update-testbed\n";
+    print STDERR "-v     - Verify install scripts by loading them only\n";
+    print STDERR "-n     - Run install script in impotent mode\n";
+    print STDERR "-d     - Debugging mode\n";
+    print STDERR "-i     - Run 'gmake boss-install' after running scripts\n";
+    print STDERR "-s     - Stop/Restart the testbed before/after running scripts\n";
     exit(-1);
 }
 my $optlist   = "idsvfn";
@@ -37,10 +42,14 @@ my $TBOPS        = "@TBOPSEMAIL@";
 my $DBNAME       = "@TBDBNAME@";
 my $SRCDIR       = "@top_srcdir@";
 my $SQLUPDATEDIR = "$SRCDIR/sql/updates";
+my $PGENIUPDATEDIR = "$SRCDIR/protogeni/updates";
 my $UPDATEDIR    = "$SRCDIR/install/updates";
 my $DBUPDATE     = "$TB/sbin/dbupdate";
+my $PGENIUPDATE  = "$TB/sbin/protogeni/update";
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $INSTALLUPDATE= "$TB/sbin/update-install";
 my $SETSITEVAR   = "$TB/sbin/setsitevar";
+my $MFRISBEED	 = "/usr/local/etc/rc.d/3.mfrisbeed.sh";
 my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
 my $tempfile     = "/var/tmp/update.$$";
 
@@ -80,7 +89,9 @@ BEGIN
     }
 }
 use emdb;
+use libEmulab;
 use libtestbed;
+use Image;
 
 #
 # Parse command arguments.
@@ -131,12 +142,22 @@ if ($SRCDIR =~ /^\//) {
 }
 
 my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
-	       "-I${objdir}/../db", 
+	       "-I${objdir}/../db", "-I${objdir}/../event/lib", 
 	       "-I${abssrcdir}/tbsetup",
 	       "-I${abssrcdir}/install",
 	       # To catch a few extra things that do not normally change.
 	       "-I@prefix@/lib"
 	       );
+
+# Chicken or Egg.
+# XXX only set specific fields as the ns_include field may not be there yet.
+DBQueryFatal("INSERT INTO sitevariables (name,value,defaultvalue,description)".
+	     " VALUES ".
+	     " ('general/testbed_shutdown',NULL,'0', ".
+	     "  'Non-zero value indicates that the testbed is shutdown ".
+	     "and scripts should not do anything when they run. ".
+	     "DO NOT SET THIS BY HAND!')")
+    if (!SiteVarExists("general/testbed_shutdown"));
 
 #
 # Dump the testbed version numbers in all modes.
@@ -172,6 +193,14 @@ if ($verify) {
     $exitval++
 	if ($?);
 
+    if ($PGENISUPPORT) {
+	print "Checking for ProtoGENI DB updates ...\n";
+	system("perl @INCDIRS ../protogeni/scripts/update ".
+	       "       -q -v -p $PGENIUPDATEDIR");
+	$exitval++
+	    if ($?);
+    }
+
     exit(0)
 	if (!$exitval);
 
@@ -196,8 +225,7 @@ sub Restart()
     }
     if ($stopped) {
 	print "Starting up testbed daemons.\n";
-	system("$STARTUP start");
-	if ($?) {
+	if (system("$MFRISBEED start") || system("$STARTUP start")) {
 	    print "*** Could not restart testbed daemons.\n";
 	    exit(1);
 	}
@@ -205,7 +233,8 @@ sub Restart()
     }
     if ($nologins) {
 	print "Turning on the web interface and allowing swaps\n";
-	if (system("$SETSITEVAR web/nologins -") ||
+	if (system("$SETSITEVAR general/testbed_shutdown -") ||
+	    system("$SETSITEVAR web/nologins -") ||
 	    system("$SETSITEVAR web/message -")) {
 	    print "*** Could not renable the web interface and swapping!\n";
 	    exit(1);
@@ -238,6 +267,10 @@ if ($stopbed) {
     system("$SETSITEVAR web/nologins 1");
     if ($?) {
 	Fatal("Could not disable web logins and experiment swaps");
+    }
+    system("$SETSITEVAR general/testbed_shutdown 1");
+    if ($?) {
+	Fatal("Could not set general/testbed_shutdown");
     }
     $nologins = 1;
     
@@ -273,11 +306,13 @@ if ($stopbed) {
 	sleep(30);
     }
     print "** Testbed is quiet; stopping testbed daemons ... \n";
-    system("$STARTUP stop >/dev/null 2>&1");
-    if ($?) {
+    if (system("$STARTUP stop >/dev/null 2>&1") ||
+	(-x $MFRISBEED &&
+	system("$MFRISBEED stop >/dev/null 2>&1"))) {
 	Fatal("Could not stop testbed daemons. Stopping.");
     }
     $stopped = 1;
+
     print "** Testbed is stopped. Proceeding to update\n";
 
     #
@@ -296,6 +331,14 @@ print "Running pre-install updates ...\n";
 system("perl @INCDIRS ./update-install $forceopt -q -a pre -p $UPDATEDIR");
 exit(1)
     if ($?);
+
+if ($PGENISUPPORT) {
+    print "Running ProtoGENI DB updates ...\n";
+    system("perl @INCDIRS ../protogeni/scripts/update ".
+	   "       -q -p $PGENIUPDATEDIR");
+    exit(1)
+	if ($?);
+}
 
 if ($install) {
     print "Installing testbed software ... this will take a while!\n";

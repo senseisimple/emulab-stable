@@ -61,10 +61,10 @@ INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'/share/freebsd
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'emulab-ops-1.4','Name of ops node install package (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch ops packages (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/windows','1','0','Turn on Windows support in inner Emulab',0);
-INSERT INTO `sitevariables` VALUES ('elabinelab/singlenet',NULL,'0','Default control net config. 0==use inner cnet, 1==use real cnet',1);
-INSERT INTO `sitevariables` VALUES ('elabinelab/boss_osid',NULL,'','Default (emulab-ops) OSID to boot on boss node. Empty string means use node_type default OSID',1);
-INSERT INTO `sitevariables` VALUES ('elabinelab/ops_osid',NULL,'','Default (emulab-ops) OSID to boot on ops node. Empty string means use node_type default OSID',1);
-INSERT INTO `sitevariables` VALUES ('elabinelab/fs_osid',NULL,'','Default (emulab-ops) OSID to boot on fs node. Empty string means use node_type default OSID',1);
+INSERT INTO sitevariables VALUES ('elabinelab/singlenet',NULL,'0','Default control net config. 0==use inner cnet, 1==use real cnet',1);
+INSERT INTO sitevariables VALUES ('elabinelab/boss_osid',NULL,'','Default (emulab-ops) OSID to boot on boss node. Empty string means use node_type default OSID',1);
+INSERT INTO sitevariables VALUES ('elabinelab/ops_osid',NULL,'','Default (emulab-ops) OSID to boot on ops node. Empty string means use node_type default OSID',1);
+INSERT INTO sitevariables VALUES ('elabinelab/fs_osid',NULL,'','Default (emulab-ops) OSID to boot on fs node. Empty string means use node_type default OSID',1);
 INSERT INTO sitevariables VALUES ('general/firstinit/state',NULL,'Ready','Indicates that a new emulab is not setup yet. Moves through several states.',0);
 INSERT INTO sitevariables VALUES ('general/firstinit/pid',NULL,'testbed','The Project Name of the first project.',0);
 INSERT INTO sitevariables VALUES ('general/version/minor','168','','Source code minor revision number',0);
@@ -72,7 +72,7 @@ INSERT INTO sitevariables VALUES ('general/version/build','12/22/2009','','Build
 INSERT INTO sitevariables VALUES ('general/version/major','4','','Source code major revision number',0);
 INSERT INTO sitevariables VALUES ('general/mailman/password','MessyBoy','','Admin password for Emulab generated lists',0);
 INSERT INTO sitevariables VALUES ('swap/swapout_command_failaction',NULL,'warn','What to do if swapout command fails (warn == continue, fail == fail swapout).',0);
-INSERT INTO sitevariables VALUES ('general/open_showexplist',NULL,'','Allow members of this experiment to view all running experiments on the experiment list page',0);
+INSERT INTO sitevariables VALUES ('general/open_showexplist',NULL,'','Allow members of this project to view all running experiments on the experiment list page',0);
 INSERT INTO sitevariables VALUES ('general/linux_endnodeshaping',NULL,'1','Use this sitevar to disable endnodeshaping on linux globally on your testbed',0);
 INSERT INTO sitevariables VALUES ('swap/swapout_command','/usr/local/bin/create-swapimage -s','','Command to run in admin MFS on each node of an experiment at swapout time. Runs as swapout user.',0);
 INSERT INTO sitevariables VALUES ('swap/swapout_command_timeout','360','120','Time (in seconds) to allow for command completion',0);
@@ -96,6 +96,8 @@ INSERT INTO sitevariables VALUES ('oml/default_server_startcmd',NULL,'','Default
 INSERT INTO sitevariables VALUES ('images/create/maxwait',NULL,'72','Max time (minutes) to allow for saving an image',0);
 INSERT INTO sitevariables VALUES ('images/create/idlewait',NULL,'8','Max time (minutes) to allow between periods of progress (image file getting larger) when saving an image (should be <= maxwait)',0);
 INSERT INTO sitevariables VALUES ('images/create/maxsize',NULL,'6','Max size (GB) of a created image',0);
+INSERT INTO sitevariables VALUES ('general/testbed_shutdown',NULL,'0','Non-zero value indicates that the testbed is shutdown and scripts should not do anything when they run. DO NOT SET THIS BY HAND!',0);
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

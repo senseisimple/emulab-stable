@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -76,6 +76,7 @@ EventTimeline instproc updatedb {DB} {
     var_import ::GLOBALS::eid
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::TBCOMPAT::triggertypes
     $self instvar sim
     $self instvar event_list
     

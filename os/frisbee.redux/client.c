@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -53,15 +53,24 @@ int		startdelay = 0, startat = 0;
 int		nothreads = 0;
 int		nodecompress = 0;
 int		debug = 0;
+int		quiet = 0;
 int		tracing = 0;
 char		traceprefix[64];
 int		randomize = 1;
 int		zero = 0;
+int		keepalive;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
+char		*imageid;
+int		askonly;
+int		busywait = 0;
+char		*proxyfor = NULL;
 static struct timeval stamp;
 static struct in_addr serverip;
+#ifdef MASTER_SERVER
+static int	xfermethods = MS_METHOD_MULTICAST;
+#endif
 
 /* Forward Decls */
 static void	PlayFrisbee(void);
@@ -76,13 +85,13 @@ extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero,
 			       unsigned long writebufmem);
 extern void	ImageUnzipSetChunkCount(unsigned long chunkcount);
 extern void	ImageUnzipSetMemory(unsigned long writebufmem);
-extern int	ImageWriteChunk(int chunkno, char *chunkdata);
-extern int	ImageUnzipChunk(char *chunkdata);
+extern int	ImageWriteChunk(int chunkno, char *chunkdata, int chunksize);
+extern int	ImageUnzipChunk(char *chunkdata, int chunksize);
 extern void	ImageUnzipFlush(void);
 extern int	ImageUnzipQuit(void);
 
 /*
- * Chunk descriptor, one for each CHUNKSIZE*BLOCKSIZE bytes of an image file.
+ * Chunk descriptor, one per MAXCHUNKSIZE*MAXBLOCKSIZE bytes of an image file.
  * For each chunk, record its state and the time at which it was last
  * requested by someone.  The time stamp is "only" 61 bits.  This could be a
  * problem if packets arrive more than 73,000 years apart.  But we'll take
@@ -110,8 +119,8 @@ typedef struct {
 	int	   blockcount;		/* Number of blocks not received yet */
 	BlockMap_t blockmap;		/* Which blocks have been received */
 	struct {
-		char	data[BLOCKSIZE];
-	} blocks[CHUNKSIZE];		/* Actual block data */
+		char	data[MAXBLOCKSIZE];
+	} blocks[MAXCHUNKSIZE];		/* Actual block data */
 } ChunkBuffer_t;
 #define CHUNK_EMPTY	0
 #define CHUNK_FILLING	1
@@ -139,17 +148,31 @@ ClientStats_t	Stats;
 #endif
 
 char *usagestr = 
- "usage: frisbee [-drzbn] [-s #] <-p #> <-m ipaddr> <output filename>\n"
+ "usage: frisbee [-drzbnqN] [-s #] <-m ipaddr> <-p #> <output filename>\n"
+ "  or\n"
+ "usage: frisbee [-drzbnqN] [-s #] <-S server> <-F fileid> <output filename>\n"
+ "\n"
  " -d              Turn on debugging. Multiple -d options increase output.\n"
  " -r              Randomly delay first request by up to one second.\n"
  " -z              Zero fill unused block ranges (default is to seek past).\n"
  " -b              Use broadcast instead of multicast\n"
  " -n              Do not use extra threads in diskwriter\n"
+ " -q              Quiet mode (no dots)\n"
+ " -N              Do not decompress the received data, just write to output.\n"
+ " -S server-IP    Specify the IP address of the server to use.\n"
  " -p portnum      Specify a port number.\n"
  " -m mcastaddr    Specify a multicast address in dotted notation.\n"
  " -i mcastif      Specify a multicast interface in dotted notation.\n"
  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
  "                 NOTE: Must specify a raw disk device for output filename.\n"
+ " -F file-ID      Specify the ID of the file (image) to download.\n"
+ "                 Here -S specifies the 'master' server which will\n"
+ "                 return unicast/multicast info to use for image download.\n"
+ " -Q file-ID      Ask the server (-S) about the indicated file (image).\n"
+ "                 Tells whether the image is accessible by this node/user.\n"
+ " -B seconds      Time to wait between queries if an image is busy (-F).\n"
+ " -X method       Transfer method for -F, one of: ucast, mcast or bcast.\n"
+ " -K seconds      Send a multicast keep alive after a period of inactivity.\n"
  "\n"
  "security options:\n"
  " -u UUID         Expect all chunks to have this unique ID\n"
@@ -193,17 +216,21 @@ int
 main(int argc, char **argv)
 {
 	int	ch, mem;
-	char   *filename;
+	char   *filename = NULL;
 	int	dostype = -1;
 	int	slice = 0;
 	char	*sig_keyfile = 0, *enc_keyfile = 0, *imageid = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONc:e:u:")) != -1)
+	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONc:e:u:K:B:F:Q:P:X:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
 			break;
 			
+		case 'q':
+			quiet++;
+			break;
+
 		case 'b':
 			broadcast++;
 			break;
@@ -239,12 +266,54 @@ main(int argc, char **argv)
 			break;
 
 		case 'S':
-			if (!inet_aton(optarg, &serverip)) {
-				fprintf(stderr, "Invalid server IP `%s'\n",
+			if (!GetIP(optarg, &serverip)) {
+				fprintf(stderr, "Invalid server name '%s'\n",
 					optarg);
 				exit(1);
 			}
 			break;
+
+#ifdef MASTER_SERVER
+		case 'B':
+			busywait = atoi(optarg);
+			break;
+		case 'F':
+			imageid = optarg;
+			break;
+		case 'Q':
+			imageid = optarg;
+			askonly = 1;
+			break;
+		case 'P':
+			proxyfor = optarg;
+			break;
+		case 'X':
+		{
+			char *ostr, *str, *cp;
+			int nm = 0;
+
+			str = ostr = strdup(optarg);
+			while ((cp = strsep(&str, ",")) != NULL) {
+				if (strcmp(cp, "ucast") == 0)
+					nm |= MS_METHOD_UNICAST;
+				else if (strcmp(cp, "mcast") == 0)
+					nm |= MS_METHOD_MULTICAST;
+				else if (strcmp(cp, "bcast") == 0)
+					nm |= MS_METHOD_BROADCAST;
+				else if (strcmp(cp, "any") == 0)
+					nm = MS_METHOD_ANY;
+			}
+			free(ostr);
+			if (nm == 0) {
+				fprintf(stderr,
+					"-X should specify one or more of: "
+					"'ucast', 'mcast', 'bcast', 'any'\n");
+				exit(1);
+			}
+			xfermethods = nm;
+			break;
+		}
+#endif
 
 		case 't':
 			tracing++;
@@ -329,6 +398,12 @@ main(int argc, char **argv)
 			break;
 		}
 
+		case 'K':
+			keepalive = atoi(optarg);
+			if (keepalive < 0)
+				keepalive = 0;
+			break;
+
 		case 'h':
 		case '?':
 		default:
@@ -337,14 +412,86 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
-		usage();
-	filename = argv[0];
+	if (!askonly) {
+		if (argc != 1)
+			usage();
+		filename = argv[0];
+	}
 
-	if (!portnum || ! mcastaddr.s_addr)
+	if (!((imageid != NULL && serverip.s_addr != 0) ||
+	      (mcastaddr.s_addr != 0 && portnum != 0)))
 		usage();
 
 	ClientLogInit();
+#ifdef MASTER_SERVER
+	if (imageid) {
+		GetReply reply;
+		int method = askonly ? MS_METHOD_ANY : xfermethods;
+		int timo = 5; /* XXX */
+		int host = 0;
+
+		if (proxyfor) {
+			struct in_addr in;
+
+			if (!GetIP(proxyfor, &in))
+				fatal("Could not resolve host '%s'\n",
+				      proxyfor);
+			host = ntohl(in.s_addr);
+		}
+		while (1) {
+			if (!ClientNetFindServer(ntohl(serverip.s_addr),
+						 portnum, host, imageid,
+						 method, askonly, timo,
+						 &reply, NULL))
+				fatal("Could not get download info for '%s'",
+				      imageid);
+
+			if (askonly) {
+				PrintGetInfo(imageid, &reply, 1);
+				exit(0);
+			}
+			if (reply.error) {
+				if (busywait == 0 ||
+				    reply.error != MS_ERROR_TRYAGAIN)
+					fatal("%s: server returned error: %s",
+					      imageid,
+					      GetMSError(reply.error));
+				log("%s: image busy, waiting %d seconds...",
+				    imageid, busywait);
+				sleep(busywait);
+				continue;
+			}
+
+			serverip.s_addr = htonl(reply.servaddr);
+			mcastaddr.s_addr = htonl(reply.addr);
+			portnum = reply.port;
+
+			if (serverip.s_addr == mcastaddr.s_addr)
+				log("%s: address: %s:%d",
+				    imageid, inet_ntoa(mcastaddr), portnum);
+			else {
+				char serverstr[sizeof("XXX.XXX.XXX.XXX")+1];
+
+				strncpy(serverstr, inet_ntoa(serverip),
+					sizeof serverstr);
+				log("%s: address: %s:%d, server: %s",
+				    imageid, inet_ntoa(mcastaddr), portnum,
+				    serverstr);
+			}
+			break;
+		}
+	}
+
+	/*
+	 * XXX if proxying for another node, assume that we are only
+	 * interested in starting up the frisbeed and don't care about
+	 * the image ourselves. So, our work is done!
+	 */
+	if (proxyfor) {
+		log("server started on behalf of %s", proxyfor);
+		exit(0);
+	}
+#endif
 	ClientNetInit();
 
 #ifdef DOEVENTS
@@ -476,8 +623,8 @@ main(int argc, char **argv)
 	 * Pass in assorted parameters and fire off the disk writer thread.
 	 * The writer thread synchronizes only with us (the decompresser).
 	 */
-	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype, 3,
-		       maxwritebufmem*1024*1024);
+	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype,
+		       quiet ? 0 : 3, maxwritebufmem*1024*1024);
 
 	if (tracing) {
 		ClientTraceInit(traceprefix);
@@ -485,6 +632,14 @@ main(int argc, char **argv)
 		if (!nothreads)
 			DiskStatusCallback = WriterStatusCallback;
 	}
+
+	/*
+	 * Set the MC keepalive counter (but only if we are multicasting!)
+	 */
+	if (broadcast || (ntohl(mcastaddr.s_addr) >> 28) != 14)
+		keepalive = 0;
+	if (keepalive)
+		log("Enabling MC keepalive at %d seconds", keepalive);
 
 	PlayFrisbee();
 
@@ -526,11 +681,13 @@ void *
 ClientRecvThread(void *arg)
 {
 	Packet_t	packet, *p = &packet;
-	int		IdleCounter, BackOff;
+	int		IdleCounter, BackOff, KACounter;
 	static int	gotone;
 
 	if (debug)
 		log("Receive pthread starting up ...");
+
+	KACounter = keepalive * TIMEOUT_HZ;
 
 	/*
 	 * Use this to control the rate at which we request blocks.
@@ -576,6 +733,23 @@ ClientRecvThread(void *arg)
 		 */
 		if (PacketReceive(p) != 0) {
 			pthread_testcancel();
+
+			/*
+			 * See if we should send a keep alive
+			 */
+			if (KACounter == 1) {
+				/* If for some reason it fails, stop trying */
+				if (debug)
+					log("sending keepalive...");
+				if (NetMCKeepAlive()) {
+					log("Multicast keepalive failed, "
+					    "disabling keepalive");
+					keepalive = 0;
+				}
+				KACounter = keepalive * TIMEOUT_HZ;
+			} else if (KACounter > 1)
+				KACounter--;
+
 			if (--IdleCounter <= 0) {
 				if (gotone)
 					DOSTAT(recvidles++);
@@ -596,6 +770,8 @@ ClientRecvThread(void *arg)
 			continue;
 		}
 		pthread_testcancel();
+		if (keepalive)
+			KACounter = keepalive * TIMEOUT_HZ;
 		gotone = 1;
 
 		if (! PacketValid(p, TotalChunkCount)) {
@@ -679,6 +855,7 @@ ClientRecvThread(void *arg)
 			break;
 
 		case PKTSUBTYPE_JOIN:
+		case PKTSUBTYPE_JOIN2:
 		case PKTSUBTYPE_LEAVE:
 			/* Ignore these. They are from other clients. */
 			CLEVENT(3, EV_OCLIMSG,
@@ -789,6 +966,8 @@ ChunkerStartup(void)
 	 * Loop until all chunks have been received and written to disk.
 	 */
 	while (chunkcount) {
+		int chunkbytes;
+
 		/*
 		 * Search the chunk cache for a chunk that is ready to write.
 		 */
@@ -843,9 +1022,10 @@ ChunkerStartup(void)
 		/*
 		 * We have a completed chunk. Write it to disk.
 		 */
+		chunkbytes = ChunkBytes(ChunkBuffer[i].thischunk);
 		if (debug)
-			log("Writing chunk %d (buffer %d) after idle=%d.%03d",
-			    ChunkBuffer[i].thischunk, i,
+			log("Writing chunk %d (buffer %d), size %d, after idle=%d.%03d",
+			    ChunkBuffer[i].thischunk, i, chunkbytes,
 			    (wasidle*idledelay) / 1000000,
 			    ((wasidle*idledelay) % 1000000) / 1000);
 
@@ -856,17 +1036,19 @@ ChunkerStartup(void)
 
 		if (nodecompress) {
 			if (ImageWriteChunk(ChunkBuffer[i].thischunk,
-					    ChunkBuffer[i].blocks[0].data))
+					    ChunkBuffer[i].blocks[0].data,
+					    chunkbytes))
 				pfatal("ImageWriteChunk failed");
 		} else {
-			if (ImageUnzipChunk(ChunkBuffer[i].blocks[0].data))
+			if (ImageUnzipChunk(ChunkBuffer[i].blocks[0].data,
+					    chunkbytes))
 				pfatal("ImageUnzipChunk failed");
 		}
 
-		CLEVENT(1, EV_CLIDCDONE,
-			ChunkBuffer[i].thischunk, chunkcount,
+		CLEVENT(1, EV_CLIDCDONE, ChunkBuffer[i].thischunk,
+			chunkbytes, chunkcount, 0);
+		CLEVENT(2, EV_CLIDCSTAT, (totalddata >> 32), totalddata,
 			decompblocks, writeridles);
-		CLEVENT(2, EV_CLIDCSTAT, (totalddata >> 32), totalddata, 0, 0);
 
 		/*
 		 * Okay, free the slot up for another chunk.
@@ -936,7 +1118,7 @@ RequestStamp(int chunk, int block, int count, void *arg)
 	 * Common case of a complete chunk request, always stamp as there will
 	 * be some data in it we need.
 	 */
-	if (block == 0 && count == CHUNKSIZE)
+	if (block == 0 && count == ChunkSize(chunk))
 		stampme = 1;
 	/*
 	 * Else, request is for a partial chunk. If we are not currently
@@ -999,8 +1181,12 @@ static int
 RequestRedoTime(int chunk, unsigned long long curtime)
 {
 	if (Chunks[chunk].lastreq == 0 || redodelay == 0 ||
-	    (int)(curtime - Chunks[chunk].lastreq) >= redodelay)
+	    (int)(curtime - Chunks[chunk].lastreq) >= redodelay) {
+		CLEVENT(5, EV_CLIREDO, chunk,
+			Chunks[chunk].lastreq/1000000,
+			Chunks[chunk].lastreq%1000000, 0);
 		return 1;
+	}
 	return 0;
 }
 
@@ -1162,7 +1348,7 @@ GotBlock(Packet_t *p)
 		i = free;
 		ChunkBuffer[i].state      = state;
 		ChunkBuffer[i].thischunk  = chunk;
-		ChunkBuffer[i].blockcount = CHUNKSIZE;
+		ChunkBuffer[i].blockcount = ChunkSize(chunk);
 		bzero(&ChunkBuffer[i].blockmap,
 		      sizeof(ChunkBuffer[i].blockmap));
 		inprogress++;
@@ -1185,7 +1371,8 @@ GotBlock(Packet_t *p)
 		return 0;
 	}
 	ChunkBuffer[i].blockcount--;
-	memcpy(ChunkBuffer[i].blocks[block].data, p->msg.block.buf, BLOCKSIZE);
+	memcpy(ChunkBuffer[i].blocks[block].data,
+	       p->msg.block.buf, BlockSize(chunk, block));
 #ifdef NEVENTS
 	goodblocksrecv++;
 
@@ -1251,19 +1438,30 @@ static void
 RequestMissing(int chunk, BlockMap_t *map, int count)
 {
 	Packet_t	packet, *p = &packet;
+	int		csize = ChunkSize(chunk);
 
 	if (debug)
-		log("Requesting missing blocks of chunk:%d", chunk);
+		log("Requesting %d missing blocks of chunk:%d", count, chunk);
 	
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_PREQUEST;
 	p->hdr.datalen    = sizeof(p->msg.prequest);
 	p->msg.prequest.chunk = chunk;
 	p->msg.prequest.retries = Chunks[chunk].ours;
+	/*
+	 * Invert the map of what we have so we request everything we
+	 * don't have, but be careful not to request anything beyond the
+	 * end of a partial chunk.  Note that we use MAXCHUNKSIZE as the
+	 * upper bound size size CHUNKSIZE may be less than that even for
+	 * "full-sized" image chunks.
+	 */
 	BlockMapInvert(map, &p->msg.prequest.blockmap);
+	if (csize < MAXCHUNKSIZE)
+		BlockMapClear(&p->msg.prequest.blockmap,
+			      csize, MAXCHUNKSIZE - csize);
 	PacketSend(p, 0);
 #ifdef STATS
-	assert(count == BlockMapIsAlloc(&p->msg.prequest.blockmap,0,CHUNKSIZE));
+	assert(count == BlockMapIsAlloc(&p->msg.prequest.blockmap, 0, CHUNKSIZE));
 	if (count == 0)
 		log("Request 0 blocks from chunk %d", chunk);
 	Stats.u.v1.lostblocks += count;
@@ -1278,7 +1476,7 @@ RequestMissing(int chunk, BlockMap_t *map, int count)
 	 * unless we were requesting something we are missing
 	 * we can just unconditionally stamp the chunk.
 	 */
-	RequestStamp(chunk, 0, CHUNKSIZE, (void *)1);
+	RequestStamp(chunk, 0, csize, (void *)1);
 	Chunks[chunk].ours = 1;
 }
 
@@ -1396,7 +1594,7 @@ RequestChunk(int timedout)
 		 * is considered a read-ahead to us.
 		 */
 		if (timedout || RequestRedoTime(chunk, stamp))
-			RequestRange(chunk, 0, CHUNKSIZE);
+			RequestRange(chunk, 0, ChunkSize(chunk));
 
 		/*
 		 * Even if we did not just request the block, we still
@@ -1468,6 +1666,7 @@ PlayFrisbee(void)
 	gettimeofday(&timeo, 0);
 	while (1) {
 		struct timeval now;
+		int32_t subtype = PKTSUBTYPE_JOIN;
 
 		gettimeofday(&now, 0);
 		if (timercmp(&timeo, &now, <=)) {
@@ -1482,9 +1681,29 @@ PlayFrisbee(void)
 			CLEVENT(1, EV_CLIJOINREQ, myid, 0, 0, 0);
 			DOSTAT(joinattempts++);
 			p->hdr.type       = PKTTYPE_REQUEST;
-			p->hdr.subtype    = PKTSUBTYPE_JOIN;
-			p->hdr.datalen    = sizeof(p->msg.join);
-			p->msg.join.clientid = myid;
+			/*
+			 * Unless they have specified the -N option, continue
+			 * to use the V1 JOIN which tells the server only to
+			 * let us join if the image being requested is a
+			 * traditional, 1MB padded image.
+			 *
+			 * Two reasons for this: 1) right now the client
+			 * code for decompressing images has not been modified
+			 * to handle non-padded images, and 2) this gives us
+			 * some degree of backward compatibility for a new
+			 * client talking to an old (pre-JOINv2) server.
+			 */
+			if (!nodecompress) {
+				subtype = p->hdr.subtype = PKTSUBTYPE_JOIN;
+				p->hdr.datalen = sizeof(p->msg.join);
+				p->msg.join.clientid = myid;
+			} else {
+				subtype = p->hdr.subtype = PKTSUBTYPE_JOIN2;
+				p->hdr.datalen = sizeof(p->msg.join2);
+				p->msg.join2.clientid = myid;
+				p->msg.join2.chunksize = MAXCHUNKSIZE;
+				p->msg.join2.blocksize = MAXBLOCKSIZE;
+			}
 			PacketSend(p, 0);
 			timeo.tv_sec = 0;
 			timeo.tv_usec = 500000;
@@ -1496,15 +1715,26 @@ PlayFrisbee(void)
 		 * we get a reply back.
 		 */
 		if (PacketReceive(p) == 0 &&
-		    p->hdr.subtype == PKTSUBTYPE_JOIN &&
+		    p->hdr.subtype == subtype &&
 		    p->hdr.type == PKTTYPE_REPLY) {
+			if (subtype == PKTSUBTYPE_JOIN) {
+				p->msg.join2.chunksize = MAXCHUNKSIZE;
+				p->msg.join2.blocksize = MAXBLOCKSIZE;
+				p->msg.join2.bytecount =
+					(uint64_t)p->msg.join.blockcount *
+					MAXBLOCKSIZE;
+			}
 			CLEVENT(1, EV_CLIJOINREP,
-				p->msg.join.blockcount, BLOCKSIZE, 0, 0);
+				CHUNKSIZE, BLOCKSIZE,
+				(p->msg.join2.bytecount >> 32),
+				p->msg.join2.bytecount);
 			break;
 		}
 	}
 	gettimeofday(&timeo, 0);
-	TotalChunkCount = p->msg.join.blockcount / CHUNKSIZE;
+	InitSizes(p->msg.join2.chunksize, p->msg.join2.blocksize,
+		  p->msg.join2.bytecount);
+	TotalChunkCount = TotalChunks();
 	ImageUnzipSetChunkCount(TotalChunkCount);
 	
 	/*
@@ -1526,9 +1756,9 @@ PlayFrisbee(void)
 	}
  
 	log("Joined the team after %d sec. ID is %u. "
-	    "File is %d chunks (%d blocks)",
+	    "File is %d chunks (%lld bytes)",
 	    timeo.tv_sec - stamp.tv_sec,
-	    myid, TotalChunkCount, p->msg.join.blockcount);
+	    myid, TotalChunkCount, p->msg.join2.bytecount);
 
 	ChunkerStartup();
 
@@ -1564,8 +1794,11 @@ PlayFrisbee(void)
 	p->msg.leave2.stats      = Stats;
 	PacketSend(p, 0);
 
-	log("");
-	ClientStatsDump(myid, &Stats);
+	if (!quiet) {
+		log("");
+		ClientStatsDump(myid, &Stats);
+		log("");
+	}
 #else
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_LEAVE;
@@ -1574,5 +1807,5 @@ PlayFrisbee(void)
 	p->msg.leave.elapsed  = estamp.tv_sec;
 	PacketSend(p, 0);
 #endif
-	log("\nLeft the team after %ld seconds on the field!", estamp.tv_sec);
+	log("Left the team after %ld seconds on the field!", estamp.tv_sec);
 }

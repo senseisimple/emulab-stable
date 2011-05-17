@@ -31,11 +31,11 @@ my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
+my $NOSHAREDFS  = @NOSHAREDFS@;
 
 #
 # Fixed paths for clients
 #
-my $PROJROOT    = "@PROJROOT_DIR@";
 my $GROUPROOT   = "@GROUPSROOT_DIR@";
 my $USERROOT    = "@USERSROOT_DIR@";
 my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
@@ -83,7 +83,12 @@ else {
 #
 my $FS_PORT = "emulab-fs-1.4";
 if ($FBSD_MAJOR > 4) {
-    if ($FBSD_MAJOR > 6) {
+    if ($FBSD_MAJOR > 7) {
+	# XXX someday...
+	$FS_PORT = "emulab-fs-4.0";
+    } elsif ($FBSD_MAJOR == 7 && $FBSD_MINOR > 2) {
+	$FS_PORT = "emulab-fs-3.1";
+    } elsif ($FBSD_MAJOR == 7) {
 	$FS_PORT = "emulab-fs-3.0";
     } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
 	$FS_PORT = "emulab-fs-2.1";
@@ -377,14 +382,17 @@ Phase "exports", "Setting up exports", sub {
 	# /share is special. We want to export to boss/ops read-write,
 	# but to the control network read-only.
 	#
-	my ($a,$b,$c,$d) = ($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
 	my $realdir = `realpath $SHAREROOT`;
 	chomp($realdir);
 	push(@exports_lines,
 	    "$realdir\t$BOSSNODE $USERNODE -maproot=root");
-	push(@exports_lines,
-	     "$realdir\t-network ${a}.${b}.${c} -mask $CONTROL_NETMASK ".
-	     "-maproot=root -ro -alldirs");
+	if (!$NOSHAREDFS) {
+	    my ($a,$b,$c,$d) =
+		($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
+	    push(@exports_lines,
+		 "$realdir\t-network ${a}.${b}.${c} ".
+		 "-mask $CONTROL_NETMASK -maproot=root -ro -alldirs");
+	}
 
 	#
 	# Put them in exports.head, and copy that to /etc/exports

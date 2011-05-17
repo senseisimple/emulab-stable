@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniSliver;
@@ -24,8 +24,6 @@ use GeniUsage;
 use GeniHRN;
 use GeniXML;
 use emutil;
-use Experiment;
-use OSinfo;
 use Node;
 use English;
 use XML::Simple;
@@ -171,9 +169,9 @@ sub Stringify($)
 # Create a sliver record in the DB. On the client side we save the credential
 # that allows control of it, for later operations.
 #
-sub Create($$$$$$$$$)
+sub Create($$$$$$$$)
 {
-    my ($class, $slice, $owner, $uuid,
+    my ($class, $slice, $owner, 
 	$resource_uuid, $resource_type, $resource_id,
 	$hrn, $nickname, $rspec) = @_;
     my @insert_data = ();
@@ -189,7 +187,9 @@ sub Create($$$$$$$$$)
 	    "Already have a certificate for $hrn/$urn\n";
 	return undef;
     }
-    $certificate = GeniCertificate->Create("sliver", $urn, $hrn, $TBOPS,$uuid);
+    $certificate = GeniCertificate->Create({'urn'  => $urn,
+					    'hrn'  => $hrn,
+					    'email'=> $TBOPS});
     if (!defined($certificate)) {
 	print STDERR "GeniSliver::Create: ".
 	    "Could not generate new certificate for $hrn/$urn\n";
@@ -197,6 +197,7 @@ sub Create($$$$$$$$$)
     }
     my $slice_uuid     = $slice->uuid();
     my $owner_uuid     = $owner->uuid();
+    my $sliver_uuid    = $certificate->uuid();
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -204,7 +205,7 @@ sub Create($$$$$$$$$)
     push(@insert_data, "hrn=" . DBQuoteSpecial($hrn));
     push(@insert_data, "nickname=" . DBQuoteSpecial($nickname))
 	if (defined($nickname));
-    push(@insert_data, "uuid='$uuid'");
+    push(@insert_data, "uuid='$sliver_uuid'");
     push(@insert_data, "resource_uuid='$resource_uuid'");
     push(@insert_data, "resource_type='$resource_type'");
     push(@insert_data, "resource_id='$resource_id'");
@@ -290,10 +291,8 @@ sub Delete($$)
     }
     DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
 	or return -1;
-    if ($self->resource_type() ne "Node") {
-	DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
-	    or return -1;
-    }
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
     DBQueryWarn("delete from geni_slivers where idx='$idx'")
 	or return -1;
 
@@ -320,6 +319,26 @@ sub GetManifest($$)
     
     my $xml = GeniXML::Serialize($self->rspec());
     return $xml;
+}
+
+#
+# Store the rspec/manifest string.
+#
+sub UpdateRspec($$)
+{
+    my ($self, $rspec) = @_;
+
+    my $idx          = $self->idx();
+    my $rspec_string = GeniXML::Serialize($rspec);
+    my $safe_rspec   = DBQuoteSpecial($rspec_string);
+
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  rspec_string=$safe_rspec ".
+			 "where idx='$idx'"));
+    
+    $self->{'RSPEC'} = $rspec;
+    return 0;
 }
 
 #
@@ -445,6 +464,7 @@ sub SetState($$)
 sub GetExperiment($)
 {
     my ($self) = @_;
+    require Experiment;
 
     return undef
 	if (! ref($self));
@@ -569,7 +589,6 @@ use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
 use GeniUtil;
-use Experiment;
 use emutil;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
@@ -582,7 +601,7 @@ sub ErrorLog($)
     my ($self)  = @_;
     my $bootlog = "";
 
-    my $node = Node->Lookup($self->uuid());
+    my $node = Node->Lookup($self->resource_id());
     if (!defined($node)) {
 	print STDERR "Could not map node $self to its object\n";
 	return "";
@@ -605,8 +624,8 @@ sub component_urn($)
 sub Create($$$$$$)
 {
     # $rspec is a LibXML element representing a single node.
-    my ($class, $slice, $user, $resource_uuid, $rspec) = @_;
-    my $virtualization_type = GeniXML::GetText("virtualization_type", $rspec);
+    my ($class, $slice, $user, $node, $rspec) = @_;
+    my $virtualization_type = GeniXML::GetVirtualizationType($rspec);
     if (!defined($virtualization_type)) {
 	print STDERR "Node does not contain a virtualization_type\n";
 	return undef;
@@ -615,17 +634,6 @@ sub Create($$$$$$)
     my $experiment = $slice->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $slice to its experiment\n";
-	return undef;
-    }
-
-    #
-    # the node is already allocated to the sliver, but still need to enter
-    # a virt_nodes entry, and possibly more virt table entries, so that the
-    # node will boot properly, and is otherwise controllable.
-    #
-    my $node = Node->Lookup($resource_uuid);
-    if (!defined($node)) {
-	print STDERR "Could not map node $resource_uuid to its object\n";
 	return undef;
     }
 
@@ -651,53 +659,51 @@ sub Create($$$$$$)
 	print STDERR "Node does not contain a virtual_id\n";
 	return undef;
     }
-    my $hrn;
-    my $sshdport = 22;
-    my $hostname;
-    my $phostname;
-    my $resource_id;
-    my $sliver_uuid;
+    my $resource_uuid = $node->uuid();
+    my $resource_id   = $node->node_id();
+    my $hrn           = "${PGENIDOMAIN}." . $node->node_id();
+    my $sshdport      = 22;
+    my $hostname      = GeniUtil::FindHostname($node->node_id());
+    my $phostname     = $hostname;
 
-    #
-    # The resource UUID refers to the physical node, but the virtualization
-    # type might require a vnode.
-    # 
-    if ($virtualization_type eq "emulab-vnode") {
-	my $vnode = $experiment->VnameToNode($nickname);
-	if (!defined($vnode)) {
-	    print STDERR "Could not lookup node $nickname in $experiment\n";
-	    return undef;
-	}
-	$hrn = "${PGENIDOMAIN}." . $vnode->node_id();
-	$sliver_uuid = $vnode->uuid();
-	$resource_id = $vnode->node_id();
-	$hostname = GeniUtil::FindHostname($vnode->node_id());
-	$phostname = GeniUtil::FindHostname($vnode->phys_nodeid());
-	$sshdport = $vnode->sshdport();
-    }
-    else {
-	$hrn = "${PGENIDOMAIN}." . $node->node_id();
-	$sliver_uuid = $node->uuid();
-	$resource_id = $node->node_id();
-	$phostname = $hostname = GeniUtil::FindHostname($node->node_id());
+    if ($node->isvirtnode()) {
+	$sshdport  = $node->sshdport();
+	$phostname = GeniUtil::FindHostname($node->phys_nodeid());
     }
 
     #
     # Add this stuff to the rspec (which becomes the manifest).
     #
-    GeniXML::SetText("sliver_uuid", $rspec, $sliver_uuid);
-    GeniXML::SetText("hostname", $rspec, $hostname);
-    GeniXML::SetText("sshdport", $rspec, $sshdport) if (defined($sshdport));
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("hostname", $rspec, $hostname);
+	GeniXML::SetText("sshdport", $rspec, $sshdport)
+	    if (defined($sshdport));
+    }
 
-    # This is a version 2.0 thing.
-    my $services = GeniXML::AddElement("services", $rspec);
-    my $login = GeniXML::AddElement("login", $services);
+    my $services = GeniXML::FindFirst("n:services", $rspec);
+    if (! defined($services)) {
+	$services = GeniXML::AddElement("services", $rspec);
+    }
+    my $login = GeniXML::FindFirst("n:login", $services);
+    if (! defined($login)) {
+	$login = GeniXML::AddElement("login", $services);
+    }
     GeniXML::SetText("authentication", $login, "ssh-keys");
     GeniXML::SetText("hostname", $login, $phostname);
     GeniXML::SetText("port", $login, $sshdport);
+    GeniXML::SetText("username", $login, $user->uid());
 
-    return GeniSliver->Create($slice, $user, $sliver_uuid, $resource_uuid,
-			      "Node", $resource_id, $hrn, $nickname, $rspec);
+    my $sliver = GeniSliver->Create($slice, $user, $resource_uuid, "Node",
+				    $resource_id, $hrn, $nickname, $rspec);
+    return undef
+	if (!defined($sliver));
+
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
+    } else {
+	GeniXML::SetText("sliver_id", $rspec, $sliver->sliver_urn());
+    }
+    return $sliver;
 }
 
 #
@@ -716,20 +722,19 @@ sub Provision($;$)
     # a virt_nodes entry, and possibly more virt table entries, so that the
     # node will boot properly, and is otherwise controllable.
     #
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $uuid = $self->uuid();
+    my $node_id = $self->resource_id();
     return 0
-	if (!defined($uuid));
-    my $node       = Node->Lookup($uuid);
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
     if (!defined($node)) {
-	print STDERR "Could not map node $uuid to its object\n";
+	print STDERR "Could not map node $node_id to its object\n";
 	return -1;
     }
-    my $node_id     = $node->node_id();
     my $reservation = $node->Reservation();
     if (!defined($reservation)) {
 	print STDERR "$node was already released from slice\n";
@@ -743,7 +748,7 @@ sub Provision($;$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
-    my $virt_type = GeniXML::GetText("virtualization_type", $self->rspec());
+    my $virt_type = GeniXML::GetVirtualizationType($self->rspec());
     if (!$node->isremotenode() &&
 	defined($virt_type) &&
 	$virt_type eq "emulab-vnode") {
@@ -756,8 +761,7 @@ sub Provision($;$)
 	# Mark
 	$node->ModifyReservation({"genisliver_idx" => $self->idx()});
 
-	my $subtype = GeniXML::GetText("virtualization_subtype",
-				       $self->rspec());
+	my $subtype = GeniXML::GetVirtualizationSubtype($self->rspec());
 	if (defined($subtype)) {
 	    if (!$pnode->sharing_mode()) {
 		$pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
@@ -788,18 +792,18 @@ sub UnProvision($;$)
     $nophysfree = 0
 	if (!defined($nophysfree));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
-	return -1;
+	return 0;
     }
-    my $uuid = $self->uuid();
+    my $node_id = $self->resource_id();
     return 0
-	if (!defined($uuid));
-    my $node       = Node->Lookup($uuid);
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
     if (!defined($node)) {
-	# Lets call this nonfatal since it might be a virtnode that 
-	print STDERR "Could not map node $uuid to its object\n";
+	# Lets call this nonfatal since it might be a virtnode that is gone.
+	print STDERR "Could not map node $node_id to its object\n";
 	return 0;
     }
     my $reservation = $node->Reservation();
@@ -827,8 +831,7 @@ sub UnProvision($;$)
 	    }
 	}
 
-	my $virt_type = GeniXML::GetText("virtualization_type",
-					 $self->rspec());
+	my $virt_type = GeniXML::GetVirtualizationType($self->rspec());
 	if (!$node->isremotenode() &&
 	    defined($virt_type) &&
 	    $virt_type eq "emulab-vnode") {
@@ -892,7 +895,7 @@ sub UnProvision($;$)
     else {
 	print STDERR "$node is reserved to another, not $self\n";
 	# Signal error so we can look at what happened.
-	return -1;
+	return 0;
     }
     return 0;
 }
@@ -907,7 +910,7 @@ sub ProcessManifest($$)
     return -1
 	if (! ref($self));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -915,12 +918,12 @@ sub ProcessManifest($$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
     
-    my $uuid = $self->uuid();
+    my $node_id = $self->resource_id();
     return 0
-	if (!defined($uuid));
-    my $node       = Node->Lookup($uuid);
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
     if (!defined($node)) {
-	print STDERR "Could not map node $uuid to its object\n";
+	print STDERR "Could not map node $node_id to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -934,10 +937,10 @@ sub ProcessManifest($$)
 	#
 	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $manifest)->get_nodelist()) {
-	    my $sliver_id = GeniXML::GetText("sliver_uuid", $ref);
-	    if (defined($sliver_id) && $sliver_id eq $uuid) {
+	    my $sliver_urn = GeniXML::GetSliverId($ref);
+	    if (defined($sliver_urn) && $sliver_urn eq $self->sliver_urn()) {
 		# startup command.
-		my $startupcmd = GeniXML::GetText("startup_command", $ref);
+		my $startupcmd = GeniXML::GetStartupCommand($ref);
 		if (defined($startupcmd)) {
 		    if (! TBcheck_dbslot($startupcmd, "virt_nodes",
 					 "startupcmd",
@@ -970,7 +973,7 @@ sub Start($$$)
     return -1
 	if (! ref($self));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -978,12 +981,12 @@ sub Start($$$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
     
-    my $uuid = $self->uuid();
+    my $node_id = $self->resource_id();
     return 0
-	if (!defined($uuid));
-    my $node       = Node->Lookup($uuid);
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
     if (!defined($node)) {
-	print STDERR "Could not map node $uuid to its object\n";
+	print STDERR "Could not map node $node_id to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -1034,7 +1037,7 @@ sub Stop($$)
     return -1
 	if (! ref($self));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -1042,12 +1045,12 @@ sub Stop($$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
     
-    my $uuid = $self->uuid();
+    my $node_id = $self->resource_id();
     return 0
-	if (!defined($uuid));
-    my $node       = Node->Lookup($uuid);
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
     if (!defined($node)) {
-	print STDERR "Could not map node $uuid to its object\n";
+	print STDERR "Could not map node $node_id to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -1092,17 +1095,17 @@ sub ComputeStatus($$)
     #
     # If the sliver is "broken" then call it failed.
     #
-    if ($self->status() eq "broken") {
+    if ($self->status() eq "broken" || $self->status() eq "failed") {
 	$$pref = "failed";
 	return 0;
     }
 
-    my $uuid = $self->uuid();
+    my $node_id = $self->resource_id();
     return -1
-	if (!defined($uuid));
-    my $node       = Node->Lookup($uuid);
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
     if (!defined($node)) {
-	print STDERR "Could not map node $uuid to its object\n";
+	print STDERR "Could not map node $node_id to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -1169,12 +1172,22 @@ sub Create()
     #
     # Add this stuff to the rspec (which becomes the manifest).
     #
-    GeniXML::SetText("sliver_uuid", $rspec, $interface_uuid);
-    GeniXML::SetText("component_urn", $rspec, $component_urn);
-
-    return GeniSliver->Create($slice, $user, $interface_uuid,
-			      $interface_uuid, "Interface", $resource_id,
-			      $hrn, $nickname, $rspec);
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("component_urn", $rspec, $component_urn);
+    } else {
+	GeniXML::SetText("component_id", $rspec, $component_urn);
+    }
+    my $sliver = GeniSliver->Create($slice, $user, $interface_uuid,
+				    "Interface", $resource_id,
+				    $hrn, $nickname, $rspec);
+    return undef
+	if (!defined($sliver));
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
+    } else {
+	GeniXML::SetText("sliver_id", $rspec, $sliver->sliver_urn());
+    }
+    return $sliver;
 }
 
 sub Provision($)
@@ -1228,12 +1241,26 @@ sub UnProvision($)
 #
 sub Start($$)
 {
-    my ($self) = @_;
+    my ($self, $version) = @_;
 
     #
     # This is actually implemented in GeniAggregate since currently "link"
     # is the smallest entity; you cannot operate on an individual interface.
     #
+    return -1
+	if (! ref($self));
+
+    $self->SetState("started");
+    return 0;
+}
+
+#
+# Stop
+#
+sub Stop($$)
+{
+    my ($self, $version) = @_;
+
     return -1
 	if (! ref($self));
 

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -17,9 +17,9 @@
  * header (24).
  */
 #ifdef JUMBO
-#define MAXBLOCKSIZE	8934
+#define MAXPACKETDATA	8934
 #else
-#define MAXBLOCKSIZE	1448
+#define MAXPACKETDATA	1448
 #endif
 
 /*
@@ -27,17 +27,17 @@
  * Chunks are broken into blocks which are the unit of transmission
  */
 #ifdef JUMBO
-#define CHUNKSIZE	128
-#define BLOCKSIZE	8192
+#define MAXCHUNKSIZE	128
+#define MAXBLOCKSIZE	8192
 #else
-#define CHUNKSIZE	1024
-#define BLOCKSIZE	1024
+#define MAXCHUNKSIZE	1024
+#define MAXBLOCKSIZE	1024
 #endif
 
 /*
  * Make sure we can fit a block in a single ethernet MTU.
  */
-#if BLOCKSIZE > MAXBLOCKSIZE
+#if MAXBLOCKSIZE > MAXPACKETDATA
 #error "Invalid block size"
 #endif
 
@@ -47,7 +47,7 @@
  * With the maximum block size of 1448, this limits a chunk to no more
  * than 16,773,632 bytes (just under 16MB).
  */
-#if (CHUNKSIZE%CHAR_BIT) != 0 || (CHUNKSIZE/CHAR_BIT) > MAXBLOCKSIZE
+#if (MAXCHUNKSIZE%CHAR_BIT) != 0 || (MAXCHUNKSIZE/CHAR_BIT) > MAXPACKETDATA
 #error "Invalid chunk size"
 #endif
 
@@ -57,8 +57,8 @@
  * of the client (forcing pieces of frisbee to be paged out to disk, even
  * if there is a swap disk to use, is not a very efficient way to load disks!)
  *
- * MAXCHUNKBUFS is the number of BLOCKSIZE*CHUNKSIZE chunk buffers used to
- * receive data from the network.  With the default values, these are 1MB
+ * MAXCHUNKBUFS is the number of MAXBLOCKSIZE*MAXCHUNKSIZE chunk buffers used
+ * to receive data from the network.  With the default values, these are 1MB
  * each.
  *
  * MAXWRITEBUFMEM is the amount, in MB, of write buffer memory in the client.
@@ -108,16 +108,16 @@
 
 /*
  * The number of disk read blocks in a single read on the server.
- * Must be an integer divisor of CHUNKSIZE.
+ * Must be an integer divisor of MAXCHUNKSIZE.
  */
 #define SERVER_READ_SIZE	32
 
 /*
  * Parameters for server network usage:
  *
- *	SERVER_BURST_SIZE	Max BLOCKSIZE packets sent in a burst.
+ *	SERVER_BURST_SIZE	Max MAXBLOCKSIZE packets sent in a burst.
  *				Should be a multiple of SERVER_READ_SIZE
- *				Should be less than SOCKBUFSIZE/BLOCKSIZE,
+ *				Should be less than SOCKBUFSIZE/MAXBLOCKSIZE,
  *				bursts of greater than the send socket
  *				buffer size are almost certain to cause
  *				lost packets.
@@ -128,12 +128,12 @@
  *				On FreeBSD we set the clock to 1ms
  *				granularity.
  *
- * Together with the BLOCKSIZE, these two params form a theoretical upper
+ * Together with the MAXBLOCKSIZE, these two params form a theoretical upper
  * bound on bandwidth consumption for the server.  That upper bound (for
  * ethernet) is:
  *
- *	(1000000 / SERVER_BURST_GAP)		# bursts per second
- *	* (BLOCKSIZE+24+42) * SERVER_BURST_SIZE	# * wire size of a burst
+ *	(1000000 / SERVER_BURST_GAP)		   # bursts per second
+ *	* (MAXBLOCKSIZE+24+42) * SERVER_BURST_SIZE # * wire size of a burst
  *
  * which for the default 1k packets, gap of 1ms and burst of 16 packets
  * is about 17.4MB/sec.  That is beyond the capacity of a 100Mb ethernet
@@ -155,7 +155,7 @@
  * How long (in usecs) to wait before re-reqesting a chunk.
  * It will take the server more than:
  *
- *	(CHUNKSIZE/SERVER_BURST_SIZE) * SERVER_BURST_GAP
+ *	(MAXCHUNKSIZE/SERVER_BURST_SIZE) * SERVER_BURST_GAP
  *
  * usec (0.13 sec with defaults) for each each chunk it pumps out,
  * and we conservatively assume that there are a fair number of other
@@ -214,7 +214,7 @@ typedef struct {
 } __attribute__((__packed__)) ClientStats_t;
 
 typedef struct {
-	char	map[CHUNKSIZE/CHAR_BIT];
+	char	map[MAXCHUNKSIZE/CHAR_BIT];
 } BlockMap_t;
 
 /*
@@ -250,7 +250,7 @@ typedef struct {
 		struct {
 			int32_t		chunk;
 			int32_t		block;
-			int8_t		buf[BLOCKSIZE];
+			int8_t		buf[MAXBLOCKSIZE];
 		} block;
 
 		/*
@@ -276,6 +276,24 @@ typedef struct {
 		} prequest;
 
 		/*
+		 * Join V2 allows:
+		 * - client to request a specific chunk/block size
+		 *   server will return what it will provide
+		 * - server to return the size in bytes
+		 *   so that we can transfer files that are not a
+		 *   multiple of the block/chunk size
+		 * Note the blockcount field remains for vague
+		 * compatibility-ish reasons.
+		 */
+		struct {
+			uint32_t	clientid;
+			int32_t		blockcount;
+			int32_t		chunksize;
+			int32_t		blocksize;
+			uint64_t		bytecount;
+		} join2;
+
+		/*
 		 * Leave reporting client params/stats
 		 */
 		struct {
@@ -294,20 +312,102 @@ typedef struct {
 #define PKTSUBTYPE_REQUEST	4
 #define PKTSUBTYPE_LEAVE2	5
 #define PKTSUBTYPE_PREQUEST	6
+#define PKTSUBTYPE_JOIN2	7
+
+#ifdef MASTER_SERVER
+#include <netinet/in.h>
+
+/* default port number: 0xfbee */
+#define MS_PORTNUM	64494
+
+/* imageid length: large enough to hold an ascii encoded SHA 1024 hash */
+#define MS_MAXIDLEN	256
+/* ditto for signature */
+#define MS_MAXSIGLEN	256
+
+/*
+ * Master server messages.
+ * These are sent via unicast TCP.
+ */
+typedef struct {
+	uint32_t	hostip;
+	uint8_t		methods;
+	uint8_t		status;
+	uint16_t	idlen;
+	uint8_t		imageid[MS_MAXIDLEN];
+} __attribute__((__packed__)) GetRequest;
+
+typedef struct {
+	uint8_t		method;
+	uint8_t		isrunning;
+	uint16_t	error;	
+	uint32_t	servaddr;
+	uint32_t	addr;
+	uint16_t	port;
+	uint16_t	sigtype;
+	uint8_t		signature[MS_MAXSIGLEN];
+	uint32_t	hisize;
+	uint32_t	losize;
+} __attribute__((__packed__)) GetReply;
+
+typedef struct {
+	struct {
+		int8_t		version[4];
+		int32_t		type;
+	} hdr;
+	union {
+		GetRequest	getrequest;
+		GetReply	getreply;
+	} body;
+} MasterMsg_t;
+
+#define MS_MSGVERS_1		"V01"
+
+#define MS_MSGTYPE_GETREQUEST	1
+#define MS_MSGTYPE_GETREPLY	2
+#define MS_MSGTYPE_PUTREQUEST	3
+#define MS_MSGTYPE_PUTREPLY	4
+
+#define MS_METHOD_UNKNOWN	0
+#define MS_METHOD_UNICAST	1
+#define MS_METHOD_MULTICAST	2
+#define MS_METHOD_BROADCAST	4
+#define MS_METHOD_ANY		7
+
+#define MS_SIGTYPE_NONE		0
+#define MS_SIGTYPE_MTIME	1
+#define MS_SIGTYPE_MD5		2
+#define MS_SIGTYPE_SHA1		3
+
+#define MS_ERROR_FAILED		1	/* internal host auth error */
+#define MS_ERROR_NOHOST		2	/* no such host */
+#define MS_ERROR_NOIMAGE	3	/* no such image */
+#define MS_ERROR_NOACCESS	4	/* access not allowed for host */
+#define MS_ERROR_NOMETHOD	5	/* not avail to host via method */
+#define MS_ERROR_INVALID	6	/* invalid argument */
+#define MS_ERROR_TRYAGAIN	7	/* try again later */
+#endif
 
 /*
  * Protos.
  */
+int	GetIP(char *str, struct in_addr *in);
 int	GetSockbufSize(void);
 int	ClientNetInit(void);
 int	ServerNetInit(void);
-int	ServerNetMCKeepAlive(void);
+int	NetMCKeepAlive(void);
 unsigned long ClientNetID(void);
 int	PacketReceive(Packet_t *p);
 void	PacketSend(Packet_t *p, int *resends);
 void	PacketReply(Packet_t *p);
 int	PacketValid(Packet_t *p, int nchunks);
 void	dump_network(void);
+#ifdef MASTER_SERVER
+int	ClientNetFindServer(in_addr_t, in_port_t, in_addr_t, char *,
+			    int, int, int, GetReply *, struct in_addr *);
+int	MsgSend(int, MasterMsg_t *, size_t, int);
+int	MsgReceive(int, MasterMsg_t *, size_t, int);
+#endif
 
 /*
  * Globals

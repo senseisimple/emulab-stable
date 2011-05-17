@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -14,12 +14,14 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDERR "Usage: testbed-control [-d] [-f] shutdown | boot\n";
+    print STDERR "Usage: testbed-control [-d] [-f] shutdown | boot | restart\n";
     exit(-1);
 }
 my $optlist   = "df";
 my $debug     = 0;
 my $force     = 0;
+my $stopped   = 0;
+my $committed = 0;
 
 #
 # Configure variables
@@ -28,6 +30,7 @@ my $TB	         = "@prefix@";
 my $TBOPS        = "@TBOPSEMAIL@";
 my $SETSITEVAR   = "$TB/sbin/setsitevar";
 my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
+my $MFRISBEED    = "/usr/local/etc/rc.d/3.mfrisbeed.sh";
 
 # Protos
 sub Fatal($);
@@ -44,6 +47,8 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libEmulab;
+use Image;
 
 #
 # Parse command arguments.
@@ -61,7 +66,8 @@ if (defined($options{"f"})) {
 usage()
     if (@ARGV != 1);
 usage()
-    if (! ($ARGV[0] eq "boot" || $ARGV[0] eq "shutdown"));
+    if (! ($ARGV[0] eq "boot" || $ARGV[0] eq "shutdown" ||
+	   $ARGV[0] eq "restart"));
 
 #
 # Must be root if actually doing this.
@@ -70,18 +76,31 @@ if ($UID) {
     Fatal("This script must be run as root! Maybe use sudo?")
 }
 
+# Chicken or Egg.
+DBQueryFatal("INSERT INTO sitevariables VALUES ".
+	     " ('general/testbed_shutdown',NULL,'0', ".
+	     "  'Non-zero value indicates that the testbed is shutdown ".
+	     "and scripts should not do anything when they run. ".
+	     "DO NOT SET THIS BY HAND!', 0)")
+    if (!SiteVarExists("general/testbed_shutdown"));
+
 sub Restart()
 {
-    print "Starting up testbed daemons.\n";
-    system("$STARTUP start");
-    if ($?) {
-	print "*** Could not restart testbed daemons.\n";
-	exit(1);
+    # Do not let the restart get interrupted. Bad.
+    $SIG{INT} = 'IGNORE';
+
+    if ($stopped) {
+	print "Starting up testbed daemons.\n";
+	if (system("$MFRISBEED start") || system("$STARTUP start")) {
+	    print "*** Could not restart testbed daemons.\n";
+	    exit(1);
+	}
+	print "\n";
     }
-    print "\n";
 
     print "Turning on the web interface and allowing swaps\n";
-    if (system("$SETSITEVAR web/nologins -") ||
+    if (system("$SETSITEVAR general/testbed_shutdown -") ||
+	system("$SETSITEVAR web/nologins -") ||
 	system("$SETSITEVAR web/message -")) {
 	print "*** Could not renable the web interface and swapping!\n";
 	exit(1);
@@ -89,9 +108,26 @@ sub Restart()
 }
 
 if ($ARGV[0] eq "boot") {
+    #
+    # What if the system is currently started? We do not want to start
+    # two copies of things. Look to see if stated and/or bootinfo are
+    # running, since these are the two most critical and quickly missed
+    # daemons.
+    #
+    if (CheckDaemonRunning("stated") || CheckDaemonRunning("bootinfo")) {
+	Fatal("Testbed appears to be running (stated and/or bootinfo running)");
+    }
+    $stopped = 1;
     Restart();
     exit(0);
 }
+
+sub Handler()
+{
+    Restart();
+    exit(1);
+}
+$SIG{INT} = 'IGNORE';
 
 #
 # Stop the testbed before doing the update.
@@ -110,8 +146,13 @@ system("$SETSITEVAR web/nologins 1");
 if ($?) {
     Fatal("Could not disable web logins and experiment swaps");
 }
+system("$SETSITEVAR general/testbed_shutdown 1");
+if ($?) {
+    Fatal("Could not set general/testbed_shutdown");
+}
     
 print "-> Waiting a few seconds for testbed to quiet down ...\n";
+$SIG{INT} = \&Handler;
 sleep(5);
 print "-> Looking for experiments still in transition.\n";
 
@@ -143,9 +184,17 @@ while (1) {
     sleep(30);
 }
 print "** Testbed is quiet; stopping testbed daemons ... \n";
-system("$STARTUP stop >/dev/null 2>&1");
-if ($?) {
+if (system("$STARTUP stop >/dev/null 2>&1") ||
+    system("$MFRISBEED stop >/dev/null 2>&1")) {
     Fatal("Could not stop testbed daemons. Stopping. Best to reboot!");
+}
+$stopped = 1;
+
+if ($ARGV[0] eq "restart") {
+    print "** Testbed is stopped. Waiting a moment before restarting ...\n";
+    sleep(2);
+    Restart();
+    exit(0);
 }
 print "** Testbed is stopped. Safe to power off or reboot\n";
 exit(0);

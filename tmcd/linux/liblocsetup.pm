@@ -19,7 +19,7 @@ use Exporter;
 	 os_ifconfig_veth os_viface_name os_modpasswd
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_getnfsmounts os_islocaldir
+	 os_groupdel os_getnfsmounts os_islocaldir os_mountextrafs
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
 	 os_get_disks os_get_disk_size os_get_partition_info os_nfsmount
 	 os_gendhcpdconf os_get_ctrlnet_ip
@@ -639,6 +639,10 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	    elsif ($speed == 10) {
 		$media = $IFC_10MBS;
 	    }
+	    elsif ($speed == 0) {
+		warn("*** Speed was 0 in ifconfig, defaulting to auto negotiation (and Gb media)\n");
+		$media = $IFC_1000MBS;
+	    }
 	    else {
 		warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
 		$speed = 100;
@@ -672,9 +676,21 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	if (defined($ethtool)) {
 	    # this seems to work for returning an error on eepro100
 	    $uplines =
-		"if $ethtool $iface >/dev/null 2>&1; then\n    " .
-		"  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
-		"  sleep 2 # needed due to likely bug in e100 driver on pc850s\n".
+		"if $ethtool $iface >/dev/null 2>&1; then\n    ";
+	    if ($speed eq '0') {
+		$uplines .= "  $ethtool -s $iface autoneg on\n";
+	    }
+	    else {
+		# If we're gigabit, we *must* turn on autoneg -- it's part
+		# of the GbE protocol.
+		if ($speed eq '1000') {
+		    $uplines .= "  $ethtool -s $iface autoneg on\n";
+		}
+		$uplines .=
+		    "  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
+		    "  sleep 2 # needed due to likely bug in e100 driver on pc850s\n";
+	    }
+	    $uplines .= 
 		"else\n    " .
 		"  /sbin/mii-tool --force=$media $iface\n    " .
 		"fi\n    ";
@@ -1955,6 +1971,32 @@ sub os_nfsmount($$)
     }
 
     return 0;
+}
+
+#
+# Create/mount a local filesystem on the extra partition if it hasn't
+# already been done.  Returns the resulting mount point (which may be
+# different than what was specified as an argument if it already existed).
+#
+sub os_mountextrafs($)
+{
+    my $dir = shift;
+    my $mntpt = "";
+    my $log = "$VARDIR/logs/mkextrafs.log";
+
+    #
+    # XXX this is a most bogus hack right now, we look for partition 4
+    # in /etc/fstab.
+    #
+    my $fstabline = `grep -E '(hda|sda)4' /etc/fstab`;
+    if ($fstabline =~ /^\/dev\/\S*4\s+(\S+)\s+/) {
+	$mntpt = $1;
+    } elsif (!system("$BINDIR/mkextrafs.pl -f $dir >$log 2>&1")) {
+	$mntpt = $dir;
+    } else {
+	print STDERR "mkextrafs failed, see $log\n";
+    }
+    return $mntpt;
 }
 
 1;

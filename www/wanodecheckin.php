@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -53,7 +53,7 @@ if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $IP) ||
 $query_result =
     DBQueryFatal("select IP from widearea_nodeinfo where privkey='$privkey'");
 if (! mysql_num_rows($query_result)) {
-    SPITSTATUS(WASTATUS_PRIVKEY);
+    SPITSTATUS(WASTATUS_BADPRIVKEY);
     return;
 }
 

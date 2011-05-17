@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -9,7 +9,6 @@ import socket
 import os
 import os.path
 import stat
-import popen2
 import tempfile
 import time
 import re
@@ -331,6 +330,7 @@ class EmulabServer:
         self.instances["node"]       = node(self);
         self.instances["elabinelab"] = elabinelab(self);
         self.instances["subboss"] = subboss(self);
+        self.instances["blob"]       = blob(self);
         return
 
     def __getattr__(self, name):
@@ -4614,14 +4614,20 @@ class subboss:
         
         argstr = escapeshellarg(str(argdict["imageid"]))
         
-        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
+	# We need admin privileges for non-global images since elabman won't
+	# belong to any projects.  We've already checked to make sure the user
+	# has permission to load the image in libosload so we don't need to
+	# check again in frisbeelauncher.  Only a subboss can make this request
+	# anyway.
+        (exitval, output) = runcommand(TBDIR + "/sbin/subboss_wrapper frisbeelauncher " + argstr)
+
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         #
         # Success. Must get the loadinfo out of the DB so we can pass it back.
         #
-        res = DBQueryFatal("select load_address from images where imageid=%s",
+        res = DBQueryFatal("select load_address from frisbee_blobs where imageid=%s",
                            (str(argdict["imageid"]),))
         
         # Hmm, something went wrong?
@@ -4656,6 +4662,7 @@ class elabinelab:
         self.clientip = server.clientip;
         self.pid      = None;
         self.eid      = None;
+	self.node     = None;
         return
 
     #
@@ -4721,6 +4728,8 @@ class elabinelab:
                                   "elabinelab method for " +
                                   res[0][1] + "/" + res[0][2]);
         
+	self.node = res[0][0];
+
         return None;
 
     #
@@ -4793,135 +4802,6 @@ class elabinelab:
         
         return node_instance.console(version, argdict);
     
-    #
-    # vlan control
-    # 
-    def vlans(self, version, argdict):
-        if version != self.VERSION:
-            return EmulabResponse(RESPONSE_BADVERSION,
-                                  output="Client version mismatch!")
-
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
-
-        argerror = CheckRequiredArgs(argdict, ("op", "arg"))
-        if (argerror):
-            return argerror
-
-        verifyerror = self.verifystuff();
-        if (verifyerror):
-            return verifyerror
-
-        if (argdict["op"] != "setup" and
-            argdict["op"] != "list" and
-            argdict["op"] != "trunk" and
-            argdict["op"] != "destroy"):
-            return EmulabResponse(RESPONSE_BADARGS,
-			  output="op must be list, trunk, setup or destroy")
-
-        argstr = "-p " + self.pid + " -e " + self.eid + " " + argdict["op"];
-     
-        #
-        # Figure out how to convert the stuff we got into something we can
-        # pass on the command line to perl backend.
-        # 
-        if argdict["op"] == "destroy" or argdict["op"] == "list":
-            #
-            # Destroy and list are easy; just pass a list of id numbers out.
-	    # The backend script does all the verification.
-            #
-            if (isinstance(argdict["arg"], types.IntType)):
-                argstr += " " + str(argdict["arg"])
-                pass
-            else:
-                tokens = argdict["arg"].split(",")
-                for token in tokens:
-                    argstr += " " + escapeshellarg(token)
-                    pass
-                pass
-            pass
-        elif argdict["op"] == "trunk":
-            #
-            # Trunk is syntactically like destroy or list with two extra args.
-            #
-	    info = argdict["arg"]
-	    argstr += " " + str(info["mode"]) + " " + str(info["port"])
-	    tokens = info["vlans"].split(",")
-	    for token in tokens:
-		argstr += " " + escapeshellarg(token)
-		pass
-	    pass
-        else:
-            #
-            # Setup is harder. Pass a set of strings to the script,
-            # consisting of:
-            #
-            #           id,node:iface,speed,duplex,vtag
-            #
-            for id, idval in argdict["arg"].items():
-                vtag = idval["virtual"]
-                
-                for port, portarray in idval["members"].items():
-                    speed  = portarray["speed"]
-                    duplex = portarray["duplex"]
-                    
-                    thisarg = escapeshellarg(str(id) + "," + port + "," +
-                                             str(speed) + "," +
-                                             duplex + "," + vtag)
-                    
-                    argstr += " " + thisarg;
-                    pass
-                pass
-            pass
-
-        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxy " + argstr)
-        if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
-        
-        return EmulabResponse(RESPONSE_SUCCESS, output=output)
-
-    #
-    # Leave the previous one in place or else existing elabinelabs will break.
-    #
-    def vlansnew(self, version, argdict):
-        if version != self.VERSION:
-            return EmulabResponse(RESPONSE_BADVERSION,
-                                  output="Client version mismatch!")
-
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
-
-        argerror = CheckRequiredArgs(argdict, ("xmldoc",))
-        if (argerror):
-            return argerror
-
-        verifyerror = self.verifystuff();
-        if (verifyerror):
-            return verifyerror
-
-        #
-        # We get an xmldoc as the argument, which we give to the proxy
-        # to decode on its own. Easier then trying to decode a bunch
-        # of stuff to pass on the commandline.
-        #
-        (xmlfp, xmlfilename) = writensfile(argdict["xmldoc"]);
-        if not xmlfilename:
-            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
-
-        argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
-
-        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxynew " + argstr)
-        if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
-        
-        return EmulabResponse(RESPONSE_SUCCESS, output=output)
-    
     def vlansv2(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
@@ -4973,6 +4853,59 @@ class elabinelab:
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS, value=stuff, output=output)
+
+    def vlansv3(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("xmldoc",))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        #
+        # We get an xmldoc as the argument, which we give to the proxy
+        # to decode on its own. Easier then trying to decode a bunch
+        # of stuff to pass on the commandline.
+        #
+        (xmlfp, xmlfilename) = writensfile(argdict["xmldoc"]);
+        if not xmlfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+
+        #
+        # Create a temporary file for the output.
+        #
+        (outfp, outfilename) = writensfile("");
+        if not outfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+
+        argstr  = "-o " + outfilename + " ";
+        argstr += "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+
+        (exitval,output) = runcommand("/usr/testbed/sbin/snmpit.proxyv3 " + argstr)
+	if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+
+        #
+        # Results are in the outfile.
+        #
+        stuff = ""
+        for l in outfp:
+            stuff += l
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=stuff, output=output)
+
     #
     # Fire up a frisbeed for an image,
     # 
@@ -5001,28 +4934,21 @@ class elabinelab:
         
         argstr = escapeshellarg(str(argdict["imageid"]))
         
-        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
+        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeehelper -n " +
+                                       self.node + " " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         #
-        # Success. Must get the loadinfo out of the DB so we can pass it back.
+        # Success. Load address was output so parse it out.
         #
-        res = DBQueryFatal("select load_address from images where imageid=%s",
-                           (argdict["imageid"],))
-        
-        # Hmm, something went wrong?
-        if len(res) == 0:
+	m = re.search("^Address is (.*)$", output)
+	if m == None or m.group(1) == None:
             return EmulabResponse(RESPONSE_ERROR,
-                                  output="Imageid is gone: " +
+                                  output="Could not image info for: " +
                                   argdict["imageid"])
-        
-        if (res[0][0] == None or res[0][0] == ""):
-            return EmulabResponse(RESPONSE_ERROR,
-                                  output="No load_address in DB: " +
-                                  argdict["imageid"])
-        
-        return EmulabResponse(RESPONSE_SUCCESS, str(res[0][0]), output=output)
+	addr = m.group(1)
+        return EmulabResponse(RESPONSE_SUCCESS, value=str(addr))
     
     #
     # Return the equivalent of what switchmac does. This is used so that
@@ -5790,6 +5716,66 @@ class template:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
     pass
+
+#
+# This class implements the server side of the XMLRPC interface to blobs.
+#
+class blob:
+    ##
+    # Initialize the object.
+    #
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
+        self.VERSION  = VERSION
+        return
+
+    def mkblob( self, version, argdict ):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        
+        argerror = CheckRequiredArgs(argdict, ("filename",))
+        if (argerror):
+            return argerror
+
+        (exitval, output) = runcommand( TBDIR + "/bin/mkblob " + self.uid + " " + argdict[ "filename" ] )
+
+        if exitval:
+            return EmulabResponse( RESPONSE_ERROR, exitval >> 8, output=output )
+        else:
+            return EmulabResponse( RESPONSE_SUCCESS, value=0, output=output )
+
+    def rmblob( self, version, argdict ):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        
+        argerror = CheckRequiredArgs(argdict, ("uuid",))
+        if (argerror):
+            return argerror
+
+        (exitval, output) = runcommand( TBDIR + "/bin/rmblob " + self.uid + " " + argdict[ "uuid" ] )
+
+        if exitval:
+            return EmulabResponse( RESPONSE_ERROR, exitval >> 8, output=output )
+        else:
+            return EmulabResponse( RESPONSE_SUCCESS, value=0, output=output )
 
 #
 # Utility functions

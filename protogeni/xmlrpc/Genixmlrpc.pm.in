@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Perl code to access an XMLRPC server using http. Derived from the
@@ -18,12 +18,6 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration.
 use English;
 use GeniResponse;
-#use IO::Socket::SSL;
-use RPC::XML;
-use RPC::XML::Parser;
-use LWP::UserAgent;
-use HTTP::Request::Common qw(POST);
-use HTTP::Headers;
 use Data::Dumper;
 
 my $debug   = 1;
@@ -140,6 +134,12 @@ sub SetTimeout($$)
 sub CallMethod($$$@)
 {
     my ($httpURL, $context, $method, @args) = @_;
+    require RPC::XML;
+    require RPC::XML::Parser;
+    require LWP::UserAgent;
+    require HTTP::Request::Common;
+    import HTTP::Request::Common;
+    require HTTP::Headers;
 
     # Default context if not set.
     $context = $MyContext
@@ -239,6 +239,7 @@ sub CallMethod($$$@)
     #
     # Convert the xmlgoo to Perl and return it.
     #
+    $xmlgoo =~ s/\<nil\/\>//g;
     my $parser   = RPC::XML::Parser->new();
     my $goo      = $parser->parse($xmlgoo);
     my ($value,$output,$code);
@@ -254,9 +255,16 @@ sub CallMethod($$$@)
     elsif ($goo->value()->is_fault() 
 	|| (ref($goo->value()) && UNIVERSAL::isa($goo->value(),"HASH") 
 	    && exists($goo->value()->{'faultCode'}))) {
-	$code   = GENIRESPONSE_RPCERROR();
+	$code   = $goo->value()->{"faultCode"}->value;
 	$value  = $goo->value()->{"faultCode"}->value;
 	$output = $goo->value()->{"faultString"}->value;
+    }
+    elsif (! (ref($goo->value()) && UNIVERSAL::isa($goo->value(),"HASH") 
+	      && exists($goo->value()->{'code'}))) {
+	# Sadly, the AM interface returns a different structure.
+	$code   = GENIRESPONSE_SUCCESS();
+	$value  = $goo->value()->value;
+	$output = undef;
     }
     else {
 	$code   = $goo->value()->{'code'}->value;

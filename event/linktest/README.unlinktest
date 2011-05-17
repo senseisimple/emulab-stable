@@ -1,0 +1,172 @@
+Unlinktest attempts to provide additional assurance that the user
+topology is implemented correctly. Specifically, unlinktest ensures
+that unallocated interfaces do not allow spurious data paths within a
+topology.
+
+There are three different kinds of unlinktest and each one provides a
+different set of assurances and trade-offs.
+
+General Limitations:
+
+* These tests only check for spurious connectivity within an
+experiment. They do not test for experiment isolation or isolation
+from other networks.
+
+* While some malicious behaviour may be detected by these tests, they
+are primarily there to detect unintentional connectivity caused by a
+bug in the configuration software.
+
+* It is important to note that none of these tests can prove
+absolutely that there are no spurious communications paths. While we
+believe that they will find most of the common cases, there are many
+more situations that will fool all of these tests.
+
+----------
+Switchtest
+----------
+
+Idea:
+Testing for spurious connections is largely about detecting if the
+switches themselves are misconfigured. If we examine the database to
+find out what the configuration of the switches should be, we can then
+query the switch state directly and compare whether the two match.
+
+Assumptions:
+
+By interacting with the database directly and using Emulab's switch
+interface, we are binding this test explicitly with Emulab as it is
+currently constituted. The script must be run on boss and cannot run
+in any form of standalone mode.
+
+Switchtest queries the database itself to determine the physical
+wiring of the nodes and the mapping between interfaces requested by
+the user and those allocated by the testbed. Switchtest cannot always
+detect misconfigurations if the database representation of wiring is
+incorrect. It cannot detect any errors in the code which maps the
+user's request onto physical reasources or the code which writes that
+configuration to the database.
+
+In addition, switchtest uses snmpit to query the switches for their
+state. This means that if snmpit is unreliable when reporting switch
+state, the test will be inaccurate.
+
+One key advantage of this method over later methods is the fact that
+it is completely endpoint-agnostic. It is the only variety of
+unlinktest which could detect problems in a black box or if a node is
+using an experimental or potentially malicious operating environment.
+
+Cost:
+
+Speed is a key advantage of switchtest. The execution time scales with
+the size of the testbed as it queries all switches in the testbed for
+their configuration information. This is a small cost when dealing
+with a testbed consisting of hundreds of nodes but may need to be
+optimized to a more targeted switch query if the testbed scales to
+thousands or tens of thousands of nodes.
+
+Usage:
+
+On boss, run the following command:
+
+switchtest.pl <proj> <exp>
+
+<proj> is the project name
+<exp> is the experiment name
+
+switchtest.pl will print a list of any switch ports in that experiment
+which are enabled or up when they are supposed to be disabled.
+
+-------------------
+Parallel Unlinktest
+-------------------
+
+Idea:
+Suppose you don't wish to trust the switch control software or you
+want a standalone test which can run outside of Emulab. A more direct
+way to test for connectivity is to try to send packets through each
+interface and check to see if they are received anywhere. A
+complication is that most network interface cards have multiple
+connection settings (speed, duplex vs. half-duplex) and if the two
+sides are not configured the same way, the link will not function.
+
+So we provide a new linktest level which will synchronously configure
+all interfaces not specified by the user to each possible
+configuration. After each configuration, each node attempts to send an
+ethernet frame through the interface and detects whether it receives
+any ethernet frames. If none of these packets are received on any
+interface, the unallocated interfaces are indeed isolated from one
+another.
+
+Assumptions:
+This procedure detects a fairly broad range of spurious connections,
+but not all of them.
+
+First, it assumes that the operating system on the nodes is itself
+reliable. It will send packets on request, will report accurately when
+a packet is received, and will configure ports
+correctly. Experimental, barebones, or potentially compromised
+operating systems on nodes will potentially invalidate any results.
+
+Second, only a subset of configuration options are tested. These
+include 10Mbps, 100Mbps, and Gigabit speeds. It tests these speeds at
+both half and full duplex. But there are many more potential
+configurations which are not tested. If connectivity is possible at
+one of these other configurations, it will not be detected.
+
+Third, this procedure only detects cases where the same configuration
+is required on both interfaces. This is generally the case if there
+were a direct wire connecting a pair of interfaces and providing
+spurious connectivity. But it may not be the case if there is a switch
+fabric connecting them. One switch port may be configured for gigabit
+speeds while another is configured for 100 megabit speeds.
+
+Fourth, it may be the case that two nodes are directly linked with a
+wire on purpose and the administrator is relying on the fact that the
+interfaces at the endpoints aren't configured to assure that this is
+not a spurious connection. Parallel linktest will likely detect this
+as a spurious connection anyway and flag it as an error. Such false
+positives are indistinguishable from a live connection to this test.
+
+Cost:
+
+The time taken to run this test is proportional to the number of
+configurations to check. Currently, this is relatively small (6
+configurations), so the test is very fast.
+
+Usage:
+
+Parallel unlinktest is linktest level 5. Run linktest at that level
+to use. It works in both standalone and bundled mode.
+
+------------------------
+Comprehensive Unlinktest
+------------------------
+
+Idea:
+One of the key limitations of parallel unlinktest is the fact that it
+doesn't detect many kinds of spurious links when those links are
+connected through a switch fabric. Since most interfaces will be
+connected to a switch fabric intentionally, this means that it may
+miss many errors.
+
+A more comprehensive solution would test every pair of unused
+interfaces using every combination of settings even if the
+configuration is different on the two nodes.
+
+Assumptions:
+
+This technique shares most of the assumptions as the parallel
+unlinktest above with the exception that it will detect many more
+kinds of spurious connections when linked through a switch fabric.
+
+Cost:
+
+The time to run this test is proportional both to the number of
+configurations and the number of interfaces. Since there are often
+multiple unused interfaces per node, this can be a slow process since
+every node must synchronize at each step of the process.
+
+Usage:
+
+Comprehensive unlinktest is linktest level 6. Run linktest at that level
+to use. It works in both standalone and bundled mode.
