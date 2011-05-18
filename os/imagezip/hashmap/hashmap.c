@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2005-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -126,7 +126,7 @@ dumphash(struct hashinfo *hinfo)
  */
 static int
 hash_and_cmp(int infd,
-	     unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	     unsigned char *(*hashfunc)(const unsigned char *, size_t,
 					unsigned char *),
 	     int hashlen, struct hashregion *hashreg, int num_reg)
 {
@@ -412,7 +412,7 @@ hashmap_compute_delta(struct range *curranges, char *hfile, int infd,
 	uint32_t		gapstart, gapsize, lastdrangeend = 0;
 	unsigned int		hashlen;
 	unsigned char		*(*hashfunc)(const unsigned char *,
-					     unsigned long, unsigned char *);
+					     size_t, unsigned char *);
 	struct range		dummy_head, *range_tail;
 	struct hashregion	*hreg, *ereg;
 	char			*hashstr;

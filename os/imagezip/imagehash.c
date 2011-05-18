@@ -367,11 +367,8 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 	int nreg;
 
 	if (report) {
-		static int first = 1;
 		printf("%s\t%u\t%u\t%u\tU\t%s\n",
-		       spewhash(hash, hashlen), start, size, chunkno,
-		       first ? fileid : "-");
-		first = 0;
+		       spewhash(hash, hashlen), start, size, chunkno, fileid);
 		return;
 	}
 
@@ -523,7 +520,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	struct hashregion *reg;
 	int chunkno;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	char *hashstr;
 	readbuf_t *rbuf;
@@ -863,7 +860,7 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	z_stream z;
 	int err, nreg;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	readbuf_t *rbuf;
 	int errors = 0;
@@ -1101,7 +1098,7 @@ hashfilechunk(int chunkno, char *chunkbufp, int chunksize,
 	int resid;
 	uint32_t cursect = 0, nbytes;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	unsigned char *bufp = (unsigned char *)chunkbufp;
 	int errors = 0;
