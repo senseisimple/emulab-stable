@@ -38,7 +38,7 @@ WITH_MSERVER_EMULAB	= 1
 
 include $(OBJDIR)/Makeconf
 
-all:	frisbee frisbeed mfrisbeed
+all:	frisbee frisbeed mfrisbeed frisupload frisuploadd
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -73,6 +73,16 @@ SERVEROBJS	= server.o $(SHAREDOBJS)
 MSERVERFLAGS	= -DUSE_NULL_CONFIG $(CFLAGS) -I$(OBJDIR)
 MSERVEROBJS	= mserver.o $(SHAREDOBJS) config.o config_null.o
 MSERVERLIBS	= 
+
+# Master server based image uploader client
+UPLOADFLAGS	= $(CFLAGS)
+UPLOADLIBS	=
+UPLOADOBJS	= upload.o uploadio.o log.o network.o utils.o
+
+# Master server based image uploader server
+UPLOADDFLAGS	= $(CFLAGS)
+UPLOADDLIBS	=
+UPLOADDOBJS	= frisuploader.o uploadio.o log.o
 
 ifeq ($(WITH_MSERVER_EMULAB),1)
 # Emulab master server config
@@ -130,11 +140,27 @@ frisbeed-debug: $(SERVEROBJS)
 #	cp frisbeed frisbeed.debug
 #	strip frisbeed
 
+frisupload-debug: $(UPLOADOBJS)
+	$(CC) $(LDFLAGS) $(UPLOADFLAGS) $(UPLOADOBJS) $(UPLOADLIBS) -o $@
+#	cp frisupload frisupload.debug
+#	strip frisupload
+
+frisuploadd-debug: $(UPLOADDOBJS)
+	$(CC) $(LDFLAGS) $(UPLOADDFLAGS) $(UPLOADDOBJS) $(UPLOADDLIBS) -o $@
+#	cp frisuploadd frisuploadd.debug
+#	strip frisuploadd
+
 mfrisbeed: $(MSERVEROBJS)
 	$(CC) $(LDFLAGS) $(MSERVERFLAGS) $(MSERVEROBJS) $(MSERVERLIBS) -o mfrisbeed
 	cp mfrisbeed mfrisbeed.debug
 	strip mfrisbeed
 
+frisuploader.o: $(SRCDIR)/frisuploader.c decls.h uploadio.h
+	$(CC) -c $(UPLOADDFLAGS) $(SRCDIR)/frisuploader.c
+upload.o: $(SRCDIR)/upload.c decls.h utils.h uploadio.h
+	$(CC) -c $(UPLOADFLAGS) $(SRCDIR)/upload.c
+uploadio.o: $(SRCDIR)/uploadio.c decls.h utils.h uploadio.h
+	$(CC) -c $(UPLOADFLAGS) $(SRCDIR)/uploadio.c
 mserver.o: $(SRCDIR)/mserver.c decls.h configdefs.h utils.h
 	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/mserver.c
 config.o: $(SRCDIR)/config.c configdefs.h log.h
@@ -164,12 +190,13 @@ log.o:		decls.h log.h
 network.o:	decls.h utils.h
 trace.o:	decls.h trace.h log.h
 
-install:	$(INSTALL_SBINDIR)/mfrisbeed $(INSTALL_SBINDIR)/frisbeed $(INSTALL_SBINDIR)/frisbee
+install:	$(INSTALL_SBINDIR)/mfrisbeed $(INSTALL_SBINDIR)/frisbeed $(INSTALL_SBINDIR)/frisbee $(INSTALL_SBINDIR)/frisuploadd
 
-client: frisbee
+client: frisbee frisupload
 
 client-install: client
 	$(INSTALL_PROGRAM) frisbee $(DESTDIR)$(CLIENT_BINDIR)
+	$(INSTALL_PROGRAM) frisupload $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
 	/bin/rm -f *.o *.a frisbee frisbeed mfrisbeed *.debug

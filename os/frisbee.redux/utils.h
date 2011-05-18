@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -75,6 +75,7 @@ void	ClientStatsDump(unsigned int id, ClientStats_t *stats);
 char	*GetMSError(int error);
 char	*GetMSMethods(int methods);
 void	PrintGetInfo(char *imageid, GetReply *reply, int raw);
+void	PrintPutInfo(char *imageid, PutReply *reply, int raw);
 #endif
 
 /* Compat */
