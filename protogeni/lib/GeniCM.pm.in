@@ -2101,6 +2101,7 @@ sub SliverWorkAux($$$$$$$)
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$rspec)->get_nodelist()) {
 	my $resource_id   = GeniXML::GetNodeId($ref);
+	my $vnode_id      = GeniXML::GetVnodeId($ref);
 	my $node_nickname = GeniXML::GetVirtualId($ref);
 	my $manager_id    = GeniXML::GetManagerId($ref);
 	
@@ -2130,9 +2131,9 @@ sub SliverWorkAux($$$$$$$)
 	    next;
 	}
 
-	my $node = GeniUtil::LookupNode($resource_id);
+	my $node = GeniUtil::LookupNode($vnode_id);
 	if (!defined($node)) {
-	    $message = "Bad resource_id $resource_id";
+	    $message = "Bad vnode_id $resource_id";
 	    goto bad;
 	}
 
@@ -2362,6 +2363,7 @@ sub SliverWorkAux($$$$$$$)
     my %rspecmap  = ();
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
 	my $resource_id   = GeniXML::GetNodeId($ref);
+	my $vnode_id      = GeniXML::GetVnodeId($ref);
 	my $virtual_id    = GeniXML::GetVirtualId($ref);
 	my $manager_id    = GeniXML::GetManagerId($ref);
 
@@ -2408,9 +2410,9 @@ sub SliverWorkAux($$$$$$$)
 	    next;
 	}
 	
-	my $node = GeniUtil::LookupNode($resource_id);
+	my $node = GeniUtil::LookupNode($vnode_id);
 	if (!defined($node)) {
-	    $message = "Unknown resource_id in ticket: $resource_id";
+	    $message = "Unknown vnode_id in ticket: $resource_id";
 	    goto bad;
 	}
 	# Must do this after mapper has run
