@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,14 +10,14 @@ use English;
 use Getopt::Std;
 
 #
-# Create a disk image. Caller must have sudo permission!
+# Client-side to create a disk image. Caller must have sudo permission!
 #
 sub usage()
 {
-    print STDOUT "Usage: create-image [-s slice] <device file> <filename>\n";
+    print STDOUT "Usage: create-image [-S image-server] [-F imageid] [-s slice] <device file> <filename>\n";
     exit(-1);
 }
-my  $optlist = "rs:";
+my  $optlist = "F:S:s:";
 
 #
 # Turn off line buffering on output
@@ -35,9 +35,14 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 my $sudo   = "/usr/local/bin/sudo";
 my $zipper = "/usr/local/bin/imagezip";
+my $uploader = "/usr/local/bin/frisupload";
 my $slice  = "";
 my $device;
 my $filename;
+
+# Frisbee master server params
+my $iserver = "boss";	# XXX
+my $imageid;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -49,6 +54,23 @@ if (! getopts($optlist, \%options)) {
 }
 if (@ARGV != 2) {
     usage();
+}
+
+if (defined($options{"S"})) {
+    $iserver = $options{"S"};
+    if ($iserver =~ /^([-\w\.]+)$/) {
+	$iserver = $1;
+    } else {
+	die("Bad -S hostname: '$iserver'");
+    }
+}
+if (defined($options{"F"})) {
+    $imageid = $options{"F"};
+    if ($imageid =~ /^(\S+)$/) {
+	$imageid = $1;
+    } else {
+	die("Bad -F imageid: '$imageid'");
+    }
 }
 
 if (defined($options{"s"})) {
@@ -68,7 +90,11 @@ if (defined($options{"s"})) {
     $slice = "-N $slice";
 }
 $device   = $ARGV[0];
-$filename = $ARGV[1];
+if (defined($imageid)) {
+    $filename = "-";
+} else {
+    $filename = $ARGV[1];
+}
 
 #
 # Untaint the arguments.
@@ -88,12 +114,21 @@ else {
 }
 
 #
+# If imageid is defined, we use the frisbee uploader.
+#
+my $cmd = "$zipper $slice $device $filename";
+if (defined($imageid)) {
+    $cmd .= " | $uploader -S $iserver -F $imageid -";
+}
+
+#
 # Run the command using sudo, since by definition only testbed users
 # with proper trust should be able to zip up a disk. sudo will fail
 # if the user is not in the proper group.
 #
-if (system("$sudo $zipper $slice $device $filename")) {
+if (system("$sudo $cmd")) {
     print STDERR "*** Failed to create image!\n";
+    print STDERR "    command: '$sudo $cmd'\n";
     exit 1;
 }
 

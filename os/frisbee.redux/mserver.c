@@ -36,6 +36,7 @@
 
 #define FRISBEE_SERVER	"/usr/testbed/sbin/frisbeed"
 #define FRISBEE_CLIENT	"/usr/testbed/sbin/frisbee"
+#define FRISBEE_UPLOAD	"/usr/testbed/sbin/frisuploadd"
 #define FRISBEE_RETRIES	3
 
 static void	get_options(int argc, char **argv);
@@ -210,7 +211,8 @@ struct childinfo {
 	char *pidfile;
 	int uid;		/* UID to run child as */
 	int gid;		/* GID to run child as */
-	int retries;
+	int retries;		/* # times to try starting up child */
+	int timeout;		/* max runtime (sec) for child */
 	in_addr_t servaddr;	/* -S arg */
 	in_addr_t ifaceaddr;	/* -i arg */
 	in_addr_t addr;		/* -m arg */
@@ -220,14 +222,22 @@ struct childinfo {
 };
 #define PTYPE_CLIENT	1
 #define PTYPE_SERVER	2
+#define PTYPE_UPLOADER	4
 
 struct clientextra {
 	char *realname;
+	char *resolvedname;
 	/* info from our parent */
 	uint16_t sigtype;
 	uint8_t signature[MS_MAXSIGLEN];
 	uint32_t hisize;
 	uint32_t losize;
+};
+
+struct uploadextra {
+	char *realname;
+	uint64_t isize;
+	uint32_t mtime;
 };
 
 static struct childinfo *findchild(char *, int, int);
@@ -237,6 +247,9 @@ static struct childinfo *startserver(struct config_imageinfo *,
 static struct childinfo *startclient(struct config_imageinfo *,
 				     in_addr_t, in_addr_t, in_addr_t,
 				     in_port_t, int, int *);
+static struct childinfo *startuploader(struct config_imageinfo *,
+				       in_addr_t, in_addr_t, uint64_t,
+				       uint32_t, int, int *);
 
 static void
 free_imageinfo(struct config_imageinfo *ii)
@@ -244,12 +257,18 @@ free_imageinfo(struct config_imageinfo *ii)
 	if (ii) {
 		if (ii->imageid)
 			free(ii->imageid);
+		if (ii->dir)
+			free(ii->dir);
 		if (ii->path)
 			free(ii->path);
 		if (ii->sig)
 			free(ii->sig);
 		if (ii->get_options)
 			free(ii->get_options);
+		if (ii->put_oldversion)
+			free(ii->put_oldversion);
+		if (ii->put_options)
+			free(ii->put_options);
 		free(ii);
 	}
 }
@@ -267,18 +286,29 @@ copy_imageinfo(struct config_imageinfo *ii)
 		goto fail;
 	if (ii->imageid && (nii->imageid = strdup(ii->imageid)) == NULL)
 		goto fail;
+	if (ii->dir && (nii->dir = strdup(ii->dir)) == NULL)
+		goto fail;
 	if (ii->path && (nii->path = strdup(ii->path)) == NULL)
 		goto fail;
 	if (ii->sig && (nii->sig = strdup(ii->sig)) == NULL)
 		goto fail;
 	nii->flags = ii->flags;
+	nii->uid = ii->uid;
+	nii->gid = ii->gid;
 	if (ii->get_options &&
 	    (nii->get_options = strdup(ii->get_options)) == NULL)
 		goto fail;
 	nii->get_methods = ii->get_methods;
-	nii->get_uid = ii->get_uid;
-	nii->get_gid = ii->get_gid;
-	/* XXX don't care about put_options and extra right now */
+	nii->get_timeout = ii->get_timeout;
+	if (ii->put_oldversion &&
+	    (nii->put_oldversion = strdup(ii->put_oldversion)) == NULL)
+		goto fail;
+	if (ii->put_options &&
+	    (nii->put_options = strdup(ii->put_options)) == NULL)
+		goto fail;
+	nii->put_maxsize = ii->put_maxsize;
+	nii->put_timeout = ii->put_timeout;
+	/* XXX don't care about extra right now */
 	return nii;
 
  fail:
@@ -595,7 +625,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * See if node has access to the image.
 	 * If not, return an error code immediately.
 	 */
-	rv = config_auth_by_IP(&cip->sin_addr, &host, imageid, &ai);
+	rv = config_auth_by_IP(1, &cip->sin_addr, &host, imageid, &ai);
 	if (rv) {
 		warning("%s: client %s %s failed: %s",
 			imageid, clientip, op, GetMSError(rv));
@@ -617,6 +647,16 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	assert((ii->flags & CONFIG_PATH_ISFILE) != 0);
 
 	/*
+	 * If the image is currently being uploaded, return TRYAGAIN.
+	 */
+	if (findchild(ii->imageid, PTYPE_UPLOADER, MS_METHOD_UNICAST)) {
+		rv = MS_ERROR_TRYAGAIN;
+		log("%s: %s currently being uploaded", imageid, op);
+		msg->body.getreply.error = rv;
+		goto reply;
+	}
+
+	/*
 	 * See if image actually exists.
 	 *
 	 * If the file exists but is not a regular file, we return an error.
@@ -628,7 +668,8 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 */
 	isize = 0;
 	getfromparent = 0;
-	if (stat(ii->path, &sb) == 0) {
+	if ((ii->flags & CONFIG_PATH_EXISTS) != 0 &&
+	    stat(ii->path, &sb) == 0) {
 		if (!S_ISREG(sb.st_mode)) {
 			rv = MS_ERROR_INVALID;
 			warning("%s: client %s %s failed: "
@@ -863,9 +904,10 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 
 		in.s_addr = htonl(ci->addr);
-		log("%s: started %s server on %s:%d (pid %d, ugid %d/%d)",
+		log("%s: started %s server on %s:%d (pid %d, ugid %d/%d, timo %ds)",
 		    imageid, GetMSMethods(ci->method),
-		    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid);
+		    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid,
+		    ci->timeout);
 
 		/*
 		 * Watch for an immediate death so we don't tell our client
@@ -877,7 +919,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		sleep(2);
 		if (reapchildren(ci->pid, &stat)) {
 			msg->body.getreply.error = MS_ERROR_TRYAGAIN;
-			log("%s: server immediately exited (stat=%d), ",
+			log("%s: server immediately exited (stat=0x%x), "
 			    "telling client to try again!",
 			    imageid, stat);
 			goto reply;
@@ -939,6 +981,253 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		free_imageinfo(ii);
 }
 
+void
+handle_put(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
+	   MasterMsg_t *msg)
+{
+	struct in_addr host, in;
+	in_addr_t myaddr;
+	char imageid[MS_MAXIDLEN+1];
+	char clientip[sizeof("XXX.XXX.XXX.XXX")+1];
+	int len;
+	struct config_host_authinfo *ai;
+	struct config_imageinfo *ii = NULL;
+	struct childinfo *ci;
+	struct stat sb;
+	uint64_t isize;
+	uint32_t mtime, timo;
+	int rv, wantstatus;
+	char *op;
+
+	/*
+	 * If an explicit host was listed, use that as the host we are
+	 * authenticating, otherwise use the caller's IP.  config_auth_by_IP
+	 * will reject the former if the caller is not allowed to proxy for
+	 * the node in question.
+	 */
+	if (msg->body.putrequest.hostip)
+		host.s_addr = msg->body.putrequest.hostip;
+	else
+		host.s_addr = cip->sin_addr.s_addr;
+
+	len = ntohs(msg->body.putrequest.idlen);
+	memcpy(imageid, msg->body.putrequest.imageid, len);
+	imageid[len] = '\0';
+	wantstatus = msg->body.putrequest.status;
+	op = wantstatus ? "PUTSTATUS" : "PUT";
+	isize = ((uint64_t)ntohl(msg->body.putrequest.hisize) << 32) |
+		ntohl(msg->body.putrequest.losize);
+	mtime = ntohl(msg->body.putrequest.mtime);
+	timo = ntohl(msg->body.putrequest.timeout);
+
+	strncpy(clientip, inet_ntoa(cip->sin_addr), sizeof clientip);
+	if (host.s_addr != cip->sin_addr.s_addr)
+		log("%s: %s from %s (for %s), size=%llu",
+		    imageid, op, clientip, inet_ntoa(host), isize);
+	else
+		log("%s: %s from %s, size=%llu",
+		    imageid, op, clientip, isize);
+
+	memset(msg, 0, sizeof *msg);
+	msg->hdr.type = htonl(MS_MSGTYPE_PUTREPLY);
+	strncpy((char *)msg->hdr.version, MS_MSGVERS_1,
+		sizeof(msg->hdr.version));
+
+	/*
+	 * XXX we don't handle mirror mode right now.
+	 */
+	if (mirrormode) {
+		rv = MS_ERROR_NOTIMPL;
+		warning("%s: client %s %s failed: "
+			"upload not supported in mirror mode",
+			imageid, clientip, op);
+		msg->body.putreply.error = rv;
+		goto reply;
+	}
+
+	/*
+	 * See if node has access to the image.
+	 * If not, return an error code immediately.
+	 */
+	rv = config_auth_by_IP(0, &cip->sin_addr, &host, imageid, &ai);
+	if (rv) {
+		warning("%s: client %s %s failed: %s",
+			imageid, clientip, op, GetMSError(rv));
+		msg->body.putreply.error = rv;
+		goto reply;
+	}
+	if (debug > 1)
+		config_dump_host_authinfo(ai);
+	if (ai->numimages > 1) {
+		rv = MS_ERROR_INVALID;
+		warning("%s: client %s %s failed: "
+			"lookup returned multiple (%d) images",
+			imageid, clientip, op, ai->numimages);
+		msg->body.putreply.error = rv;
+		goto reply;
+	}
+	ii = copy_imageinfo(&ai->imageinfo[0]);
+	config_free_host_authinfo(ai);		
+	assert((ii->flags & CONFIG_PATH_ISFILE) != 0);
+
+	/*
+	 * If they gave us a size and it exceeds the maxsize, return an error.
+	 * We do this even for a status-only request; they can specify a size
+	 * of zero if they want to get all the image attributes.
+	 */
+	if (isize > ii->put_maxsize) {
+		rv = MS_ERROR_TOOBIG;
+		warning("%s: client %s %s failed: "
+			"upload size (%llu) exceeds maximum for image (%llu)",
+			imageid, clientip, op, isize, ii->put_maxsize);
+
+		/*
+		 * We return the max size here along with the error so that
+		 * the client doesn't have to make a second, wantstatus call.
+		 */
+		msg->body.putreply.himaxsize = htonl(ii->put_maxsize >> 32);
+		msg->body.putreply.lomaxsize = htonl(ii->put_maxsize);
+
+		msg->body.putreply.error = rv;
+		goto reply;
+	}
+
+	/*
+	 * They gave us an mtime and it is "bad", return an error.
+	 * XXX somewhat arbitrary: cannot set a time in the future.
+	 */
+	if (mtime) {
+		struct timeval now;
+
+		gettimeofday(&now, NULL);
+		if (mtime > now.tv_sec) {
+			rv = MS_ERROR_BADMTIME;
+			warning("%s: client %s %s failed: "
+				"attempt to set mtime in the future",
+				imageid, clientip, op);
+			msg->body.putreply.error = rv;
+			goto reply;
+		}
+	}
+
+	/*
+	 * If the image is being served, fetched from our parent,
+	 * or uploaded--return TRYAGAIN.
+	 */
+	if ((ci = findchild(ii->imageid, PTYPE_SERVER, onlymethods)) ||
+	    (ci = findchild(ii->imageid, PTYPE_CLIENT, onlymethods)) ||
+	    (ci = findchild(ii->imageid, PTYPE_UPLOADER, MS_METHOD_UNICAST))) {
+		msg->body.putreply.error = MS_ERROR_TRYAGAIN;
+		log("%s: %s currently being %s", imageid, op,
+		    (ci->ptype == PTYPE_SERVER) ? "served" :
+		    (ci->ptype == PTYPE_CLIENT) ? "downloaded from parent" :
+		    "uploaded");
+		goto reply;
+	}
+
+	/*
+	 * See if image actually exists.
+	 *
+	 * If the file exists but is not a regular file, we return an error.
+	 * (maybe we should just remove it?)
+	 *
+	 * If it is a regular file, we return its current signature.
+	 *
+	 * If the file does not exist, that is okay (the authentication check
+	 * has verified that the node can create the image).
+	 */
+	if ((ii->flags & CONFIG_PATH_EXISTS) != 0 &&
+	    stat(ii->path, &sb) == 0) {
+		if (!S_ISREG(sb.st_mode)) {
+			rv = MS_ERROR_INVALID;
+			warning("%s: client %s %s failed: "
+				"existing target is not a regular file",
+				imageid, clientip, op);
+			msg->body.putreply.error = rv;
+			goto reply;
+		}
+		msg->body.putreply.exists = 1;
+
+		/*
+		 * Return the current size and signature info
+		 */
+		msg->body.putreply.hisize = htonl((uint64_t)sb.st_size >> 32);
+		msg->body.putreply.losize = htonl(sb.st_size);
+
+		if (ii->sig != NULL) {
+			int32_t mt = *(int32_t *)ii->sig;
+
+			assert((ii->flags & CONFIG_SIG_ISMTIME) != 0);
+			msg->body.putreply.sigtype = htons(MS_SIGTYPE_MTIME);
+			*(int32_t *)msg->body.putreply.signature = htonl(mt);
+		}
+	} else {
+		msg->body.putreply.exists = 0;
+	}
+
+	/*
+	 * At this point we know that there is no conflicting use of the
+	 * image in progress, so either return status or fire off an uploader
+	 * and return the contact info to the client.
+	 */
+	msg->body.putreply.himaxsize = htonl(ii->put_maxsize >> 32);
+	msg->body.putreply.lomaxsize = htonl(ii->put_maxsize);
+
+	if (wantstatus) {
+		log("%s: PUTSTATUS upload allowed", imageid);
+		goto reply;
+	}
+	myaddr = ntohl(sip->sin_addr.s_addr);
+	ci = startuploader(ii, myaddr, ntohl(cip->sin_addr.s_addr),
+			   isize, mtime, (int)timo, &rv);
+	if (ci == NULL) {
+		msg->body.putreply.error = rv;
+		goto reply;
+	}
+
+	in.s_addr = htonl(ci->addr);
+	log("%s: started uploader on %s:%d (pid %d, ugid %d/%d, timo %ds)",
+	    imageid, inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid,
+	    ci->timeout);
+
+	/*
+	 * Watch for an immediate death so we don't tell our client
+	 * an uploader is running when it really isn't.
+	 *
+	 * XXX what is the right response? Right now we just tell
+	 * them to try again and hope the problem is transient.
+	 */
+	sleep(2);
+	if (reapchildren(ci->pid, &rv)) {
+		msg->body.putreply.error = MS_ERROR_TRYAGAIN;
+		log("%s: uploader immediately exited (stat=0x%x), "
+		    "telling client to try again!",
+		    imageid, rv);
+		goto reply;
+	}
+
+	msg->body.putreply.addr = htonl(ci->servaddr);
+	msg->body.putreply.port = htons(ci->port);
+
+ reply:
+	msg->body.putreply.error = htons(msg->body.putreply.error);
+	if (debug) {
+		info("%s reply: sigtype=%d, sig=0x%08x..., "
+		     "size=%x/%x, maxsize=%x/%x",
+		     op, ntohs(msg->body.putreply.sigtype),
+		     ntohl(*(uint32_t *)msg->body.putreply.signature),
+		     ntohl(msg->body.putreply.hisize),
+		     ntohl(msg->body.putreply.losize),
+		     ntohl(msg->body.putreply.himaxsize),
+		     ntohl(msg->body.putreply.lomaxsize));
+	}
+	len = sizeof msg->hdr + sizeof msg->body.putreply;
+	if (!MsgSend(sock, msg, len, 10))
+		error("%s: could not send reply", inet_ntoa(cip->sin_addr));
+	if (ii)
+		free_imageinfo(ii);
+}
+
 static void
 handle_request(int sock)
 {
@@ -969,12 +1258,18 @@ handle_request(int sock)
 	switch (ntohl(msg.hdr.type)) {
 	case MS_MSGTYPE_GETREQUEST:
 		if (cc < sizeof msg.hdr + sizeof msg.body.getrequest)
-			error("request message too small");
+			error("GET request message too small");
 		else
 			handle_get(sock, &me, &you, &msg);
 		break;
+	case MS_MSGTYPE_PUTREQUEST:
+		if (cc < sizeof msg.hdr + sizeof msg.body.putrequest)
+			error("PUT request message too small");
+		else
+			handle_put(sock, &me, &you, &msg);
+		break;
 	default:
-		error("unreconized message type %d", ntohl(msg.hdr.type));
+		error("unrecognized message type %d", ntohl(msg.hdr.type));
 		break;
 	}
 }
@@ -1170,7 +1465,7 @@ static struct childinfo *
 findchild(char *imageid, int ptype, int methods)
 {
 	struct childinfo *ci, *bestci;
-	assert((methods & ~onlymethods) == 0);
+	assert(ptype == PTYPE_UPLOADER || (methods & ~onlymethods) == 0);
 
 	bestci = NULL;
 	for (ci = children; ci != NULL; ci = ci->next)
@@ -1213,37 +1508,93 @@ startchild(struct childinfo *ci)
 		char *argv[64], **ap, *args;
 		int argc;
 		struct in_addr in;
-		char *pname;
+		char *pname, *opts;
 
 		if (myuid == 0) {
 			if ((ci->gid != mygid && setgid(ci->gid) != 0) ||
 			    (ci->uid != myuid && setuid(ci->uid) != 0)) {
-				error("could not setuid/gid to %d/%d",
+				error("child: could not setuid/gid to %d/%d",
 				      ci->uid, ci->gid);
 				exit(-2);
 			}
 		}
 
-		pname = (ci->ptype == PTYPE_SERVER) ?
-			FRISBEE_SERVER : FRISBEE_CLIENT;
+		/*
+		 * Now that we are running as the user, see if we to
+		 * resolve the path to catch permission problems, create
+		 * intermediate directories, etc.
+		 */
+		if (ci->imageinfo->flags & CONFIG_PATH_RESOLVE) {
+			char *rname;
+			int mkdirs = 0;
+			assert(ci->imageinfo->dir != NULL);
+
+			if (ci->ptype == PTYPE_CLIENT ||
+			    ci->ptype == PTYPE_UPLOADER)
+				mkdirs = 1;
+			rname = resolvepath(ci->imageinfo->path,
+					    ci->imageinfo->dir, mkdirs);
+			if (rname == NULL) {
+				error("child: could not resolve '%s'",
+				      ci->imageinfo->path);
+				exit(-4);
+			}
+			if (debug)
+				info("child: resolve '%s' to '%s'",
+				     ci->imageinfo->path, rname);
+
+			/*
+			 * XXX right now we don't do anything with this path.
+			 * We could pass it to the server instance in place
+			 * of the user-provided string, to insure they don't
+			 * mess with the latter between now and when the
+			 * instance starts.
+			 */
+			free(rname);
+		}
+
 		in.s_addr = htonl(ci->ifaceaddr);
 		strncpy(ifacestr, inet_ntoa(in), sizeof ifacestr);
 		in.s_addr = htonl(ci->servaddr);
 		strncpy(servstr, inet_ntoa(in), sizeof servstr);
 		in.s_addr = htonl(ci->addr);
-		if (ci->ptype == PTYPE_SERVER)
+
+		switch (ci->ptype) {
+		case PTYPE_SERVER:
+			pname = FRISBEE_SERVER;
+			opts = ci->imageinfo->get_options ?
+				ci->imageinfo->get_options : "";
 			snprintf(argbuf, sizeof argbuf,
-				 "%s -i %s %s -m %s -p %d %s",
-				 pname, ifacestr,
-				 ci->imageinfo->get_options,
+				 "%s -i %s -T %d %s -m %s -p %d %s",
+				 pname, ifacestr, ci->timeout, opts,
 				 inet_ntoa(in), ci->port, ci->imageinfo->path);
-		else
+			break;
+		case PTYPE_CLIENT:
+			pname = FRISBEE_CLIENT;
 			snprintf(argbuf, sizeof argbuf,
 				 "%s -N -S %s -i %s %s %s -m %s -p %d %s",
 				 pname, servstr, ifacestr,
 				 debug > 1 ? "" : "-q",
 				 ci->method == CONFIG_IMAGE_UCAST ? "-O" : "",
 				 inet_ntoa(in), ci->port, ci->imageinfo->path);
+			break;
+		case PTYPE_UPLOADER:
+		{
+			uint64_t isize =
+				((struct uploadextra *)ci->extra)->isize;
+
+			pname = FRISBEE_UPLOAD;
+			opts = ci->imageinfo->put_options ?
+				ci->imageinfo->put_options : "";
+			snprintf(argbuf, sizeof argbuf,
+				 "%s -i %s -T %d %s -s %llu -m %s -p %d %s",
+				 pname, ifacestr, ci->timeout, opts, isize,
+				 inet_ntoa(in), ci->port, ci->imageinfo->path);
+			break;
+		}
+		default:
+			exit(-3);
+		}
 		if (debug)
 			info("execing: %s", argbuf);
 
@@ -1329,16 +1680,17 @@ startserver(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	 * Otherwise just run it as our uid/gid.
 	 */
 	if (myuid == 0) {
-		if (ii->get_uid >= 0 && myuid != ii->get_uid)
-			ci->uid = ii->get_uid;
+		if (ii->uid >= 0 && myuid != ii->uid)
+			ci->uid = ii->uid;
 		else
 			ci->uid = myuid;
-		if (ii->get_gid >= 0 && mygid != ii->get_gid)
-			ci->gid = ii->get_gid;
+		if (ii->gid >= 0 && mygid != ii->gid)
+			ci->gid = ii->gid;
 		else
 			ci->gid = mygid;
 	}
 
+	ci->timeout = ii->get_timeout;
 	ci->servaddr = meaddr;
 	ci->ifaceaddr = meaddr;
 	ci->imageinfo = copy_imageinfo(ii);
@@ -1418,10 +1770,9 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	assert(errorp != NULL);
 
 	ci = calloc(1, sizeof(struct childinfo));
-	if (ci == NULL) {
-		*errorp = MS_ERROR_FAILED;
-		return NULL;
-	}
+	if (ci == NULL)
+		goto fail;
+
 	ci->servaddr = youaddr;
 	ci->ifaceaddr = meaddr;
 	ci->addr = addr;
@@ -1429,34 +1780,198 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	ci->method = methods;
 	ci->imageinfo = copy_imageinfo(ii);
 	ci->ptype = PTYPE_CLIENT;
-	ci->retries = 0;
 
 	/* For now, we just run the client as us */
 	ci->uid = myuid;
 	ci->gid = mygid;
 
-	ce = ci->extra = malloc(sizeof(struct clientextra));
-	if (ce == NULL) {
-		free(ci);
-		*errorp = MS_ERROR_FAILED;
-		return NULL;
-	}
-	memset(ce, 0, sizeof(*ce));
+	ce = ci->extra = calloc(1, sizeof(struct clientextra));
+	if (ce == NULL)
+		goto fail;
 
 	/*
 	 * Arrange to download the image as <path>.tmp and then
 	 * rename it into place when done.
 	 */
 	len = strlen(ci->imageinfo->path) + 5;
-	if ((tmpname = malloc(len)) != NULL) {
-		ce->realname = ci->imageinfo->path;
-		snprintf(tmpname, len, "%s.tmp", ci->imageinfo->path);
-		ci->imageinfo->path = tmpname;
-		ci->done = finishclient;
-	}
+	if ((tmpname = malloc(len)) == NULL)
+		goto fail;
+
+	ce->realname = ci->imageinfo->path;
+	snprintf(tmpname, len, "%s.tmp", ce->realname);
+	ci->imageinfo->path = tmpname;
+	ci->done = finishclient;
+
 	if ((*errorp = startchild(ci)) != 0) {
+		free(ce->realname);
+		goto fail;
+	}
+
+	return ci;
+
+ fail:
+	if (ci) {
 		if (ci->extra)
 			free(ci->extra);
+		if (ci->imageinfo)
+			free_imageinfo(ci->imageinfo);
+		free(ci);
+		*errorp = MS_ERROR_FAILED;
+	}
+	return NULL;
+}
+
+static void
+finishupload(struct childinfo *ci, int status)
+{
+	char *bakname, *tmpname, *realname;
+	int len, didbackup;
+	struct uploadextra *ue;
+	time_t mtime;
+
+	assert(ci->extra != NULL);
+	ue = ci->extra;
+	realname = ue->realname;
+	mtime = (time_t)ue->mtime;
+	free(ci->extra);
+	ci->extra = NULL;
+	tmpname = ci->imageinfo->path;
+	ci->imageinfo->path = realname;
+
+	if (status != 0) {
+		error("%s: upload failed, removing tmpfile %s",
+		      realname, tmpname);
+		unlink(tmpname);
+		free(tmpname);
+		return;
+	}
+
+	if (mtime) {
+		struct timeval tv[2];
+		gettimeofday(&tv[0], NULL);
+		tv[1].tv_sec = mtime;
+		tv[1].tv_usec = 0;
+		if (utimes(tmpname, tv) < 0)
+			warning("%s: failed to set mtime", tmpname);
+	}
+
+	/*
+	 * If the configuration specified an explicit place for the
+	 * old version, move it there now. Otherwise just save it as
+	 * <realname>.bak
+	 */
+	if (ci->imageinfo->put_oldversion)
+		bakname = ci->imageinfo->put_oldversion;
+	else {
+		len = strlen(realname) + 5;
+		bakname = malloc(len);
+		snprintf(bakname, len, "%s.bak", realname);
+	}
+	didbackup = 1;
+	if (rename(realname, bakname) < 0)
+		didbackup = 0;
+	if ((!didbackup && errno != ENOENT) || rename(tmpname, realname) < 0) {
+		error("%s: failed to install new version (%d), leaving as %s",
+		      realname, errno, tmpname);
+		if (didbackup)
+			rename(bakname, realname);
+	}
+
+	free(tmpname);
+	if (ci->imageinfo->put_oldversion == NULL)
+		free(bakname);
+	log("%s: upload complete", realname);
+}
+
+/*
+ * Start an image upload process
+ */
+static struct childinfo *
+startuploader(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
+	      uint64_t isize, uint32_t mtime, int timo, int *errorp)
+{
+	struct childinfo *ci;
+	struct uploadextra *ue;
+	char *tmpname;
+	int len;
+
+	assert(findchild(ii->imageid, PTYPE_UPLOADER, MS_METHOD_ANY) == NULL);
+	assert(errorp != NULL);
+
+	ci = calloc(1, sizeof(struct childinfo));
+	if (ci == NULL) {
+		*errorp = MS_ERROR_FAILED;
+		return NULL;
+	}
+
+	/*
+	 * Adjust the user supplied values for size and timeout if they
+	 * exceed what the image allows.
+	 */
+	if (isize == 0 || isize > ii->put_maxsize)
+		isize = ii->put_maxsize;
+	if (timo == 0 || timo > ii->put_timeout)
+		timo = ii->put_timeout;
+
+	/*
+	 * Find a port to use. Note that with MS_METHOD_UNICAST,
+	 * get_server_address will return 0 as the addr, so we set it
+	 * to the client's address afterward.
+	 */
+	if (config_get_server_address(ii, MS_METHOD_UNICAST, 1, &ci->addr,
+				      &ci->port, &ci->method)) {
+		free(ci);
+		*errorp = MS_ERROR_FAILED;
+		return NULL;
+	}
+	ci->addr = youaddr;
+
+	/*
+	 * If we are running as root, prefer to run the frisbee uploader
+	 * for the image as indicated in the imageinfo (if set).
+	 * Otherwise just run it as our uid/gid.
+	 */
+	if (myuid == 0) {
+		if (ii->uid >= 0 && myuid != ii->uid)
+			ci->uid = ii->uid;
+		else
+			ci->uid = myuid;
+		if (ii->gid >= 0 && mygid != ii->gid)
+			ci->gid = ii->gid;
+		else
+			ci->gid = mygid;
+	}
+
+	ci->timeout = timo;
+	ci->servaddr = meaddr;
+	ci->ifaceaddr = meaddr;
+	ci->imageinfo = copy_imageinfo(ii);
+	ci->ptype = PTYPE_UPLOADER;
+	ci->retries = FRISBEE_RETRIES;
+
+	ue = ci->extra = malloc(sizeof(struct uploadextra));
+	if (ue == NULL) {
+		free(ci);
+		*errorp = MS_ERROR_FAILED;
+		return NULL;
+	}
+	memset(ue, 0, sizeof(*ue));
+	ue->isize = isize;
+	ue->mtime = mtime;
+
+	/*
+	 * Arrange to upload the image as <path>.tmp and then
+	 * rename it into place when done.
+	 */
+	len = strlen(ci->imageinfo->path) + 5;
+	if ((tmpname = malloc(len)) != NULL) {
+		ue->realname = ci->imageinfo->path;
+		snprintf(tmpname, len, "%s.tmp", ci->imageinfo->path);
+		ci->imageinfo->path = tmpname;
+		ci->done = finishupload;
+	}
+
+	if ((*errorp = startchild(ci)) != 0) {
 		free_imageinfo(ci->imageinfo);
 		free(ci);
 		return NULL;
@@ -1518,20 +2033,21 @@ reapchildren(int wpid, int *statusp)
 		in.s_addr = htonl(ci->addr);
 		log("%s: %s process %d on %s:%d exited (status=0x%x)",
 		    ci->imageinfo->imageid,
-		    ci->ptype == PTYPE_SERVER ? "server" : "client",
+		    ci->ptype == PTYPE_SERVER ? "server" :
+		    ci->ptype == PTYPE_CLIENT ? "client" : "uploader",
 		    pid, inet_ntoa(in), ci->port, status);
 
 		/*
 		 * Special case exit value.
-		 * Server (or client) could not bind to the port we gave it.
-		 * For the server, we get a new address and try again up to
-		 * FRISBEE_RETRIES times.  For a client, we just fail right
-		 * now.  Maybe we should sleep awhile and try again or
-		 * reask our server?
+		 * The program could not bind to the port we gave it.
+		 * For the server (and uploader), we get a new address (port)
+		 * and try again up to FRISBEE_RETRIES times.  For a client,
+		 * we just fail right now.  Maybe we should sleep awhile and
+		 * try again or reask our server?
 		 */
 		if (ci->retries > 0 && WEXITSTATUS(status) == EADDRINUSE) {
 			ci->retries--;
-			if (ci->ptype == PTYPE_SERVER &&
+			if (ci->ptype != PTYPE_CLIENT &&
 			    !config_get_server_address(ci->imageinfo,
 						       ci->method, 0,
 						       &ci->addr, &ci->port,

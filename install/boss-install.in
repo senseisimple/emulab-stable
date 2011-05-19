@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2010 , 2011, 2011University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -42,6 +42,8 @@ my $FSNODE_IP=   '@FSNODE_IP@';
 my $SCRATCHDIR = '@FSDIR_SCRATCH@';
 my $SHAREDIR   = '@FSDIR_SHARE@';
 my $FRISADDR   = '@FRISEBEEMCASTADDR@';
+
+my $NEEDMROUTED = @NEEDMROUTED@;
 
 #
 # Fixed paths for clients
@@ -536,6 +538,15 @@ Phase "ports", "Installing ports", sub {
 			ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
 			    if ($pname);
 			ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PYM2_PKG");
+		    };
+		}
+		if ($NEEDMROUTED && $FBSD_MAJOR == 7 && $FBSD_MINOR > 2) {
+		    Phase "mrouted", "Installing mrouted", sub {
+			if (!ExecQuiet("$PKG_INFO -x mrouted")) {
+			    PhaseSkip("mrouted already installed");
+			}
+			my $pname = GetPackage("mrouted", $packagedir);
+			ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 		    };
 		}
 	    }
@@ -1104,6 +1115,11 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
     my ($o1) = split(/\./, $FRISADDR);
     push(@strings, (qq|static_routes="\$static_routes frisbee"|,
 		    qq|route_frisbee="-net $o1.0.0.0/8 -iface $BOSSNODE_IP"|));
+
+    # enable mrouted if needed
+    if ($NEEDMROUTED) {
+	push(@strings, qq|mrouted_enable="YES"|);
+    }
 
     AppendToFileFatal($RCCONF, @strings);
 };

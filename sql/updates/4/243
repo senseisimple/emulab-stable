@@ -1,0 +1,34 @@
+#
+# Create site variables for frisbee server transmission speeds.
+# These were previously hardwired in frisbeelauncher and mfrisbeed.
+# Default to those historic values.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    my $var = "images/frisbee/maxrate_std";
+    if (!TBSiteVarExists($var)) {
+	my $desc = "Max bandwidth (Bytes/sec) at which to distribute ".
+	           "standard images from the /usr/testbed/images directory.";
+	my $defval = "72000000";
+
+	DBQueryFatal("INSERT INTO sitevariables VALUES ".
+                     "('$var',NULL,'$defval','$desc',0)");
+    }
+
+    $var = "images/frisbee/maxrate_usr";
+    if (!TBSiteVarExists($var)) {
+	my $desc = "Max bandwidth (Bytes/sec) at which to distribute ".
+	           "user-defined images from the /proj/.../images directory.";
+	my $defval = "54000000";
+
+	DBQueryFatal("INSERT INTO sitevariables VALUES ".
+                     "('$var',NULL,'$defval','$desc',0)");
+    }
+    return 0;
+}
+1;

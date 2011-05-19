@@ -193,6 +193,18 @@ mysystem("$TB/sbin/genelists -a");
 mysystem("$TB/sbin/exports_setup");
 
 #
+# Set some sitevars that are different for inner elabs
+#
+if (TBSiteVarExists("images/frisbee/maxrate_std")) {
+    # XXX traditional value for elabinelab
+    TBSetSiteVar("images/frisbee/maxrate_std", "54000000");
+}
+if (TBSiteVarExists("images/frisbee/maxrate_usr")) {
+    # XXX traditional value for elabinelab
+    TBSetSiteVar("images/frisbee/maxrate_usr", "54000000");
+}
+
+#
 # Fixup pxeboot and MFS info.
 #
 # Right now we only load the standard BSD-based pxeboot and MFSes into

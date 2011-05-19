@@ -528,11 +528,32 @@ sub doSwapout($) {
 	# Grab our per-experiment switch stack name.
 	#
 	my @expswitches = $experiment->SwitchList(1);
-	my ($perexpstack,$leader,@curswitches) = \
+	my ($perexpstack,$leader,@curswitches) = 
 	    GetPerExperimentSwitchStack($experiment);
 	my $stackarg = "";
 	if (defined($perexpstack) && (@expswitches || @curswitches)) {
 	    $stackarg = "-S $perexpstack --skip-supplied";
+	}
+
+	#
+	# Remove per-experiment switch stacks.
+	#
+	# Clean up any reserved VLAN tags in per-experiment switches so that
+	# underlying logical wires can be deleted!
+	#
+	if ($type != MODIFY && defined($perexpstack)) {
+	    # Kill tag reservations on actual swapout.
+	    TBDebugTimeStamp("snmpit started");
+	    print STDERR "Removing per-experiment VLANs.\n";
+	    if (system("snmpit -S $perexpstack --redirect-err -r $pid $eid")) {
+		tbwarn "Failed to remove per-experiment VLANs";
+	    }
+	    TBDebugTimeStamp("snmpit finished");
+	}
+	if ($type >= RETRY && defined($perexpstack)) {
+	    print STDERR "Removing per-experiment switch stack.\n";
+	    DeletePerExperimentSwitchStack($experiment);
+	    $stackarg = "";
 	}
 
 	#
@@ -578,15 +599,6 @@ sub doSwapout($) {
 		    $swapout_errors = 1;
 		}
 	    }
-	}
-
-	#
-	# Remove per-experiment switch stacks -- don't bother to check if there
-	# are any; it's cheap.
-	#
-	if ($type >= RETRY && defined($perexpstack)) {
-	    print STDERR "Removing per-experiment switch stack.\n";
-	    DeletePerExperimentSwitchStack($experiment);
 	}
     }
 	
@@ -981,7 +993,7 @@ sub doSwapin($) {
     # Still haven't done any vlan synch for modify.
     #
     my @expswitches = $experiment->SwitchList(1);
-    my ($perexpstack,$leader,@curswitches) = \
+    my ($perexpstack,$leader,@curswitches) = 
 	GetPerExperimentSwitchStack($experiment);
     my $stackarg = "";
     if (($type > MODIFY && @expswitches)

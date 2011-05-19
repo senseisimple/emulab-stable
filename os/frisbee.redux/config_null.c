@@ -25,7 +25,7 @@
 #include "log.h"
 #include "configdefs.h"
 
-static int debug = 1;
+extern int debug;
 
 static char *DEFAULT_IMAGEDIR	= "/usr/local/images";
 static char *DEFAULT_MCADDR	= "239.192.1";
@@ -37,9 +37,6 @@ static char *rimagedir;
 
 /* Multicast address/port base info */
 static int mc_a, mc_b, mc_c, mc_port;
-
-static char *imageidtopath(char *imageid);
-static char *myrealpath(char *path, char rpath[PATH_MAX]);
 
 /* Memory alloc functions that abort when no memory */
 static void *mymalloc(size_t size);
@@ -79,29 +76,25 @@ null_free(void *state)
 }
 
 /*
- * Set the allowed GET methods.
- * XXX for now, just unicast and multicast.
+ * Set the GET methods and options for a particular node/image.
  */
 static void
-set_get_methods(struct config_host_authinfo *ai, int ix)
-{
-	ai->imageinfo[ix].get_methods = CONFIG_IMAGE_MCAST;
-#if 1
-	ai->imageinfo[ix].get_methods |= CONFIG_IMAGE_UCAST;
-#endif
-}
-
-/*
- * Set the GET options for a particular node/image.
- */
-static void
-set_get_options(struct config_host_authinfo *ai, int ix)
+set_get_values(struct config_host_authinfo *ai, int ix)
 {
 	char str[256];
 
-	strcpy(str, "");
-	strcat(str, " -W 100000000 -K 15");
+	/* get_methods */
+	ai->imageinfo[ix].get_methods = CONFIG_IMAGE_MCAST;
+#if 1
+	/*
+	 * XXX the current frisbee server allows only a single client
+	 * in unicast mode, which makes this option rather limited.
+	 * So you may not want to allow it by default.
+	 */
+	ai->imageinfo[ix].get_methods |= CONFIG_IMAGE_UCAST;
+#endif
 
+	/* get_timeout */
 	/*
 	 * We use a small server inactive timeout since we no longer have
 	 * to start up a frisbeed well in advance of the client(s).
@@ -111,9 +104,43 @@ set_get_options(struct config_host_authinfo *ai, int ix)
 	 * to flush all their buffers and report their stats before we give
 	 * up on them.
 	 */
-	strcat(str, " -T 180");
+	ai->imageinfo[ix].get_timeout = 180;
 
+	/* get_options */
+	strcpy(str, "");
+	strcat(str, " -W 100000000 -K 15");
 	ai->imageinfo[ix].get_options = mystrdup(str);
+
+	/* and whack the put_* fields */
+	ai->imageinfo[ix].put_maxsize = 0;
+	ai->imageinfo[ix].put_timeout = 0;
+	ai->imageinfo[ix].put_oldversion = NULL;
+	ai->imageinfo[ix].put_options = NULL;
+}
+
+/*
+ * Set the PUT maxsize/options for a particular node/image.
+ * XXX right now these are completely pulled out of our posterior.
+ */
+static void
+set_put_values(struct config_host_authinfo *ai, int ix)
+{
+	/* put_maxsize */
+	ai->imageinfo[ix].put_maxsize = 10000000000ULL;	/* XXX 10GB */
+
+	/* put_timeout */
+	ai->imageinfo[ix].put_timeout = 900;
+
+	/* put_oldversion */
+	ai->imageinfo[ix].put_oldversion = NULL;
+
+	/* put_options */
+	ai->imageinfo[ix].put_options = NULL;
+
+	/* and whack the get_* fields */
+	ai->imageinfo[ix].get_methods = 0;
+	ai->imageinfo[ix].get_timeout = 0;
+	ai->imageinfo[ix].get_options = NULL;
 }
 
 #define FREE(p) { if (p) free(p); }
@@ -136,6 +163,7 @@ null_free_host_authinfo(struct config_host_authinfo *ai)
 			FREE(ai->imageinfo[i].path);
 			FREE(ai->imageinfo[i].sig);
 			FREE(ai->imageinfo[i].get_options);
+			FREE(ai->imageinfo[i].put_oldversion);
 			FREE(ai->imageinfo[i].put_options);
 			FREE(ai->imageinfo[i].extra);
 		}
@@ -169,6 +197,7 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 			in_addr_t *addrp, in_port_t *portp, int *methp)
 {
 	int	a, b, c, d, idx;
+	int	incr = 1;
 	FILE	*fd;
 
 	if ((methods & (CONFIG_IMAGE_MCAST|CONFIG_IMAGE_UCAST)) == 0) {
@@ -176,6 +205,7 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		return 1;
 	}
 
+ again:
 	if ((fd = fopen(indexfile, "r+")) == NULL) {
 		error("get_server_address: could not open index file '%s'!",
 		      indexfile);
@@ -187,7 +217,14 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		fclose(fd);
 		return 1;
 	}
-	if (fseek(fd, 0L, SEEK_SET) != 0 || fprintf(fd, "%d\n", idx+1) < 0) {
+
+	/*
+	 * Make this work like mysql LAST_INSERT_ID();
+	 * i.e., the persistent value is the one we just used.
+	 */
+	idx += incr;
+
+	if (fseek(fd, 0L, SEEK_SET) != 0 || fprintf(fd, "%d\n", idx) < 0) {
 		error("get_server_address: cannot update index in '%s'!",
 		      indexfile);
 		fclose(fd);
@@ -221,10 +258,19 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		 * but because of the way IP multicast addresses map
 		 * onto ethernet addresses (only the low 23 bits are used)
 		 * ANY MC address (224-239) with those bits will also flood.
-		 * So avoid those.
+		 * So avoid those, by skipping over the problematic range
+		 * in the index.
+		 *
+		 * Note that because of the way the above increment process
+		 * works, this should never happen except when the initial
+		 * MC_BASEADDR is bad in this way (i.e., because of the
+		 * "c = (c % 254) + 1" this function will never generate
+		 * a zero value for c).
 		 */
-		if (c == 0 && (b == 0 || b == 128))
-			c++;
+		if (c == 0 && (b == 0 || b == 128)) {
+			incr = 254;
+			goto again;
+		}
 
 		*methp = CONFIG_IMAGE_MCAST;
 		*addrp = (a << 24) | (b << 16) | (c << 8) | d;
@@ -279,18 +325,18 @@ allow_stddirs(char *imageid,
 			for (i = put->numimages; i < ni; i++) {
 				ci = &put->imageinfo[i];
 				ci->imageid = NULL;
+				ci->dir = NULL;
 				ci->path = mystrdup(dirs[i - put->numimages]);
 				ci->flags = CONFIG_PATH_ISDIR;
 				if (stat(ci->path, &sb) == 0) {
+					ci->flags |= CONFIG_PATH_EXISTS;
 					ci->sig = mymalloc(sizeof(time_t));
 					*(time_t *)ci->sig = sb.st_mtime;
 					ci->flags |= CONFIG_SIG_ISMTIME;
 				} else
 					ci->sig = NULL;
-				ci->get_options = NULL;
-				ci->get_methods = 0;
-				ci->get_uid = ci->get_gid = -1;
-				ci->put_options = NULL;
+				ci->uid = ci->gid = -1;
+				set_put_values(put, i);
 				ci->extra = NULL;
 			}
 			put->numimages = ni;
@@ -309,18 +355,18 @@ allow_stddirs(char *imageid,
 			for (i = get->numimages; i < ni; i++) {
 				ci = &get->imageinfo[i];
 				ci->imageid = NULL;
+				ci->dir = NULL;
 				ci->path = mystrdup(dirs[i - get->numimages]);
 				ci->flags = CONFIG_PATH_ISDIR;
 				if (stat(ci->path, &sb) == 0) {
+					ci->flags |= CONFIG_PATH_EXISTS;
 					ci->sig = mymalloc(sizeof(time_t));
 					*(time_t *)ci->sig = sb.st_mtime;
 					ci->flags |= CONFIG_SIG_ISMTIME;
 				} else
 					ci->sig = NULL;
-				set_get_options(get, i);
-				set_get_methods(get, i);
-				ci->get_uid = ci->get_gid = -1;
-				ci->put_options = NULL;
+				ci->uid = ci->gid = -1;
+				set_get_values(get, i);
 				ci->extra = NULL;
 			}
 			get->numimages = ni;
@@ -372,11 +418,81 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		return 1;
 
 	/*
-	 * If an imageid is specified and it doesn't resolve to a valid
-	 * path, it is an error.
+	 * If an imageid is specified, convert it into a plausible path.
 	 */
-	if (imageid != NULL && (path = imageidtopath(imageid)) == NULL)
-		return 1;
+	if (imageid != NULL) {
+		char rpath[PATH_MAX], *cp;
+		int idlen;
+
+		/*
+		 * We seriously limit what chars can be in an imageid since we
+		 * use it as a file name. This check is based on the Emulab
+		 * regex for image paths: "^[-_\w\.\/:+]+$"
+		 */
+		idlen = strlen(imageid);
+		if (idlen == 0 || idlen >= PATH_MAX) {
+			if (debug)
+				fprintf(stderr, "imageid too short/long\n");
+			return 1;
+		}
+		for (cp = imageid; *cp != '\0'; cp++) {
+			if (isalnum(*cp) || *cp == '-' || *cp == '_' ||
+			    *cp == '.' || *cp == '/' || *cp == ':' ||
+			    *cp == '+')
+				continue;
+			if (debug)
+				fprintf(stderr,
+					"bogus char (0x%x) in imageid\n", *cp);
+			return 1;
+		}
+
+		/*
+		 * If imageid is specified and starts with a '/', it is an
+		 * absolute path.  We prepend imagedir if it doesn't already
+		 * start with that. If it doesn't start with a '/' we prepend
+		 * imagedir. Either way the result is an absolute path rooted
+		 * at imagedir.
+		 */
+		assert(imagedir && imagedir[0]);
+		if (imageid[0] != '/' ||
+		    strstr(imageid, imagedir) != imageid) {
+			path = mymalloc(strlen(imagedir) + idlen + 2);
+			strcpy(path, imagedir);
+			if (imageid[0] != '/')
+				strcat(path, "/");
+			strcat(path, imageid);
+		} else
+			path = mystrdup(imageid);
+		if (debug)
+			fprintf(stderr, "imageid %s: mapped to path '%s'\n",
+				imageid, path);
+
+		/*
+		 * Run the result through realpath to insure it is still in
+		 * imagedir.
+		 *
+		 * At this point we cannot do a full path check since the
+		 * full path need not exist and we are possibly running with
+		 * enhanced privilege. So we only weed out obviously bogus
+		 * paths here (possibly checking just the partial path
+		 * returned by realpath) and mark the imageinfo as needed a
+		 * full resolution later.
+		 */
+		if (myrealpath(path, rpath) == NULL) {
+			if (errno != ENOENT) {
+				free(path);
+				return 1;
+			}
+			exists = 0;
+		} else
+			exists = 1;
+		if (!isindir(rimagedir, rpath)) {
+			free(path);
+			return 1;
+		}
+		if (exists && stat(path, &sb) < 0)
+			exists = 0;
+	}
 
 	if (getp == NULL && putp == NULL) {
 		if (path)
@@ -432,18 +548,18 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		put->numimages = 1;
 		ci = &put->imageinfo[0];
 		ci->imageid = mystrdup(imageid);
+		ci->dir = mystrdup(rimagedir);
 		ci->path = mystrdup(path);
-		ci->flags = CONFIG_PATH_ISFILE;
+		ci->flags = CONFIG_PATH_ISFILE|CONFIG_PATH_RESOLVE;
 		if (exists) {
+			ci->flags |= CONFIG_PATH_EXISTS;
 			ci->sig = mymalloc(sizeof(time_t));
 			*(time_t *)ci->sig = sb.st_mtime;
 			ci->flags |= CONFIG_SIG_ISMTIME;
 		} else
 			ci->sig = NULL;
-		ci->get_methods = 0;
-		ci->get_options = NULL;
-		ci->get_uid = ci->get_gid = -1;
-		ci->put_options = NULL;
+		ci->uid = ci->gid = -1;
+		set_put_values(put, 0);
 		ci->extra = NULL;
 	}
 
@@ -452,18 +568,18 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		get->numimages = 1;
 		ci = &get->imageinfo[0];
 		ci->imageid = mystrdup(imageid);
+		ci->dir = mystrdup(rimagedir);
 		ci->path = mystrdup(path);
-		ci->flags = CONFIG_PATH_ISFILE;
+		ci->flags = CONFIG_PATH_ISFILE|CONFIG_PATH_RESOLVE;
 		if (exists) {
+			ci->flags |= CONFIG_PATH_EXISTS;
 			ci->sig = mymalloc(sizeof(time_t));
 			*(time_t *)ci->sig = sb.st_mtime;
 			ci->flags |= CONFIG_SIG_ISMTIME;
 		} else
 			ci->sig = NULL;
-		set_get_methods(get, 0);
-		set_get_options(get, 0);
-		ci->get_uid = ci->get_gid = -1;
-		ci->put_options = NULL;
+		ci->uid = ci->gid = -1;
+		set_get_values(get, 0);
 		ci->extra = NULL;
 	}
 
@@ -563,191 +679,6 @@ null_init(void)
 	return &null_config;
 }
 
-/*
- * Validate an imageid and convert it into a filesystem path in our
- * imageid directory.  Returns a pointer to a dynamically allocated path
- * path string on success, NULL otherwise.  On success, the path will either
- * point to an existing regular file or to a non-existent file within the
- * image directory.
- */
-static char *
-imageidtopath(char *imageid)
-{
-	char rpath[PATH_MAX], *path, *cp;
-	int idlen;
-
-	assert(imageid != NULL);
-
-	/*
-	 * We seriously limit what chars can be in an imageid since we
-	 * use it as a file name.
-	 */
-	idlen = strlen(imageid);
-	if (idlen == 0 || idlen >= PATH_MAX) {
-		if (debug)
-			fprintf(stderr, "imageid too short/long\n");
-		return NULL;
-	}
-	for (cp = imageid; *cp != '\0'; cp++) {
-		if (isalnum(*cp) ||
-		    *cp == '-' || *cp == '.' || *cp == '+' || *cp == '_')
-			continue;
-		if (*cp == '/')
-			continue;
-		if (debug)
-			fprintf(stderr, "bogus char (0x%x) in imageid\n", *cp);
-		return NULL;
-	}
-
-	/*
-	 * If imageid is specified and starts with a '/', it is an
-	 * absolute path.  We prepend imagedir if it doesn't already
-	 * exist.
-	 *
-	 * If it doesn't start with a '/' we prepend imagedir.
-	 */
-	assert(imagedir && imagedir[0]);
-	if (imageid[0] != '/' || strstr(imageid, imagedir) != imageid) {
-		path = mymalloc(strlen(imagedir) + idlen + 2);
-		strcpy(path, imagedir);
-		if (imageid[0] != '/')
-			strcat(path, "/");
-		strcat(path, imageid);
-	} else
-		path = mystrdup(imageid);
-	if (debug)
-		fprintf(stderr, "imageid %s: mapped to path '%s'\n",
-			imageid, path);
-
-	/*
-	 * Run it through realpath.
-	 * Sounds easy enough, right?  Well, except that the whole path
-	 * doesn't need to exist.  The imageid can effectively create
-	 * subdirectories if it contains a slash, so realpath can fail
-	 * because of missing intermediate subdirs and not because of
-	 * an invalid path.
-	 */
-	if (myrealpath(path, rpath) == NULL) {
-		char pathbuf[PATH_MAX];
-		char *next, *ep;
-
-		/*
-		 * Make sure all intermediate directories exist.
-		 * So we start with the imagedir path, and iterate through
-		 * the path, adding one component from the imageid each time.
-		 * As long as realpath succeeds each time and the resulting
-		 * path is within the imagedir, everything is okay and we
-		 * create the subdir and continue.
-		 */
-		strncpy(pathbuf, path, PATH_MAX);
-		assert(strncmp(pathbuf, imagedir, strlen(imagedir)) == 0);
-		next = &pathbuf[strlen(imagedir)+1];
-		assert(next[-1] == '/');
-		while ((ep = index(next, '/')) != NULL) {
-			*ep = '\0';
-			if (debug)
-				fprintf(stderr, "Testing: %s\n", pathbuf);
-
-			/*
-			 * If realpath fails on the component, see if
-			 * it failed due to a missing component in our path.
-			 * If so, create the component and continue.
-			 *
-			 * N.B. realpath returning the canonicalized version
-			 * of the path resolved so far in the case of an
-			 * error, is documented behavior for the FreeBSD
-			 * version but not for Linux. However, it is the
-			 * observed behavior for Linux and we rely on it
-			 * for now.
-			 */
-			if (myrealpath(pathbuf, rpath) == NULL) {
-				if (errno != ENOENT ||
-				    strstr(rpath, rimagedir) != rpath) {
-					fprintf(stderr,
-						"  resolves bad (%s)\n",
-						rpath);
-					free(path);
-					return NULL;
-				}
-				/*
-				 * Try creating the missing component.
-				 */
-				if (mkdir(rpath, 0755) < 0) {
-					fprintf(stderr,
-						"  could not create (%s)\n",
-						rpath);
-					free(path);
-					return NULL;
-				}
-				if (debug)
-					fprintf(stderr, "  created (%s)\n",
-						rpath);
-			} else {
-				if (debug)
-					fprintf(stderr, "  exists (%s)\n",
-						rpath);
-			}
-			*ep = '/';
-			next = ep+1;
-		}
-
-		/*
-		 * We are down to the final component of the original path.
-		 * It should either exist and be a regular file or not
-		 * exist at all.
-		 */
-		if (myrealpath(pathbuf, rpath) == NULL &&
-		    (errno != ENOENT || strstr(rpath, rimagedir) != rpath)) {
-			if (debug)
-				fprintf(stderr,
-					"imageid %s: realpath (%s) bad\n",
-					imageid, rpath);
-			free(path);
-			return NULL;
-		}
-	}
-	free(path);
-
-	/*
-	 * Realpath worked if we got here.
-	 * But we still need to make sure it resolved within the imagedir.
-	 */
-	if (strstr(rpath, rimagedir) != rpath) {
-		fprintf(stderr, "imageid %s: realpath (%s) bad\n",
-			imageid, rpath);
-		return NULL;
-	}
-
-	if (debug)
-		fprintf(stderr, "imageid %s: path '%s' resolved to '%s'\n",
-			imageid, path, rpath);
-
-	return mystrdup(rpath);
-}
-
-/*
- * Account for differences between BSD and Linux realpath.
- * In particular, BSD realpath() apparently doesn't even test the
- * final component.  It will return success even if the final component
- * doesn't exist. Settle on the Linux behavior.
- */
-static char *
-myrealpath(char *path, char rpath[PATH_MAX])
-{
-	char *rv;
-
-	rv = realpath(path, rpath);
-#ifndef linux
-	if (rv != NULL) {
-		struct stat sb;
-		/* also sets errno correctly */
-		if (stat(path, &sb) < 0)
-			rv = NULL;
-	}
-#endif
-	return rv;
-}
- 
 /*
  * XXX memory allocation functions that either return memory or abort.
  * We shouldn't run out of memory and don't want to check every return values.

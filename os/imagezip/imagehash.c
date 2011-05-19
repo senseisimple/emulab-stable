@@ -367,11 +367,8 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 	int nreg;
 
 	if (report) {
-		static int first = 1;
 		printf("%s\t%u\t%u\t%u\tU\t%s\n",
-		       spewhash(hash, hashlen), start, size, chunkno,
-		       first ? fileid : "-");
-		first = 0;
+		       spewhash(hash, hashlen), start, size, chunkno, fileid);
 		return;
 	}
 

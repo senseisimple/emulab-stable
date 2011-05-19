@@ -425,6 +425,7 @@ main(int argc, char **argv)
 	ClientLogInit();
 #ifdef MASTER_SERVER
 	if (imageid) {
+		struct in_addr pif;
 		GetReply reply;
 		int method = askonly ? MS_METHOD_ANY : xfermethods;
 		int timo = 5; /* XXX */
@@ -442,7 +443,7 @@ main(int argc, char **argv)
 			if (!ClientNetFindServer(ntohl(serverip.s_addr),
 						 portnum, host, imageid,
 						 method, askonly, timo,
-						 &reply, NULL))
+						 &reply, &pif))
 				fatal("Could not get download info for '%s'",
 				      imageid);
 
@@ -465,6 +466,14 @@ main(int argc, char **argv)
 			serverip.s_addr = htonl(reply.servaddr);
 			mcastaddr.s_addr = htonl(reply.addr);
 			portnum = reply.port;
+
+			/*
+			 * Unless the user explicitly specified the interface
+			 * to use, default to the one on which we got a
+			 * response from the server.
+			 */
+			if (mcastif.s_addr == 0)
+				mcastif = pif;
 
 			if (serverip.s_addr == mcastaddr.s_addr)
 				log("%s: address: %s:%d",
