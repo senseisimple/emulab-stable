@@ -36,6 +36,7 @@ use snmpit_remote;
 
 # Protos
 sub parseStatusString($);
+sub filterList($$);
 sub debug($);
 sub doListVlans($);
 sub doListPorts($);
@@ -107,6 +108,8 @@ General:
                       given multiple times
   -S <stack>      Operate on the given stack, instead of the default of the
                       experimental network
+  --skip-supplied If the -S option was given, start with the default stacks, 
+                      but skip any switches in the stacks listed in -S.
   --redirect-err  Redirect STDERR to STDOUT, for easier capturing in logfiles
 
 VLAN Control:
@@ -187,7 +190,7 @@ GetOptions(\%opt,
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'Z', 'vlan_tag=i', 
     'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
     'o=s@{1,1}', 'redirect-err', 'blockmode', 'syncvlans', 'impotent',
-    'shadow');
+    'shadow', 'skip-supplied');
 
 if ($opt{h}) {
     exit &usage;
@@ -545,6 +548,13 @@ if (!@commands) {
 #
 # User-supplied switch lists
 #
+
+# See if we should we flip the behavior of -S and -i ?
+my $skip_supplied = 0;
+if ($opt{'skip-supplied'} && $opt{S}) {
+    $skip_supplied = 1;
+}
+
 my @supplied_switches = ();
 my @supplied_stacks   = ();
 my $supplied_switches = 0; # Whether -i or -S was given
@@ -687,17 +697,18 @@ COMMAND: foreach my $command (@commands) {
     SWITCH: for ($operation) {
 	(/listvlans/ || /getstats/ || /vlannumber/ || /synchleader/ ||
 	 /syncvlans/) && do {
-	    @devicenames = $supplied_switches?
+	    @devicenames = ($supplied_switches && !$skip_supplied)?
 			   @supplied_switches : getTestSwitches();
 	    last;
 	};
 	(/listports/) && do {
-	    @devicenames = $supplied_switches? @supplied_switches :
-	    (@ports? getDeviceNames(@ports) : getTestSwitches());
+	    @devicenames = ($supplied_switches && !$skip_supplied)? 
+		           @supplied_switches :
+			   (@ports? getDeviceNames(@ports) : getTestSwitches());
 	    last;
 	};
 	( /make/ ) && do {
-            if ($supplied_switches) {
+            if ($supplied_switches && !$skip_supplied) {
                 @devicenames = @supplied_switches;
             } elsif (@ports) {
                 # Have to operate on whole stacks so that trunks work
@@ -714,7 +725,7 @@ COMMAND: foreach my $command (@commands) {
             #   vlan from the db
             #   if others fail, default to experimental switches
 	    my ($vlan_name) = @args;
-            if ($supplied_switches) {
+            if ($supplied_switches && !$skip_supplied) {
                 debug("Remove: using supplied switches\n");
                 @devicenames = @supplied_switches;
             }
@@ -749,7 +760,7 @@ COMMAND: foreach my $command (@commands) {
 		    if (!$quiet);
                 next COMMAND;
             }
-            if ($supplied_switches) {
+            if ($supplied_switches && !$skip_supplied) {
                 debug("Tables: using supplied switches\n");
                 @devicenames = @supplied_switches;
 		@vlans = filterVlansBySwitches(\@supplied_switches, @vlans);
@@ -763,6 +774,17 @@ COMMAND: foreach my $command (@commands) {
                 @devicenames = mapVlansToSwitches(@vlans);
                 debug("Tables: list from database: " . join(",",@devicenames) .
 		      "\n");
+            }
+            if ($skip_supplied) {
+                debug("Tables: skipping supplied switches\n");
+		@devicenames = filterList(\@devicenames,\@supplied_switches);
+		@vlans = filterVlansBySwitches(\@devicenames, @vlans);
+		if (!@devicenames || !@vlans) {
+		    print "snmpit: $pid/$eid has no VLANs to create ".
+			"on skip-filtered device list, skipping\n"
+			if (!$quiet);
+		    next COMMAND;
+		}
             }
             if (scalar(@devicenames == 0)) {
                 debug("Tables: falling back to test swtiches\n");
@@ -795,7 +817,7 @@ COMMAND: foreach my $command (@commands) {
                     "created on switches\n  ... skipping\n";
                 next COMMAND;
             }
-            if ($supplied_switches) {
+            if ($supplied_switches && !$skip_supplied) {
                 debug("Reset: using supplied switches\n");
                 @devicenames = @supplied_switches;
 		@vlans = filterVlansBySwitches(\@supplied_switches, @vlans);
@@ -809,6 +831,18 @@ COMMAND: foreach my $command (@commands) {
                 @devicenames = mapVlansToSwitches(@vlans);
                 debug("Reset: list from database: " . join(",",@devicenames) .
                     "\n");
+            }
+
+            if ($skip_supplied) {
+                debug("Reset: skipping supplied switches\n");
+		@devicenames = filterList(\@devicenames,\@supplied_switches);
+		@vlans = filterVlansBySwitches(\@devicenames, @vlans);
+		if (!@devicenames || !@vlans) {
+		    print "snmpit: $pid/$eid has no VLANs to reset ".
+			"on skip-filtered device list, skipping\n"
+			if (!$quiet);
+		    next COMMAND;
+		}
             }
 
             # Fallthrough - if we haven't found any switches yet, operate
@@ -826,7 +860,7 @@ COMMAND: foreach my $command (@commands) {
 	    my @oldvlans;
 	    VLan->StaleVlanList($experiment,\@oldvlans);
 
-            if ($supplied_switches) {
+            if ($supplied_switches && !$skip_supplied) {
 		die("-X and -i cannot be used together\n");
             }
 	    else {
@@ -835,6 +869,19 @@ COMMAND: foreach my $command (@commands) {
                 debug("Sync: list from database: " . join(",",@devicenames) .
 		      "\n");
             }
+
+            if ($skip_supplied) {
+                debug("Sync: skipping supplied switches (dangerous!)\n");
+		@devicenames = filterList(\@devicenames,\@supplied_switches);
+		@vlans = filterVlansBySwitches(\@devicenames, @vlans);
+		if (!@devicenames || !@vlans) {
+		    print "snmpit: $pid/$eid has no VLANs to sync ".
+			"on skip-filtered device list, skipping\n"
+			if (!$quiet);
+		    next COMMAND;
+		}
+            }
+
             # Fallthrough - if we haven't found any switches yet, operate
             # on the whole experimental net
             if (scalar(@devicenames) == 0) {
@@ -844,7 +891,7 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	};
 	(/portcontrol/ || /trunkdisable/ || /portstatus/) && do {
-	    @devicenames = $supplied_switches?
+	    @devicenames = ($supplied_switches && !$skip_supplied)?
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    last;
 	};
@@ -857,14 +904,14 @@ COMMAND: foreach my $command (@commands) {
 	    # Safety check - cannot be used with -i . We have to operate on
 	    # all experimental switches
 	    #
-	    if ($supplied_switches) {
+	    if ($supplied_switches && !$skip_supplied) {
 		die "-c and -i or -S cannot be used together\n";
 	    }
 	    @devicenames = getTestSwitches();
 	    last;
 	};
 	(/trunkenable/) && do {
-	    @devicenames = $supplied_switches?
+	    @devicenames = ($supplied_switches && !$skip_supplied)?
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    @vlans = @optvlanids;
 	    last;
@@ -881,7 +928,7 @@ COMMAND: foreach my $command (@commands) {
             if ($args{vlan}) {
                 @vlans = ($args{vlan});
             }
-	    @devicenames = $supplied_switches?
+	    @devicenames = ($supplied_switches && !$skip_supplied)?
 		           @supplied_switches : getDeviceNames(@ports);
             @args = %args;
             last;
@@ -891,7 +938,7 @@ COMMAND: foreach my $command (@commands) {
 
 	    # Same to 'remove', we find stacks by VLAN 
 	    my ($vlanobj, $stack);
-            if ($supplied_switches) {
+            if ($supplied_switches && !$skip_supplied) {
                 debug("Openflow operations: using supplied switches\n");
                 @devicenames = @supplied_switches;
             } elsif (defined($experiment) &&
@@ -906,6 +953,13 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	};
     }
+
+    #
+    # No matter what operation we're doing, we're safe to filter the 
+    # devicenames list now!
+    #
+    @devicenames = filterList(\@devicenames,\@supplied_switches)
+        if ($skip_supplied);
 
     debug("Device names: " . join(",",@devicenames) . "\n");
     debug("Ports: " . join(",", map($_->toIfaceString(), @ports)) . "\n");
@@ -3386,7 +3440,28 @@ sub doTrunkDisable($$) {
 	if (!$errors);
     return $errors;
 }
+ 
+#
+# Simple little list filtering util function.
+#
+sub filterList($$) {
+    my ($srclist,$filterlist) = @_;
+    my @retval = ();
 
+    foreach my $item (@$srclist) {
+	my $found = 0;
+	foreach my $filter (@$filterlist) {
+	    if ($item eq $filter) {
+		$found = 1;
+		last;
+	    }
+	}
+	push @retval, $item 
+	    if (!$found);
+    }
+
+    return @retval;
+}
 
 #
 # Openflow lock and functions
