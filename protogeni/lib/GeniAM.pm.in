@@ -124,8 +124,7 @@ sub GetVersion()
         "version" => "2",
         "schema" => "http://www.protogeni.net/resources/rspec/2/ad.xsd",
         "namespace" => "http://www.protogeni.net/resources/rspec/2",
-        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1\
-"]
+        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
     };
 
     my $blob = {
