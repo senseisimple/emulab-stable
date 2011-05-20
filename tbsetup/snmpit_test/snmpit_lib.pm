@@ -312,7 +312,7 @@ sub getVlanPorts (@) {
     my @ports = ();
 
     foreach my $vlanid (@vlans) {	
-
+        
     	my $vlan = VLan->Lookup($vlanid);
     	if (!defined($vlan)) {
         	die("*** $0:\n".
@@ -323,30 +323,22 @@ sub getVlanPorts (@) {
         	die("*** $0:\n".
 		    "    Unable to load members for $vlan\n");
 	}
-	my %pathifaces = ();
-	my $error = getPathVlanIfaces($vlanid, \%pathifaces);
-	if ($error < 0) {
-	    die("*** $0:\n".
-		"    Error getting path interfaces for $vlan\n");
-	}
-	if ($error == 0) {
-	    foreach my $k (keys %pathifaces) {
-		push(@ports, Port->LookupByIface($pathifaces{$k}));
+	
+	#
+	# getPathVlanIfaces call removed because we've made
+	# virtual ports and wires.
+	#
+	foreach my $member (@members) {
+	    my $nodeid;
+	    my $iface;
+	    
+	    if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
+		$member->GetAttribute("iface", \$iface) != 0) {
+		die("*** $0:\n".
+		    "    Missing attributes for $member in $vlan\n");
 	    }
-	}
-	else {
-	    foreach my $member (@members) {
-	 	my $nodeid;
-	 	my $iface;
-
-		if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
-		    $member->GetAttribute("iface", \$iface) != 0) {
-		    die("*** $0:\n".
-			"    Missing attributes for $member in $vlan\n");
-		}
-		push(@ports, Port->LookupByIface($nodeid, $iface));
-	    }
-	}
+	    push(@ports, Port->LookupByIface($nodeid, $iface));
+	}	
     }
     return @ports;
 }
