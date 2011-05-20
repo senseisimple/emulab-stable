@@ -4030,6 +4030,23 @@ CREATE TABLE `virt_blobs` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `virt_bridges`
+--
+
+DROP TABLE IF EXISTS `virt_bridges`;
+CREATE TABLE `virt_bridges` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vname` varchar(32) NOT NULL default '',
+  `vlink` varchar(32) NOT NULL default '',
+  `vnode` varchar(32) NOT NULL default '',
+  `vport` tinyint(3) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`vname`,`vlink`,`vnode`,`vport`),
+  KEY `pideid` (`pid`,`eid`,`vname`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `virt_client_service_ctl`
 --
 
@@ -4214,6 +4231,9 @@ CREATE TABLE `virt_lans` (
   `implemented_by_link` tinytext,
   `ofenabled` tinyint(1) default '0',
   `ofcontroller` tinytext,
+  `bridged_vname` varchar(32) default NULL,
+  `bridged_vnode` varchar(32) default NULL,
+  `bridged_vport` tinyint(3) default NULL,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),
@@ -4296,6 +4316,7 @@ CREATE TABLE `virt_nodes` (
   `plab_plcnet` varchar(32) NOT NULL default 'none',
   `numeric_id` int(11) default NULL,
   `sharing_mode` varchar(32) default NULL,
+  `role` enum('node','bridge') NOT NULL default 'node',
   PRIMARY KEY  (`exptidx`,`vname`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`vname`),
   KEY `pid` (`pid`,`eid`,`vname`)

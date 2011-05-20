@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -91,6 +91,7 @@ Node instproc init {s} {
     $self set fixed ""
     $self set nseconfig ""
     $self set sharing_mode ""
+    $self set role ""
 
     $self set topo ""
 
@@ -158,6 +159,7 @@ Node instproc updatedb {DB} {
     $self instvar failureaction
     $self instvar inner_elab_role
     $self instvar plab_role
+    $self instvar role
     $self instvar plab_plcnet
     $self instvar routertype
     $self instvar fixed
@@ -308,6 +310,11 @@ Node instproc updatedb {DB} {
     if { $inner_elab_role != "" } {
 	lappend fields "inner_elab_role"
 	lappend values $inner_elab_role
+    }
+
+    if { $role != "" } {
+	lappend fields "role"
+	lappend values $role
     }
 
     if { $plab_role != "none" } {
@@ -685,3 +692,10 @@ Node instproc set_numeric_id {myid} {
 
     set numeric_id $myid
 }
+
+Node instproc set_role {newrole} {
+    $self instvar role
+
+    set role $newrole
+}
+

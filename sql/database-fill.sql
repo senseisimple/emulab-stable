@@ -904,6 +904,9 @@ REPLACE INTO table_regex VALUES ('location_info','phone','text','regex','^[-\\d\
 REPLACE INTO table_regex VALUES ('location_info','room','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vport','int','redirect','default:tinyint',0,99,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','bridged_vname','text','redirect','virt_lans:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','bridged_vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','bridged_vport','int','redirect','virt_lans:vport',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','ip','text','regex','^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})$',0,15,NULL);
 REPLACE INTO table_regex VALUES ('experiments','usemodelnet','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','modelnet_cores','int','redirect','default:tinyint',0,5,NULL);
@@ -922,6 +925,7 @@ REPLACE INTO table_regex VALUES ('firewall_rules','eid','text','redirect','exper
 REPLACE INTO table_regex VALUES ('firewall_rules','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','ruleno','int','redirect','default:int',0,50000,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','rule','text','regex','^\\w[-\\w \\t,/\\{\\}\\(\\)!:\\.]*$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','role','text','regex','^(node|bridge)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','inner_elab_role','text','regex','^(boss|boss\\+router|router|ops|ops\\+fs|fs|node)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','plab_role','text','regex','^(plc|node|none)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','default:boolean',0,0,NULL);
@@ -1078,7 +1082,12 @@ REPLACE INTO table_regex VALUES ('virt_paths','pathname','text','redirect','virt
 REPLACE INTO table_regex VALUES ('virt_paths','segmentname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_paths','segmentindex','int','redirect','default:tinyuint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_paths','layer','int','redirect','default:tinyint',0,0,NULL);
-
+REPLACE INTO table_regex VALUES ('virt_bridges','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_bridges','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_bridges','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_bridges','vlink','text','redirect','virt_lans:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_bridges','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_bridges','vport','int','redirect','default:tinyint',0,99,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_path','text','redirect','virt_paths:pathname',1,128,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_link','text','redirect','default:tinytext',0,0,NULL);
 

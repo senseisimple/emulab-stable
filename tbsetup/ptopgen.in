@@ -719,7 +719,7 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 # features
 #
 $result = DBQueryFatal("SELECT DISTINCT node_id1, node_id2 " .
-                       "  FROM wires where logical=0");
+                       "  FROM wires where logical=0 and type!='Unused'");
 my %connections = ();
 while (my ($node_id1, $node_id2) = $result->fetchrow()) {
     foreach my $nodes ([$node_id1, $node_id2], [$node_id2, $node_id1]) {

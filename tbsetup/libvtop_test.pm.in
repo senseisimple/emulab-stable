@@ -489,6 +489,7 @@ sub membershaped($$) {
 sub setmembershaped($$) {
     my ($self, $member) = @_;
     $self->shapedmembers()->{"$member"} = 1;
+    $member->_shaped(1);
 }
 
 ###############################################################################
@@ -1099,6 +1100,7 @@ sub LoadVirtNodes($)
 	# Set below from a desire.
 	$vnode->_sharedokay(0);
 	$vnode->_fixedvm(undef);
+	$vnode->_isbridge(($vnode->role() eq "bridge" ? 1 : 0));
 
 	# For a list of interfaces on this node, as for rspec generation
 	$vnode->_virtifaces([]);
@@ -1480,7 +1482,8 @@ sub LoadVirtLans($)
 	$virtlan->_geninodes(0);
 	$virtlan->_implemented_by($implemented_by);
 	$virtlan->_vpath(undef);
-
+	$virtlan->_bridged(0);
+	
 	if (defined($encap) &&
 	    ($encap eq "vtun" || $encap eq "gre" || $encap eq "egre")) {
 	    $virtlan->_tunnel(1);
@@ -1534,7 +1537,9 @@ sub LoadVirtLans($)
 	# shaped, or because it is being traced or monitored.
 	#
 	$virtlan->shapedmembers()->{"$vlanmember"} = 0;
+	$vlanmember->_shaped(0);
 	$virtlan->_delayed(0);
+	$vlanmember->_bridged(undef);
 
 	#
 	# XXX - Whenever a delay node is inserted, port speeds are set to
@@ -1569,6 +1574,35 @@ sub LoadVirtLans($)
 	    $self->printdb("  Forcing $vlanmember to reserve shared bandwidth\n");
 	}
     }
+
+    #
+    # Check the bridge requests and set the cross links.
+    #
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	foreach my $member ($virtlan->memberlist()) {
+	    next
+		if (!defined($member->bridged_vname()));
+
+	    my $bridged_vname  = $member->bridged_vname();
+	    my $bridged_vnode  = $member->bridged_vnode();
+	    my $bridged_vport  = $member->bridged_vport();
+	    my $bridged_member =
+		$self->memberof()->{"$bridged_vnode:$bridged_vport"};
+
+	    if (!defined($bridged_member)) {
+		tberror("$member is bridged to nonexistent member\n");
+		return -1;
+	    }
+	    if (!$member->virt_node()->_isbridge()) {
+		tberror("$member is bridged but is not a bridge\n");
+		return -1;
+	    }
+	    $member->_bridged($bridged_member);
+	    $virtlan->_bridged(1);
+	    $self->printdb("$virtlan bridge: $member to $bridged_member\n");
+	}
+    }
+    
     #
     # Load the virt paths.
     #
@@ -2543,7 +2577,7 @@ sub GenVirtLans($)
 		next;
 	    }
 	}
-	elsif (@members == 2) {
+	elsif (@members == 2 && !$vlan->_bridged()) {
 	    #
 	    # We treat LANs with two members specially - they are just links
 	    #
@@ -2554,7 +2588,7 @@ sub GenVirtLans($)
 	    my $virtnode1 = $member1->virt_node();
 	    my $vname0    = $virtnode0->vname();
 	    my $vname1    = $virtnode1->vname();
-	    
+
 	    my ($delay0,$bw0,$ebw0,$backfill0,$loss0,
 		$rdelay0,$rbw0,$rebw0,$rbackfill0,$rloss0) =
 		    @{$member0->_delayinfo()};
@@ -2818,7 +2852,7 @@ sub GenVirtLans($)
 		my $plink = "linksimple/$vname/$member0,$member1";
 		my $bw = '';
 		my $others = {'isgeninode' => $vlan->_geninodes()};
-		
+
 		if ($emulated) {
 		    $bw = max($top_bw,$top_rbw);
 		}
@@ -2936,6 +2970,8 @@ sub GenVirtLans($)
 		     $mustdelay ||
 		     # Global force, or per-lan force. 
 		     $self->option('forcelinkdelays') || $uselinkdelay) &&
+		    # No shaping on bridged lans.
+		    !$vlan->_bridged() &&
 		    # No shaping for geni nodes.
 		    $vlan->_geninodes() == 0) {
 		    $shaped = 1;
@@ -2984,6 +3020,8 @@ sub GenVirtLans($)
 		my $rbandwidth = $self->getbandwidth($member,$vlan,$rbw);
 
 		if (($shaped || ($traced && !$trace_endnode)) &&
+		    # Ignore for bridged links.
+		    !$vlan->_bridged() &&
 		    # if we have 1 real node in the LAN, we may need to create
 		    # a lan
 		    ($realnodes != 0)) {
@@ -5025,30 +5063,32 @@ sub InterpLinks($)
 	if ($self->InterpLinksAux() != 0);
 
     #
-    # Find all the layer 2 paths and add the bridges between them.
-    # Eventually this should be optional; the user should be free
-    # to set this up themselves.
+    # Go through and look for bridge nodes. 
     #
-    foreach my $pathname (keys(%{ $self->vpaths() })) {
-	my $vpath = $self->vpaths()->{$pathname};
+    foreach my $virtual (keys(%{ $self->solution_v2p() })) {
+	my $pnode    = $self->pnodes()->{$self->solution_v2p()->{$virtual}};
+	my $virtnode = $self->vnodes()->{$virtual};
 
 	next
-	    if ($vpath->layer() != 2);
+	    if (!$virtnode->_isbridge());
 
-	my @members = $vpath->virtlanlist();
-	next
-	    if (scalar(@members) < 2);
+	# Links that are connected to this bridge. 
+	my @virtlans = $virtnode->memberlist();
 
-	# A list of virtlans (segments)
-	my $prev = shift(@members);
-	my $next = shift(@members);
-	while ($next) {
-	    my (undef, $member0) = $prev->memberlist();
-	    my ($member1, undef) = $next->memberlist();
-	    $self->AddBridge($vpath, $member0, $member1);
-	    $prev = $next;
-	    $next = shift(@members);
+	# Find the members that are connected through this bridge.
+	my @members;
+	foreach my $virtlan (@virtlans) {
+	    foreach my $member ($virtlan->memberlist()) {
+		if ($member->virt_node()->vname() eq $virtnode->vname()) {
+		    push(@members, $member);
+		}
+	    }
 	}
+
+	# Can only bridge two links.
+	my ($member0,$member1) = @members;
+
+	$self->AddBridge($member0, $member1);
     }
 
     #
@@ -5735,7 +5775,7 @@ sub InterpLinksAux($)
 		my ($delay,$bandwidth,$backfill,$loss,
 		    $rdelay,$rbandwidth,$rbackfill,$rloss,$trivial_ok) =
 			@{$self->delaylinks()->{$plink}};
-		
+
 		if (!$trivial_ok || ($trivial_ok && $trivial)) {
 		    #
 		    # Two entries, one for each side of the duplex link.
@@ -6227,6 +6267,11 @@ sub InitializePhysNode($$$)
 	    }
 	    elsif ($pnode->_needslinkdelay()) {
 		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
+	    }
+	    elsif ($virtnode->_isbridge()) {
+		$osid = ($self->option("delay_osid") || $pnode->delay_osid());
+		$cmdline = $self->osidbootcmd($osid, "delay", "");
+		$role = TBDB_RSRVROLE_DELAYNODE();
 	    }
 	    elsif (defined($inner_elab_role) &&
 		   ($inner_elab_role eq "boss" ||
@@ -6842,13 +6887,11 @@ sub AddLinkDelay($$$$$$)
 }
 
 #
-# Add a bridge. The DB table for bridges allows for any number of
-# interfaces, but in practice there are only two when creating them
-# inside of libvtop.
+# Add a bridge. At the moment, bridges are just delay nodes. 
 #
-sub AddBridge($$$$)
+sub AddBridge($$$)
 {
-    my ($self, $vpath, $member0, $member1) = @_;
+    my ($self, $member0, $member1) = @_;
     my $iface0 = $member0->_pport();
     my $iface1 = $member1->_pport();
     my $pnodename = $member0->_pnode();
@@ -6858,27 +6901,125 @@ sub AddBridge($$$$)
     my $bridgeidx = $pnode->_pipenumber();
     $pnode->_pipenumber($bridgeidx + 1);
 
+    # ipfw pipe numbers.
+    my $pipe0 = $pnode->_pipenumber();
+    my $pipe1 = $pipe0 + 10;
+    $pnode->_pipenumber($pipe1 + 10);
+
     my $vnodename0 = $member0->vnode();
     my $vnodename1 = $member1->vnode();
     my $experiment = $self->experiment();
     my $pid   = $experiment->pid();
     my $eid   = $experiment->eid();
     my $idx   = $experiment->idx();
-    my $vname = $vpath->pathname();
+
+    # The name of the bridge (as for the delay agent) is the name of node.
+    # Might have to change this if we want to use a pnode for more then
+    # one bridge.
+    my $vname = $pnodename;
 
     $self->printdb("  Bridge:$bridgeidx $iface0:$pnodename:$iface1\n");
 
-    DBQueryWarn("insert into bridges " .
-		" (pid,eid,exptidx,node_id,bridx,iface,vname,vnode) ".
-		" values ('$pid','$eid','$idx','$pnodename','$bridgeidx', ".
-		"         '$iface0','$vname','$vnodename0')")
+    # Grab the queue info.
+    my ($q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,
+	$q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,
+	$q0_droptail,$q0_red,$q0_gentle) = @{ $member0->_queueinfo() };
+
+    my ($q1_limit,$q1_maxthresh,$q1_minthresh,$q1_weight,$q1_linterm,
+	$q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit,
+	$q1_droptail,$q1_red,$q1_gentle) = @{ $member1->_queueinfo() };
+
+    #
+    # And the shaping params. Since this bridge mimics the delay for
+    # a duplex link, we only use the "forward" params from each
+    # member.
+    #
+    my ($delay,$bandwidth,undef,$backfill,$lossrate)      =
+	@{ $member0->_delayinfo() };
+    my ($rdelay,$rbandwidth,undef,$rbackfill,$rlossrate)  =
+	@{ $member1->_delayinfo() };
+
+    # See if the user wants the bw shaping to be disabled.
+    $bandwidth = 0
+	if ($member0->nobwshaping());
+    $rbandwidth = 0
+	if ($member1->nobwshaping());
+
+    #
+    # We are inserting the bridge, but it might not be for shaping.
+    # Maybe for tracing. We use the estimated bandwidth field to
+    # signal this, but need a better approach.
+    #
+    my $noshaping = (defined($member0->est_bandwidth()) ||
+		     defined($member1->est_bandwidth()) ? 0 : 1);
+
+    $self->printdb("  Shaping: $pipe0,$delay,$bandwidth,$lossrate\n".
+		   "           $pipe1,$rdelay,$rbandwidth,$rlossrate\n")
+	if (!$noshaping);
+    
+    DBQueryWarn("insert into delays " .
+		" (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
+		",vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0" .
+		",vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1" .
+		",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
+		",q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit" .
+		",q0_droptail,q0_red,q0_gentle" .
+		",q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm" .
+		",q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit" .
+		",q1_droptail,q1_red,q1_gentle)" .
+		" values ('$pid','$eid','$idx','$pnodename','$vname' ".
+		",$noshaping,'$iface0','$iface1'".
+		",'$vnodename0',$pipe0,$delay,$bandwidth,$backfill,$lossrate".
+		",'$vnodename1',$pipe1,$rdelay,$rbandwidth,$rbackfill".
+		",$rlossrate".
+		",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
+		",$q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit".
+		",$q0_droptail,$q0_red,$q0_gentle".
+		",$q1_limit,$q1_maxthresh,$q1_minthresh,$q1_weight,$q1_linterm".
+		",$q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit".
+		",$q1_droptail,$q1_red,$q1_gentle)")
 	or return -1 if (! ($self->impotent() || $self->alloconly()));
 
-    DBQueryWarn("insert into bridges " .
-		" (pid,eid,exptidx,node_id,bridx,iface,vname,vnode) ".
-		" values ('$pid','$eid','$idx','$pnodename','$bridgeidx', ".
-		"         '$iface1','$vname','$vnodename1')")
-	or return -1 if (! ($self->impotent() || $self->alloconly()));
+    #
+    # Check for tracing.
+    #
+    my ($traced0, $endnode0, $trace_type0, $trace_expr0,
+	$trace_snaplen0, $trace_db0) = @{ $member0->_traceinfo() };
+
+    if ($traced0) {
+	$self->printdb("  Trace: $member0, $pnodename, $iface0, $iface1\n");
+	my $vname = $member0->virt_lan()->vname();
+
+	DBQueryWarn("insert into traces ".
+		    " (node_id, idx, iface0, iface1, pid, eid, exptidx, ".
+		    "  linkvname, vnode, trace_type, trace_expr, ".
+		    "  trace_snaplen, trace_db) ".
+		    "values ".
+		    "  ('$pnodename', 0, '$iface0', '$iface1','$pid','$eid', ".
+		    "   '$idx', '$vname', '$vnodename0', ".
+		    "   '$trace_type0', '$trace_expr0', $trace_snaplen0, ".
+		    "   '$trace_db0')")
+	    or return -1 if (! ($self->impotent() || $self->alloconly()));
+    }
+    
+    my ($traced1, $endnode1, $trace_type1, $trace_expr1,
+	$trace_snaplen1, $trace_db1) = @{ $member1->_traceinfo() };
+
+    if ($traced1) {
+	$self->printdb("  Trace: $member1, $pnodename, $iface1, $iface0\n");
+	my $vname = $member1->virt_lan()->vname();
+
+	DBQueryWarn("insert into traces ".
+		    " (node_id, idx, iface0, iface1, pid, eid, exptidx, ".
+		    "  linkvname, vnode, trace_type, trace_expr, ".
+		    "  trace_snaplen, trace_db) ".
+		    "values ".
+		    "  ('$pnodename', 0, '$iface1', '$iface0','$pid','$eid', ".
+		    "   '$idx', '$vname', '$vnodename1', ".
+		    "   '$trace_type1', '$trace_expr1', $trace_snaplen1, ".
+		    "   '$trace_db1')")
+	    or return -1 if (! ($self->impotent() || $self->alloconly()));
+    }
     
     #
     # XXX - Whenever a bridge node is inserted, port speeds are set to
@@ -6917,6 +7058,10 @@ sub SetUpTracing($$$$$)
 {
     my ($self, $virtlan, $member, $pnodename, $iface0, $iface1) = @_;
     my $vnodename = $member->vnode();
+
+    # Bridged links handled elsewhere.
+    return 0
+	if ($virtlan->_bridged());
 
     #
     # Handle virtual nodes - in some cases (ie. PlanetLab), we have to

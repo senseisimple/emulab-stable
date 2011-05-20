@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -272,6 +272,7 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar cost
     $self instvar linkq
     $self instvar fixed_iface
+    $self instvar bridge_links
 
     $self instvar iscloud
     $self set iscloud 0
@@ -459,35 +460,193 @@ LanLink instproc get_port {node} {
     return {}
 }
 
+# Set the bridge link field
+LanLink instproc bridge {srcport link node dstport} {
+    $self instvar bridge_links
+    set nodepair [list $node $srcport]
+
+    set bridge_links($nodepair) [list $link $node $dstport]
+}
+
+#
+# Bridge from a LanLink to another Lanlink via node. 
+#
+LanLink instproc bridge_with {link node} {
+    set srcvport [$self get_port $node]
+    set dstvport [$link get_port $node]
+
+    if {$srcvport == {}} {
+	perror "bridge_with: $node is not a member of $self";
+	return
+    }
+    if {$dstvport == {}} {
+	perror "bridge_with: $node is not a member of $link";
+	return
+    }
+    # Cross link
+    $self bridge $srcvport $link $node $dstvport
+    $link bridge $dstvport $self $node $srcvport
+    $node set_role "bridge"
+}
+
+#
+# Find the queue object for a node on a link. 
+#
+Link instproc Queue {node} {
+    $self instvar toqueue
+    $self instvar fromqueue
+
+    if {$node == [$self set src_node]} {
+	return $toqueue
+    } elseif {$node == [$self set dst_node]} {
+	return $fromqueue
+    } else {
+	perror "Queue: $node is not a member of $self"
+	return {}
+    }
+}
+
+#
+# Ditto for a node in a lan.
+#
+LanLink instproc Queue {node} {
+    $self instvar nodelist
+    $self instvar linkq
+    set vport [$self get_port $node]
+
+    if {$vport == {}} {
+	perror "SetDelayParams: $node is not a member of $self";
+	return
+    }
+    set nodepair [list $node $vport]
+    return $linkq($nodepair)
+}
+
+#
+# Set the delay params for a node on a link. This should be used
+# ONLY in conjunction with the bridge code since it completely violates
+# all rules about how the delay params in the virt_lans table are used.
+#
+LanLink instproc SetDelayParams {node todelay tobw toloss} {
+    $self instvar bandwidth
+    $self instvar rbandwidth
+    $self instvar nodelist
+    set vport [$self get_port $node]
+    set role [$node set role]
+
+    # Node better be a bridge
+    if {$role != "bridge"} {
+	perror "SetDelayParams: $node is not a bridge!\n"
+	return
+    }
+    if {$vport == {}} {
+	perror "SetDelayParams: $node is not a member of $self";
+	return
+    }
+
+    # This is the original bandwidth when the link is created.
+    # Remember it, for the mapper. Needs more thought.
+    foreach nodeport $nodelist {
+	$self set ebandwidth($nodeport) $bandwidth($nodeport)
+	$self set rebandwidth($nodeport) $rbandwidth($nodeport)
+    }
+
+    set realtodelay [parse_delay $todelay]
+    set realtobw [parse_bw $tobw]
+
+    $self set delay([list $node $vport]) $realtodelay
+    $self set loss([list $node $vport]) $toloss
+    $self set bandwidth([list $node $vport]) $realtobw
+}
+
+#
+# Ditto for tracing.
+#
+Link instproc SetTraceParams {node {ttype "header"} {snaplen 0} {texpr ""}} {
+    $self instvar toqueue
+    $self instvar fromqueue
+
+    if {$node == [$self set src_node]} {
+	$toqueue trace $ttype $texpr
+	if {$snaplen > 0} {
+	    $toqueue set trace_snaplen $snaplen
+	}
+    } elseif {$node == [$self set dst_node]} {
+	$fromqueue trace $ttype $texpr
+	if {$snaplen > 0} {
+	    $fromqueue set trace_snaplen $snaplen
+	}
+    } else {
+	perror "SetTraceParams: $node is not a member of $self"
+    }
+}
+
+Lan instproc SetTraceParams {node {ttype "header"} {snaplen 0} {texpr ""}} {
+    $self instvar nodelist
+    $self instvar linkq
+
+    set vport [$self get_port $node]
+    set nodepair [list $node $vport]
+
+    set linkqueue $linkq($nodepair)
+    $linkqueue trace $ttype $texpr
+    if {$snaplen > 0} {
+	$linkqueue set trace_snaplen $snaplen
+    }
+}
+
 # fill_ips
 # This fills out the IP addresses (see README).  It determines a
 # subnet, either from already assigned IPs or by asking the Simulator
 # for one, and then fills out unassigned node:port's with free IP
 # addresses.
 LanLink instproc fill_ips {} {
-    $self instvar nodelist
     $self instvar sim
     $self instvar widearea
     $self instvar netmask
     set isremote 0
     set netmaskint [inet_atohl $netmask]
 
+    #
+    # Find the entire set of nodeports that are reachable because of
+    # bridged links/lans.
+    #
+    set lanlist [list $self]
+    while {$lanlist != {}} {
+	set lan [lindex $lanlist 0]
+	lpop lanlist
+	set reachable($lan) 1
+	$lan instvar bridge_links
+
+	foreach nodeport [array names bridge_links] {
+	    set linkage $bridge_links($nodeport)
+	    set nextlan [lindex $linkage 0]
+	    if {! [info exists reachable($nextlan)]} {
+		lappend lanlist $nextlan
+	    }
+	}
+    }
+
     # Determine a subnet (if possible) and any used IP addresses in it.
     # ips is a set which contains all used IP addresses in this LanLink.
     set subnet {}
-    foreach nodeport $nodelist {
-	set node [lindex $nodeport 0]
-	set port [lindex $nodeport 1]
-	set ip [$node ip $port]
-	set isremote [expr $isremote + [$node set isremote]]
-	if {$ip != {}} {
-	    if {$isremote} {
-		perror "Not allowed to specify IP subnet of a remote link!"
+    foreach {lan num} [array get reachable] {
+	set nodelist [$lan set nodelist]
+	
+	foreach nodeport $nodelist {
+	    set node [lindex $nodeport 0]
+	    set port [lindex $nodeport 1]
+	    set ip [$node ip $port]
+	    set isremote [expr $isremote + [$node set isremote]]
+	    if {$ip != {}} {
+		if {$isremote} {
+		    perror "Not allowed to specify IP subnet of a remote link!"
+		}
+		set ipint [inet_atohl $ip]
+		set subnet [inet_hltoa [expr $ipint & $netmaskint]]
+		set ips($ip) 1
+		$sim use_subnet $subnet $netmask
 	    }
-	    set ipint [inet_atohl $ip]
-	    set subnet [inet_hltoa [expr $ipint & $netmaskint]]
-	    set ips($ip) 1
-	    $sim use_subnet $subnet $netmask
 	}
     }
     if {$isremote && [$self info class] != "Link"} {
@@ -511,7 +670,7 @@ LanLink instproc fill_ips {} {
     if {$subnet == {}} {
 	if {$isremote} {
 	    set subnet [$sim get_subnet_remote]
-	} else {
+	} else
 	    set subnet [$sim get_subnet $netmask]
 	}
     }
@@ -519,27 +678,30 @@ LanLink instproc fill_ips {} {
     # Now we assign IP addresses to any node:port's without them.
     set ip_counter 2
     set subnetint [inet_atohl $subnet]
-    foreach nodeport $nodelist {
-	set node [lindex $nodeport 0]
-	set port [lindex $nodeport 1]
-	if {[$node ip $port] == {}} {
-	    set ip {}
-	    set max [expr ~ $netmaskint]
-	    for {set i $ip_counter} {$i < $max} {incr i} {
-		set nextip [inet_hltoa [expr $subnetint | $i]]
-		
-		if {! [info exists ips($nextip)]} {
-		    set ip $nextip
-		    set ips($ip) 1
-		    set ip_counter [expr $i + 1]
-		    break
+    foreach {lan num} [array get reachable] {
+	set nodelist [$lan set nodelist]
+	foreach nodeport $nodelist {
+	    set node [lindex $nodeport 0]
+	    set port [lindex $nodeport 1]
+	    if {[$node ip $port] == {}} {
+		set ip {}
+		set max [expr ~ $netmaskint]
+		for {set i $ip_counter} {$i < $max} {incr i} {
+		    set nextip [inet_hltoa [expr $subnetint | $i]]
+		    
+		    if {! [info exists ips($nextip)]} {
+			set ip $nextip
+			set ips($ip) 1
+			set ip_counter [expr $i + 1]
+			break
+		    }
 		}
+		if {$ip == {}} {
+		    perror "Ran out of IP addresses in subnet $subnet."
+		    set ip "255.255.255.255"
+		}
+		$node ip $port $ip
 	    }
-	    if {$ip == {}} {
-		perror "Ran out of IP addresses in subnet $subnet."
-		set ip "255.255.255.255"
-	    }
-	    $node ip $port $ip
 	}
     }
 }
@@ -779,6 +941,7 @@ Link instproc updatedb {DB} {
     $self instvar implemented_by
     $self instvar ofenabled
     $self instvar ofcontroller
+    $self instvar bridge_links
     set vindex 0
 
     $sim spitxml_data "virt_lan_lans" [list "vname" "failureaction"] [list $self $failureaction]
@@ -926,6 +1089,23 @@ Link instproc updatedb {DB} {
 	    lappend values ""
 	}
 
+	#
+	# Look for a bridge to a nodepair in another link or lan.
+	#
+	if { [info exists bridge_links($nodeport)] } {
+	    set dest $bridge_links($nodeport)
+	    set bridge_vname [lindex $dest 0]
+	    set bridge_vnode [lindex $dest 1]
+	    set bridge_vport [lindex $dest 2]
+
+	    lappend fields "bridged_vname"
+	    lappend values $bridge_vname
+	    lappend fields "bridged_vnode"
+	    lappend values $bridge_vnode
+	    lappend fields "bridged_vport"
+	    lappend values $bridge_vport
+	}
+
 	lappend fields "vindex"
 	lappend values $vindex
 	set vindex [expr $vindex + 1]
@@ -969,6 +1149,7 @@ Lan instproc updatedb {DB} {
     $self instvar fixed_iface
     $self instvar ofenabled
     $self instvar ofcontroller
+    $self instvar bridge_links
     set vindex 0
 
     if {$modelnet_cores > 0 || $modelnet_edges > 0} {
@@ -1112,6 +1293,23 @@ Lan instproc updatedb {DB} {
 	    lappend values $ofcontroller
 	} else {
 	    lappend values ""
+	}
+
+	#
+	# Look for a bridge to a nodepair in another link or lan.
+	#
+	if { [info exists bridge_links($nodeport)] } {
+	    set dest $bridge_links($nodeport)
+	    set bridge_vname [lindex $dest 0]
+	    set bridge_vnode [lindex $dest 1]
+	    set bridge_vport [lindex $dest 2]
+
+	    lappend fields "bridged_vname"
+	    lappend values $bridge_vname
+	    lappend fields "bridged_vnode"
+	    lappend values $bridge_vnode
+	    lappend fields "bridged_vport"
+	    lappend values $bridge_vport
 	}
 
 	lappend fields "vindex"

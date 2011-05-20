@@ -1,0 +1,77 @@
+#
+# Add "role" to virt_nodes, for supporting alternate node roles, like
+# as a bridge (delay, trace, etc). Add other slots to the virt_lans
+# table to support bridges between links and lans. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("virt_nodes", "role")) {
+	DBQueryFatal("alter table virt_nodes add ".
+		     " `role` enum('node','bridge') NOT NULL default 'node'");
+    }
+    if (!DBSlotExists("virt_lans", "bridge_vname")) {
+        print "  *** Updating virt_lans ... please be patient.\n";
+	DBQueryFatal("alter table virt_lans add ".
+		     " `bridged_vname` varchar(32) default NULL");
+    }
+    if (!DBSlotExists("virt_lans", "bridged_vnode")) {
+        print "  *** Updating virt_lans ... please be patient.\n";
+	DBQueryFatal("alter table virt_lans add ".
+		     " `bridged_vnode` varchar(32) default NULL");
+    }
+    if (!DBSlotExists("virt_lans", "bridged_vport")) {
+        print "  *** Updating virt_lans ... please be patient.\n";
+	DBQueryFatal("alter table virt_lans add ".
+		     "  `bridged_vport` tinyint(3) default NULL");
+    }
+    if (!DBTableExists("virt_bridges")) {
+	DBQueryFatal("CREATE TABLE `virt_bridges` ( ".
+		     " `pid` varchar(12) NOT NULL default '', ".
+		     " `eid` varchar(32) NOT NULL default '', ".
+		     " `exptidx` int(11) NOT NULL default '0', ".
+		     " `vname` varchar(32) NOT NULL default '', ".
+		     " `vlink` varchar(32) NOT NULL default '', ".
+		     " `vnode` varchar(32) NOT NULL default '', ".
+		     " `vport` tinyint(3) NOT NULL default '0', ".
+		     " PRIMARY KEY (`exptidx`,`vname`,`vlink`,`vnode`,`vport`),".
+		     " KEY `pideid` (`pid`,`eid`,`vname`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_bridges','pid','text','redirect',".
+		 "  'projects:pid',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_bridges','eid','text','redirect',".
+		 "  'experiments:eid',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_bridges','vname','text','redirect',".
+		 "  'virt_nodes:vname',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_bridges','vlink','text','redirect',".
+		 "  'virt_lans:vname',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_bridges','vnode','text','redirect',".
+		 "  'virt_nodes:vname',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_bridges','vport','int','redirect',".
+		 "  'default:tinyint',0,99,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 "  ('virt_nodes','role','text','regex', ".
+		 "   '^(node|bridge)\$',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_lans','bridged_vname','text','redirect',".
+		 "  'virt_lans:vname',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_lans','bridged_vnode','text','redirect',".
+		 "  'virt_nodes:vname',0,0,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_lans','bridged_vport','int','redirect',".
+		 "  'virt_lans:vport',0,0,NULL)");
+    return 0;
+}
+1;
