@@ -33,7 +33,6 @@ package protogeni.resources
 			this.manager = newGm;
 		}
 		
-		
 		private static var NODE_PARSE : int = 0;
 		private static var LINK_PARSE : int = 1;
 		private static var DONE : int = 2;
@@ -95,12 +94,12 @@ package protogeni.resources
 			this.nodes = this.manager.Rspec.defaultNamespace::node;
 			this.links = this.manager.Rspec.defaultNamespace::link;
 			
-			this.myAfter = afterCompletion;
 			this.myIndex = 0;
 			this.myState = NODE_PARSE;
 			this.interfaceDictionary = new Dictionary();
 			this.nodeNameDictionary = new Dictionary();
 			this.subnodeList = new ArrayCollection();
+			this.myAfter = afterCompletion;
 			FlexGlobals.topLevelApplication.stage.addEventListener(Event.ENTER_FRAME, parseNext);
 		}
 		
@@ -133,14 +132,11 @@ package protogeni.resources
 				this.interfaceDictionary = null;
 				this.nodeNameDictionary = null;
 				this.subnodeList = null;
-				this.manager.totalNodes = this.manager.AllNodes.length;
-				this.manager.availableNodes = this.manager.getAvailableNodes().length;
-				this.manager.unavailableNodes = this.manager.AllNodes.length - this.manager.availableNodes;
-				this.manager.percentageAvailable = (this.manager.availableNodes / this.manager.totalNodes) * 100;
 				this.manager.Status = GeniManager.STATUS_VALID;
 				Main.geniDispatcher.dispatchGeniManagerChanged(this.manager, GeniEvent.ACTION_POPULATED);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
-				this.myAfter();
+				if(this.myAfter != null)
+					this.myAfter(this.manager);
 			}
 			else
 			{
@@ -279,7 +275,11 @@ package protogeni.resources
 			for each(var obj:Object in this.subnodeList)
 			{
 				var parentNode:PhysicalNode = this.nodeNameDictionary[obj.parentName];
-				parentNode.subNodes.push(obj.subNode);
+				var subNode:PhysicalNode = obj.subNode;
+				// Hack so user doesn't try to get subnodes of nodes which aren't available
+				if(!parentNode.available)
+					subNode.available = false;
+				parentNode.subNodes.push(subNode);
 				obj.subNode.subNodeOf = parentNode;
 			}
 			
@@ -511,6 +511,7 @@ package protogeni.resources
 					virtualNode.sliverId = nodeXml.@sliver_id;
 				}
 				
+				var sliverTypeShapingXml:XML = null;
 				for each(var nodeChildXml:XML in nodeXml.children()) {
 					localName = nodeChildXml.localName();
 					// default namespace stuff
@@ -541,9 +542,11 @@ package protogeni.resources
 							case "sliver_type":
 								virtualNode.sliverType = nodeChildXml.@name;
 								for each(var sliverTypeChild:XML in nodeChildXml.children()) {
-								if(sliverTypeChild.localName() == "disk_image")
-									virtualNode.diskImage = sliverTypeChild.@name;
-							}
+									if(sliverTypeChild.localName() == "disk_image")
+										virtualNode.diskImage = sliverTypeChild.@name;
+									else if(sliverTypeChild.localName() == "sliver_type_shaping")
+										sliverTypeShapingXml = sliverTypeChild;
+								}
 								break;
 							case "services":
 								for each(var servicesChild:XML in nodeChildXml.children()) {
@@ -564,14 +567,22 @@ package protogeni.resources
 						}
 					}
 						// Extension stuff
-					else
+					else if(nodeChildXml.namespace() == XmlUtil.flackNamespace)
 					{
-						if(nodeChildXml.localName() == "canvas_location"
-							&& (nodeChildXml.namespace() as Namespace).prefix == "flack")
-						{
-							virtualNode.flackX = int(nodeChildXml.@x);
-							virtualNode.flackY = int(nodeChildXml.@y);
-						}
+						virtualNode.flackX = int(nodeChildXml.@x);
+						virtualNode.flackY = int(nodeChildXml.@y);
+						if(nodeChildXml.@unbound.length() == 1)
+							virtualNode.flackUnbound = nodeChildXml.@unbound == "true";
+					}
+				}
+				
+				if(sliverTypeShapingXml != null) {
+					for each(var pipeXml:XML in sliverTypeShapingXml.children()) {
+						virtualNode.pipes.add(new Pipe(virtualNode.interfaces.GetByID(pipeXml.@source),
+							virtualNode.interfaces.GetByID(pipeXml.@dest),
+							pipeXml.@capacity.length() == 1 ? Number(pipeXml.@capacity) : NaN,
+							pipeXml.@latency.length() == 1 ? Number(pipeXml.@latency) : NaN,
+							pipeXml.@packet_loss.length() == 1 ? Number(pipeXml.@packet_loss) : NaN));
 					}
 				}
 				
@@ -733,9 +744,11 @@ package protogeni.resources
 			return;
 		}
 		
-		public function generateSliverRspec(s:Sliver):XML
+		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean):XML
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?><rspec type=\"request\" />");
+			
+			// Add namespaces
 			var defaultNamespace:Namespace;
 			switch(manager.inputRspecVersion) {
 				case 0.1:
@@ -749,10 +762,13 @@ package protogeni.resources
 					break;
 			}
 			requestRspec.setNamespace(defaultNamespace);
+			if(manager.inputRspecVersion >= 2)
+				requestRspec.addNamespace(XmlUtil.flackNamespace);
 			var xsiNamespace:Namespace = XmlUtil.xsiNamespace;
 			requestRspec.addNamespace(xsiNamespace);
+			
+			// Add schema locations
 			var schemaLocations:String;
-			//var tunnelNamespace:Namespace;
 			switch(manager.inputRspecVersion) {
 				case 0.1:
 					schemaLocations = XmlUtil.rspec01SchemaLocation;
@@ -764,15 +780,19 @@ package protogeni.resources
 					schemaLocations = XmlUtil.rspec2SchemaLocation;
 					break;
 			}
-			requestRspec.@xsiNamespace::schemaLocation = schemaLocations;
-			if(manager.inputRspecVersion >= 2) {
-				requestRspec.addNamespace(XmlUtil.flackNamespace);
+			for each(var testNode:VirtualNode in s.nodes.collection) {
+				if(testNode.isDelayNode) {
+					requestRspec.addNamespace(XmlUtil.delayNamespace);
+					schemaLocations += " " + XmlUtil.delaySchemaLocation;
+					break;
+				}
 			}
+			requestRspec.@xsiNamespace::schemaLocation = schemaLocations;
 			// FIXME: Need to add schemaLocation and namespaces if they were there before...
 			// TOHERE
 			
 			for each(var vn:VirtualNode in s.nodes.collection) {
-				requestRspec.appendChild(generateNodeRspec(vn));
+				requestRspec.appendChild(generateNodeRspec(vn, removeNonexplicitBinding));
 			}
 			
 			for each(var vl:VirtualLink in s.links.collection) {
@@ -782,7 +802,7 @@ package protogeni.resources
 			return requestRspec;
 		}
 		
-		public function generateNodeRspec(vn:VirtualNode):XML
+		public function generateNodeRspec(vn:VirtualNode, removeNonexplicitBinding:Boolean):XML
 		{
 			var nodeXml:XML = <node />;
 			if(manager.inputRspecVersion < 1) {
@@ -794,7 +814,8 @@ package protogeni.resources
 				nodeXml.@component_manager_id = vn.manager.Urn.full;
 			}
 			
-			if (vn.IsBound()) {
+			if (vn.IsBound() &&
+					!(removeNonexplicitBinding && vn.flackUnbound)) {
 				if(manager.inputRspecVersion < 1) {
 					nodeXml.@component_uuid = vn.physicalNode.id;
 				} else {
@@ -819,7 +840,7 @@ package protogeni.resources
 			}
 			
 			// Currently only pcs
-			if(manager.inputRspecVersion < 1) {
+			if(manager.inputRspecVersion < 2) {
 				var nodeType:String = "pc";
 				if (!vn.Exclusive)
 					nodeType = "pcvm";
@@ -827,9 +848,32 @@ package protogeni.resources
 				nodeTypeXml.@type_name = nodeType;
 				nodeTypeXml.@type_slots = 1;
 				nodeXml.appendChild(nodeTypeXml);
+				
+				if(vn.diskImage.length > 0) {
+					var diskImageXml:XML = <disk_image />;
+					diskImageXml.@name = vn.diskImage;
+					nodeXml.appendChild(diskImageXml);
+				}
 			} else {
 				var sliverType:XML = <sliver_type />
 				sliverType.@name = vn.sliverType;
+				if(vn.isDelayNode) {
+					var sliverTypeShapingXml:XML = <sliver_type_shaping />;
+					sliverTypeShapingXml.setNamespace(XmlUtil.delayNamespace);
+					for each(var pipe:Pipe in vn.pipes.collection) {
+						var pipeXml:XML = <pipe />;
+						pipeXml.@source = pipe.source.id;
+						pipeXml.@dest = pipe.destination.id;
+						if(pipe.capacity)
+							pipeXml.@capacity = pipe.capacity;
+						if(pipe.packetLoss)
+							pipeXml.@packet_loss = pipe.packetLoss;
+						if(pipe.latency)
+							pipeXml.@latency = pipe.latency;
+						sliverTypeShapingXml.appendChild(pipeXml);
+					}
+					sliverType.appendChild(sliverTypeShapingXml);
+				}
 				if(vn.diskImage.length > 0) {
 					var sliverDiskImageXml:XML = <disk_image />;
 					sliverDiskImageXml.@name = vn.diskImage;
@@ -865,12 +909,6 @@ package protogeni.resources
 					nodeXml.appendChild(serviceXml);
 			}
 			
-			if(manager.inputRspecVersion < 2 && vn.diskImage.length > 0) {
-				var diskImageXml:XML = <disk_image />;
-				diskImageXml.@name = vn.diskImage;
-				nodeXml.appendChild(diskImageXml);
-			}
-			
 			if (manager.inputRspecVersion < 1 && vn.superNode != null)
 				nodeXml.appendChild(XML("<subnode_of>" + vn.superNode.sliverId + "</subnode_of>"));
 			
@@ -897,10 +935,11 @@ package protogeni.resources
 			}
 			
 			if(manager.inputRspecVersion >= 2) {
-				var flackXml:XML = <canvas_location />;
+				var flackXml:XML = <info />;
 				flackXml.setNamespace(XmlUtil.flackNamespace);
 				flackXml.@x = vn.flackX;
 				flackXml.@y = vn.flackY;
+				flackXml.@unbound = vn.flackUnbound;
 				nodeXml.appendChild(flackXml);
 			}
 			

@@ -19,8 +19,16 @@
  
  package protogeni.display
 {
+	import spark.primitives.BitmapImage;
+
 	public final class ImageUtil
 	{
+		public static function getBitmapImageFor(img:Class):BitmapImage {
+			var newBitmapImage:BitmapImage = new BitmapImage();
+			newBitmapImage.source = img;
+			return newBitmapImage;
+		}
+		
 		[Bindable]
 		[Embed(source="../../../images/flack.png")]
 		public static var logoIcon:Class;
@@ -252,5 +260,9 @@
 		[Bindable]
 		[Embed(source="../../../images/email.png")]
 		public static var emailIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/time.png")]
+		public static var timeIcon:Class;
 	}
 }

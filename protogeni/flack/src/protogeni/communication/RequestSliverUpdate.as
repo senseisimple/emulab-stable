@@ -27,7 +27,7 @@ package protogeni.communication
 				CommunicationUtil.updateSliver);
 			sliver = s;
 			op.addField("sliver_urn", sliver.urn.full);
-			op.addField("rspec", sliver.getRequestRspec().toXMLString());
+			op.addField("rspec", sliver.getRequestRspec(false).toXMLString());
 			op.addField("credentials", new Array(sliver.slice.credential));
 			op.setUrl(sliver.manager.Url);
 		}

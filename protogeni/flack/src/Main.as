@@ -42,5 +42,7 @@
 	
 	[Bindable]
 	public static var useGpeni:Boolean = false;
+	
+	public static var offlineMode:Boolean = false;
   }
 }

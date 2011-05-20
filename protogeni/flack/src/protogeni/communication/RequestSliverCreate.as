@@ -34,7 +34,7 @@ package protogeni.communication
 			sliver = s;
 			s.created = false;
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("rspec", sliver.getRequestRspec().toXMLString());
+			op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
 			op.addField("keys", sliver.slice.creator.keys);
 			op.addField("credentials", new Array(sliver.slice.credential));
 			op.setUrl(sliver.manager.Url);

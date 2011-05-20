@@ -20,10 +20,13 @@ package protogeni.resources
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
 	
+	import protogeni.communication.RequestResolvePl;
 	import protogeni.communication.RequestSitesLocation;
 	
 	public class PlanetlabRspecProcessor implements RspecProcessorInterface
 	{
+		public var callGetSites:Boolean = true;
+		
 		private var manager:PlanetlabAggregateManager;
 		public function PlanetlabRspecProcessor(newGm:PlanetlabAggregateManager)
 		{
@@ -83,21 +86,20 @@ package protogeni.resources
 			{
 				GeniManager.processing--;
 				Main.Application().setStatus("Parsing " + manager.Hrn + " RSPEC Done",false);
-				manager.totalNodes = manager.AllNodes.length;
-				manager.availableNodes = manager.totalNodes;
-				manager.unavailableNodes = 0;
-				manager.percentageAvailable = 100;
 				manager.Status = GeniManager.STATUS_VALID;
 				Main.geniDispatcher.dispatchGeniManagerChanged(manager); // not 'populated' until sites are resolved
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				
-				var r:RequestSitesLocation = new RequestSitesLocation(manager);
-				r.forceNext = true;
-				//var r:RequestResolvePl = new RequestResolvePl(gm);
-				//r.forceNext = true;
-				Main.geniHandler.requestHandler.pushRequest(r);
+				if(callGetSites) {
+					var r:RequestSitesLocation = new RequestSitesLocation(manager);
+					r.forceNext = true;
+					//var r:RequestResolvePl = new RequestResolvePl(manager);
+					//r.forceNext = true;
+					Main.geniHandler.requestHandler.pushRequest(r);
+				}
 				
-				myAfter();
+				if(this.myAfter != null)
+					myAfter(this.manager);
 			}
 			else
 			{
@@ -118,7 +120,7 @@ package protogeni.resources
 				site.id = s.@id;
 				site.name = s.child("name")[0].toString();
 				site.hrn = manager.networkName + "." + site.id;
-				manager.sites.addItem(site);
+				manager.sites.push(site);
 				for each(var p:XML in s.child("node")) {
 					var node:PhysicalNode = new PhysicalNode(null, manager);
 					node.name = p.@id;
@@ -154,7 +156,7 @@ package protogeni.resources
 		{
 		}
 		
-		public function generateSliverRspec(s:Sliver):XML
+		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean):XML
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?><RSpec type=\"SFA\" />");
 			var networkXml:XML = new XML("<network name=\""+manager.networkName+"\" />");

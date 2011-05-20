@@ -37,7 +37,7 @@ package protogeni.resources
 		public var manager:GeniManager = null;
 		public var rspec:XML = null;
 		[Bindable]
-		public var urn:IdnUrn = null;
+		public var urn:IdnUrn = new IdnUrn();
 		
 		public var ticket:XML;
 		public var manifest:XML;
@@ -101,9 +101,9 @@ package protogeni.resources
 			return null;
 		}
 		
-		public function getRequestRspec():XML
+		public function getRequestRspec(removeNonexplicitBinding:Boolean):XML
 		{
-			return this.manager.rspecProcessor.generateSliverRspec(this);
+			return this.manager.rspecProcessor.generateSliverRspec(this, removeNonexplicitBinding);
 		}
 		
 		public function parseRspec():void

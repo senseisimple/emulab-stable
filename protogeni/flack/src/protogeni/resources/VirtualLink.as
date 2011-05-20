@@ -95,8 +95,8 @@ package protogeni.resources
 			for each(var s:Sliver in this.slivers.collection)
 				s.links.add(this);
 			
-				this.capacity = Math.floor(Math.min(firstInterface.bandwidth,
-													secondInterface.bandwidth));
+				this.capacity = Math.floor(Math.min(firstInterface.capacity,
+													secondInterface.capacity));
 			if (first.clientId.slice(0, 2) == "pg"
 					|| second.clientId.slice(0, 2) == "pg")
 				this.capacity = 1000000;

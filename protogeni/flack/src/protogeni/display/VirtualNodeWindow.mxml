@@ -27,6 +27,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
+			import mx.collections.ArrayCollection;
 			import mx.collections.ArrayList;
 			import mx.controls.Alert;
 			import mx.events.CloseEvent;
@@ -36,13 +37,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.resources.ExecuteService;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.InstallService;
+			import protogeni.resources.Pipe;
+			import protogeni.resources.PipeCollection;
 			import protogeni.resources.ProtogeniRspecProcessor;
 			import protogeni.resources.SliverType;
+			import protogeni.resources.VirtualInterface;
 			import protogeni.resources.VirtualLink;
 			import protogeni.resources.VirtualLinkCollection;
 			import protogeni.resources.VirtualNode;
 			import protogeni.resources.VirtualNodeCollection;
 			
+			import spark.components.NumericStepper;
+			import spark.primitives.BitmapImage;
 			import spark.primitives.Rect;
 			
 			[Bindable]
@@ -52,6 +58,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			private var sliverTypes:ArrayList;
 			
 			public var sn:SliceNode;
+			
+			[Bindable]
+			private var pipes:ArrayCollection;
 			
 			public function loadNode(n:VirtualNode):void {
 				node = n;
@@ -85,7 +94,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				
 				loadHierarchy();
 				
-				if(node.physicalNode != null)
+				if(node.isDelayNode) {
+					this.bindingDelayRadiobutton.selected = true;
+					this.bindingPhysicalRadiobutton.enabled = false;
+				}
+				else if(node.physicalNode != null)
 				{
 					this.bindingPhysicalRadiobutton.selected = true;
 					physicalVgroup.addElement(DisplayUtil.getPhysicalNodeButton(node.physicalNode));
@@ -94,7 +107,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				{
 					this.bindingVirtualRadiobutton.selected = true;
 					this.exclusiveCheckbox.selected = node.Exclusive;
+					this.bindingPhysicalRadiobutton.enabled = false;
 				}
+				setBinding();
 				
 				this.installFileTypeList.selectedIndex = 0;
 				if(node.installServices.length > 0) {
@@ -138,7 +153,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					this.loginText.text = "None established";
 
 				loadSlices();
-				
 			}
 			
 			public function loadSlices():void {
@@ -195,6 +209,30 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					}
 				}
 			}
+
+			public function loadDelayPipes():void {
+				pipes = new ArrayCollection();
+				for(var i:int = 0; i < this.node.interfaces.length; i++) {
+					var first:VirtualInterface = this.node.interfaces.collection[i];
+					if(first.id == "control")
+						continue;
+					for(var j:int = i+1; j < this.node.interfaces.length; j++) {
+						var second:VirtualInterface = this.node.interfaces.collection[j];
+						if(second.id == "control")
+							continue;
+
+						var firstPipe:Pipe = node.pipes.getFor(first, second);
+						if(firstPipe == null)
+							firstPipe = new Pipe(first, second);
+						pipes.addItem(firstPipe);
+						
+						var secondPipe:Pipe = node.pipes.getFor(second, first);
+						if(secondPipe == null)
+							secondPipe = new Pipe(second, first);
+						pipes.addItem(secondPipe);
+					}
+				}
+			}
 			
 			public function success():void
 			{
@@ -206,11 +244,19 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				this.node.clientId = this.idLabel.Text;
 				if(this.bindingPhysicalRadiobutton.selected) {
-					// nothing yet
+					// currently can't select a physical node here
 				} else if(this.bindingVirtualRadiobutton.selected) {
 					node.Exclusive = this.exclusiveCheckbox.selected;
 					node.physicalNode = null;
+				} else if(this.bindingDelayRadiobutton.selected) {
+					node.Exclusive = true;
+					node.physicalNode = null;
+					node.isDelayNode = true;
+					node.pipes = new PipeCollection();
+					for each(var pipe:Pipe in pipes)
+						node.pipes.add(pipe);
 				}
+				
 				node.installServices = new Vector.<InstallService>();
 				if(this.installUrlText.text.length > 0) {
 					node.installServices.push(new InstallService(this.installUrlText.text, this.installPathText.text, this.installFileTypeList.textInput.text));
@@ -251,7 +297,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 							default:
 								var previewRspec:XmlWindow = new XmlWindow();
 								previewRspec.title = "Preview Request RSPEC for: " + node.clientId;
-								previewRspec.loadXml((node.manager.rspecProcessor as ProtogeniRspecProcessor).generateNodeRspec(node));
+								previewRspec.loadXml((node.manager.rspecProcessor as ProtogeniRspecProcessor).generateNodeRspec(node, true));
 								previewRspec.showWindow();
 						}
 					});
@@ -261,6 +307,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				this.physicalVgroup.enabled = this.bindingPhysicalRadiobutton.selected;
 				this.virtualVgroup.enabled = this.bindingVirtualRadiobutton.selected;
+				if(this.bindingDelayRadiobutton.selected) {
+					detailsViewstack.selectedChild = this.delayView;
+					this.validateNow();
+					loadDelayPipes();
+				} else
+					detailsViewstack.selectedChild = this.detailsView;
 			}
 
 		]]>
@@ -293,50 +345,98 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	
 	<s:Label text="Binding" fontWeight="bold" />
 	<s:HGroup width="100%">
-		<s:VGroup width="50%">
+		<s:VGroup width="33%">
 			<s:RadioButton id="bindingPhysicalRadiobutton" label="Physical" group="{boundGroup}" />
 			<s:VGroup id="physicalVgroup" />
 		</s:VGroup>
-		<s:VGroup width="50%">
+		<s:VGroup width="33%">
 			<s:RadioButton id="bindingVirtualRadiobutton" label="Virtual" group="{boundGroup}" />
 			<s:VGroup id="virtualVgroup">
 				<s:CheckBox id="exclusiveCheckbox" label="Exclusive?" />
 			</s:VGroup>
 		</s:VGroup>
+		<s:VGroup width="33%">
+			<s:RadioButton id="bindingDelayRadiobutton" label="Delay" group="{boundGroup}" />
+		</s:VGroup>
 	</s:HGroup>
 	
-	<s:Label text="Disk Image" fontWeight="bold" />
-	<s:DropDownList id="diskImageSelect" width="100%" prompt="Select image to override default"
-					dataProvider="{sliverTypes}" labelField="diskDescription"
-					change="diskImageText.text = diskImageSelect.selectedItem.diskLongName" />
-	<s:TextInput id="diskImageText" width="100%"
-				 text="{node.diskImage}"
-				 prompt="Select image above or manually type OSID" />
-
-	<s:Label text="Install" fontWeight="bold" />
-	<s:HGroup width="100%" verticalAlign="middle">
-		<s:TextInput id="installUrlText" width="55%"
-					 prompt="Archive URL" />
-		<s:ComboBox id="installFileTypeList" width="15%" prompt="File type">
-			<s:dataProvider>
-				<s:ArrayList>
-					<fx:String>tar.gz</fx:String>
-				</s:ArrayList>
-			</s:dataProvider>
-		</s:ComboBox>
-		<s:Label text="in" />
-		<s:TextInput id="installPathText" width="30%" text="/"
-					 prompt="Install path" />
-	</s:HGroup>
-	
-	<s:Label text="Execute" fontWeight="bold" />
-	<s:HGroup width="100%" verticalAlign="middle">
-		<s:TextInput id="executeCommandText" width="90%"
-					 prompt="Command" />
-		<s:Label text="using" />
-		<s:TextInput id="executeShellText" width="10%" text="sh"
-					 prompt="Shell? (sh, bash, etc.)" />
-	</s:HGroup>
+	<mx:ViewStack id="detailsViewstack" width="100%">
+		<s:NavigatorContent id="detailsView" width="100%">
+			<s:VGroup id="nodeOptionsVgroup" width="100%">
+				<s:Label text="Disk Image" fontWeight="bold" />
+				<s:DropDownList id="diskImageSelect" width="100%" prompt="Select image to override default"
+								dataProvider="{sliverTypes}" labelField="diskDescription"
+								change="diskImageText.text = diskImageSelect.selectedItem.diskLongName" />
+				<s:TextInput id="diskImageText" width="100%"
+							 text="{node.diskImage}"
+							 prompt="Select image above or manually type OSID" />
+				
+				<s:Label text="Install" fontWeight="bold" />
+				<s:HGroup width="100%" verticalAlign="middle">
+					<s:TextInput id="installUrlText" width="55%"
+								 prompt="Archive URL" />
+					<s:ComboBox id="installFileTypeList" width="15%" prompt="File type">
+						<s:dataProvider>
+							<s:ArrayList>
+								<fx:String>tar.gz</fx:String>
+							</s:ArrayList>
+						</s:dataProvider>
+					</s:ComboBox>
+					<s:Label text="in" />
+					<s:TextInput id="installPathText" width="30%" text="/"
+								 prompt="Install path" />
+				</s:HGroup>
+				
+				<s:Label text="Execute" fontWeight="bold" />
+				<s:HGroup width="100%" verticalAlign="middle">
+					<s:TextInput id="executeCommandText" width="90%"
+								 prompt="Command" />
+					<s:Label text="using" />
+					<s:TextInput id="executeShellText" width="10%" text="sh"
+								 prompt="Shell? (sh, bash, etc.)" />
+				</s:HGroup>
+			</s:VGroup>
+		</s:NavigatorContent>
+		<s:NavigatorContent id="delayView" width="100%">
+			<s:DataGrid id="delayGrid" width="100%" height="100%" 
+						dataProvider="{pipes}"
+						rowHeight="24"
+						editable="true">
+				<s:columns>
+					<s:ArrayList>
+						<s:GridColumn headerText="Pipe">
+							<s:itemRenderer>
+								<fx:Component>
+									<s:GridItemRenderer>
+										<s:HGroup height="100%" verticalAlign="middle" paddingLeft="2">
+											<s:Label text="{data.sourceName}" />
+											<s:BitmapImage source="{ImageUtil.rightIcon}" />
+											<s:Label text="{data.destName}" />
+										</s:HGroup>
+									</s:GridItemRenderer>
+								</fx:Component>
+							</s:itemRenderer>
+						</s:GridColumn>
+						<s:GridColumn dataField="capacity"
+									  headerText="Capacity"
+									  itemRenderer="protogeni.display.components.NumericGridRenderer"
+									  itemEditor="protogeni.display.components.NumericEditor">
+						</s:GridColumn>
+						<s:GridColumn dataField="latency" 
+									  headerText="Latency"
+									  itemRenderer="protogeni.display.components.NumericGridRenderer"
+									  itemEditor="protogeni.display.components.NumericEditor">
+						</s:GridColumn>
+						<s:GridColumn dataField="packetLoss" 
+									  headerText="Packet Loss"
+									  itemRenderer="protogeni.display.components.NumericGridRenderer"
+									  itemEditor="protogeni.display.components.NumericEditor">
+						</s:GridColumn>
+					</s:ArrayList> 
+				</s:columns>
+			</s:DataGrid> 
+		</s:NavigatorContent>
+	</mx:ViewStack>
 	
 	<s:HGroup width="100%">
 		<s:Label text="Login" fontWeight="bold" />

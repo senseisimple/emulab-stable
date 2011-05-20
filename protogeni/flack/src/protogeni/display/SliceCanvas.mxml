@@ -178,15 +178,19 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			private  function dragEnterHandler(event:DragEvent):void {
-				if (event.dragSource.hasFormat("canvas") ||
+				var selectedNode:PhysicalNode = null;
+				if(event.dragInitiator is List && (event.dragInitiator as List).selectedItem is PhysicalNode)
+					selectedNode = (event.dragInitiator as List).selectedItem;
+				else if(event.dragSource.hasFormat("physicalnode"))
+					selectedNode = event.dragSource.dataForFormat("physicalnode") as PhysicalNode;
+				if ((selectedNode != null
+						&& selectedNode.available
+						&& !allNodes.containsPhysicalNode(selectedNode)
+						&& (selectedNode.subNodeOf == null ||
+							selectedNode.subNodeOf.available)) ||
+					event.dragSource.hasFormat("canvas") ||
 					event.dragSource.hasFormat("marker") ||
-					event.dragSource.hasFormat("physicalnode") ||
-					event.dragSource.hasFormat("virtualnode") ||
-					(event.dragInitiator is List &&
-						(List(event.dragInitiator).selectedItem is VirtualNode ||
-							(List(event.dragInitiator).selectedItem is PhysicalNode &&
-								PhysicalNode(List(event.dragInitiator).selectedItem).available &&
-								!allNodes.containsPhysicalNode(PhysicalNode(List(event.dragInitiator).selectedItem))))))
+					event.dragSource.hasFormat("virtualnode"))
 				{
 					DragManager.acceptDragDrop(SliceCanvas(event.currentTarget));
 				}
@@ -298,6 +302,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function addBasicVirtualNode(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode {
 				var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(vn.manager));
 				nvn.Exclusive = vn.Exclusive;
+				nvn.isDelayNode = vn.isDelayNode;
 				nvn.clientId = slice.getUniqueVirtualNodeId(nvn);
 				return this.addVirtualNode(nvn, x, y);
 			}
@@ -309,6 +314,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					return allNodes.getForVirtualNode(vn);
 				
 				var sn:SliceNode = addVirtualNodeToCanvas(vn, x, y);
+				sn.node.flackUnbound = true;
 				if(!vn.slivers.collection[0].nodes.contains(vn))
 					vn.slivers.collection[0].nodes.add(vn);
 				
@@ -352,6 +358,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					return allNodes.getForPhysicalNode(pn);
 				
 				var sn:SliceNode = addPhysicalNodeToCanvas(pn, x, y);
+				sn.node.flackUnbound = false;
 				if(!sn.node.slivers.collection[0].nodes.contains(sn.node))
 					sn.node.slivers.collection[0].nodes.add(sn.node);
 				
@@ -396,13 +403,15 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				if(startNode != null)
 				{
-					// See if a node is under
+					// See if a valid node is under
 					currentNode = null;
 					for each(var sn:SliceNode in allNodes)
 					{
 						if(sn != startNode
 							&& sn.getRect(this).contains(mouseX, mouseY)
-							&& !allLinks.hasLinkFor(startNode, sn)) {
+							&& !allLinks.hasLinkFor(startNode, sn)
+							&& (!startNode.node.isDelayNode || sn.node.manager == startNode.node.manager))
+						{
 							currentNode = sn;
 							break;
 						}

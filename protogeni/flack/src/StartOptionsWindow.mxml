@@ -39,8 +39,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.NetUtil;
 			import protogeni.display.ImageUtil;
 			
+			[Bindable]
+			private var showOffline:Boolean = false;
+			
 			public function showWindow():void
 			{
+				showOffline = FlackCache.offlineAvailable;
 				if(!this.isPopUp)
 					PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, true);
 				else
@@ -67,24 +71,38 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				this.closeWindow();
 			}
 			
+			public function doOffline():void {
+				Main.offlineMode = true;
+				FlackCache.loadOfflineSharedObject();
+				FlackCache.applyOffline();
+				this.closeWindow();
+			}
+			
 		]]>
 	</fx:Script>
 	
 	<s:BitmapImage source="{ImageUtil.logoIcon}" />
 	<s:VGroup width="50%" paddingTop="10" paddingBottom="10" horizontalAlign="center">
 		<s:Button label="Log in" id="loginButton"
-				  width="100%" height="30"
+				  width="100%" height="28"
 				  icon="{ImageUtil.authenticationIcon}"
 				  toolTip="Log in to view and be able to allocate resources"
 				  click="doAuthenticate()" />
 		<s:Label text="Not a user?" />
 		<s:Button label="View resources"
-				  width="100%" height="30"
+				  width="100%" height="28"
 				  toolTip="View resources available in GENI, but allocation of resources is not available"
 				  click="doPublic()" />
 		<s:Button label="Become a user"
-				  width="100%" height="30"
+				  width="100%" height="28"
 				  toolTip="Follow a few simple steps to be able to allocate resources"
 				  click="NetUtil.openWebsite('https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup')" />
+		<s:Label text="Want to use the cached data?"
+				 visible="{showOffline}" includeInLayout="{showOffline}" />
+		<s:Button label="Load cached data"
+				  width="100%" height="28"
+				  visible="{showOffline}" includeInLayout="{showOffline}"
+				  toolTip="Use the last saved offline data"
+				  click="doOffline();" />
 	</s:VGroup>
 </s:TitleWindow>

@@ -33,9 +33,9 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				FlackCache.instance.rootBundle = response as String;
-				FlackCache.instance.save();
-				JSLoader.setServerCertificate(FlackCache.instance.geniBundle + FlackCache.instance.rootBundle);
+				FlackCache.rootBundle = response as String;
+				FlackCache.saveBasic();
+				JSLoader.setServerCertificate(FlackCache.geniBundle + FlackCache.rootBundle);
 			}
 			
 			return null;
@@ -43,10 +43,10 @@ package protogeni.communication
 		
 		override public function fail(event:ErrorEvent, fault:MethodFault):*
 		{
-			if(FlackCache.instance.rootBundle.length == 0)
-				FlackCache.instance.rootBundle = (new FallbackRootBundle()).toString();
-			FlackCache.instance.save();
-			JSLoader.setServerCertificate(FlackCache.instance.geniBundle + FlackCache.instance.rootBundle);
+			if(FlackCache.rootBundle.length == 0)
+				FlackCache.rootBundle = (new FallbackRootBundle()).toString();
+			FlackCache.saveBasic();
+			JSLoader.setServerCertificate(FlackCache.geniBundle + FlackCache.rootBundle);
 		}
 	}
 }

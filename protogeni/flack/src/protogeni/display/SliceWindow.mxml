@@ -30,13 +30,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
 			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.managers.DragManager;
 			
 			import protogeni.GeniEvent;
 			import protogeni.display.components.AdvancedTextArea;
 			import protogeni.display.components.DataButton;
 			import protogeni.display.components.DefaultWindow;
+			import protogeni.display.mapping.GeniMapMarker;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.PhysicalNodeGroup;
+			import protogeni.resources.Site;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualNode;
@@ -175,7 +180,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					&& !this.sliceCanvas.slice.isStaged()
 					&& Main.geniHandler.requestHandler.queue.isEmpty()
 					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_READY
-					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_FAILED)
+					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_FAILED
+					&& !Main.offlineMode)
 					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice, true);
 			}
 			
@@ -253,7 +259,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					tab.label = s.manager.Hrn;
 
 					var previewTextArea:AdvancedTextArea = new AdvancedTextArea();
-					previewTextArea.text = s.getRequestRspec().toString();
+					previewTextArea.text = s.getRequestRspec(true).toString();
 
 					tab.addElement(previewTextArea);
 					tabs.addChild(tab);
@@ -286,7 +292,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function saveRspec():void {
 				loading = false;
-				fr.save(sliceCanvas.slice.slivers.getCombined().getRequestRspec().toXMLString(), "rspec.xml");
+				fr.save(sliceCanvas.slice.slivers.getCombined().getRequestRspec(true).toXMLString(), "rspec.xml");
 			}
 			
 			protected function onFileBrowse(event:MouseEvent):void
@@ -327,18 +333,31 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						break;
 					case VIEW_MANAGER:
 						this.addManagerOption(data, true);
-						var nodeList:NodeList = new NodeList();
-						nodeList.percentHeight = 100;
-						nodeList.percentWidth = 100;
-						this.sidePane.addElement(nodeList);
-						var nodes:ArrayCollection = new ArrayCollection();
-						for each(var node:PhysicalNode in data.AllNodes)
-							nodes.addItem(node);
-						nodeList.load(nodes);
+						this.addNodeList(data.AllNodes);
 						break;
 					case VIEW_COLLECTION:
+						var toggleViewButton:ImageButton = new ImageButton();
+						toggleViewButton.setStyle("icon", ImageUtil.leftIcon);
+						toggleViewButton.toolTip = "View all the managers";
+						toggleViewButton.addEventListener(MouseEvent.CLICK,
+							function toggleViewClicked(e:MouseEvent):void {
+								me.setSidePane(VIEW_MANAGERS);
+							});
+						this.sidePane.addElement(toggleViewButton);
+						this.addNodeList(data);
 						break;
 				}
+			}
+			
+			private function addNodeList(nodes:Vector.<PhysicalNode>):void {
+				var nodeList:NodeList = new NodeList();
+				nodeList.percentHeight = 100;
+				nodeList.percentWidth = 100;
+				this.sidePane.addElement(nodeList);
+				var nodeCollection:ArrayCollection = new ArrayCollection();
+				for each(var node:PhysicalNode in nodes)
+					nodeCollection.addItem(node);
+				nodeList.load(nodeCollection);
 			}
 			
 			private function addManagerOption(manager:GeniManager, only:Boolean):void {
@@ -347,7 +366,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				managerHgroup.gap = 2;
 				var toggleViewButton:ImageButton = new ImageButton();
 				if(only) {
-					toggleViewButton.setStyle("icon", ImageUtil.downIcon);
+					toggleViewButton.setStyle("icon", ImageUtil.leftIcon);
 					toggleViewButton.toolTip = "View all the managers";
 					toggleViewButton.addEventListener(MouseEvent.CLICK,
 						function toggleViewClicked(e:MouseEvent):void {
@@ -365,6 +384,24 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				var managerButton:Button = DisplayUtil.getGeniManagerButton(manager);
 				managerButton.percentWidth = 100;
 				managerHgroup.addElement(managerButton);
+				
+				var delay:VirtualNode = new VirtualNode(null);
+				delay.clientId = "Delay";
+				delay.isDelayNode = true;
+				delay.manager = manager;
+				var addDelayButton:DataButton = new DataButton("",
+					"Add a delay node",
+					ImageUtil.timeIcon,
+					null,
+					"virtualnode");
+				addDelayButton.data = delay;
+				addDelayButton.setStyle("chromeColor", ColorUtil.colorsDark[manager.colorIdx]);
+				addDelayButton.setStyle("color", ColorUtil.colorsLight[manager.colorIdx]);
+				addDelayButton.addEventListener(MouseEvent.CLICK,
+					function addDelayClicked(e:MouseEvent):void {
+						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
+					});
+				managerHgroup.addElement(addDelayButton);
 
 				var exclusive:VirtualNode = new VirtualNode(null);
 				exclusive.clientId = "Exclusive";
@@ -400,6 +437,36 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					});
 				managerHgroup.addElement(addSharedButton);
 				this.sidePane.addElement(managerHgroup);
+			}
+
+
+			protected function sidePane_dragEnterHandler(event:DragEvent):void
+			{
+				if (event.dragSource.hasFormat("site") ||
+					event.dragSource.hasFormat("manager") ||
+					event.dragSource.hasFormat("marker") ||
+					event.dragSource.hasFormat("physicalnodegroup"))
+				{
+					DragManager.acceptDragDrop(VGroup(event.currentTarget));
+				}
+			}
+
+
+			protected function sidePane_dragDropHandler(event:DragEvent):void
+			{
+				if(event.dragSource.hasFormat("marker"))
+				{
+					var dragMarker:GeniMapMarker = event.dragSource.dataForFormat('marker') as GeniMapMarker;
+					setSidePane(VIEW_COLLECTION, dragMarker.showGroups.GetAll());
+				} else if(event.dragSource.hasFormat("manager")) {
+					setSidePane(VIEW_MANAGER, event.dragSource.dataForFormat('manager'));
+				} else if(event.dragSource.hasFormat("site")) {
+					var dragSite:Site = event.dragSource.dataForFormat('site') as Site;
+					setSidePane(VIEW_COLLECTION, dragSite.nodes);
+				} else if(event.dragSource.hasFormat("physicalnodegroup")) {
+					var dragGroup:PhysicalNodeGroup = event.dragSource.dataForFormat('physicalnodegroup') as PhysicalNodeGroup;
+					setSidePane(VIEW_COLLECTION, dragGroup.collection);
+				}
 			}
 
 		]]>
@@ -442,8 +509,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					valueCommit="Main.useGpeni = pgeniCheckbox.selected" />
 	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
-		<s:Scroller height="100%" minWidth="140">
-			<s:VGroup id="sidePane" height="100%" width="100%" gap="2" />
+		<s:Scroller height="100%" minWidth="150">
+			<s:VGroup id="sidePane" height="100%" width="100%" gap="2"
+					  dragEnter="sidePane_dragEnterHandler(event)"
+					  dragDrop="sidePane_dragDropHandler(event)" />
 		</s:Scroller>
 
 		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />

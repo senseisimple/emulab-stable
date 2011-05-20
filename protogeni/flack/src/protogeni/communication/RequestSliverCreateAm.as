@@ -31,7 +31,7 @@ package protogeni.communication
 			s.created = false;
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
-			op.pushField(sliver.getRequestRspec().toXMLString());
+			op.pushField(sliver.getRequestRspec(true).toXMLString());
 			// Internal API error: <Fault 102: "person_id 1: AddPersonKey: Invalid key_fields['key'] value: expected string, got struct">
 			var userKeys:Array = [];
 			for each(var keyObject:Object in sliver.slice.creator.keys) {

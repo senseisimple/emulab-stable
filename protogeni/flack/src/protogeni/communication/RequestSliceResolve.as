@@ -56,7 +56,6 @@ package protogeni.communication
 				}
 				else
 				{
-					slice.uuid = response.value.uuid;
 					slice.creator = Main.geniHandler.CurrentUser;
 					slice.hrn = response.value.hrn;
 					slice.urn = new IdnUrn(response.value.urn);

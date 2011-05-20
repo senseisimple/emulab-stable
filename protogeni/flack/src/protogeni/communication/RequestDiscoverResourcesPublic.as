@@ -53,7 +53,7 @@ package protogeni.communication
 					rspec = bytes.toString();
 				}
 				componentManager.Rspec = new XML(rspec);
-				componentManager.rspecProcessor.processResourceRspec(cleanup);
+				componentManager.rspecProcessor.processResourceRspec(after);
 			}
 			else
 			{
@@ -70,6 +70,10 @@ package protogeni.communication
 			componentManager.Status = GeniManager.STATUS_UNKOWN;
 			Main.geniDispatcher.dispatchGeniManagerChanged(componentManager);
 			op.cleanup();
+		}
+		
+		private function after(junk:GeniManager):void {
+			cleanup();
 		}
 		
 		override public function cleanup():void

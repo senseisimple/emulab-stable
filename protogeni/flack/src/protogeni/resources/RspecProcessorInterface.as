@@ -21,6 +21,7 @@ package protogeni.resources
 		function processSliverRspec(s:Sliver):void;
 		
 		// Generate
-		function generateSliverRspec(s:Sliver):XML;
+		function generateSliverRspec(s:Sliver,
+									 removeNonexplicitBinding:Boolean):XML;
 	}
 }

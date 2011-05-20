@@ -37,8 +37,14 @@ package protogeni.resources
 		
 		public var expires:Date;
 		
-		// depreciated
-		public var uuid:String = null;
+		public function get name():String {
+			if(urn != null)
+				return urn.name;
+			else if(hrn != null)
+				return hrn;
+			else
+				return "*No name*";
+		}
 		
 		public function Slice()
 		{
@@ -213,7 +219,6 @@ package protogeni.resources
 		public function clone(addOutsideReferences:Boolean = true):Slice
 		{
 			var newSlice:Slice = new Slice();
-			newSlice.uuid = this.uuid;
 			newSlice.hrn = this.hrn;
 			newSlice.urn = new IdnUrn(this.urn.full);
 			newSlice.creator = this.creator;
@@ -288,6 +293,7 @@ package protogeni.resources
 					newNode.diskImage = node.diskImage;
 					newNode.flackX = node.flackX;
 					newNode.flackY = node.flackY;
+					newNode.flackUnbound = node.flackUnbound;
 					// depreciated
 					newNode.virtualizationType = node.virtualizationType;
 					newNode.virtualizationSubtype = node.virtualizationSubtype;
@@ -303,7 +309,7 @@ package protogeni.resources
 						var newVirtualInterface:VirtualInterface = new VirtualInterface(newNode);
 						newVirtualInterface.id = vi.id;
 						newVirtualInterface.physicalNodeInterface = vi.physicalNodeInterface;
-						newVirtualInterface.bandwidth = vi.bandwidth;
+						newVirtualInterface.capacity = vi.capacity;
 						newVirtualInterface.ip = vi.ip;
 						newVirtualInterface.mask = vi.mask;
 						newVirtualInterface.type = vi.type;
@@ -377,36 +383,6 @@ package protogeni.resources
 			}
 		}
 		
-		public function DisplayString():String {
-			
-			if(this.hrn == null
-					&& this.uuid == null) {
-				return "All Resources";
-			}
-			
-			var returnString:String;
-			if(this.hrn == null)
-				returnString = uuid;
-			else
-				returnString = hrn;
-			
-			return returnString + " (" + this.Status() + ")";
-		}
-		
-		// Used to push more important slices to the top of lists
-		public function CompareValue():int {
-			
-			if(this.hrn == null
-					&& this.uuid == null) {
-				return -1;
-			}
-			
-			if(this.Status() == "ready")
-				return 0;
-			else
-				return 1;
-		}
-		
 		public function getUniqueVirtualLinkId(l:VirtualLink = null):String
 		{
 			var highest:int = 0;
@@ -435,7 +411,9 @@ package protogeni.resources
 				newId = "node-";
 			else
 			{
-				if(n.Exclusive)
+				if(n.isDelayNode)
+					newId = "bridge-";
+				else if(n.Exclusive)
 					newId = "exclusive-";
 				else
 					newId = "shared-";
