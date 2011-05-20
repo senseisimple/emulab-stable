@@ -66,6 +66,8 @@ package protogeni.resources
 		
 		public var colorIdx:int;
 		
+		public var data:*;
+		
 		public function AllNodesAsArray():Array {
 			var allNodesArray:Array = new Array();
 			for each (var elem:PhysicalNode in AllNodes) {
@@ -83,10 +85,46 @@ package protogeni.resources
 		}
 		
 		// For now set when RSPEC is parsed
-		public var totalNodes:int = 0;
-		public var availableNodes:int = 0;
-		public var unavailableNodes:int = 0;
-		public var percentageAvailable:int;
+		public function get totalNodes():int {
+			if(this.AllNodes != null)
+				return this.AllNodes.length;
+			else
+				return 0;
+		}
+		
+		public function get availableNodes():int {
+			var count:int = 0;
+			if(this.AllNodes != null) {
+				for each(var node:PhysicalNode in this.AllNodes) {
+					if(node.available)
+						count++;
+				}
+				return count;
+			}
+			else
+				return 0;
+		}
+		
+		public function get unavailableNodes():int {
+			var count:int = 0;
+			if(this.AllNodes != null) {
+				for each(var node:PhysicalNode in this.AllNodes) {
+					if(!node.available)
+						count++;
+				}
+				return count;
+			}
+			else
+				return 0;
+		}
+		
+		public function get percentageAvailable():int {
+			if(this.AllNodes != null && this.AllNodes.length > 0) {
+				return (this.availableNodes * 100) / this.AllNodes.length;
+			}
+			else
+				return 0;
+		}
 		
 		public var rspecProcessor:RspecProcessorInterface;
 		

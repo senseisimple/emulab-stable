@@ -52,19 +52,17 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			 click="NetUtil.openWebsite('http://www.protogeni.net');" />
 	<s:Label text="Displays resources from ProtoGENI and associated federations." />
 	<s:HGroup horizontalAlign="center">
-		<s:Button label="Purge cache"
-				  click="FlackCache.instance.clear();"
-				  height="24" />
 		<s:Button label="Open the manual"
 				  icon="{ImageUtil.helpIcon}"
 				  click="NetUtil.showManual();"
 				  height="24" />
 	</s:HGroup>
 	
-	<mx:TabNavigator width="100%" height="120" paddingTop="2">
+	<mx:TabNavigator width="100%" height="130" paddingTop="2">
 		<s:NavigatorContent label="System" width="100%" height="100%">
 			<s:Scroller width="100%" height="100%">
-				<s:VGroup width="100%" height="100%">
+				<s:VGroup width="100%" height="100%"
+						  paddingBottom="4" paddingLeft="4" paddingRight="4" paddingTop="4">
 					<s:HGroup width="100%">
 						<s:Label text="Flash Version" fontWeight="bold" />
 						<s:Label text="{Capabilities.version}" />
@@ -88,9 +86,26 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				</s:VGroup>
 			</s:Scroller>
 		</s:NavigatorContent>
+		<s:NavigatorContent label="Cache" width="100%" height="100%">
+			<s:Scroller width="100%" height="100%">
+				<s:VGroup width="100%" height="100%" horizontalAlign="center"
+						  paddingBottom="4" paddingLeft="4" paddingRight="4" paddingTop="4">
+					<s:Button label="Save for offline"
+							  click="FlackCache.saveOffline();"
+							  height="24" />
+					<s:Button label="Delete All"
+							  click="FlackCache.clearAll();"
+							  height="24" />
+					<s:Button label="Delete Offline-Use Data"
+							  click="FlackCache.clearOffline();"
+							  height="24" />
+				</s:VGroup>
+			</s:Scroller>
+		</s:NavigatorContent>
 		<s:NavigatorContent label="Special Thanks" width="100%" height="100%">
 			<s:Scroller width="100%" height="100%">
-				<s:VGroup width="100%" height="100%" horizontalAlign="center" gap="2">
+				<s:VGroup width="100%" height="100%" horizontalAlign="center" gap="2"
+						  paddingBottom="4" paddingLeft="4" paddingRight="4" paddingTop="4">
 					<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">
 						<mx:click>navigateToURL(new URLRequest("http://www.fatcow.com/free-icons/index.bml"), "_blank");</mx:click>
 					</mx:LinkButton>

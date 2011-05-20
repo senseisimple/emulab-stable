@@ -19,10 +19,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 <components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						xmlns:mx="library://ns.adobe.com/flex/mx"
+						xmlns:display="protogeni.display.*"
+						xmlns:components="protogeni.display.components.*"
 						width="500" height="300"
 						title="Search"
-						close="closeWindow()" xmlns:components="protogeni.display.components.*">
+						close="closeWindow()">
 	<fx:Script>
 		<![CDATA[
 			import mx.core.IVisualElement;
@@ -40,7 +42,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	</fx:Script>
 
 	<s:HGroup width="100%">
-		<display:KeyboardTextInput id="searchField" width="100%" creationComplete="searchField.setEnter(search)" />
+		<display:KeyboardTextInput id="searchField" width="100%" creationComplete="searchField.setEnter(search); searchField.textInput.setFocus();" />
 		<components:ImageButton icon="{ImageUtil.searchIcon}" click="search()" />
 	</s:HGroup>
 	<s:HGroup width="100%">

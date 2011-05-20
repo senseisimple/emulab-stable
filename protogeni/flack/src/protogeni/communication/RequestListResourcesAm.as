@@ -59,7 +59,7 @@ package protogeni.communication
 				var decodedRspec:String = bytes.toString();
 				
 				aggregateManager.Rspec = new XML(decodedRspec);
-				aggregateManager.rspecProcessor.processResourceRspec(cleanup);
+				aggregateManager.rspecProcessor.processResourceRspec(after);
 				
 			} catch(e:Error)
 			{
@@ -93,6 +93,10 @@ package protogeni.communication
 			aggregateManager.Status = GeniManager.STATUS_UNKOWN;
 			Main.geniDispatcher.dispatchGeniManagerChanged(aggregateManager);
 			op.cleanup();
+		}
+		
+		private function after(junk:GeniManager):void {
+			cleanup();
 		}
 		
 		override public function cleanup():void

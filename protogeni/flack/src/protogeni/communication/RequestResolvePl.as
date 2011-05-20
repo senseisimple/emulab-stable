@@ -21,6 +21,7 @@ package protogeni.communication
 	import mx.collections.ArrayList;
 	
 	import protogeni.GeniEvent;
+	import protogeni.StringUtil;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PlanetlabAggregateManager;
@@ -37,11 +38,11 @@ package protogeni.communication
 				CommunicationUtil.resolvePl,
 				true, true, false);
 			this.ignoreReturnCode = true;
-			op.timeout = 360;
+			op.timeout = 600;
 			planetLabManager = newPlm;
 			var a:ArrayList = new ArrayList();
 			for each(var s:Site in planetLabManager.sites)
-			a.addItem("plc." + s.id);
+				a.addItem("plc." + s.id);
 			op.pushField(a.source);
 			op.pushField([Main.geniHandler.CurrentUser.credential]);	// credentials
 			op.setExactUrl(planetLabManager.registryUrl);

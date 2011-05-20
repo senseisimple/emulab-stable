@@ -63,13 +63,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				for each(var s:Slice in user.slices)
 					slices.addElement(DisplayUtil.getSliceButton(s));
 				if(sslPem != null)
-					this.sslPem.text = FlackCache.instance.userSslPem;
+					this.sslPem.text = FlackCache.userSslPem;
 			}
 			
 			public function save():void
 			{
-				FlackCache.instance.userSslPem = this.sslPem.text;
-				FlackCache.instance.save();
+				FlackCache.userSslPem = this.sslPem.text;
+				FlackCache.saveBasic();
 			}
 		]]>
 	</fx:Script>
@@ -87,7 +87,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				</s:HGroup>
 				<s:HGroup verticalAlign="middle">
 					<s:Image source="{ImageUtil.passwordIcon}" toolTip="Password" />
-					<s:Button label="Force delete password" click="FlackCache.instance.userPassword = ''; FlackCache.instance.save(); Alert.show('Password removed');" />
+					<s:Button label="Force delete password" click="FlackCache.userPassword = ''; FlackCache.saveBasic(); Alert.show('Password removed');" />
 				</s:HGroup>
 				<s:Label text="Slices" fontWeight="bold"/>
 				<s:Scroller width="100%" height="100%">
@@ -96,7 +96,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			</s:VGroup>
 		</s:NavigatorContent>
 		<s:NavigatorContent height="100%" width="100%" label="SSL Certificate">
-			<s:TextArea id="sslPem" text="{FlackCache.instance.userSslPem}" width="100%" height="100%" />
+			<s:TextArea id="sslPem" text="{FlackCache.userSslPem}" width="100%" height="100%" />
 		</s:NavigatorContent>
 	</mx:TabNavigator>
 	<components:controlBarContent>

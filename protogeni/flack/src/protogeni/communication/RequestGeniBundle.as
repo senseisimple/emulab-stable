@@ -35,7 +35,7 @@ package protogeni.communication
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			FlackCache.instance.geniBundle = response as String;
+			FlackCache.geniBundle = response as String;
 		}
 		
 		return null;
@@ -43,8 +43,8 @@ package protogeni.communication
 	
 	override public function fail(event:ErrorEvent, fault:MethodFault):*
 	{
-		if(FlackCache.instance.geniBundle.length == 0)
-			FlackCache.instance.geniBundle = (new FallbackGeniBundle()).toString();
+		if(FlackCache.geniBundle.length == 0)
+			FlackCache.geniBundle = (new FallbackGeniBundle()).toString();
 	}
   }
 }

@@ -37,6 +37,8 @@ package protogeni.resources
 		[Bindable]
 		public var interfaces:VirtualInterfaceCollection;
 		
+		public var pipes:PipeCollection;
+		
 		[Bindable]
 		public var slivers:SliverCollection;
 		public function get sliver():Sliver {
@@ -55,6 +57,7 @@ package protogeni.resources
 		
 		public var flackX:int = -1;
 		public var flackY:int = -1;
+		public var flackUnbound:Boolean = false;
 		
 		public var rspec:XML;
 		
@@ -64,12 +67,22 @@ package protogeni.resources
 		public var executeServices:Vector.<ExecuteService> = new Vector.<ExecuteService>();
 		public var loginServices:Vector.<LoginService> = new Vector.<LoginService>();
 		
+		[Bindable]
+		public var diskImage:String = "";
+		
+		public function get isDelayNode():Boolean { return this.sliverType == "delay" };
+		public function set isDelayNode(value:Boolean):void {
+			if(value) {
+				this._exclusive = true;
+				this.sliverType = "delay";
+			} else {
+				Exclusive = this.Exclusive;
+			}
+		}
+		
 		// Depreciated
 		public var virtualizationType:String = "emulab-vnode";
 		public var virtualizationSubtype:String = "emulab-openvz";
-		//public var uuid:String;
-		[Bindable]
-		public var diskImage:String = "";
 		
 		public function VirtualNode(owner:Sliver)
 		{
@@ -81,6 +94,7 @@ package protogeni.resources
 			}
 			
 			this.interfaces = new VirtualInterfaceCollection();
+			this.pipes = new PipeCollection();
 			// depreciated for v2
 			var controlInterface:VirtualInterface = new VirtualInterface(this);
 			controlInterface.id = "control";
@@ -129,7 +143,7 @@ package protogeni.resources
 				var newVirtualInterface:VirtualInterface = new VirtualInterface(this);
 				newVirtualInterface.id = this.clientId + ":if" + this.interfaces.length;
 				//newVirtualInterface.role = PhysicalNodeInterface.ROLE_EXPERIMENTAL;
-				newVirtualInterface.bandwidth = 100000;
+				newVirtualInterface.capacity = 100000;
 				//newVirtualInterface.isVirtual = true;
 				return newVirtualInterface;
 			} else {

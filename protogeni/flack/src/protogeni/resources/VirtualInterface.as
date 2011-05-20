@@ -40,14 +40,28 @@ package protogeni.resources
 		
 		[Bindable]
 		public var virtualLinks:VirtualLinkCollection;
-		
-		// depreciated
-		public var bandwidth:int = 100000;
+
+		public var capacity:int = 100000;
 		
 		public function VirtualInterface(own:VirtualNode)
 		{
 			this.owner = own;
 			this.virtualLinks = new VirtualLinkCollection();
+		}
+		
+		public function nodesOtherThan(node:VirtualNode = null):VirtualNodeCollection {
+			var ignoreNode:VirtualNode = node;
+			if(node == null)
+				ignoreNode = this.owner;
+			var ac:VirtualNodeCollection = new VirtualNodeCollection();
+			for each(var virtualLink:VirtualLink in this.virtualLinks.collection) {
+				for each(var destInterface:VirtualInterface in virtualLink.interfaces.collection) {
+					if(destInterface.owner != ignoreNode
+						&& !ac.contains(destInterface.owner))
+						ac.add(destInterface.owner);
+				}
+			}
+			return ac;
 		}
 		
 		public function IsBound():Boolean {

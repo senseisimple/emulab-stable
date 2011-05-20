@@ -52,39 +52,45 @@ package protogeni.communication
 				for each(var obj:Object in response.value)
 				{
 					var newGm:GeniManager = null;
-					var ts:String = obj.url.substr(0, obj.url.length-3);
-					//if(ts != "https://www.emulab.net/protogeni/xmlrpc")
-					//	continue;
-					var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
-					newCm.Hrn = obj.hrn;
-					newCm.Url = ts;
-					newCm.Urn = new IdnUrn(obj.urn);
-					// Quick hack, giving exceptions in forge
-					if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.full.toLowerCase().indexOf("etri") > 0)
-						continue;
-					if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
-						newCm.supportsIon = true;
-					if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
-						newCm.supportsGpeni = true;
-					Main.geniHandler.GeniManagers.add(newCm);
-					newGm = newCm;
-					if(startDiscoverResources)
-					{
-						newGm.Status = GeniManager.STATUS_INPROGRESS;
-						if(newGm is AggregateManager)
-							newCalls.push(new RequestGetVersionAm(newGm as AggregateManager));
-						else if(newGm is ProtogeniComponentManager)
-							newCalls.push(new RequestGetVersion(newGm as ProtogeniComponentManager));
+					var url:String = obj.url;
+					// ProtoGENI Component Manager
+					if(url.substring(url.length-3) == "/cm") {
+						var ts:String = obj.url.substr(0, obj.url.length-3);
+						var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
+						newCm.Hrn = obj.hrn;
+						newCm.Url = ts;
+						newCm.Urn = new IdnUrn(obj.urn);
+						// Quick hack, giving exceptions in forge
+						if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.full.toLowerCase().indexOf("etri") > 0)
+							continue;
+						if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
+							newCm.supportsIon = true;
+						if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
+							newCm.supportsGpeni = true;
+						Main.geniHandler.GeniManagers.add(newCm);
+						newGm = newCm;
+						if(startDiscoverResources)
+						{
+							newGm.Status = GeniManager.STATUS_INPROGRESS;
+							if(newGm is AggregateManager)
+								newCalls.push(new RequestGetVersionAm(newGm as AggregateManager));
+							else if(newGm is ProtogeniComponentManager)
+								newCalls.push(new RequestGetVersion(newGm as ProtogeniComponentManager));
+						}
 					}
+					// Aggregate Manager
+					else if(!Main.protogeniOnly)
+					{
+						if(url.indexOf("planet-lab.org") != -1) {
+							var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
+							Main.geniHandler.GeniManagers.add(planetLabAm);
+							planetLabAm.Status = GeniManager.STATUS_INPROGRESS;
+							newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
+							Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
+						}
+					}
+					
 					Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
-				}
-				
-				if(!Main.protogeniOnly) {
-					var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
-					Main.geniHandler.GeniManagers.add(planetLabAm);
-					planetLabAm.Status = GeniManager.STATUS_INPROGRESS;
-					newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
-					Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
 				}
 				
 				if(startSlices)

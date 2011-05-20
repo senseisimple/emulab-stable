@@ -50,11 +50,14 @@ package protogeni
 			var u:GeniUser = null;
 			if(Main.geniHandler != null)
 				u = Main.geniHandler.CurrentUser;
-			dispatchEvent(new GeniEvent(GeniEvent.USER_CHANGED, u));
+			dispatchEvent(new GeniEvent(GeniEvent.USER_CHANGED,
+										u));
 		}
 		
-		public function dispatchSliceChanged(s:Slice):void {
-			dispatchEvent(new GeniEvent(GeniEvent.SLICE_CHANGED, s));
+		public function dispatchSliceChanged(s:Slice, action:int = 0):void {
+			dispatchEvent(new GeniEvent(GeniEvent.SLICE_CHANGED,
+										s,
+										action));
 		}
 		
 		public function dispatchSlicesChanged():void {
@@ -62,7 +65,8 @@ package protogeni
 		}
 		
 		public function dispatchLogsChanged(m:LogMessage = null):void {
-			dispatchEvent(new GeniEvent(GeniEvent.LOGS_CHANGED, m));
+			dispatchEvent(new GeniEvent(GeniEvent.LOGS_CHANGED,
+										m));
 		}
 	}
 }

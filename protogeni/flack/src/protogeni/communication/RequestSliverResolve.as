@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.GeniEvent;
 	import protogeni.resources.Sliver;
 	
 	public final class RequestSliverResolve extends Request
@@ -39,7 +40,10 @@ package protogeni.communication
 				sliver.rspec = new XML(response.value.manifest);
 				sliver.created = true;
 				sliver.parseRspec();
-				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+				if(sliver.slice.isCreated())
+					Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATED);
+				else
+					Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 				return new RequestSliverStatus(sliver);
 			}
 			else

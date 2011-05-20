@@ -56,8 +56,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			private function mappreinit():void {
 				// Force a key
-				if((Main.Application() as flack).forceMapKey != null) {
-					key = Main.(Application() as protogeniflash).forceMapKey;
+				if(Main.Application().forceMapKey != null) {
+					key = Main.Application().forceMapKey;
 				}
 				// else detect a key from our default list
 				else
@@ -85,8 +85,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				addControl(new NavigationControl());
 				enableScrollWheelZoom();
 				enableContinuousZoom();
-				
-				
 				
 				// Create a new pane lying immediately below the marker pane.
 				var manager:IPaneManager = this.getPaneManager();

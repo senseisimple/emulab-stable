@@ -112,7 +112,10 @@ package protogeni.display
 		// Gets a button for the component manager
 		public static function getGeniManagerButton(gm:GeniManager):Button {
 			var cmButton:DataButton = new DataButton(gm.Hrn,
-				"@ " + gm.Url, null, gm);
+													"@ " + gm.Url,
+													null,
+													gm,
+													"manager");
 			cmButton.setStyle("chromeColor", ColorUtil.colorsDark[gm.colorIdx]);
 			cmButton.setStyle("color", ColorUtil.colorsLight[gm.colorIdx]);
 			return cmButton;
@@ -123,7 +126,8 @@ package protogeni.display
 			return new DataButton(s.id + " (" + s.name + ")",
 									s.name,
 									null,
-									s);
+									s,
+									"site");
 		}
 		
 		// Gets a button for the physical node

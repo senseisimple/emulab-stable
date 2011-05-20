@@ -157,8 +157,7 @@ package protogeni
 			{
 				if(Util.findInAny(searchFrom,
 									new Array(slice.urn.full,
-												slice.hrn,
-												slice.uuid),
+												slice.hrn),
 									matchAll))
 					results.push(DisplayUtil.getSliceButton(slice));
 				for each(var sliver:Sliver in slice.slivers.collection)

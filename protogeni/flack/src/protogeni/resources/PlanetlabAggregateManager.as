@@ -20,7 +20,7 @@ package protogeni.resources
 	{
 		public var registryUrl:String;
 		public var networkName:String;
-		public var sites:ArrayCollection;
+		public var sites:Vector.<Site>;
 		
 		public function PlanetlabAggregateManager()
 		{
@@ -29,7 +29,7 @@ package protogeni.resources
 			this.registryUrl = "https://planet-lab.org:12345/";
 			this.Hrn = "planet-lab.am";
 			this.Urn = new IdnUrn("urn:publicid:IDN+planet-lab.org+authority+am");
-			this.sites = new ArrayCollection();
+			this.sites = new Vector.<Site>();
 			this.type = GeniManager.TYPE_PLANETLAB;
 			
 			this.rspecProcessor = new PlanetlabRspecProcessor(this);

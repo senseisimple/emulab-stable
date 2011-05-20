@@ -140,7 +140,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					return;
 				}
 				
-				Main.geniHandler.requestHandler.createSlice(sliceName.textInput.text);
+				Main.geniHandler.requestHandler.createSlice(sliceName.Text);
+				sliceName.Text = "";
 			}
 			
 			public function tryUpdateSlices(junk:* = null):void
@@ -194,8 +195,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		</s:Scroller>
 		<s:HGroup verticalAlign="middle">
 			<s:Label text="+" />
-			<display:KeyboardTextInput id="sliceName" width="100%" creationComplete="readyInput()" />
-			<components:ImageButton id="createButton" icon="{ImageUtil.actionIcon}" click="createSlice();" />
+			<display:KeyboardTextInput id="sliceName"
+									   width="100%"
+									   creationComplete="readyInput()" />
+			<components:ImageButton id="createButton"
+									icon="{ImageUtil.actionIcon}"
+									click="createSlice();" />
 		</s:HGroup>
 	</s:VGroup>
 </components:CollapsiblePanel>

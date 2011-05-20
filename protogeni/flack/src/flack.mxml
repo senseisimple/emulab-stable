@@ -142,8 +142,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				// Flash options
 				ParamHandler.load();
 				
-				FlackCache.instance.loadSharedObject();
-				FlackCache.instance.applyData();
+				FlackCache.loadBasicSharedObject();
+				FlackCache.loadOfflineSharedObject();
+				FlackCache.applyBasic();
 				
 				if(Main.debugMode)
 					LogHandler.viewConsole();
@@ -161,13 +162,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			private function uncaughtErrorHandler(event:UncaughtErrorEvent):void
 			{
+				// Fix for dell streak 7
+				if(event.errorID == 2063)
+					return;
 				Main.geniHandler.requestHandler.pause();
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				var uncaughtErrorMessage:LogMessage = new LogMessage("",
 					"Uncaught Error",
 					"Error:\n" + event.error.toString() + "\n\nEvent:\n" + event.toString(),
-					true)
+					true);
 				LogHandler.appendMessage(uncaughtErrorMessage);
 				LogHandler.viewConsole();
 				DisplayUtil.viewLogMessage(uncaughtErrorMessage);
@@ -230,7 +234,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			protected function loadUser():void
 			{
-				if(Main.geniHandler.unauthenticatedMode) {
+				if(Main.geniHandler.unauthenticatedMode && !Main.offlineMode) {
 					Main.geniHandler.requestHandler.startInitiationSequence(true);
 				} else {
 					DisplayUtil.viewUserWindow();

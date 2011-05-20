@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:GridItemRenderer
+	xmlns:fx="http://ns.adobe.com/mxml/2009"
+	xmlns:s="library://ns.adobe.com/flex/spark">
+	
+	<fx:Script>
+		<![CDATA[
+			override public function prepare(hasBeenRecycled:Boolean):void
+			{
+				if(data && data[column.dataField])
+					valueDisplay.text = data[column.dataField].toString();
+				else
+					valueDisplay.text = "";
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Label id="valueDisplay" height="100%" verticalAlign="middle" paddingLeft="4" />
+	
+</s:GridItemRenderer>

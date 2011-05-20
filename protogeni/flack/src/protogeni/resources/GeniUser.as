@@ -48,22 +48,22 @@ package protogeni.resources
 		public function setPassword(password:String,
 									store:Boolean):Boolean {
 			if(store) {
-				if(FlackCache.instance.userPassword != password) {
-					FlackCache.instance.userPassword = password;
-					FlackCache.instance.save();
+				if(FlackCache.userPassword != password) {
+					FlackCache.userPassword = password;
+					FlackCache.saveBasic();
 				}
-			} else if(FlackCache.instance.userPassword.length > 0) {
-				FlackCache.instance.userPassword = "";
-				FlackCache.instance.save();
+			} else if(FlackCache.userPassword.length > 0) {
+				FlackCache.userPassword = "";
+				FlackCache.saveBasic();
 			}
 			return tryToSetInJavascript(password);
 		}
 		
 		public function tryToSetInJavascript(password:String):Boolean {
 			if(Main.useJavascript) {
-				if(password.length > 0 && FlackCache.instance.userSslPem.length > 0) {
+				if(password.length > 0 && FlackCache.userSslPem.length > 0) {
 					try {
-						JSLoader.setClientInfo(password, FlackCache.instance.userSslPem);
+						JSLoader.setClientInfo(password, FlackCache.userSslPem);
 						hasSetupJavascript = true;
 					} catch ( e:Error) {
 						LogHandler.appendMessage(new LogMessage("JS", "JS User Cert", e.toString(), true, LogMessage.TYPE_END));

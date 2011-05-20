@@ -49,40 +49,42 @@ package protogeni.resources
 			this.country = cnt;
 			this.owner = own;
 			this.original = orig;
-			if(this.original == null) {
+			if(this.original == null && !Main.offlineMode) {
 				this.Geocode();
 			}
 		}
 		
 		public function Geocode():void {
-			var geocoder:ClientGeocoder = new ClientGeocoder();
-			geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
-				function(event:GeocodingEvent):void {
-					var placemarks:Array = event.response.placemarks;
-					if (placemarks.length > 0) {
-						try {
-							var p:Placemark = event.response.placemarks[0] as Placemark;
-							var fullAddress : String = p.address;
-							var splitAddress : Array = fullAddress.split(',');
-							if(splitAddress.length == 3)
-								city = splitAddress[0];
-							else 
-								if(splitAddress.length == 4)
-									city = splitAddress[1];
-								else
-									city = fullAddress;
-							//nodeGroup.city = groupInfo.city;
-						} catch (err:Error) { }
-					}
-				});
-			
-			geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
-				function(event:GeocodingEvent):void {
-					//Main.log.appendMessage(
-					//	new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
-				});
-			
-			geocoder.reverseGeocode(new LatLng(latitude, longitude));
+			try {
+				var geocoder:ClientGeocoder = new ClientGeocoder();
+				geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
+					function(event:GeocodingEvent):void {
+						var placemarks:Array = event.response.placemarks;
+						if (placemarks.length > 0) {
+							try {
+								var p:Placemark = event.response.placemarks[0] as Placemark;
+								var fullAddress : String = p.address;
+								var splitAddress : Array = fullAddress.split(',');
+								if(splitAddress.length == 3)
+									city = splitAddress[0];
+								else 
+									if(splitAddress.length == 4)
+										city = splitAddress[1];
+									else
+										city = fullAddress;
+								//nodeGroup.city = groupInfo.city;
+							} catch (err:Error) { }
+						}
+					});
+				
+				geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
+					function(event:GeocodingEvent):void {
+						//Main.log.appendMessage(
+						//	new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
+					});
+				
+				geocoder.reverseGeocode(new LatLng(latitude, longitude));
+			} catch(e:Error) {}
 		}
 		
 		public function Add(n:PhysicalNode):void {

@@ -36,7 +36,7 @@ package protogeni.communication
 			
 			op.addField("credential", newSliver.slice.creator.credential);
 			op.addField("advertisement", encodedRspec);
-			op.addField("request", sliver.getRequestRspec());
+			op.addField("request", sliver.getRequestRspec(true));
 			op.setUrl(CommunicationUtil.sesUrl);
 		}
 		
