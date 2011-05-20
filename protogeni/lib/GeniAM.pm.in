@@ -183,12 +183,22 @@ sub ListResources()
         $xml = GeniResponse::value($response)->{'manifest'};
 
     } else {
-
+	my $pgversion = undef;
+	if (! defined($version)) {
+	    $pgversion = "0.2";
+	} elsif (defined($version->{'type'}) &&
+		 ($version->{'type'} eq "ProtoGENI" ||
+		  $version->{'type'} eq "protogeni")) {
+	    $pgversion = $version->{'version'};
+	} else {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Only ProtoGENI RSpec advertisements are supported");
+	}
         # No slice was specified, so get the advertisement RSpec.
         my $discover_args = {
             'credentials' => $credentials,
             'available' => $available,
-	    'rspec_version' => $version,
+	    'rspec_version' => $pgversion,
         };
         my $response = GeniCMV2::DiscoverResources($discover_args);
         if (GeniResponse::IsError($response)) {
