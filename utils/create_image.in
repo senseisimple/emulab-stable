@@ -53,8 +53,8 @@ sub usage()
 my $optlist  = "p:wsNd";
 my $waitmode = 0;
 my $usessh = 0;
-my $usenfs = 0;
-my $usefup = 1;
+my $usenfs = 1;
+my $usefup = 0;
 
 #
 # Configure variables
@@ -538,6 +538,14 @@ if ($usefup && $result eq "255") {
     } else {
 	$command .= " $filename";
     }
+
+    # reset state for check_progress
+    $usefup = 0;
+    $runticks = 0;
+    $idleticks = 0;
+    $lastsize = 0;
+    $result = undef;
+
     if ($NONFS) {
 	$result = run_with_ssh($command, $filename);
     } else {
