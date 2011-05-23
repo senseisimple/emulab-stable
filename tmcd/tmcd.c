@@ -4542,17 +4542,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 		prepare = row[6];
 
 		res2 = mydb_query("select IP "
-				  "from subboss_images as i "
-				  "left join subbosses as s "
-				  "  on s.subboss_id=i.subboss_id "
-				  "left join interfaces as n "
-				  "  on n.node_id=s.subboss_id "
-				  "where s.node_id='%s' and "
-				  "  s.service='frisbee' and "
-				  "  i.imageid='%s' and "
-				  "  n.role='ctrl' and i.sync!=1",
-				  1, reqp->nodeid, row[5]);
-
+				  " from interfaces as i, subbosses as s "
+				  " where i.node_id=s.subboss_id and "
+				  " i.role='ctrl' and "
+				  " s.node_id='%s' and s.service='frisbee'",
+				  1, reqp->nodeid);
 		if (!res2) {
 			error("doloadinfo: %s: DB Error getting subboss info!\n",
 			       reqp->nodeid);
