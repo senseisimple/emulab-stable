@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -92,6 +92,7 @@ if ((my $locked = TBScriptLock("named", 1)) != TBSCRIPTLOCK_OKAY()) {
     exit(0)
         if ($locked == TBSCRIPTLOCK_IGNORE);
     fatal("Could not get the lock after a long time!\n");
+
 }
 
 #
@@ -128,6 +129,19 @@ $db_result =
 		 "         i.role='" . TBDB_IFACEROLE_GW() . "') ");
 process_nodes($db_result);
 
+# Get the v2pmap table since that holds the additional name mappings.
+my %p2vmap = ();
+$db_result =
+    DBQueryFatal("select v.vname,v.node_id from reserved as r ".
+                 "left join v2pmap as v on v.node_id=r.node_id and ".
+                 "     v.exptidx=r.exptidx and v.vname!=r.vname ".
+                 "where v.vname is not null");
+while (my ($vname,$node_id) = $db_result->fetchrow_array()) {
+    $p2vmap{$node_id} = []
+        if (!exists($p2vmap{$node_id}));
+    push(@{ $p2vmap{$node_id} }, $vname);
+}
+
 #
 # Get the list of currently-reserved nodes so that we can make CNAMEs for them
 #
@@ -160,8 +174,22 @@ while (my ($node_id,$pid,$eid,$vname,$erole) = $db_result->fetchrow_array()) {
         ($erole eq "ops" || $erole eq "ops+fs")) {
         push @{$cnames{$node_id}}, "event-server.$eid.$pid";
     }
-}
 
+    #
+    # And add additional names in v2pmap, which can happen for delay and
+    # bridge nodes.
+    #
+    if (exists($p2vmap{$node_id})) {
+        my @extras = @{ $p2vmap{$node_id} };
+
+	foreach my $extra (@extras) {
+            next
+		if ($extra eq $vname);
+
+	    push @{$cnames{$node_id}}, "$extra.$eid.$pid";
+	}
+    }
+}
 
 #
 # Make the zone file for routable IP addresses

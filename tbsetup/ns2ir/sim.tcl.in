@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -145,6 +145,31 @@ Simulator instproc node {args} {
 	# boot osid over others
 	$curnode add-desire "FBSD-NSE" 0.9
     }
+    set node_list($curnode) {}
+    set last_class $curnode
+
+    $self instvar new_node_config;
+    $curnode topography $new_node_config(-topography)
+
+    return $curnode
+}
+
+#
+# A bridge is really a node.
+#
+Simulator instproc bridge {args} {
+    var_import ::GLOBALS::last_class
+    var_import ::GLOBALS::simulated
+    $self instvar id_counter
+    $self instvar node_list
+
+    if {($args != {})} {
+	punsup "Arguments for node: $args"
+    }
+    
+    set curnode tbnode-n[incr id_counter]
+    Bridge $curnode $self
+
     set node_list($curnode) {}
     set last_class $curnode
 

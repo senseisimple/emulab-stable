@@ -302,6 +302,14 @@ LanLink instproc init {s nodes bw d type} {
 	set lq q[incr new_counter]
 	Queue lq$lq $self $type $node
 	set linkq($nodepair) lq$lq
+
+	#
+	# Look for bridge connections, and cross link.
+	#
+	if {[$node info class] == "Bridge"} {
+	    $node addbridgelink $self
+	    set bridge_links($nodepair) $node
+	}
     }
 }
 
@@ -460,35 +468,6 @@ LanLink instproc get_port {node} {
     return {}
 }
 
-# Set the bridge link field
-LanLink instproc bridge {srcport link node dstport} {
-    $self instvar bridge_links
-    set nodepair [list $node $srcport]
-
-    set bridge_links($nodepair) [list $link $node $dstport]
-}
-
-#
-# Bridge from a LanLink to another Lanlink via node. 
-#
-LanLink instproc bridge_with {link node} {
-    set srcvport [$self get_port $node]
-    set dstvport [$link get_port $node]
-
-    if {$srcvport == {}} {
-	perror "bridge_with: $node is not a member of $self";
-	return
-    }
-    if {$dstvport == {}} {
-	perror "bridge_with: $node is not a member of $link";
-	return
-    }
-    # Cross link
-    $self bridge $srcvport $link $node $dstvport
-    $link bridge $dstvport $self $node $srcvport
-    $node set_role "bridge"
-}
-
 #
 # Find the queue object for a node on a link. 
 #
@@ -619,10 +598,13 @@ LanLink instproc fill_ips {} {
 	$lan instvar bridge_links
 
 	foreach nodeport [array names bridge_links] {
-	    set linkage $bridge_links($nodeport)
-	    set nextlan [lindex $linkage 0]
-	    if {! [info exists reachable($nextlan)]} {
-		lappend lanlist $nextlan
+	    set bridge $bridge_links($nodeport)
+	    set nextlanlist [$bridge set bridgelist]
+
+	    foreach nextlan $nextlanlist {
+		if {! [info exists reachable($nextlan)]} {
+		    lappend lanlist $nextlan
+		}
 	    }
 	}
     }
@@ -670,7 +652,7 @@ LanLink instproc fill_ips {} {
     if {$subnet == {}} {
 	if {$isremote} {
 	    set subnet [$sim get_subnet_remote]
-	} else
+	} else {
 	    set subnet [$sim get_subnet $netmask]
 	}
     }
@@ -1093,17 +1075,10 @@ Link instproc updatedb {DB} {
 	# Look for a bridge to a nodepair in another link or lan.
 	#
 	if { [info exists bridge_links($nodeport)] } {
-	    set dest $bridge_links($nodeport)
-	    set bridge_vname [lindex $dest 0]
-	    set bridge_vnode [lindex $dest 1]
-	    set bridge_vport [lindex $dest 2]
+	    set bridge_vname $bridge_links($nodeport)
 
-	    lappend fields "bridged_vname"
+	    lappend fields "bridge_vname"
 	    lappend values $bridge_vname
-	    lappend fields "bridged_vnode"
-	    lappend values $bridge_vnode
-	    lappend fields "bridged_vport"
-	    lappend values $bridge_vport
 	}
 
 	lappend fields "vindex"
@@ -1299,17 +1274,10 @@ Lan instproc updatedb {DB} {
 	# Look for a bridge to a nodepair in another link or lan.
 	#
 	if { [info exists bridge_links($nodeport)] } {
-	    set dest $bridge_links($nodeport)
-	    set bridge_vname [lindex $dest 0]
-	    set bridge_vnode [lindex $dest 1]
-	    set bridge_vport [lindex $dest 2]
+	    set bridge_vname $bridge_links($nodeport)
 
-	    lappend fields "bridged_vname"
+	    lappend fields "bridge_vname"
 	    lappend values $bridge_vname
-	    lappend fields "bridged_vnode"
-	    lappend values $bridge_vnode
-	    lappend fields "bridged_vport"
-	    lappend values $bridge_vport
 	}
 
 	lappend fields "vindex"

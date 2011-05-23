@@ -19,6 +19,7 @@
 ######################################################################
 
 Class Node -superclass NSObject
+Class Bridge -superclass Node
 
 Node instproc init {s} {
     $self set sim $s
@@ -79,6 +80,9 @@ Node instproc init {s} {
     $self instvar desirelist
     array set desirelist {}
 
+    # If this is a bridge, list of the link members that connect to it.
+    $self set bridgelist {}
+
     # These are just various strings that we pass through to the DB.
     $self set cmdline ""
     $self set rpms ""
@@ -116,6 +120,13 @@ Node instproc init {s} {
     $self set numeric_id {}
 }
 
+Bridge instproc init {s} {
+    $self next $s
+    $self instvar role
+
+    set role "bridge"
+}
+
 # The following procs support renaming (see README)
 Node instproc rename {old new} {
     $self instvar portlist
@@ -133,6 +144,8 @@ Node instproc rename {old new} {
 
 Node instproc rename_lanlink {old new} {
     $self instvar portlist
+    $self instvar bridgelist
+    
     set newportlist {}
     foreach node $portlist {
 	if {$node == $old} {
@@ -142,6 +155,16 @@ Node instproc rename_lanlink {old new} {
 	}
     }
     set portlist $newportlist
+
+    set newbridgelist {}
+    foreach link $bridgelist {
+	if {$link == $old} {
+	    lappend newbridgelist $new
+	} else {
+	    lappend newbridgelist $link
+	}
+    }
+    set bridgelist $newbridgelist
 }
 
 # updatedb DB
@@ -693,9 +716,31 @@ Node instproc set_numeric_id {myid} {
     set numeric_id $myid
 }
 
-Node instproc set_role {newrole} {
-    $self instvar role
+#
+# Add a link to this bridge.
+#
+Bridge instproc addbridgelink {link} {
+    $self instvar bridgelist
 
-    set role $newrole
+    lappend bridgelist $link
 }
 
+Bridge instproc updatedb {DB} {
+    $self next $DB
+
+    $self instvar bridgelist
+    $self instvar sim
+    
+    foreach link $bridgelist {
+	set port [$self find_port $link]
+
+	if {$port == {}} {
+	    perror "Bridge $self is not a member of $link";
+	    return
+	}
+	set fields [list "vname" "vlink" "vport"]
+	set values [list $self $link $port]
+
+	$sim spitxml_data "virt_bridges" $fields $values	
+    }
+}

@@ -80,6 +80,7 @@ sub Create($$$$)
     $self->{'VNODES'}     = {};
     $self->{'DELAYNODES'} = {};
     $self->{'LANNODES'}   = {};
+    $self->{'BRIDGES'}    = {};
     $self->{'VLANS'}      = {};
     $self->{'VPATHS'}     = {};
     $self->{'MEMBEROF'}   = {};
@@ -126,6 +127,7 @@ sub virtexperiment($)   { return $_[0]->{'VIRTEXPT'}; }
 sub flags($)            { return $_[0]->{'FLAGS'}; }
 sub vnodes($)           { return $_[0]->{'VNODES'}; }
 sub delaynodes($)       { return $_[0]->{'DELAYNODES'}; }
+sub bridges($)          { return $_[0]->{'BRIDGES'}; }
 sub lannodes($)         { return $_[0]->{'LANNODES'}; }
 sub vlans($)            { return $_[0]->{'VLANS'}; }
 sub memberof($)         { return $_[0]->{'MEMBEROF'}; }
@@ -164,6 +166,7 @@ sub virt_nodes($)       { return $_[0]->virt_table("virt_nodes"); }
 sub virt_lans($)        { return $_[0]->virt_table("virt_lans"); }
 sub virt_lan_lans($)    { return $_[0]->virt_table("virt_lan_lans"); }
 sub virt_paths($)       { return $_[0]->virt_table("virt_paths"); }
+sub virt_bridges($)     { return $_[0]->virt_table("virt_bridges"); }
 sub virt_desires($)	{ return $_[0]->virt_table("virt_node_desires"); }
 sub virt_startloc($)	{ return $_[0]->virt_table("virt_node_startloc"); }
 sub virt_trafgens($)	{ return $_[0]->virt_table("virt_trafgens"); }
@@ -1539,7 +1542,7 @@ sub LoadVirtLans($)
 	$virtlan->shapedmembers()->{"$vlanmember"} = 0;
 	$vlanmember->_shaped(0);
 	$virtlan->_delayed(0);
-	$vlanmember->_bridged(undef);
+	$vlanmember->_bridged(0);
 
 	#
 	# XXX - Whenever a delay node is inserted, port speeds are set to
@@ -1576,28 +1579,61 @@ sub LoadVirtLans($)
     }
 
     #
+    # Load up the virt_bridges.
+    #
+    foreach my $virt_bridge ($self->virt_bridges()->Rows()) {
+	my $bridgename = $virt_bridge->vname();
+	my $bridgevlan = $virt_bridge->vlink();
+	my $bridgeport = $virt_bridge->vport();
+
+	if (!exists($self->vlans()->{$bridgevlan})) {
+	    tberror("virt_bridge: no such vlan $bridgevlan\n");
+	    return -1;
+	}
+	if (!exists($self->vnodes()->{$bridgename})) {
+	    tberror("virt_bridge: no such node $bridgename\n");
+	    return -1;
+	}
+	my $memberof = $self->memberof()->{"$bridgename:$bridgeport"};
+	if (!defined($memberof)) {
+	    tberror("virt_bridge: ".
+		    "$bridgename:$bridgeport is not in $bridgevlan\n");
+	    return -1;
+	}
+	my $vlan = $self->vlans()->{$bridgevlan};
+	my $member = $vlan->members()->{"$bridgename:$bridgeport"};
+
+	$self->bridges()->{$bridgename} = {}
+	    if (!exists($self->bridges()->{$bridgename}));
+
+	# Store the list of members of this bridge. We assume that
+	# a lan is not in a bridge more then once.
+	$self->bridges()->{$bridgename}->{"$member"} = $member;
+    }
+
+    #
     # Check the bridge requests and set the cross links.
     #
     foreach my $virtlan (values(%{ $self->vlans() })) {
 	foreach my $member ($virtlan->memberlist()) {
 	    next
-		if (!defined($member->bridged_vname()));
+		if (!defined($member->bridge_vname()));
 
-	    my $bridged_vname  = $member->bridged_vname();
-	    my $bridged_vnode  = $member->bridged_vnode();
-	    my $bridged_vport  = $member->bridged_vport();
-	    my $bridged_member =
-		$self->memberof()->{"$bridged_vnode:$bridged_vport"};
-
-	    if (!defined($bridged_member)) {
-		tberror("$member is bridged to nonexistent member\n");
+	    my $bridge_vname = $member->bridge_vname();
+	    if (!exists($self->bridges()->{$bridge_vname})) {
+		tberror("$virtlan: no such bridge $bridge_vname\n");
 		return -1;
 	    }
 	    if (!$member->virt_node()->_isbridge()) {
 		tberror("$member is bridged but is not a bridge\n");
 		return -1;
 	    }
-	    $member->_bridged($bridged_member);
+	    my $bridged_member = $self->bridges()->{$bridge_vname}->{"$member"};
+	    if (!defined($bridged_member)) {
+		tberror("$member is bridged to nonexistent member\n");
+		return -1;
+	    }
+	    $member->_bridged(1);
 	    $virtlan->_bridged(1);
 	    $self->printdb("$virtlan bridge: $member to $bridged_member\n");
 	}
@@ -1883,6 +1919,9 @@ sub GenVirtNodes($)
 	    if ($query_result && $query_result->numrows) {
 		($nodeweight) = $query_result->fetchrow_array();
 	    }
+	}
+	elsif ($vnode->_isbridge()) {
+	    $type = ($type eq "pc" ? "delay" : "delay-" . $type);
 	}
 	
 	$self->createNode($vname, $vnode->_cmurn(),
@@ -5065,30 +5104,13 @@ sub InterpLinks($)
     #
     # Go through and look for bridge nodes. 
     #
-    foreach my $virtual (keys(%{ $self->solution_v2p() })) {
-	my $pnode    = $self->pnodes()->{$self->solution_v2p()->{$virtual}};
-	my $virtnode = $self->vnodes()->{$virtual};
-
-	next
-	    if (!$virtnode->_isbridge());
-
-	# Links that are connected to this bridge. 
-	my @virtlans = $virtnode->memberlist();
-
-	# Find the members that are connected through this bridge.
-	my @members;
-	foreach my $virtlan (@virtlans) {
-	    foreach my $member ($virtlan->memberlist()) {
-		if ($member->virt_node()->vname() eq $virtnode->vname()) {
-		    push(@members, $member);
-		}
-	    }
-	}
+    foreach my $bridgename (keys(%{ $self->bridges() })) {
+	my @members = values(%{ $self->bridges()->{$bridgename} });
 
 	# Can only bridge two links.
 	my ($member0,$member1) = @members;
 
-	$self->AddBridge($member0, $member1);
+	$self->AddBridge($bridgename, $member0, $member1);
     }
 
     #
@@ -6889,9 +6911,9 @@ sub AddLinkDelay($$$$$$)
 #
 # Add a bridge. At the moment, bridges are just delay nodes. 
 #
-sub AddBridge($$$)
+sub AddBridge($$$$)
 {
-    my ($self, $member0, $member1) = @_;
+    my ($self, $bridgename, $member0, $member1) = @_;
     my $iface0 = $member0->_pport();
     my $iface1 = $member1->_pport();
     my $pnodename = $member0->_pnode();
@@ -6913,10 +6935,8 @@ sub AddBridge($$$)
     my $eid   = $experiment->eid();
     my $idx   = $experiment->idx();
 
-    # The name of the bridge (as for the delay agent) is the name of node.
-    # Might have to change this if we want to use a pnode for more then
-    # one bridge.
-    my $vname = $pnodename;
+    # The name of the bridge (as for the delay agent).
+    my $vname = $bridgename;
 
     $self->printdb("  Bridge:$bridgeidx $iface0:$pnodename:$iface1\n");
 
