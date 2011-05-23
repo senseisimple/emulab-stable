@@ -3727,11 +3727,14 @@ sub SetupNetworkAgents($)
     foreach my $member ($lan_members->Rows()) {
 	my $vnode = $member->vnode();
 	my $vlanname = $member->vname();
+	my $bridgename = $member->bridge_vname();
+	my $agentname =
+	    (defined($bridgename) ? $bridgename : $vlanname) . "-${vnode}";
 
 	DBQueryFatal("insert into virt_agents ".
 		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
 		     " select '$idx', '$pid', '$eid', ".
-		     "   '${vlanname}-${vnode}', '*', ".
+		     "   '$agentname', '*', ".
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='LINK'");
 
@@ -3758,6 +3761,20 @@ sub SetupNetworkAgents($)
 	$ethlans{$vlanname} = $vlanname
 	    if ($member->protocol() ne "ipv4");
     }
+
+    #
+    # Bridges have their own naming; each bridge gets a link agent.
+    #
+    my $bridge_members = $virtexp->Table("virt_bridges");
+    foreach my $member ($bridge_members->Rows()) {
+	my $bridgename = $member->vname();
+
+	DBQueryFatal("replace into virt_agents ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$idx', '$pid', '$eid', '$bridgename', '*', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='LINK'");
+    }    
 
     my $lans = $virtexp->Table("virt_lan_lans");
     foreach my $lan ($lans->Rows()) {
