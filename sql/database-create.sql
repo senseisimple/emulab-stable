@@ -4040,9 +4040,8 @@ CREATE TABLE `virt_bridges` (
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
   `vlink` varchar(32) NOT NULL default '',
-  `vnode` varchar(32) NOT NULL default '',
   `vport` tinyint(3) NOT NULL default '0',
-  PRIMARY KEY  (`exptidx`,`vname`,`vlink`,`vnode`,`vport`),
+  PRIMARY KEY  (`exptidx`,`vname`,`vlink`,`vport`),
   KEY `pideid` (`pid`,`eid`,`vname`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -4231,9 +4230,7 @@ CREATE TABLE `virt_lans` (
   `implemented_by_link` tinytext,
   `ofenabled` tinyint(1) default '0',
   `ofcontroller` tinytext,
-  `bridged_vname` varchar(32) default NULL,
-  `bridged_vnode` varchar(32) default NULL,
-  `bridged_vport` tinyint(3) default NULL,
+  `bridge_vname` varchar(32) default NULL,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),

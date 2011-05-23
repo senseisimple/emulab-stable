@@ -904,9 +904,7 @@ REPLACE INTO table_regex VALUES ('location_info','phone','text','regex','^[-\\d\
 REPLACE INTO table_regex VALUES ('location_info','room','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vport','int','redirect','default:tinyint',0,99,NULL);
-REPLACE INTO table_regex VALUES ('virt_lans','bridged_vname','text','redirect','virt_lans:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_lans','bridged_vnode','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_lans','bridged_vport','int','redirect','virt_lans:vport',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','bridge_vname','text','redirect','virt_lans:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','ip','text','regex','^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})$',0,15,NULL);
 REPLACE INTO table_regex VALUES ('experiments','usemodelnet','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','modelnet_cores','int','redirect','default:tinyint',0,5,NULL);
@@ -1086,7 +1084,6 @@ REPLACE INTO table_regex VALUES ('virt_bridges','pid','text','redirect','project
 REPLACE INTO table_regex VALUES ('virt_bridges','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_bridges','vname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_bridges','vlink','text','redirect','virt_lans:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_bridges','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_bridges','vport','int','redirect','default:tinyint',0,99,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_path','text','redirect','virt_paths:pathname',1,128,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_link','text','redirect','default:tinytext',0,0,NULL);
