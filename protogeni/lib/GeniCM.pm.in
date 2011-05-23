@@ -659,6 +659,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     my %iface2node = ();
     my %vportmap = ();
     my %nodemap  = ();
+    my %bridgemap= ();
     my @nodeids  = ();
     my %lannodes = ();
     # For stitching, keep track of external nodes and links.
@@ -756,6 +757,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $pctype;
 	my $osname;
 	my $node;
+	my $isbridge;
 
 	# Always populate iface2node mapping, even if we let the node
 	# pass through.
@@ -868,6 +870,10 @@ sub GetTicketAuxAux($$$$$$$$$)
 			   || $virtualization_subtype eq "raw-pc") {
 			$pctype = undef;
 			goto raw;
+		    }
+		    elsif ($virtualization_subtype eq "delay") {
+			$isbridge = 1;
+			$pctype   = undef;
 		    }
 		    else {
 			$response
@@ -992,6 +998,10 @@ sub GetTicketAuxAux($$$$$$$$$)
 				      defined($node) ? $node->node_id() : ""),
 			};
 
+	if ($isbridge) {
+	    $nodeblob->{'role'} = "bridge";
+	}
+
 	# Tarball and startup command.
 	my $startupcmd = GeniXML::GetStartupCommand($ref);
 	if (defined($startupcmd)) {
@@ -1039,7 +1049,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	#
 	next
 	    if (!defined(GeniXML::FindFirst("n:interface", $ref)));
-	
+
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
 	    my $virtual_id   = GeniXML::GetInterfaceId($linkref);
@@ -1062,6 +1072,50 @@ sub GetTicketAuxAux($$$$$$$$$)
 
 	    # This is used after the mapper runs since it uses vname:vport.
 	    $vportmap{"$node_nickname:$vport"} = {"rspec" => $linkref};
+	}
+
+	#
+	# Look for bridge info.
+	#
+	if ($isbridge) {
+	    my @pipes = GeniXML::GetDelayPipes($ref);
+	    if (!@pipes) {
+		$response =
+		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "No pipes declared for $node_nickname");
+		goto bad;
+	    }
+	    foreach my $pipe (@pipes) {
+		#
+		# Might just want a bridge with no shaping, so params
+		# might not be defined. 
+		#
+		my $source   = GetText("source", $pipe);
+		my $dest     = GetText("dest", $pipe);
+		my $capacity = GetText("capacity", $pipe);
+		my $latency  = GetText("latency", $pipe);
+		my $lossrate = GetText("lossrate", $pipe);
+
+		# Get the vport we computed above
+		if (!exists($ifacemap{$node_nickname}->{$source})) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					     "Pipe specification error");
+		    goto bad;
+		}
+		my $vport = $ifacemap{$node_nickname}->{$source}->{'vport'};
+
+		print STDERR "Bridge: $node_nickname, $source, $dest, $vport\n";
+
+		$bridgemap{$source} = {
+		    "name"     => $node_nickname,
+		    "dest"     => $dest,
+		    "capacity" => $capacity,
+		    "latency"  => $latency,
+		    "lossrate" => $lossrate,
+		    "vport"    => $vport,
+		};
+	    }
 	}
     }
 
@@ -1337,17 +1391,45 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    $iface_vport = $ifacemap{$node_nickname}->{$iface_id}->{"vport"};
 
 	  stitch:
+	    my $ip = GeniXML::GetIp($ref, $nodemap{$node_nickname}->{'rspec'});
+	    my $mask = GeniXML::GetMask($ref, $nodemap{$node_nickname}->{'rspec'});
+	    
 	    # XXX
-	    my $ip     = "10.10.${linknum}.${ifacenum}";
-	    my $mask   = "255.255.255.0";
+	    $ip     = "10.10.${linknum}.${ifacenum}" if (!defined($ip));
+	    $mask   = "255.255.255.0" if (!defined($mask));
 	    my $member = "$node_nickname:$iface_vport";
 	    my $bandwidth = 100000;
+	    my $latency   = 0.0;
+	    my $lossrate  = 0.0;
+	    my $estbw     = undef;
 
-	    # TODO: Allow asymmetric bandwidths
 	    # Let user override.
 	    my $user_bandwidth = GeniXML::GetBandwidth($linkref);
 	    if (defined($user_bandwidth)) {
 		$bandwidth = $user_bandwidth;
+	    }
+
+	    # Look for a link to a bridge.
+	    my $bridge_vname = undef;
+	    if (exists($bridgemap{$iface_id})) {
+		my $bblob = $bridgemap{$iface_id};
+		$virtexperiment->NewTableRow("virt_bridges",
+					     {"vname" => $bblob->{'name'},
+					      "vlink" => $lanname,
+					      "vport" => $iface_vport});
+		#
+		# And then if the bridge is a shaping bridge (delay node).
+		#
+		if (defined($bblob->{'capacity'})) {
+		    # XXX original bw spec goes here for now, for the mapper.
+		    $estbw = $bandwidth;
+		    $bandwidth = $bblob->{'capacity'};
+		}
+		$lossrate = $bblob->{'lossrate'}
+		    if (defined($bblob->{'lossrate'}));
+		$latency = $bblob->{'latency'}
+		    if (defined($bblob->{'latency'}));
+		$bridge_vname = $bblob->{'name'};
 	    }
 
 	    my $virtlan =
@@ -1358,14 +1440,17 @@ sub GetTicketAuxAux($$$$$$$$$)
 					  "vindex"	=> $vindex,
 					  "trivial_ok"  => $trivial_ok,
 					  "ip"          => $ip,
-					  "delay"       => 0.0,
+					  "delay"       => $latency,
 					  "bandwidth"   => $bandwidth, # kbps
-					  "lossrate"    => 0.0,
+					  "est_bandwidth" => $estbw,
+					  "lossrate"    => $lossrate,
 					  "member"      => $member,
 					  "mask"        => $mask,
 					  "rdelay"      => 0.0,
 					  "rbandwidth"  => $bandwidth, # kbps
+					  "rest_bandwidth" => $estbw,
 					  "rlossrate"   => 0.0,
+					  "bridge_vname"=> $bridge_vname,
 					  "fixed_iface" => $iface_name});
 	    $vportmap{$member}->{"virtlan"} = $virtlan;
 	    $ifacenum++;
