@@ -3728,8 +3728,16 @@ sub SetupNetworkAgents($)
 	my $vnode = $member->vnode();
 	my $vlanname = $member->vname();
 	my $bridgename = $member->bridge_vname();
-	my $agentname =
-	    (defined($bridgename) ? $bridgename : $vlanname) . "-${vnode}";
+	my $agentname;
+
+	# A bridge connects two links, so the naming has to reflect that.
+	# See libvtop and tmcd for corresponding changes.
+	if (defined($bridgename)) {
+	    $agentname = "${bridgename}-${vlanname}";
+	}
+	else {
+	    $agentname = "${vlanname}-${vnode}";
+	}
 
 	DBQueryFatal("insert into virt_agents ".
 		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
