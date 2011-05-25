@@ -573,7 +573,13 @@ if ($result eq "toobig") {
     fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
 }
 if ($result != 0) {
-    fatal("FAILED: Returned error code $result generating image ... \n");
+    # it is a wait return value
+    if ($result & 127) {
+	fatal("FAILED: Died with signal $result generating image ... \n");
+    } else {
+	$result = $result >> 8;
+	fatal("FAILED: Returned error code $result generating image ... \n");
+    }
 }
 
 #
@@ -768,11 +774,11 @@ sub run_with_ssh($$)
     my ($cmd,$output) = @_;
     my $stat = undef;
 
-    $cmd = "$TB/bin/sshtb -host $node_id $cmd";
+    $cmd = "$TB/bin/sshtb -n -host $node_id $cmd";
     if (defined($output)) {
 	$cmd .= " > $output";
     }
-    print STDERR "About to: '$cmd'\n";
+    print STDERR "About to: '$cmd' as uid $UID\n" if ($debug);
 
     my $mypid = fork();
     if ($mypid < 0) {
@@ -783,7 +789,15 @@ sub run_with_ssh($$)
     # Child. Just do it.
     #
     if ($mypid == 0) {
-	exit(system($cmd));
+	my $stat = 0;
+	if (system($cmd)) {
+	    $stat = $?;
+	}
+	if ($stat & 127) {
+	    # died with a signal, return the signal
+	    exit($stat & 127);
+	}
+	exit($stat >> 8);
     }
 
     #
