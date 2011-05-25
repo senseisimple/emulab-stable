@@ -6721,6 +6721,7 @@ sub AddDelay($$$$$$$$$)
     
 	DBQueryWarn("insert into delays " .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
+	     ",vlan0,vlan1".
 	     ",vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0" .
 	     ",vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1" .
 	     ",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
@@ -6730,7 +6731,7 @@ sub AddDelay($$$$$$$$$)
 	     ",q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit" .
 	     ",q1_droptail,q1_red,q1_gentle)" .
 	     " values ('$pid','$eid','$idx','$pnodename','$lan' ".
-	     ",$noshaping,'$iface0','$iface1'".
+	     ",$noshaping,'$iface0','$iface1','$lan','$lan'".
 	     ",'$vnodename0',$pipe0,$delay,$bandwidth,$backfill,$lossrate".
 	     ",'$vnodename1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate".
 	     ",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
@@ -6760,13 +6761,14 @@ sub AddDelay($$$$$$$$$)
 	#
 	DBQueryWarn("insert into delays" .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1," .
+	     "  vlan0,vlan1,".
 	     "  vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0," .
 	     "  vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1," .
 	     "  q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm," .
 	     "  q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit," .
 	     "  q0_droptail,q0_red,q0_gentle,q1_limit,q1_qinbytes) " .
 	     " values ('$pid','$eid','$idx','$pnodename','$lan', ".
-	     "  $noshaping,'$iface0','$iface1',".
+	     "  $noshaping,'$iface0','$iface1','$lan','$lan',".
 	     "  '$vnodename0',$pipe0,$delay,$bandwidth,$backfill,$lossrate,".
 	     "  '$vnodename1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate,".
 	     "  $q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,".
@@ -6918,6 +6920,8 @@ sub AddBridge($$$$)
     my $iface1 = $member1->_pport();
     my $pnodename = $member0->_pnode();
     my $pnode =  $self->pnodes()->{$pnodename};
+    my $lan0  = $member0->virt_lan()->vname();
+    my $lan1  = $member1->virt_lan()->vname();
 
     # Bridge index, multiple rows in the table under the same index.
     my $bridgeidx = $pnode->_pipenumber();
@@ -6973,12 +6977,13 @@ sub AddBridge($$$$)
     my $noshaping = (defined($member0->est_bandwidth()) ||
 		     defined($member1->est_bandwidth()) ? 0 : 1);
 
-    $self->printdb("  Shaping: $pipe0,$delay,$bandwidth,$lossrate\n".
-		   "           $pipe1,$rdelay,$rbandwidth,$rlossrate\n")
+    $self->printdb("  Shaping: $lan0: $pipe0,$delay,$bandwidth,$lossrate\n".
+		   "           $lan1: $pipe1,$rdelay,$rbandwidth,$rlossrate\n")
 	if (!$noshaping);
     
     DBQueryWarn("insert into delays " .
 		" (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
+		",vlan0,vlan1,isbridge".
 		",vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0" .
 		",vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1" .
 		",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
@@ -6988,7 +6993,7 @@ sub AddBridge($$$$)
 		",q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit" .
 		",q1_droptail,q1_red,q1_gentle)" .
 		" values ('$pid','$eid','$idx','$pnodename','$vname' ".
-		",$noshaping,'$iface0','$iface1'".
+		",$noshaping,'$iface0','$iface1','$lan0','$lan1',1".
 		",'$vnodename0',$pipe0,$delay,$bandwidth,$backfill,$lossrate".
 		",'$vnodename1',$pipe1,$rdelay,$rbandwidth,$rbackfill".
 		",$rlossrate".
