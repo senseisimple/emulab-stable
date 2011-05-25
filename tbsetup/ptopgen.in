@@ -1041,11 +1041,15 @@ foreach $node (@nodenames) {
 	# We don't want to include subnodes unless their parent node is going
 	# to be in the ptop file too
 	if (!$nodes{$current->subnode_of()} ||
-	    $sharing_mode{$current->subnode_of()}) {
+	    $sharing_mode{$current->subnode_of()} ||
+	    !$nodetoavailable{$current->subnode_of()}) {
 	    # In fact, nuke it from %nodes so that we don't include its links,
 	    # either
-	    delete $nodes{$node};
-	    next;
+	    $nodetoavailable{$node} = 0;
+	    if (! $allnodes) {
+		delete $nodes{$node};
+		next;
+	    }
 	}
 	# Push the subnode's information into its flags
 	push @flags, "subnode_of:" . $current->subnode_of();
