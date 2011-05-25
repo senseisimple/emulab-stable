@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -151,7 +151,7 @@ elsif ($action eq 'modify') {
 }
 else {
     # best effort at up/down: ifconfig -- and assume it's in PATH
-    exit(system("ifconfig $iface $action"));
+    exit(system("ifconfig $iface $action") >> 8);
 }
 
 # should not get here
