@@ -4616,6 +4616,9 @@ sub GeniExperiment($)
 	    print $fh " <attribute name=\"group_leader\">\n";
 	    print $fh "  <value>geniuser</value>\n";
 	    print $fh " </attribute>\n";
+	    print $fh " <attribute name=\"group_description\">\n";
+	    print $fh "  <value></value>\n";
+	    print $fh " </attribute>\n";
 	    print $fh "</group>\n";
 	    close($fh);
 	    my $output = GeniUtil::ExecQuiet("$NEWGROUP $filename");
