@@ -388,7 +388,15 @@ Node instproc updatedb {DB} {
 	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list $self $desire $weight]
     }
 
-    $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $self $self $objtypes(NODE)]
+    set agentname "$self"
+    if { $role == "bridge" } {
+	# XXX Gack. We cannot have two virt_agents with the same name
+	# and there will be a network agent by this name. I do not have
+	# a solution yet, so just bypass for now.
+	set agentname "_${self}"
+    }
+    
+    $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $self $agentname $objtypes(NODE)]
 }
 
 # add_lanlink lanlink
