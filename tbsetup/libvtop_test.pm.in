@@ -441,9 +441,11 @@ sub Create($$$$)
 sub virt_lanlan($)	{ return $_[0]->{'VIRTLANLAN'}; }
 sub members($)		{ return $_[0]->{'MEMBERHASH'}; }
 sub memberlist($)       { return @{ $_[0]->{'MEMBERLIST'} }; }
+sub member($$)          { return @{ $_[0]->{'MEMBERLIST'} }[$_[1]]; }
 sub shapedmembers($)	{ return $_[0]->{'SHAPEDMEMBERS'}; }
 sub vtop($)		{ return $_[0]->{'VTOP'}; }
 sub hash($)		{ return $_[0]->{'HASH'}; }
+sub islink($)           { return (@{ $_[0]->{'MEMBERLIST'} } == 2 ? 1 : 0); }
 
 # Break circular reference someplace to avoid exit errors.
 sub DESTROY {
@@ -502,7 +504,7 @@ sub setmembershaped($$) {
 package libvtop::virt_lan_member;
 use Carp;
 use vars qw($AUTOLOAD);
-use overload ('""' => 'Stringify');
+use overload ('""' => 'Stringify', 'eq' => 'StringEQ');
 
 # To avoid wrtting out all the methods.
 sub AUTOLOAD {
@@ -566,6 +568,13 @@ sub Stringify($)
     my $vport  = $self->vport();
 
     return "$vnode:$vport";
+}
+
+sub StringEQ($$)
+{
+    my ($self, $other) = @_;
+
+    return ($self->Stringify() eq "$other" ? 1 : 0);
 }
 
 sub usevirtiface($)
@@ -1636,6 +1645,17 @@ sub LoadVirtLans($)
 	    $member->_bridged(1);
 	    $virtlan->_bridged(1);
 	    $self->printdb("$virtlan bridge: $member to $bridged_member\n");
+
+	    #
+	    # Check tracing. Only on links attached to the bridge.
+	    # One side might be a lan, but tracing is allowed on the
+	    # link side only. This mirrors the delay node impl, where
+	    # tracing is done only at ingress to the lan.
+	    #
+	    if ($member->traced() && !$virtlan->islink()) {
+		tberror("$member is traced, but $virtlan is not a link\n");
+		return -1;
+	    }
 	}
     }
     
@@ -7012,8 +7032,17 @@ sub AddBridge($$$$)
 	$trace_snaplen0, $trace_db0) = @{ $member0->_traceinfo() };
 
     if ($traced0) {
-	$self->printdb("  Trace: $member0, $pnodename, $iface0, $iface1\n");
+	#
+	# Must find the other end of the link, since a trace works by
+	# capturing packets *leaving* the other side. 
+	#
+	my $omember = ($member0->virt_lan()->member(0) eq "$member0" ?
+		       $member0->virt_lan()->member(1) :
+		       $member0->virt_lan()->member(0));
+	
+	$self->printdb("  Trace: $member0: $omember,$pnodename,$iface0,$iface1\n");
 	my $vname = $member0->virt_lan()->vname();
+	my $vnode = $omember->virt_node()->vname();
 
 	DBQueryWarn("insert into traces ".
 		    " (node_id, idx, iface0, iface1, pid, eid, exptidx, ".
@@ -7021,7 +7050,7 @@ sub AddBridge($$$$)
 		    "  trace_snaplen, trace_db) ".
 		    "values ".
 		    "  ('$pnodename', 0, '$iface0', '$iface1','$pid','$eid', ".
-		    "   '$idx', '$vname', '$vnodename0', ".
+		    "   '$idx', '$vname', '$vnode', ".
 		    "   '$trace_type0', '$trace_expr0', $trace_snaplen0, ".
 		    "   '$trace_db0')")
 	    or return -1 if (! ($self->impotent() || $self->alloconly()));
@@ -7031,8 +7060,17 @@ sub AddBridge($$$$)
 	$trace_snaplen1, $trace_db1) = @{ $member1->_traceinfo() };
 
     if ($traced1) {
-	$self->printdb("  Trace: $member1, $pnodename, $iface1, $iface0\n");
+	#
+	# Must find the other end of the link, since a trace works by
+	# capturing packets *leaving* the other side. 
+	#
+	my $omember = ($member1->virt_lan()->member(0) eq "$member1" ?
+		       $member1->virt_lan()->member(1) :
+		       $member1->virt_lan()->member(0));
+	
+	$self->printdb("  Trace: $member1: $omember,$pnodename,$iface1,$iface0\n");
 	my $vname = $member1->virt_lan()->vname();
+	my $vnode = $omember->virt_node()->vname();
 
 	DBQueryWarn("insert into traces ".
 		    " (node_id, idx, iface0, iface1, pid, eid, exptidx, ".
@@ -7040,7 +7078,7 @@ sub AddBridge($$$$)
 		    "  trace_snaplen, trace_db) ".
 		    "values ".
 		    "  ('$pnodename', 0, '$iface1', '$iface0','$pid','$eid', ".
-		    "   '$idx', '$vname', '$vnodename1', ".
+		    "   '$idx', '$vname', '$vnode', ".
 		    "   '$trace_type1', '$trace_expr1', $trace_snaplen1, ".
 		    "   '$trace_db1')")
 	    or return -1 if (! ($self->impotent() || $self->alloconly()));
