@@ -3746,6 +3746,13 @@ sub SetupNetworkAgents($)
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='LINK'");
 
+	# I do not understand this.
+	$ethlans{$vlanname} = $vlanname
+	    if ($member->protocol() ne "ipv4");
+
+	next
+	    if (!$member->traced());
+
 	DBQueryFatal("insert into virt_agents ".
 		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
 		     " select '$idx', '$pid', '$eid', ".
@@ -3758,16 +3765,19 @@ sub SetupNetworkAgents($)
 		     " values ('$idx', '$pid', '$eid', NULL, ".
 		     "         '__all_tracemon', ".
 		     "         '${vlanname}-${vnode}-tracemon')");
-	
+
+	my $groupname;
+	if (defined($bridgename)) {
+	    $groupname = "${bridgename}-tracemon";
+	}
+	else {
+	    $groupname = "${vlanname}-tracemon}";
+	}
 	DBQueryFatal("insert into event_groups ".
 		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
 		     " values ('$idx', '$pid', '$eid', NULL, ".
-		     "         '${vlanname}-tracemon', ".
+		     "         '$groupname', ".
 		     "         '${vlanname}-${vnode}-tracemon')");
-
-	# I do not understand this.
-	$ethlans{$vlanname} = $vlanname
-	    if ($member->protocol() ne "ipv4");
     }
 
     #
