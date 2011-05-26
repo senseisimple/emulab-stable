@@ -225,9 +225,9 @@ package protogeni.resources
 							} else if(nodeChildXml.localName() == "relation") {
 								var relationType:String = nodeChildXml.@type;
 								if(relationType == "subnode_of") {
-									var pararentId:String = nodeChildXml.@component_id;
-									if(pararentId.length > 0)
-										subnodeList.addItem({subNode:node, parentName:pararentId});
+									var parentId:String = nodeChildXml.@component_id;
+									if(parentId.length > 0)
+										subnodeList.addItem({subNode:node, parentName:parentId});
 								}
 							} else if(nodeChildXml.localName() == "disk_image") {
 								if(node.sliverTypes.length == 0)
@@ -275,12 +275,14 @@ package protogeni.resources
 			for each(var obj:Object in this.subnodeList)
 			{
 				var parentNode:PhysicalNode = this.nodeNameDictionary[obj.parentName];
-				var subNode:PhysicalNode = obj.subNode;
-				// Hack so user doesn't try to get subnodes of nodes which aren't available
-				if(!parentNode.available)
-					subNode.available = false;
-				parentNode.subNodes.push(subNode);
-				obj.subNode.subNodeOf = parentNode;
+				if(parentNode != null) {
+					var subNode:PhysicalNode = obj.subNode;
+					// Hack so user doesn't try to get subnodes of nodes which aren't available
+					if(!parentNode.available)
+						subNode.available = false;
+					parentNode.subNodes.push(subNode);
+					obj.subNode.subNodeOf = parentNode;
+				}
 			}
 			
 			this.myState = LINK_PARSE;
@@ -860,8 +862,10 @@ package protogeni.resources
 				if(vn.isDelayNode) {
 					var sliverTypeShapingXml:XML = <sliver_type_shaping />;
 					sliverTypeShapingXml.setNamespace(XmlUtil.delayNamespace);
+					//sliverTypeShapingXml.@xmlns = XmlUtil.delayNamespace.uri;
 					for each(var pipe:Pipe in vn.pipes.collection) {
 						var pipeXml:XML = <pipe />;
+						pipeXml.setNamespace(XmlUtil.delayNamespace);
 						pipeXml.@source = pipe.source.id;
 						pipeXml.@dest = pipe.destination.id;
 						if(pipe.capacity)

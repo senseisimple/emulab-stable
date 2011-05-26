@@ -78,19 +78,17 @@ package protogeni.communication
 								newCalls.push(new RequestGetVersion(newGm as ProtogeniComponentManager));
 						}
 					}
-					// Aggregate Manager
-					else if(!Main.protogeniOnly)
-					{
-						if(url.indexOf("planet-lab.org") != -1) {
-							var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
-							Main.geniHandler.GeniManagers.add(planetLabAm);
-							planetLabAm.Status = GeniManager.STATUS_INPROGRESS;
-							newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
-							Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
-						}
-					}
 					
 					Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
+				}
+				
+				if(!Main.protogeniOnly)
+				{
+					var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
+					Main.geniHandler.GeniManagers.add(planetLabAm);
+					planetLabAm.Status = GeniManager.STATUS_INPROGRESS;
+					newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
+					Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
 				}
 				
 				if(startSlices)

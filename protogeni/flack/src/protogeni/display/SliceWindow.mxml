@@ -395,8 +395,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					null,
 					"virtualnode");
 				addDelayButton.data = delay;
-				addDelayButton.setStyle("chromeColor", ColorUtil.colorsDark[manager.colorIdx]);
-				addDelayButton.setStyle("color", ColorUtil.colorsLight[manager.colorIdx]);
 				addDelayButton.addEventListener(MouseEvent.CLICK,
 					function addDelayClicked(e:MouseEvent):void {
 						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
@@ -413,8 +411,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					null,
 					"virtualnode");
 				addExclusiveButton.data = exclusive;
-				addExclusiveButton.setStyle("chromeColor", ColorUtil.colorsDark[manager.colorIdx]);
-				addExclusiveButton.setStyle("color", ColorUtil.colorsLight[manager.colorIdx]);
 				addExclusiveButton.addEventListener(MouseEvent.CLICK,
 					function addExclusiveClicked(e:MouseEvent):void {
 						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
@@ -429,8 +425,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					"Add a shared node",
 					ImageUtil.sharedIcon, null, "virtualnode");
 				addSharedButton.data = shared;
-				addSharedButton.setStyle("chromeColor", ColorUtil.colorsDark[manager.colorIdx]);
-				addSharedButton.setStyle("color", ColorUtil.colorsLight[manager.colorIdx]);
 				addSharedButton.addEventListener(MouseEvent.CLICK,
 					function addSharedClicked(e:MouseEvent):void {
 						sliceCanvas.addBasicVirtualNode(shared);
