@@ -22,6 +22,7 @@ package protogeni.resources
 	
 	import protogeni.XmlUtil;
 	import protogeni.communication.CommunicationUtil;
+	import protogeni.display.ChooseManagerWindow;
 	import protogeni.display.ImageUtil;
 	
 	// Slice that a user created in ProtoGENI
@@ -469,24 +470,60 @@ package protogeni.resources
 				Alert.show("The slice has resources allocated to it.  Please delete the slice before trying to import.", "Allocated Resources Exist");
 			else if(this.GetAllNodes().length > 0)
 				Alert.show("The slice already has resources waiting to be allocated.  Please clear the canvas before trying to import", "Resources Exist");
-			else
-				return this.doImport(rspec);
+			else {
+				var sliceRspec:XML;
+				try
+				{
+					sliceRspec = new XML(rspec);
+				}
+				catch(e:Error)
+				{
+					Alert.show("There is a problem with the XML: " + e.toString());
+					return false;
+				}
+				
+				var defaultNamespace:Namespace = sliceRspec.namespace();
+				var detectedRspecVersion:Number;
+				switch(defaultNamespace.uri) {
+					case XmlUtil.rspec01Namespace:
+						detectedRspecVersion = 0.1;
+						break;
+					case XmlUtil.rspec02Namespace:
+						detectedRspecVersion = 0.2;
+						break;
+					case XmlUtil.rspec2Namespace:
+						detectedRspecVersion = 2;
+						break;
+					default:
+						Alert.show("Please use a compatible RSPEC");
+						return false;
+				}
+				
+				for each(var nodeXml:XML in sliceRspec.defaultNamespace::node)
+				{
+					var managerUrn:String;
+					if(detectedRspecVersion < 1)
+						managerUrn = nodeXml.@component_manager_uuid;
+					else
+						managerUrn = nodeXml.@component_manager_id;
+					if(managerUrn.length == 0) {
+						var chooseManagerWindow:ChooseManagerWindow = new ChooseManagerWindow();
+						chooseManagerWindow.success = function importWithDefault(manager:GeniManager):void {
+															doImport(sliceRspec, manager);
+														}
+						chooseManagerWindow.showWindow();
+						return true;
+					}
+				}
+				
+				return this.doImport(sliceRspec);
+			}
 			return false;
 		}
 		
-		public function doImport(rspec:String):Boolean {
-			var sliceRspec:XML;
-			try
-			{
-				sliceRspec = new XML(rspec);
-			}
-			catch(e:Error)
-			{
-				Alert.show("There is a problem with the XML: " + e.toString());
-				return false;
-			}
+		public function doImport(sliceRspec:XML, defaultManager:GeniManager = null):Boolean {
 			
-			// Detect managers, create slivers
+			// Detect managers
 			try {
 				var defaultNamespace:Namespace = sliceRspec.namespace();
 				var detectedRspecVersion:Number;
@@ -511,18 +548,38 @@ package protogeni.resources
 			
 			this.slivers = new SliverCollection();
 			
+			// Set the unknown managers to the default manager if set
+			if(defaultManager != null) {
+				for each(var testNodeXml:XML in sliceRspec.defaultNamespace::node)
+				{
+					var testManagerUrn:String;
+					if(detectedRspecVersion < 1)
+						testManagerUrn = testNodeXml.@component_manager_uuid;
+					else
+						testManagerUrn = testNodeXml.@component_manager_id;
+					if(testManagerUrn.length == 0) {
+						if(detectedRspecVersion < 1)
+							testNodeXml.@component_manager_uuid = defaultManager.Urn.full;
+						else
+							testNodeXml.@component_manager_id = defaultManager.Urn.full;
+					}
+				}
+			}
+			
 			for each(var nodeXml:XML in sliceRspec.defaultNamespace::node)
 			{
 				var managerUrn:String;
+				var detectedManager:GeniManager;
 				if(detectedRspecVersion < 1)
 					managerUrn = nodeXml.@component_manager_uuid;
 				else
 					managerUrn = nodeXml.@component_manager_id;
 				if(managerUrn.length == 0) {
-					Alert.show("All nodes must have a manager id");
+					Alert.show("All nodes must have a manager associated with them");
 					return false;
-				}
-				var detectedManager:GeniManager = Main.geniHandler.GeniManagers.getByUrn(managerUrn);
+				} else
+					detectedManager = Main.geniHandler.GeniManagers.getByUrn(managerUrn);
+				
 				if(detectedManager == null) {
 					Alert.show("All nodes must have a manager id for a known manager");
 					return false;

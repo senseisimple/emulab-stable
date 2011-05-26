@@ -54,6 +54,7 @@ package protogeni
 		
 		public var forceMapKey:String = null;
 		
+		[Bindable]
 		public var GeniManagers:GeniManagerCollection;
 		
 		[Bindable]
