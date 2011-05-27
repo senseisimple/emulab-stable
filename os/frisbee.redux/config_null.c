@@ -30,13 +30,14 @@ extern int debug;
 static char *DEFAULT_IMAGEDIR	= "/usr/local/images";
 static char *DEFAULT_MCADDR	= "239.192.1";
 static char *DEFAULT_MCPORT	= "1025";
+static char *DEFAULT_MCNUMPORT	= "0";
 
 static char *indexfile;
 char *imagedir = NULL;
 static char *rimagedir;
 
 /* Multicast address/port base info */
-static int mc_a, mc_b, mc_c, mc_port;
+static int mc_a, mc_b, mc_c, mc_port_lo, mc_port_num;
 
 /* Memory alloc functions that abort when no memory */
 static void *mymalloc(size_t size);
@@ -276,9 +277,25 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		*addrp = (a << 24) | (b << 16) | (c << 8) | d;
 	} else if (methods & CONFIG_IMAGE_UCAST) {
 		*methp = CONFIG_IMAGE_UCAST;
-		*addrp = 0;
+		/* XXX on retries, we don't mess with the address */
+		if (first)
+			*addrp = 0;
 	}
-	*portp = mc_port + (((c << 8) | d) & 0x7FFF);
+
+	/*
+	 * In the interest of uniform distribution, if we have a maximum
+	 * number of ports to use we just use the index directly.
+	 */
+	if (mc_port_num) {
+		*portp = mc_port_lo + (idx % mc_port_num);
+	}
+	/*
+	 * In the interest of backward compat, if there is no maximum
+	 * number of ports, we use the "classic" formula.
+	 */
+	else {
+		*portp = mc_port_lo + (((c << 8) | d) & 0x7FFF);
+	}
 
 	if (debug)
 		fprintf(stderr,
@@ -674,7 +691,13 @@ null_init(void)
 		      DEFAULT_MCADDR);
 		return NULL;
 	}
-	mc_port = atoi(DEFAULT_MCPORT);
+	mc_port_lo = atoi(DEFAULT_MCPORT);
+	mc_port_num = atoi(DEFAULT_MCNUMPORT);
+	if (mc_port_num < 0 || mc_port_num >= 65536) {
+		error("emulab_init: MC numports '%s' not in valid range!",
+		      DEFAULT_MCNUMPORT);
+		return NULL;
+	}
 
 	return &null_config;
 }

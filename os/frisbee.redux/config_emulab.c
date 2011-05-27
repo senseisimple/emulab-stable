@@ -58,6 +58,11 @@ struct emulab_ha_extra_info {
 
 static char *MC_BASEADDR = FRISEBEEMCASTADDR;
 static char *MC_BASEPORT = FRISEBEEMCASTPORT;
+#ifdef FRISEBEENUMPORTS
+static char *MC_NUMPORTS = FRISEBEENUMPORTS;
+#else
+static char *MC_NUMPORTS = "0";
+#endif
 static char *SHAREDIR	 = SHAREROOT_DIR;
 static char *PROJDIR	 = PROJROOT_DIR;
 static char *GROUPSDIR	 = GROUPSROOT_DIR;
@@ -81,7 +86,7 @@ static char *STDIMAGEDIR;
 static int dump_doaliases = 1;
 
 /* Multicast address/port base info */
-static int mc_a, mc_b, mc_c, mc_port;
+static int mc_a, mc_b, mc_c, mc_port_lo, mc_port_num;
 
 /* Memory alloc functions that abort when no memory */
 static void *mymalloc(size_t size);
@@ -251,7 +256,6 @@ set_get_values(struct config_host_authinfo *ai, int ix)
 #endif
 
 	/* get_timeout */
-#if 1
 	/*
 	 * In the short run, we leave this at pre-master-server levels
 	 * for compatibility (we still support advance startup of servers
@@ -260,15 +264,17 @@ set_get_values(struct config_host_authinfo *ai, int ix)
 	 * We also need this at Utah while we work out some MC problems on
 	 * our control net (sometimes nodes can take minutes before they
 	 * actually hook up with the server.
+	 *
+	 * In an inner elab, neither of these apply.
 	 */
-	ii->get_timeout = 1800;
-#else
+	if (!INELABINELAB)
+		ii->get_timeout = 1800;
 	/*
 	 * We use a small server inactive timeout since we no longer have
 	 * to start up a frisbeed well in advance of the client(s).
 	 */
-	ii->get_timeout = 60;
-#endif
+	else
+		ii->get_timeout = 60;
 
 	/* get_options */
 	snprintf(str, sizeof str, " -W %u",
@@ -455,9 +461,25 @@ emulab_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		*addrp = (a << 24) | (b << 16) | (c << 8) | d;
 	} else if (methods & CONFIG_IMAGE_UCAST) {
 		*methp = CONFIG_IMAGE_UCAST;
-		*addrp = 0;
+		/* XXX on retries, we don't mess with the address */
+		if (first)
+			*addrp = 0;
 	}
-	*portp = mc_port + (((c << 8) | d) & 0x7FFF);
+
+	/*
+	 * In the interest of uniform distribution, if we have a maximum
+	 * number of ports to use we just use the index directly.
+	 */
+	if (mc_port_num) {
+		*portp = mc_port_lo + (idx % mc_port_num);
+	}
+	/*
+	 * In the interest of backward compat, if there is no maximum
+	 * number of ports, we use the "classic" formula.
+	 */
+	else {
+		*portp = mc_port_lo + (((c << 8) | d) & 0x7FFF);
+	}
 
 	return 0;
 }
@@ -1404,7 +1426,13 @@ emulab_init(void)
 		      MC_BASEADDR);
 		return NULL;
 	}
-	mc_port = atoi(MC_BASEPORT);
+	mc_port_lo = atoi(MC_BASEPORT);
+	mc_port_num = atoi(MC_NUMPORTS);
+	if (mc_port_num < 0 || mc_port_num >= 65536) {
+		error("emulab_init: MC_NUMPORTS '%s' not in valid range!",
+		      MC_NUMPORTS);
+		return NULL;
+	}
 
 	if ((path = realpath(SHAREROOT_DIR, pathbuf)) == NULL) {
 		error("emulab_init: could not resolve '%s'", SHAREROOT_DIR);
