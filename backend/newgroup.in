@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -364,8 +364,8 @@ my $group_idx = $new_group->gid_idx();
 my $cmd = "mkgroup $group_idx";
 print($cmd . "\n")
     if ($debug);
-my $cmd_out = `$cmd`;
-UserError("Error: " . $cmd_out)
+system($cmd);
+fatal("Failed: '$cmd'")
     if ($?);
 
 #
@@ -375,8 +375,8 @@ my $safe_id = escapeshellarg($group_id);
 $cmd = "modgroups -a $group_pid:$safe_id:group_root $group_leader";
 print($cmd . "\n")
     if ($debug);
-$cmd_out = `$cmd`;
-UserError("Error: " . $cmd_out)
+system($cmd);
+fatal("Failed: '$cmd'")
     if ($?);
 
 # The web interface requires this line to be printed.
