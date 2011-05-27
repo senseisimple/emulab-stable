@@ -51,10 +51,11 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 		  boot_what_t *info, char* key)
 {
 	int		nrows, rval = 0;
-	MYSQL_RES	*res;
-	MYSQL_ROW	row;
+	MYSQL_RES	*res, *res2;
+	MYSQL_ROW	row, row2;
 	char		ipstr[32];
 	int		haskey=0;
+	int             bootdisk_bios_id = 0;
 
 	char		savedkey[HOSTKEY_LENGTH];
 	if(key != NULL)
@@ -158,6 +159,24 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 				 "where i.IP='%s' "
 				 "  and nobootinfo_types.attrvalue is NULL",
 				 16, inet_ntoa(ipaddr));
+
+		/* Get boot drive from DB */
+		res2 = mydb_query("select attrvalue from node_type_attributes as a, nodes as n, interfaces as i where "
+				  "i.IP = '%s' and i.node_id = n.node_id and n.type = a.type and a.attrkey = 'bootdisk_bios_id';",
+				  1, inet_ntoa(ipaddr));
+
+		if (!res2) {
+			error("Query failed for host %s\n", node_id ? node_id : ipstr);
+			/* XXX Wrong. Should fail so client can request again later */
+			return 0;
+		}
+
+		if (mysql_num_rows(res2)) {
+			row2 = mysql_fetch_row(res2);
+			bootdisk_bios_id = atoi(row2[0]);
+			mysql_free_result(res2);
+		}
+
 	}
 	else { /* User provided a widearea hostkey, so they don't have a necessarily-unique IP address. */
 		/* This is meant to be similar to the above, but queries on the wideareanodekey instead. */
@@ -246,8 +265,14 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 			}
 		}
 		else if (DEFINED(NEXT_BOOT_PARTITION)) {
-			info->type = BIBOOTWHAT_TYPE_PART;
-			info->what.partition = TOINT(NEXT_BOOT_PARTITION);
+			if (bootdisk_bios_id) {
+				info->type = BIBOOTWHAT_TYPE_DISKPART;
+				info->what.dp.disk = bootdisk_bios_id;
+				info->what.dp.partition = TOINT(NEXT_BOOT_PARTITION);
+			} else {
+				info->type = BIBOOTWHAT_TYPE_PART;
+				info->what.partition = TOINT(NEXT_BOOT_PARTITION);
+			}
 		}
 		else {
 			error("Invalid NEXT_BOOT entry for host %s\n",
@@ -280,8 +305,14 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 			}
 		}
 		else if (DEFINED(TEMP_BOOT_PARTITION)) {
-			info->type = BIBOOTWHAT_TYPE_PART;
-			info->what.partition = TOINT(TEMP_BOOT_PARTITION);
+			if (bootdisk_bios_id) {
+				info->type = BIBOOTWHAT_TYPE_DISKPART;
+				info->what.dp.disk = bootdisk_bios_id;
+				info->what.dp.partition = TOINT(TEMP_BOOT_PARTITION);
+			} else {
+				info->type = BIBOOTWHAT_TYPE_PART;
+				info->what.partition = TOINT(TEMP_BOOT_PARTITION);
+			}
 		}
 		else {
 			error("Invalid TEMP_BOOT entry for host %s\n",
@@ -306,8 +337,14 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 			}
 		}
 		else if (DEFINED(DEF_BOOT_PARTITION)) {
-			info->type = BIBOOTWHAT_TYPE_PART;
-			info->what.partition = TOINT(DEF_BOOT_PARTITION);
+			if (bootdisk_bios_id) {
+				info->type = BIBOOTWHAT_TYPE_DISKPART;
+				info->what.dp.disk = bootdisk_bios_id;
+				info->what.dp.partition = TOINT(DEF_BOOT_PARTITION);
+			} else {
+				info->type = BIBOOTWHAT_TYPE_PART;
+				info->what.partition = TOINT(DEF_BOOT_PARTITION);
+			}
 		}
 		else {
 			error("Invalid DEF_BOOT entry for host %s\n",

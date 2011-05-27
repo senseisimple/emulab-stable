@@ -86,6 +86,16 @@ typedef struct boot_what {
 		 * With no host spec, defaults to bootinfo server IP.
 		 */
 		char			mfs[MAX_BOOT_PATH];
+
+		/*
+		 * Type is BIBOOTWHAT_TYPE_DISKPART
+		 *
+		 * Specifies the BIOS disk and partition numbers.
+		 */
+		struct {
+			int disk;
+			int partition;
+		} dp;
 	} what;
 	/*
 	 * Kernel and command line to pass to boot loader or multiboot kernel.
@@ -102,6 +112,7 @@ typedef struct boot_what {
 #define BIBOOTWHAT_TYPE_AUTO	6	/* Do a bootinfo query */
 #define BIBOOTWHAT_TYPE_MFS	7	/* Boot an MFS from server:/path */
 #define BIBOOTWHAT_TYPE_RESTART	8	/* Restart ourselves without reset */
+#define BIBOOTWHAT_TYPE_DISKPART 9      /* Boot a partition from a specific disk */
 
 /* Flags */
 #define BIBOOTWHAT_FLAGS_CMDLINE	0x01	/* Kernel to boot */ 

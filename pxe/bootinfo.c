@@ -110,6 +110,7 @@ bootinfo(struct in_addr ipaddr, char *node_id, struct boot_info *boot_info,
 		if (!no_event_send && needevent) {
 			switch (boot_whatp->type) {
 			case BIBOOTWHAT_TYPE_PART:
+			case BIBOOTWHAT_TYPE_DISKPART:
 			case BIBOOTWHAT_TYPE_SYSID:
 			case BIBOOTWHAT_TYPE_MB:
 			case BIBOOTWHAT_TYPE_MFS:
