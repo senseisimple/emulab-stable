@@ -1729,29 +1729,23 @@ END {
 	info("Recursive call to END block. Returning ...\n");
 	return;
     }
-    if (!defined($eventchild)) {
-	#
-	# No eventchild, nothing interesting happening. 
-	#
+    if (defined($eventchild) && $eventchild == 0) {
+	# We are the event child; just exit.
 	return;
     }
     $ending = 1;
-    debug("Ending stated...\n");
     my $stat = $?;
     $lastmail=0;
     notify("",1);
     if (defined($lockfile) && $lockfile ne "") {
 	unlink $lockfile;
-	announce("Stated exiting, cleaning up\n");
-    } else {
-	# Must be a child
-	info("Stated child exiting\n");
     }
+    announce("Stated exiting, cleaning up\n");
     debug("Announced. Cleaning up...\n");
-    if ($eventchild) {
+    if (defined($eventchild) && $eventchild) {
 	debug("Killing event reader child ...\n");
 	if (! kill('TERM', $eventchild)) {
-	    info("Could not kill event reader child\n");
+	    announce("Could not kill event reader child: $eventchild\n");
 	}
     }
     debug("Cleaned up. Bye!\n");
@@ -1819,6 +1813,12 @@ sub StartEvents()
 
     # We want to exit on any warning. Let the caller notice.
     $SIG{__WARN__} = sub { print STDERR $_[0]; exit(-1); };
+
+    # Plain exit in the child.
+    $SIG{TERM} = sub {
+	print STDERR "Caught a TERM in child. Exiting ...\n";
+	exit(0);
+    };
 
     # Make sure this child starts writing into the new logfile.
     $SIG{USR2} = sub {
