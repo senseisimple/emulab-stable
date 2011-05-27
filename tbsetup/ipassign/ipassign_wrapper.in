@@ -144,6 +144,45 @@ $doroutes = 0;
 $ipassign_args .= " -!";
 
 #
+# Grab bridge information and use them as equivalence classes to
+# partition the vlans.
+#
+
+my %bridges = ();
+# Link parent in an equivalence class.
+# ! exists implies that this is the root
+our %linkparents = ();
+
+sub getRoot($) {
+    my ($link) = @_;
+    while (exists($linkparents{$link})) {
+	$link = $linkparents{$link};
+    }
+    return $link;
+}
+
+sub mergeLink($$)
+{
+    my ($leftlink, $rightlink) = @_;
+    my $left = getRoot($leftlink);
+    my $right = getRoot($rightlink);
+    $linkparents{$left} = $right;
+}
+
+$query_result =
+    DBQueryFatal("select vname, vlink from virt_bridges ".
+		 " where pid='$pid' and eid='$eid'");
+while (my ($bridgeid, $linkid) = $query_result->fetchrow_array) {
+    if (! exists($bridges{$bridgeid})) {
+	$bridges{$bridgeid} = [];
+    }
+    foreach $oldlink (@{ $bridges{$bridgeid} }) {
+	mergeLink($linkid, $oldlink);
+    }
+    push(@{ $bridges{$bridgeid} }, $linkid);
+}
+
+#
 # Grab virtual lan configuration from the DB
 #
 $query_result =
@@ -166,11 +205,18 @@ my %lans = ();
 my %costs = ();
 my %masks = ();
 my %lan2iface = ();
-while (my ($vlan,$member,$cost,$mask) = $query_result->fetchrow_array) {
+my %iface2lan = ();
+while (my ($vlan_name,$member,$cost,$mask) = $query_result->fetchrow_array) {
+    my($vnode, $iface) = split(":", $member);
+
+    # If this is a bridge node, skip address assignment for it.
+    next
+	if (exists($linkparents{$vlan_name}));
+
+    my $vlan = getRoot($vlan_name);
     if (! defined($lans{$vlan})) {
 	$lans{$vlan} = [];
     }
-    my($vnode, $iface) = split(":", $member);
     if (! defined($vnode2index{$vnode})) {
         $vnode2index{$vnode} = $vindex;
         $index2vnode{$vindex} = $vnode;
@@ -179,6 +225,7 @@ while (my ($vlan,$member,$cost,$mask) = $query_result->fetchrow_array) {
 
     push(@{$lans{$vlan}},$vnode2index{$vnode});
     $lan2iface{$vlan}->{$vnode} = $iface;
+    $iface2lan{$vnode}->{$iface} = $vlan_name;
     $costs{$vlan} = int($cost);
     $masks{$vlan} = inet_aton($mask);
 }
@@ -256,9 +303,11 @@ while(<CHILD>) {
         my ($lindex, $vindex, $ip) = /^\s*(\d+)\s+(\d+)\s+([\d\.]+)/;
         my $lan = $index2lan{$lindex};
         my $vn = $index2vnode{$vindex};
+	my $iface = $lan2iface{$lan}->{$vn};
+	my $real_lan = $iface2lan{$vn}->{$iface};
 
         push (@{$vnodetab{$vn}->{'IPS'}}, 
-              [$ip, $masks{$lan}, $lan2iface{$lan}->{$vn}, $lan]);
+              [$ip, $masks{$lan}, $iface, $lan]);
     }
 
     elsif ($mode eq "route") {
