@@ -53,8 +53,8 @@ sub usage()
 my $optlist  = "p:wsNd";
 my $waitmode = 0;
 my $usessh = 0;
-my $usenfs = 1;
-my $usefup = 0;
+my $usenfs = 0;
+my $usefup = 1;
 
 #
 # Configure variables
@@ -725,6 +725,7 @@ sub check_progress($$)
     #
     if (defined($statusp) && $statusp->{$node_id} ne "none") {
 	$result = $statusp->{$node_id};
+	print "$node_id: image capture has completed\n";
 	return 0;
     }
 
