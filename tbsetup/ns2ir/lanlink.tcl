@@ -897,6 +897,7 @@ Link instproc updatedb {DB} {
     $self instvar trivial_ok
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    var_import ::GLOBALS::use_ipassign
     $self instvar bandwidth
     $self instvar rbandwidth
     $self instvar ebandwidth
@@ -979,7 +980,9 @@ Link instproc updatedb {DB} {
 	set port [lindex $nodeport 1]
 	set ip [$node ip $port]
 
-	$self check-ip-mask $ip $netmask
+	if {! $use_ipassign} {
+	  $self check-ip-mask $ip $netmask
+	}
 
 	set nodeportraw [join $nodeport ":"]
 
@@ -1095,6 +1098,7 @@ Lan instproc updatedb {DB} {
     $self instvar trivial_ok
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    var_import ::GLOBALS::use_ipassign
     var_import ::GLOBALS::modelnet_cores
     var_import ::GLOBALS::modelnet_edges
     $self instvar bandwidth
@@ -1192,7 +1196,9 @@ Lan instproc updatedb {DB} {
 	set port [lindex $nodeport 1]
 	set ip [$node ip $port]
 
-	$self check-ip-mask $ip $netmask
+	if {! $use_ipassign} {
+	  $self check-ip-mask $ip $netmask
+	}
 
 	set nodeportraw [join $nodeport ":"]
 
