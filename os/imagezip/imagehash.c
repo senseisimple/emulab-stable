@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 , 2011University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -367,8 +367,11 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 	int nreg;
 
 	if (report) {
-		printf("%s\t%u\t%u\t%u\tU\t%s\n",
-		       spewhash(hash, hashlen), start, size, chunkno, fileid);
+		printf("%s\t%u\t%u",
+		       spewhash(hash, hashlen), start, size);
+		if (report > 1)
+			printf("\t%u\tU\t%s", chunkno, fileid);
+		putchar('\n');
 		return;
 	}
 
