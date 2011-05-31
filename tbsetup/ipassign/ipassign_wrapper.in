@@ -211,7 +211,7 @@ while (my ($vlan_name,$member,$cost,$mask) = $query_result->fetchrow_array) {
 
     # If this is a bridge node, skip address assignment for it.
     next
-	if (exists($linkparents{$vlan_name}));
+	if (exists($bridges{$vnode}));
 
     my $vlan = getRoot($vlan_name);
     if (! defined($lans{$vlan})) {
@@ -307,7 +307,7 @@ while(<CHILD>) {
 	my $real_lan = $iface2lan{$vn}->{$iface};
 
         push (@{$vnodetab{$vn}->{'IPS'}}, 
-              [$ip, $masks{$lan}, $iface, $lan]);
+              [$ip, $masks{$lan}, $iface, $real_lan]);
     }
 
     elsif ($mode eq "route") {
