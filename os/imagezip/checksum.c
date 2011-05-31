@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2009-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2009-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -14,14 +14,15 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "imagehdr.h"
+#include "checksum.h"
+
 #ifdef WITH_CRYPTO
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/rsa.h>
 
-#include "imagehdr.h"
-#include "checksum.h"
-
+#ifdef SIGN_CHECKSUM
 static RSA *signature_key = NULL;
 
 char *
@@ -44,26 +45,6 @@ checksum_keyfile(char *imagename)
 	return fname;
 }
 
-static void
-input_public_key(char *keyfile, RSA *key)
-{
-	char str[1024];
-	FILE *file;
-
-	file = fopen(keyfile, "r");
-	fscanf(file, "%1024s", str);
-	BN_hex2bn(&key->n, str);
-	fscanf(file, "%1024s", str);
-	BN_hex2bn(&key->e, str);
-	fscanf(file, "%1024s", str);
-	BN_hex2bn(&key->dmp1, str);
-	fscanf(file, "%1024s", str);
-	BN_hex2bn(&key->dmq1, str);
-	fscanf(file, "%1024s", str);
-	BN_hex2bn(&key->iqmp, str);
-	fclose(file);
-}
-
 /*
  * Initialize everything necessary to check the signature of the given image.
  * Returns non-zero if successful, 0 otherwise.
@@ -71,12 +52,30 @@ input_public_key(char *keyfile, RSA *key)
 int
 init_checksum(char *keyfile)
 {
-	if (keyfile == NULL || access(keyfile, R_OK)) {
-		fprintf(stderr, "Cannot open keyfile\n");
+	char str[1024];
+	FILE *file;
+
+	if (keyfile == NULL || (file = fopen(keyfile, "r")) == NULL) {
+		fprintf(stderr, "%s: cannot open keyfile\n", keyfile);
 		return 0;
 	}
-	signature_key = RSA_new();
-	input_public_key(keyfile, signature_key);
+	if ((signature_key = RSA_new()) == NULL) {
+		fprintf(stderr, "%s: cannot allocate RSA struct\n", keyfile);
+		return 0;
+	}
+
+	fscanf(file, "%1024s", str);
+	BN_hex2bn(&signature_key->n, str);
+	fscanf(file, "%1024s", str);
+	BN_hex2bn(&signature_key->e, str);
+	fscanf(file, "%1024s", str);
+	BN_hex2bn(&signature_key->dmp1, str);
+	fscanf(file, "%1024s", str);
+	BN_hex2bn(&signature_key->dmq1, str);
+	fscanf(file, "%1024s", str);
+	BN_hex2bn(&signature_key->iqmp, str);
+	fclose(file);
+
 	return 1; 
 }
 
@@ -94,17 +93,40 @@ decrypt_checksum(unsigned char *alleged_sum)
 
 	memcpy(raw_sum, alleged_sum, CSUM_MAX_LEN);
 	memset(alleged_sum, '\0', CSUM_MAX_LEN);
-	RSA_public_decrypt(CSUM_MAX_LEN, raw_sum, alleged_sum, signature_key,
-			   RSA_PKCS1_PADDING);
+	RSA_public_decrypt(sizeof(raw_sum), raw_sum, alleged_sum,
+			   signature_key, RSA_PKCS1_PADDING);
 }
+#endif
 
 int
-verify_checksum(blockhdr_t *blockhdr, const unsigned char *bodybufp)
+verify_checksum(blockhdr_t *blockhdr, const unsigned char *bodybufp, int type)
 {
 	SHA_CTX sum_context;
 	int sum_length;
 	unsigned char alleged_sum[CSUM_MAX_LEN];
 	unsigned char calculated_sum[CSUM_MAX_LEN];
+
+	if (type == CSUM_NONE) {
+		fprintf(stderr, "Chunk has no checksum\n");
+		return 0;
+	}
+#ifdef SIGN_CHECKSUM
+	if ((type & CSUM_SIGNED) == 0) {
+		fprintf(stderr, "Chunk checksum must be signed\n");
+		return 0;
+	}
+#else
+	if ((type & CSUM_SIGNED) != 0) {
+		fprintf(stderr, "Chunk checksum must not be signed\n");
+		return 0;
+	}
+#endif
+	type &= CSUM_TYPE;
+	if (type != CSUM_SHA1) {
+		fprintf(stderr, "Chunk checksum type %d not supported\n",
+			type);
+		return 0;
+	}
 
 	/* initialize checksum state */
 	memcpy(alleged_sum, blockhdr->checksum, CSUM_MAX_LEN);
@@ -153,7 +175,7 @@ verify_checksum(blockhdr_t *blockhdr, const unsigned char *bodybufp)
 int
 encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen)
 {
-	char akeybuf[ENC_MAX_KEYLEN*2+1];
+	char akeybuf[ENC_MAX_KEYLEN*2+1], *cp;
 	FILE *fp;
 
 	/* XXX */
@@ -162,13 +184,17 @@ encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen)
 
 	fp = fopen(keyfile, "r");
 	if (fp == NULL) {
-		fprintf(stderr, "Cannot open encryption keyfile\n");
+		fprintf(stderr, "%s: cannot open encryption keyfile\n",
+			keyfile);
 		return 0;
 	}
 	fgets(akeybuf, sizeof(akeybuf), fp);
 	fclose(fp);
+	if ((cp = rindex(akeybuf, '\n')))
+		*cp = '\0';
 	if (!hexstr_to_mem(keybuf, akeybuf, buflen)) {
-		fprintf(stderr, "Cannot parse key in keyfile\n");
+		fprintf(stderr, "%s: cannot parse encryption key\n",
+			keyfile);
 		return 0;
 	}
 

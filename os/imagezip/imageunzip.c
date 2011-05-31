@@ -200,6 +200,7 @@ unsigned long		splits;
 /* security */
 static int do_checksum = 0;
 static int do_decrypt = 0;
+static char *cipherarg = NULL;
 static unsigned char encryption_key[ENC_MAX_KEYLEN];
 #endif
 
@@ -547,8 +548,11 @@ usage(void)
 		" -d              Turn on progressive levels of debugging\n"
 		" -r retries      Number of image read retries to attempt\n"
 		" -W size         MB of memory to use for write buffering\n"
-		" -c key          Key used to authenticate a checksum (hex number)\n"
-		" -k key          Key used for encryption/decryption (hex number)\n");
+		" -c              Check per-chunk checksum\n"
+		" -a keyfile      File containing pubkey used to sign checksum (implies -c)\n"
+		" -e cipher       Decrypt the image with the given cipher\n"
+		" -k keyfile      File containing key used for encryption/decryption\n"
+		" -u uuid         UUID for image\n");
 	exit(1);
 }
 
@@ -563,7 +567,7 @@ main(int argc, char *argv[])
 #ifdef NOTHREADS
 	nothreads = 1;
 #endif
-	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:Nck:u:")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:Na:ck:eu:")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
 		case 'F':
@@ -628,16 +632,41 @@ main(int argc, char *argv[])
 #endif
 #ifdef WITH_CRYPTO
 		case 'c':
+#ifndef SIGN_CHECKSUM
 			do_checksum = 1;
 			break;
-		case 'k':
-			if (!hexstr_to_mem(encryption_key, optarg,
-					ENC_MAX_KEYLEN)) {
-				do_decrypt = 0;
+#else
+			fprintf(stderr, "Unsigned checksums not supported\n");
+			exit(1);
+#endif
+
+		case 'a':
+#ifdef SIGN_CHECKSUM
+			if (!init_checksum(optarg))
+				exit(1);
+			do_checksum = 1;
+			break;
+#else
+			fprintf(stderr, "Signed checksums not supported\n");
+			exit(1);
+#endif
+
+		case 'e':
+			/* Encryption cipher */
+			cipherarg = optarg;
+			if (strcmp(cipherarg, "bf_cbc") != 0) {
+				fprintf(stderr,
+					"Only know \"bf_cbc\" (blowfish CBC)\n");
 				usage();
-			} else {
-				do_decrypt = 1;
 			}
+			do_decrypt = 1;
+			break;
+
+		case 'k':
+			if (!encrypt_readkey(optarg, encryption_key,
+					     ENC_MAX_KEYLEN))
+				exit(1);
+			do_decrypt = 1;
 			break;
 #endif
 		case 'u':
@@ -688,17 +717,6 @@ main(int argc, char *argv[])
 			readretries = 0;
 		}
 	}
-
-#ifdef WITH_CRYPTO
-	if (do_checksum > 0) {
-		char *keyfile = checksum_keyfile(argv[0]);
-		if (!init_checksum(keyfile)) {
-			fprintf(stderr,
-				"%s: Cannot validate signature\n", argv[0]);
-			exit(1);
-		}
-	}
-#endif
 
 	if (docrconly)
 		outfd = -1;
@@ -883,8 +901,10 @@ main(int argc, char *argv[])
 		fprintf(stderr, "%s: CRC=%u\n", argv[0], ~crc);
 	dump_writebufs();
 #ifdef WITH_CRYPTO
-	if (do_checksum > 0)
+#ifdef SIGN_CHECKSUM
+	if (do_checksum)
 		cleanup_checksum();
+#endif
 #endif
 	return 0;
 }
@@ -895,15 +915,21 @@ main(int argc, char *argv[])
 int
 ImageUnzipInitKeys(char *uuid, char *sig_keyfile, char *enc_keyfile)
 {
-#ifdef WITH_CRYPTO
 	if (uuid) {
 		memcpy(imageid, uuid, UUID_LENGTH);
 		has_id = 1;
 	}
+#ifdef WITH_CRYPTO
+
 	if (sig_keyfile) {
+#ifdef SIGN_CHECKSUM
 		if (!init_checksum(sig_keyfile))
 			exit(1);
 		do_checksum = 1;
+#else
+		fprintf(stderr, "Signed checksums not supported\n");
+		exit(1);
+#endif
 	}
 	if (enc_keyfile) {
 		if (!encrypt_readkey(enc_keyfile,
@@ -1030,8 +1056,10 @@ ImageUnzipQuit(void)
 		fixmbr(slice, dostype);
 
 #ifdef WITH_CRYPTO
-	if (do_checksum > 0)
+#ifdef SIGN_CHECKSUM
+	if (do_checksum)
 		cleanup_checksum();
+#endif
 #endif
 
 	fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
@@ -1197,7 +1225,8 @@ write_subblock(int chunkno, const char *chunkbufp, int chunksize)
 #ifdef WITH_CRYPTO
 /* returns the number of characters decrypted */
 static int
-decrypt_buffer(unsigned char *dest, const unsigned char *source, const blockhdr_t *header)
+decrypt_buffer(unsigned char *dest, const unsigned char *source,
+	       const blockhdr_t *header)
 {
 	/* init */
 	int update_count = 0;
@@ -1263,23 +1292,28 @@ inflate_subblock(const char *chunkbufp)
 	blockhdr    = (const blockhdr_t *) chunkbufp;
 	chunkbufp  += DEFAULTREGIONSIZE;
 
+#ifdef WITH_CRYPTO
+	/*
+	 * If decryption and/or signing is required and the image is too
+	 * old, bail.
+	 *
+	 * XXX this assumes that version nums are monotonically increasing,
+	 * I cannot imagine why they would not be in the future!
+	 */
+	if (blockhdr->magic < COMPRESSED_V4 &&
+	    (do_checksum || do_decrypt)) {
+		fprintf(stderr,
+			"%s requested but image is old format (V%d)\n",
+			do_checksum ? "checksum" : "decryption",
+			blockhdr->magic - COMPRESSED_MAGIC_BASE);
+		exit(1);
+	}
+#endif
 	switch (blockhdr->magic) {
 	case COMPRESSED_V1:
 	{
 		static int didwarn;
 
-#ifdef WITH_CRYPTO
-		if (do_checksum) {
-			fprintf(stderr,
-				"signature checking requested but image is wrong format\n");
-			exit(1);
-		}
-		if (do_decrypt) {
-			fprintf(stderr,
-				"decryption requested but image is wrong format\n");
-			exit(1);
-		}
-#endif
 		curregion = (struct region *)
 			((struct blockhdr_V1 *)blockhdr + 1);
 		if (dofill && !didwarn) {
@@ -1293,18 +1327,6 @@ inflate_subblock(const char *chunkbufp)
 
 	case COMPRESSED_V2:
 	case COMPRESSED_V3:
-#ifdef WITH_CRYPTO
-		if (do_checksum) {
-			fprintf(stderr,
-				"signature checking requested but image is wrong format\n");
-			exit(1);
-		}
-		if (do_decrypt) {
-			fprintf(stderr,
-				"decryption requested but image is wrong format\n");
-			exit(1);
-		}
-#endif
 		imageversion = 2;
 		curregion = (struct region *)
 			((struct blockhdr_V2 *)blockhdr + 1);
@@ -1317,11 +1339,12 @@ inflate_subblock(const char *chunkbufp)
 	case COMPRESSED_V4:
 #ifdef WITH_CRYPTO
 		/*
-		 * Verify the hash signature before looking at anything else.
+		 * Verify the checksum before looking at anything else.
 		 */
 		if (do_checksum &&
 		    !verify_checksum((blockhdr_t *)blockhdr,
-				     (const unsigned char *)blockhdr))
+				     (const unsigned char *)blockhdr,
+				     blockhdr->csum_type))
 			exit(1);
 #endif
 
@@ -1329,9 +1352,12 @@ inflate_subblock(const char *chunkbufp)
 		 * Track the current image UUID.
 		 *
 		 * If a UUID was specified on the command line, use that as
-		 * the expected UUID.  Otherwise, if this is the first chunk
-		 * received, remember its UUID.  All other chunks must match
-		 * this UUID.
+		 * the expected UUID. All chunks much match this UUID.
+		 *
+		 * XXX if no UUID was specified, we use the one from the
+		 * first chunk received and match all others against that.
+		 * This is not ideal, since it is vulnerable to spoofing if
+		 * the client is not using a signature and/or encryption.
 		 */
 		if (has_id == 0) {
 			has_id = 1;
@@ -1353,6 +1379,17 @@ inflate_subblock(const char *chunkbufp)
 		 * Decrypt the rest of the chunk if encrypted.
 		 */
 		if (do_decrypt) {
+			if (blockhdr->enc_cipher == ENC_NONE) {
+				fprintf(stderr, "Chunk has no cipher\n");
+				exit(1);
+			}
+			if (blockhdr->enc_cipher != ENC_BLOWFISH_CBC) {
+				fprintf(stderr,
+					"Chunk cipher type %d not supported\n",
+					blockhdr->enc_cipher);
+				exit(1);
+			}
+
 			((blockhdr_t *)blockhdr)->size
 				= decrypt_buffer((unsigned char *)plaintext,
 						 (unsigned char *)chunkbufp,

@@ -16,9 +16,18 @@ DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
-# Set to 1 for "secure frisbee" support.  Requires openssl libraries.
+#
+# Support encrypted and signed-checksumed images.
+# Requires openssl libraries.
+#
 WITH_CRYPTO	= 1
+WITH_SIGNING	= 1
 
+#
+# Support for auto-generation of old image versions
+#
+WITH_V3COMPAT	= 1
+ 
 SYSTEM	:= $(shell uname -s)
 
 # FreeBSD specific goop
@@ -56,6 +65,9 @@ export HAVE_LOCALE = 1
 
 endif
 
+#
+# Support for various filesystems
+#
 WITH_FFS	= 1
 WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
@@ -95,8 +107,16 @@ HASHLIBS	= $(LIBS) -lcrypto $(PTHREADLIBS)
 
 # Secure images
 ifeq ($(WITH_CRYPTO),1)
-CFLAGS		+= -DWITH_CRYPTO -DSIGN_CHECKSUM
+CFLAGS		+= -DWITH_CRYPTO
+ifeq ($(WITH_SIGNING),1)
+CFLAGS		+= -DSIGN_CHECKSUM
+endif
 LIBS		+= -lcrypto
+endif
+
+# Support generation of V3 images when "secure" features not used
+ifeq ($(WITH_V3COMPAT),1)
+CFLAGS		+= -DWITH_V3COMPAT
 endif
 
 # UFS/UFS2

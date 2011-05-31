@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -81,13 +81,12 @@ struct blockhdr_V2 {
  * Version 4 of the block descriptor adds support for authentication,
  * integrety protection and encryption.
  *
- * An encrypted hash (aka, signature) of each header+chunk is stored in
- * the header (checksum).  The hash algorithm used is likewise stored in
- * the header (checksumtype).  The signature key used to encrypt the hash
- * is transfered out-of-band.
+ * An optionally-signed checksum (hash) of each header+chunk is stored in
+ * the header (checksum) along with the hash algorithm used (csum_type).
+ * The pubkey used to sign the hash is transfered out-of-band.
  *
- * To ensure that all valid signed chunks are part of the same image, a
- * unique identifier is stored in the header (imageid) of each chunk
+ * To ensure that all valid signed chunks are part of the same image,
+ * a unique identifier is stored in the header (imageid) of each chunk
  * associated with the same image.
  *
  * Optionally, the contents of each chunk (but not the header) is encrypted
@@ -105,12 +104,12 @@ struct blockhdr_V4 {
 	uint32_t	lastsect;	/* last sector described by block */
 	int32_t		reloccount;	/* number of reloc entries */
 	/* V4 follows */
-	uint32_t	enc_cipher;	/* Which cipher was used to encrypt */
+	uint16_t	enc_cipher;	/* cipher was used to encrypt */
+	uint16_t	csum_type;	/* checksum algortihm used */
 	uint8_t		enc_iv[ENC_MAX_KEYLEN];
 					/* Initialization vector */
-	uint32_t	checksumtype;	/* Which checksum was used */
 	unsigned char	checksum[SIG_MAX_KEYLEN];
-					/* Checksum, leave room for 512 bits */
+					/* (Signed) checksum */
 	unsigned char	imageid[UUID_LENGTH];
 					/* Unique ID for the whole image */
 };
@@ -121,6 +120,12 @@ struct blockhdr_V4 {
 #define CSUM_NONE		0  /* must be zero */
 #define CSUM_SHA1		1  /* SHA1: default */
 #define CSUM_SHA1_LEN		20
+
+/* type field */
+#define CSUM_TYPE		0xFF
+
+/* flags */
+#define CSUM_SIGNED		0x8000	/* checksum is signed */
 
 /*
  * Ciphers supported

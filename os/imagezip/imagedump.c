@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -118,23 +118,27 @@ main(int argc, char **argv)
 			infd = fileno(stdin);
 
 #ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
 		if (checksums > 0) {
 			char *keyfile = checksum_keyfile(argv[0]);
 
 			if (!init_checksum(keyfile)) {
 				fprintf(stderr,
-					"%s: Cannot validate signature\n",
+					"%s: Cannot validate checksum signing key\n",
 					argv[0]);
 				continue;
 			}
 		}
 #endif
+#endif
 
 		errors = dumpfile(isstdin ? "<stdin>" : argv[0], infd);
 
 #ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
 		if (checksums > 0)
 			cleanup_checksum();
+#endif
 #endif
 
 		if (!isstdin)
@@ -150,7 +154,7 @@ usage(void)
 		"imagedump options <image filename> ...\n"
 		" -v              Print version info and exit\n"
 		" -d              Turn on progressive levels of detail\n"
-		" -c              Verify chunk signaturees\n");
+		" -c              Verify chunk checksums\n");
 	exit(1);
 }
 
@@ -286,7 +290,7 @@ dumpfile(char *name, int fd)
 				       (unsigned long)(filesize / CHUNKSIZE),
 				       magic - COMPRESSED_MAGIC_BASE + 1);
 				if (magic >= COMPRESSED_V4) {
-					sigtype = hdr->checksumtype;
+					sigtype = hdr->csum_type;
 					if (sigtype != CSUM_NONE)
 						printf(", signed (%d)",
 						       sigtype);
@@ -440,8 +444,8 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 	case COMPRESSED_V4:
 		reg = (struct region *)((struct blockhdr_V4 *)hdr + 1);
 		if (chunkno > 0) {
-			if (sigtype != hdr->checksumtype) {
-				printf("%s: wrong signature type in chunk %d\n",
+			if (sigtype != hdr->csum_type) {
+				printf("%s: wrong checksum type in chunk %d\n",
 				       name, chunkno);
 				return 1;
 			}
@@ -456,11 +460,11 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 				return 1;
 			}
 		}
-		if (checksums && hdr->checksumtype != CSUM_NONE) {
-			if (hdr->checksumtype != CSUM_SHA1) {
+		if (checksums && hdr->csum_type != CSUM_NONE) {
+			if (hdr->csum_type != CSUM_SHA1) {
 				printf("%s: unsupported checksum type %d in "
 				       "chunk %d", name,
-				       hdr->checksumtype,
+				       hdr->csum_type,
 				       chunkno);
 				return 1;
 			}
@@ -510,9 +514,9 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 		if (hdr->magic >= COMPRESSED_V4) {
 			int len;
 
-			if (hdr->checksumtype != CSUM_NONE) {
+			if (hdr->csum_type != CSUM_NONE) {
 				len = 0;
-				switch (hdr->checksumtype) {
+				switch (hdr->csum_type) {
 				case CSUM_SHA1:
 					len = CSUM_SHA1_LEN;
 					break;
@@ -715,8 +719,9 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 	/*
 	 * Checksum this image.  Assumes SHA1, because we check for this above.
 	 */
-	if (checksums && hdr->checksumtype != CSUM_NONE) {
-		if (!verify_checksum(hdr, (unsigned char *)buf)) {
+	if (checksums && hdr->csum_type != CSUM_NONE) {
+		if (!verify_checksum(hdr, (unsigned char *)buf,
+				     hdr->csum_type)) {
 			printf("ERROR: chunk %d fails checksum!\n", chunkno);
 			return 1;
 		}

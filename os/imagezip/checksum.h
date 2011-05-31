@@ -15,7 +15,7 @@ cleanup_checksum(void);
 // Returns 1 if checksums matched, 0 if they failed to match.
 // If the checksums fail to match, an error message is also printed.
 int
-verify_checksum(blockhdr_t *blockhdr, const unsigned char *bodybufp);
+verify_checksum(blockhdr_t *blockhdr, const unsigned char *bodybufp, int type);
 
 int
 encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen);
