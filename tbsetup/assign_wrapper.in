@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -2373,6 +2373,7 @@ foreach $delayid (sort {$a <=> $b} keys(%nodedelays)) {
     
 	DBQueryFatal("insert into delays " .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
+	     ",vlan0,vlan1".
 	     ",vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0" .
 	     ",vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1" .
 	     ",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
@@ -2382,7 +2383,7 @@ foreach $delayid (sort {$a <=> $b} keys(%nodedelays)) {
 	     ",q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit" .
 	     ",q1_droptail,q1_red,q1_gentle)" .
 	     " values ('$pid','$eid','$experiment_idx','$pnode','$vname' ".
-	     ",$noshaping,'$int0','$int1'".
+	     ",$noshaping,'$int0','$int1','$vname','$vname'".
 	     ",'$vnode0',$pipe0,$delay,$bandwidth,$backfill,$lossrate".
 	     ",'$vnode1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate".
 	     ",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
@@ -2412,13 +2413,14 @@ foreach $delayid (sort {$a <=> $b} keys(%nodedelays)) {
 	#
 	DBQueryFatal("insert into delays" .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1," .
+	     "  vlan0,vlan1,".
 	     "  vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0," .
 	     "  vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1," .
 	     "  q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm," .
 	     "  q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit," .
 	     "  q0_droptail,q0_red,q0_gentle,q1_limit,q1_qinbytes) " .
 	     " values ('$pid','$eid','$experiment_idx','$pnode','$vname', ".
-	     "  $noshaping,'$int0','$int1',".
+	     "  $noshaping,'$int0','$int1','$vname','$vname',".
 	     "  '$vnode0',$pipe0,$delay,$bandwidth,$backfill,$lossrate,".
 	     "  '$vnode1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate,".
 	     "  $q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,".

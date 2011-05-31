@@ -98,4 +98,10 @@ control-install:	$(CLIENTBINS) $(USERLIBS) \
 			$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBINS))
 	$(LINKS)
 
+client:
+
+client-install: client $(CLIENTBINS) $(USERLIBS) \
+			$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
+			$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBINS))
+
 clean:

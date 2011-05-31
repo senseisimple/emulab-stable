@@ -1806,11 +1806,13 @@ sub GetBootLog($$)
 		    "where node_id='$node_id'");
     return -1
 	if (! $query_result);
-    return 0
-	if (! $query_result->numrows);
 
-    my ($bootlog) = $query_result->fetchrow_array();
-    $$pref = $bootlog;
+    if ($query_result->numrows) {
+	my ($bootlog) = $query_result->fetchrow_array();
+	$$pref = $bootlog;
+    } else {
+	$$pref = "";
+    }
     return 0;
 }
 

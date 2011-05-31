@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -226,8 +226,8 @@ main(int argc, char **argv)
 	if (gethashinfo(argv[0], &hashinfo))
 		exit(2);
 	dumphash(argv[0], hashinfo);
-	(void) checkhash(argv[1], hashinfo);
-
+	if (checkhash(argv[1], hashinfo))
+		exit(1);
 	exit(0);
 }
 
@@ -367,8 +367,11 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 	int nreg;
 
 	if (report) {
-		printf("%s\t%u\t%u\t%u\tU\t%s\n",
-		       spewhash(hash, hashlen), start, size, chunkno, fileid);
+		printf("%s\t%u\t%u",
+		       spewhash(hash, hashlen), start, size);
+		if (report > 1)
+			printf("\t%u\tU\t%s", chunkno, fileid);
+		putchar('\n');
 		return;
 	}
 
@@ -641,7 +644,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	printf("%llu bytes: read cycles: %llu, hash cycles: %llu, cmp cycles: %llu\n",
 	       ndatabytes, rcycles, hcycles, ccycles);
 #endif
-	return 0;
+	return badhashes;
 }
 
 static int

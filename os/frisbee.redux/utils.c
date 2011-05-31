@@ -694,7 +694,7 @@ PrintGetInfo(char *imageid, GetReply *reply, int raw)
 
 		printf("method=0x%x\n", reply->method);
 		isize = ((uint64_t)reply->hisize << 32) | reply->losize;
-		printf("size=%llu\n", isize);
+		printf("size=%llu\n", (unsigned long long)isize);
 		printf("sigtype=0x%x\n", reply->sigtype);
 		switch (reply->sigtype) {
 		case MS_SIGTYPE_MTIME:
@@ -750,7 +750,7 @@ PrintGetInfo(char *imageid, GetReply *reply, int raw)
 		    imageid, GetMSMethods(reply->method));
 
 	isize = ((uint64_t)reply->hisize << 32) | reply->losize;
-	printf("  size=%llu\n", isize);
+	printf("  size=%llu\n", (unsigned long long)isize);
 
 	switch (reply->sigtype) {
 	case MS_SIGTYPE_MTIME:
@@ -781,7 +781,8 @@ PrintPutInfo(char *imageid, PutReply *reply, int raw)
 			if (reply->error == MS_ERROR_TOOBIG) {
 				isize = ((uint64_t)reply->himaxsize << 32) |
 					reply->lomaxsize;
-				printf("maxsize=%llu\n", isize);
+				printf("maxsize=%llu\n",
+				       (unsigned long long)isize);
 			}
 			return;
 		}
@@ -790,7 +791,7 @@ PrintPutInfo(char *imageid, PutReply *reply, int raw)
 		if (reply->exists) {
 			isize = ((uint64_t)reply->hisize << 32) |
 				reply->losize;
-			printf("size=%llu\n", isize);
+			printf("size=%llu\n", (unsigned long long)isize);
 			printf("sigtype=0x%x\n", reply->sigtype);
 			switch (reply->sigtype) {
 			case MS_SIGTYPE_MTIME:
@@ -823,7 +824,7 @@ PrintPutInfo(char *imageid, PutReply *reply, int raw)
 			}
 		}
 		isize = ((uint64_t)reply->himaxsize << 32) | reply->lomaxsize;
-		printf("maxsize=%llu\n", isize);
+		printf("maxsize=%llu\n", (unsigned long long)isize);
 		in.s_addr = htonl(reply->addr);
 		printf("servaddr=%s\n", inet_ntoa(in));
 		in.s_addr = htonl(reply->addr);
@@ -838,7 +839,8 @@ PrintPutInfo(char *imageid, PutReply *reply, int raw)
 		if (reply->error == MS_ERROR_TOOBIG) {
 			isize = ((uint64_t)reply->himaxsize << 32) |
 				reply->lomaxsize;
-			printf("  max allowed size=%llu\n", isize);
+			printf("  max allowed size=%llu\n",
+			       (unsigned long long)isize);
 		}
 		return;
 	}
@@ -846,7 +848,7 @@ PrintPutInfo(char *imageid, PutReply *reply, int raw)
 	if (reply->exists) {
 		printf("%s: currently exists\n", imageid);
 		isize = ((uint64_t)reply->hisize << 32) | reply->losize;
-		printf("  size=%llu\n", isize);
+		printf("  size=%llu\n", (unsigned long long)isize);
 		switch (reply->sigtype) {
 		case MS_SIGTYPE_MTIME:
 		{
@@ -858,9 +860,10 @@ PrintPutInfo(char *imageid, PutReply *reply, int raw)
 		}
 	}
 	isize = ((uint64_t)reply->himaxsize << 32) | reply->lomaxsize;
-	printf("  max allowed size=%llu\n", isize);
+	printf("  max allowed size=%llu\n", (unsigned long long)isize);
 	in.s_addr = htonl(reply->addr);
 	printf("%s: access OK, upload via %s:%d, maxsize=%llu\n",
-	       imageid, inet_ntoa(in), reply->port, isize);
+	       imageid, inet_ntoa(in), reply->port,
+	       (unsigned long long)isize);
 }
 #endif

@@ -538,6 +538,14 @@ if ($usefup && $result eq "255") {
     } else {
 	$command .= " $filename";
     }
+
+    # reset state for check_progress
+    $usefup = 0;
+    $runticks = 0;
+    $idleticks = 0;
+    $lastsize = 0;
+    $result = undef;
+
     if ($NONFS) {
 	$result = run_with_ssh($command, $filename);
     } else {
@@ -565,7 +573,13 @@ if ($result eq "toobig") {
     fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
 }
 if ($result != 0) {
-    fatal("FAILED: Returned error code $result generating image ... \n");
+    # it is a wait return value
+    if ($result & 127) {
+	fatal("FAILED: Died with signal $result generating image ... \n");
+    } else {
+	$result = $result >> 8;
+	fatal("FAILED: Returned error code $result generating image ... \n");
+    }
 }
 
 #
@@ -711,6 +725,7 @@ sub check_progress($$)
     #
     if (defined($statusp) && $statusp->{$node_id} ne "none") {
 	$result = $statusp->{$node_id};
+	print "$node_id: image capture has completed\n";
 	return 0;
     }
 
@@ -760,11 +775,11 @@ sub run_with_ssh($$)
     my ($cmd,$output) = @_;
     my $stat = undef;
 
-    $cmd = "$TB/bin/sshtb -host $node_id $cmd";
+    $cmd = "$TB/bin/sshtb -n -host $node_id $cmd";
     if (defined($output)) {
 	$cmd .= " > $output";
     }
-    print STDERR "About to: '$cmd'\n";
+    print STDERR "About to: '$cmd' as uid $UID\n" if ($debug);
 
     my $mypid = fork();
     if ($mypid < 0) {
@@ -775,7 +790,15 @@ sub run_with_ssh($$)
     # Child. Just do it.
     #
     if ($mypid == 0) {
-	exit(system($cmd));
+	my $stat = 0;
+	if (system($cmd)) {
+	    $stat = $?;
+	}
+	if ($stat & 127) {
+	    # died with a signal, return the signal
+	    exit($stat & 127);
+	}
+	exit($stat >> 8);
     }
 
     #

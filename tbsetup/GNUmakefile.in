@@ -102,11 +102,8 @@ SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeehelper \
 SETUID_LIBX_SCRIPTS  = console_setup spewlogfile
 
 ifeq ($(SYSTEM),FreeBSD)
-FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
-ifeq ($(FBSDVERSION),FreeBSD4)
 SUBDIRS  += ipassign
 IPASSIGN  = Yes
-endif
 endif
 
 #

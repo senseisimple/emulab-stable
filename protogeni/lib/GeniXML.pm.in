@@ -18,7 +18,7 @@ GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
 GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
-CreateDocument AddElement RemoveChild PolicyExists);
+CreateDocument AddElement RemoveChild PolicyExists GetMask);
 
 use English;
 use XML::LibXML;
@@ -38,6 +38,9 @@ $EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
 # Configure variables
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
+
+# Name Space stuff
+my $DELAY_NS = "http://www.protogeni.net/resources/rspec/ext/delay/1";
 
 # Returns the document element by parsing a given string. If the
 # string fails to parse, returns undefined.
@@ -317,13 +320,34 @@ sub GetBandwidth($)
     return $result;
 }
 
-sub GetIp($$)
+sub GetMask($$)
 {
     my ($ifaceref, $node) = @_;
     my $result = undef;
     if (IsVersion0($ifaceref)) {
 	$result = GetText("tunnel_ip", $ifaceref);
     } else {
+	my $id = GetInterfaceId($ifaceref);
+	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
+	foreach my $iface (@ifaces) {
+	    my $testid = GetInterfaceId($iface);
+	    if (defined($id) && defined($testid) && $testid eq $id) {
+		my $ip = FindFirst("n:ip", $iface);
+		if (defined($ip)) {
+		    $result = GetText("mask", $ip);
+		}
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub GetIp($$)
+{
+    my ($ifaceref, $node) = @_;
+    my $result = undef;
+    if (! IsVersion0($ifaceref)) {
 	my $id = GetInterfaceId($ifaceref);
 	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
 	foreach my $iface (@ifaces) {
@@ -550,6 +574,24 @@ sub GetLinkManager($)
 {
     my ($link) = @_;
     return GetFirstText($link, "id", "name");
+}
+
+sub GetDelayPipes($)
+{
+    my ($node) = @_;
+    my @result = ();
+    
+    if (! IsVersion0($node)) {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (defined($type)) {
+	    my $name = GetText("name", $type);
+	    if (defined($name) && $name eq "delay") {
+		@result = FindNodesNS("n:sliver_type_shaping/n:pipe", $type,
+				      $DELAY_NS)->get_nodelist();
+	    }
+	}
+    }
+    return @result;
 }
 
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets

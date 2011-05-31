@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,6 +19,18 @@ Duplink instproc init {} {
 }
 
 Duplink instproc unknown {m args} {
+}
+
+Class FakeQueue
+
+FakeQueue instproc init {args} {
+}
+
+FakeQueue instproc unknown {args} {
+}
+
+Duplink instproc Queue {args} {
+    return [new FakeQueue]
 }
 
 # converts internal ns structures to linktest structure

@@ -2063,6 +2063,7 @@ sub CreateDefsFile($)
 		/^FRISEBEEMCASTADDR$/ && do {
 		    print OUTDEFS "FRISEBEEMCASTADDR=\"$frismcastaddr\"\n";
 		    print OUTDEFS "FRISEBEEMCASTPORT=\"6000\"\n";
+		    print OUTDEFS "FRISEBEENUMPORTS=\"0\"\n";
 		    last SWITCH;
 		};
 		/^TBCOOKIESUFFIX$/ && do {

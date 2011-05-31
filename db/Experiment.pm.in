@@ -127,6 +127,7 @@ $EXPT_RESOURCESHOSED    = 0;
 		   "virt_user_environment",
 		   "virt_parameters",
 		   "virt_paths",
+		   "virt_bridges",
 		   # vis_nodes is locked during update in prerender, so we
 		   # will get a consistent dataset when we backup.
 		   "vis_nodes",
@@ -3726,13 +3727,31 @@ sub SetupNetworkAgents($)
     foreach my $member ($lan_members->Rows()) {
 	my $vnode = $member->vnode();
 	my $vlanname = $member->vname();
+	my $bridgename = $member->bridge_vname();
+	my $agentname;
+
+	# A bridge connects two links, so the naming has to reflect that.
+	# See libvtop and tmcd for corresponding changes.
+	if (defined($bridgename)) {
+	    $agentname = "${bridgename}-${vlanname}";
+	}
+	else {
+	    $agentname = "${vlanname}-${vnode}";
+	}
 
 	DBQueryFatal("insert into virt_agents ".
 		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
 		     " select '$idx', '$pid', '$eid', ".
-		     "   '${vlanname}-${vnode}', '*', ".
+		     "   '$agentname', '*', ".
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='LINK'");
+
+	# I do not understand this.
+	$ethlans{$vlanname} = $vlanname
+	    if ($member->protocol() ne "ipv4");
+
+	next
+	    if (!$member->traced());
 
 	DBQueryFatal("insert into virt_agents ".
 		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
@@ -3746,17 +3765,34 @@ sub SetupNetworkAgents($)
 		     " values ('$idx', '$pid', '$eid', NULL, ".
 		     "         '__all_tracemon', ".
 		     "         '${vlanname}-${vnode}-tracemon')");
-	
+
+	my $groupname;
+	if (defined($bridgename)) {
+	    $groupname = "${bridgename}-tracemon";
+	}
+	else {
+	    $groupname = "${vlanname}-tracemon}";
+	}
 	DBQueryFatal("insert into event_groups ".
 		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
 		     " values ('$idx', '$pid', '$eid', NULL, ".
-		     "         '${vlanname}-tracemon', ".
+		     "         '$groupname', ".
 		     "         '${vlanname}-${vnode}-tracemon')");
-
-	# I do not understand this.
-	$ethlans{$vlanname} = $vlanname
-	    if ($member->protocol() ne "ipv4");
     }
+
+    #
+    # Bridges have their own naming; each bridge gets a link agent.
+    #
+    my $bridge_members = $virtexp->Table("virt_bridges");
+    foreach my $member ($bridge_members->Rows()) {
+	my $bridgename = $member->vname();
+
+	DBQueryFatal("replace into virt_agents ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$idx', '$pid', '$eid', '$bridgename', '*', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='LINK'");
+    }    
 
     my $lans = $virtexp->Table("virt_lan_lans");
     foreach my $lan ($lans->Rows()) {

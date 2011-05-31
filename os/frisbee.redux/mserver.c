@@ -37,7 +37,7 @@
 #define FRISBEE_SERVER	"/usr/testbed/sbin/frisbeed"
 #define FRISBEE_CLIENT	"/usr/testbed/sbin/frisbee"
 #define FRISBEE_UPLOAD	"/usr/testbed/sbin/frisuploadd"
-#define FRISBEE_RETRIES	3
+#define FRISBEE_RETRIES	5
 
 static void	get_options(int argc, char **argv);
 static int	makesocket(int portnum, struct in_addr *ifip, int *tcpsockp);
@@ -1588,7 +1588,8 @@ startchild(struct childinfo *ci)
 				ci->imageinfo->put_options : "";
 			snprintf(argbuf, sizeof argbuf,
 				 "%s -i %s -T %d %s -s %llu -m %s -p %d %s",
-				 pname, ifacestr, ci->timeout, opts, isize,
+				 pname, ifacestr, ci->timeout, opts,
+				 (unsigned long long)isize,
 				 inet_ntoa(in), ci->port, ci->imageinfo->path);
 			break;
 		}
@@ -2052,8 +2053,20 @@ reapchildren(int wpid, int *statusp)
 						       ci->method, 0,
 						       &ci->addr, &ci->port,
 						       &ci->method) &&
-			    !startchild(ci))
+			    !startchild(ci)) {
+				/* give it a chance to run, and check again */
+				sleep(1);
+				in.s_addr = htonl(ci->addr);
+				log("%s: restarted %s process on %s:%d"
+				    " (pid %d)",
+				    ci->imageinfo->imageid,
+				    ci->ptype == PTYPE_SERVER ?
+				    "server" : "uploader",
+				    inet_ntoa(in), ci->port, ci->pid);
+				if (wpid)
+					wpid = ci->pid;
 				continue;
+			}
 		}
 		if (ci->done)
 			ci->done(ci, status);

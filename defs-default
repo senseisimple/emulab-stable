@@ -51,6 +51,14 @@ NOSHAREDFS=0
 NFSRACY=1
 
 #
+# Define a port range for frisbee use. You may want to do this if you
+# have a firewall between boss and the nodes to limit the size of the
+# "hole" required.
+#
+FRISEBEEMCASTPORT=21700
+FRISEBEENUMPORTS=100
+
+#
 # If enabled, needs setup, see:
 #   http://users.emulab.net/trac/emulab/wiki/NodeUsageInstall
 #

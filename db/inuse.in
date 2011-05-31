@@ -23,7 +23,7 @@ use libdb;
 
 sub usage() {
     print STDOUT "Usage: inuse [-a | -t type] [-p pid [-e eid]] [-s|-r] " .
-        "[-f|-F] [-h] [-R]\n";
+        "[-f|-F] [-h] [-R] [-u feature | -U feature]\n";
     print STDOUT "  -h          This message\n";
     print STDOUT "  -a          Print all nodes (default: only PCs\n";
     print STDOUT "  -t type     Limit to nodes of type (or class)\n";
@@ -34,9 +34,11 @@ sub usage() {
     print STDOUT "  -f          Include free nodes\n";
     print STDOUT "  -F          Include ONLY free nodes\n";
     print STDOUT "  -R          Only include pre-reserved nodes\n";
+    print STDOUT "  -u feature  Only include nodes with the given feature\n";
+    print STDOUT "  -U feature  Exclude nodes with the given feature\n";
     exit (-1);
 }
-my $optlist = "t:p:e:srafFhR";
+my $optlist = "t:p:e:srafFhRu:U:";
 
 my @columns = ("n.node_id","n.type","pid","eid","reserved_pid");
 
@@ -50,7 +52,8 @@ if (@ARGV != 0 || $opt{h}) {
 
 # Check for mutually exclusive options or ones that must go together
 if (($opt{s} && $opt{r}) || ($opt{e} && !$opt{p}) ||
-    ($opt{a} && $opt{t}) || ($opt{f} && $opt{F})) {
+    ($opt{a} && $opt{t}) || ($opt{f} && $opt{F}) ||
+    ($opt{u} && $opt{U})) {
     usage();
 }
 
@@ -92,6 +95,24 @@ if ($opt{p}) {
     }
 }
 
+if ($opt{u} || $opt{U}) {
+    my $feature = defined($opt{u}) ? $opt{u} : $opt{U};
+    my $subquery = "(".
+       "EXISTS (SELECT * FROM node_features AS nf " .
+       "        WHERE nf.node_id = n.node_id " .
+       "        AND feature = '$feature') " .
+       " OR " .
+       "EXISTS (SELECT * FROM node_type_features AS ntf " .
+       "        WHERE ntf.type = n.type " .
+       "        AND feature = '$feature') " .
+       ")";
+    if (defined($opt{u})) {
+        push @whereclauses, $subquery;
+    } else {
+        push @whereclauses, "NOT $subquery";
+    }
+}
+
 my $whereclause = "";
 if (@whereclauses) {
     $whereclause = "where " . join(" and ",map {"($_)"} @whereclauses);
@@ -104,6 +125,7 @@ if ($opt{s}) {
     push @columns, "rsrv_time";
     $sortclause = "order by rsrv_time,priority";
 }
+
 
 my $columns = join(",",@columns);
 

@@ -20,7 +20,7 @@ public:
     {
     }
 
-    std::auto_ptr<Partition> CutSearchPartition::clone()
+    std::auto_ptr<Partition> clone()
     {
         return std::auto_ptr<Partition>(new CutSearchPartition(*this));
     }

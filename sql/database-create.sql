@@ -444,11 +444,14 @@ CREATE TABLE `delays` (
   `eid` varchar(32) default NULL,
   `pid` varchar(32) default NULL,
   `vname` varchar(32) default NULL,
+  `vlan0` varchar(32) default NULL,
+  `vlan1` varchar(32) default NULL,
   `vnode0` varchar(32) default NULL,
   `vnode1` varchar(32) default NULL,
   `card0` tinyint(3) unsigned default NULL,
   `card1` tinyint(3) unsigned default NULL,
   `noshaping` tinyint(1) default '0',
+  `isbridge` tinyint(1) default '0',
   PRIMARY KEY  (`node_id`,`iface0`,`iface1`),
   KEY `pid` (`pid`,`eid`),
   KEY `exptidx` (`exptidx`)
@@ -4030,6 +4033,22 @@ CREATE TABLE `virt_blobs` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `virt_bridges`
+--
+
+DROP TABLE IF EXISTS `virt_bridges`;
+CREATE TABLE `virt_bridges` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vname` varchar(32) NOT NULL default '',
+  `vlink` varchar(32) NOT NULL default '',
+  `vport` tinyint(3) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`vname`,`vlink`,`vport`),
+  KEY `pideid` (`pid`,`eid`,`vname`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `virt_client_service_ctl`
 --
 
@@ -4214,6 +4233,7 @@ CREATE TABLE `virt_lans` (
   `implemented_by_link` tinytext,
   `ofenabled` tinyint(1) default '0',
   `ofcontroller` tinytext,
+  `bridge_vname` varchar(32) default NULL,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),
@@ -4296,6 +4316,7 @@ CREATE TABLE `virt_nodes` (
   `plab_plcnet` varchar(32) NOT NULL default 'none',
   `numeric_id` int(11) default NULL,
   `sharing_mode` varchar(32) default NULL,
+  `role` enum('node','bridge') NOT NULL default 'node',
   PRIMARY KEY  (`exptidx`,`vname`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`vname`),
   KEY `pid` (`pid`,`eid`,`vname`)

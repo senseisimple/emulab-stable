@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,6 +19,7 @@
 ######################################################################
 
 Class Node -superclass NSObject
+Class Bridge -superclass Node
 
 Node instproc init {s} {
     $self set sim $s
@@ -79,6 +80,9 @@ Node instproc init {s} {
     $self instvar desirelist
     array set desirelist {}
 
+    # If this is a bridge, list of the link members that connect to it.
+    $self set bridgelist {}
+
     # These are just various strings that we pass through to the DB.
     $self set cmdline ""
     $self set rpms ""
@@ -91,6 +95,7 @@ Node instproc init {s} {
     $self set fixed ""
     $self set nseconfig ""
     $self set sharing_mode ""
+    $self set role ""
 
     $self set topo ""
 
@@ -115,6 +120,13 @@ Node instproc init {s} {
     $self set numeric_id {}
 }
 
+Bridge instproc init {s} {
+    $self next $s
+    $self instvar role
+
+    set role "bridge"
+}
+
 # The following procs support renaming (see README)
 Node instproc rename {old new} {
     $self instvar portlist
@@ -132,6 +144,8 @@ Node instproc rename {old new} {
 
 Node instproc rename_lanlink {old new} {
     $self instvar portlist
+    $self instvar bridgelist
+    
     set newportlist {}
     foreach node $portlist {
 	if {$node == $old} {
@@ -141,6 +155,16 @@ Node instproc rename_lanlink {old new} {
 	}
     }
     set portlist $newportlist
+
+    set newbridgelist {}
+    foreach link $bridgelist {
+	if {$link == $old} {
+	    lappend newbridgelist $new
+	} else {
+	    lappend newbridgelist $link
+	}
+    }
+    set bridgelist $newbridgelist
 }
 
 # updatedb DB
@@ -158,6 +182,7 @@ Node instproc updatedb {DB} {
     $self instvar failureaction
     $self instvar inner_elab_role
     $self instvar plab_role
+    $self instvar role
     $self instvar plab_plcnet
     $self instvar routertype
     $self instvar fixed
@@ -310,6 +335,11 @@ Node instproc updatedb {DB} {
 	lappend values $inner_elab_role
     }
 
+    if { $role != "" } {
+	lappend fields "role"
+	lappend values $role
+    }
+
     if { $plab_role != "none" } {
 	lappend fields "plab_role"
 	lappend values $plab_role
@@ -358,7 +388,15 @@ Node instproc updatedb {DB} {
 	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list $self $desire $weight]
     }
 
-    $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $self $self $objtypes(NODE)]
+    set agentname "$self"
+    if { $role == "bridge" } {
+	# XXX Gack. We cannot have two virt_agents with the same name
+	# and there will be a network agent by this name. I do not have
+	# a solution yet, so just bypass for now.
+	set agentname "_${self}"
+    }
+    
+    $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $self $agentname $objtypes(NODE)]
 }
 
 # add_lanlink lanlink
@@ -684,4 +722,33 @@ Node instproc set_numeric_id {myid} {
     $self instvar numeric_id
 
     set numeric_id $myid
+}
+
+#
+# Add a link to this bridge.
+#
+Bridge instproc addbridgelink {link} {
+    $self instvar bridgelist
+
+    lappend bridgelist $link
+}
+
+Bridge instproc updatedb {DB} {
+    $self next $DB
+
+    $self instvar bridgelist
+    $self instvar sim
+    
+    foreach link $bridgelist {
+	set port [$self find_port $link]
+
+	if {$port == {}} {
+	    perror "Bridge $self is not a member of $link";
+	    return
+	}
+	set fields [list "vname" "vlink" "vport"]
+	set values [list $self $link $port]
+
+	$sim spitxml_data "virt_bridges" $fields $values	
+    }
 }
