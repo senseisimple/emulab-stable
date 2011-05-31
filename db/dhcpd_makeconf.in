@@ -174,11 +174,17 @@ if (! $query_result) {
 while (my %row = $query_result->fetchhash()) {
     my $node_id = $row{"node_id"};
 
+    # We need to try restarting dhcpd on *all* subbosses, just in case
+    # we've moved all dhcp nodes from one subboss to another.
+    # Otherwise the old server wouldn't get restarted and both the old
+    # and new servers would attempt to respond to dhcp requests.
+
+    $subboss_dhcp_servers{$row{"subboss_id"}} = 1;
+
     if ($row{"service"} eq 'tftp') {
 	    $tftp_subbosses{$node_id} = $row{"IP"};
     } elsif ($row{"service"} eq 'dhcp') {
 	    $dhcp_subbosses{$node_id} = $row{"IP"};
-	    $subboss_dhcp_servers{$row{"subboss_id"}} = 1;
     } elsif ($row{"service"} eq 'bootinfo') {
 	    $bootinfo_subbosses{$node_id} = $row{"IP"};
     }
