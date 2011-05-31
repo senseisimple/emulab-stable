@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 , 2011University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -226,8 +226,8 @@ main(int argc, char **argv)
 	if (gethashinfo(argv[0], &hashinfo))
 		exit(2);
 	dumphash(argv[0], hashinfo);
-	(void) checkhash(argv[1], hashinfo);
-
+	if (checkhash(argv[1], hashinfo))
+		exit(1);
 	exit(0);
 }
 
@@ -644,7 +644,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	printf("%llu bytes: read cycles: %llu, hash cycles: %llu, cmp cycles: %llu\n",
 	       ndatabytes, rcycles, hcycles, ccycles);
 #endif
-	return 0;
+	return badhashes;
 }
 
 static int
