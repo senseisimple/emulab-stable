@@ -50,6 +50,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					previewRspecButton.visible = true;
 				}
 				
+				if(link.capacity != -1)
+					capacityInput.text = link.capacity.toString();
+				
 				types = new ArrayList();
 				types.addItem({type:link.linkType, name:VirtualLink.TypeToString(link.linkType)});
 				if(link.linkType == VirtualLink.TYPE_TUNNEL) {
@@ -118,7 +121,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					else
 						link.linkType = this.typeList.selectedItem.type;
 				}
-				link.capacity = this.bandwidthStepper.value;
+				if(this.capacityInput.text.length > 0)
+					link.capacity = Number(this.capacityInput.text);
+				else
+					link.capacity = -1;
 				Main.geniDispatcher.dispatchSliceChanged(link.slivers.collection[0].slice);
 			}
 		]]>
@@ -144,7 +150,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	
 	<s:HGroup verticalAlign="middle" width="100%">
 		<s:Label text="Bandwidth" fontWeight="bold"/>
-		<s:NumericStepper id="bandwidthStepper" value="{link.capacity}" minimum="1"  maximum="{int.MAX_VALUE}" width="100%" />
+		<s:TextInput id="capacityInput" resize="0-9" width="100%" />
 		<s:Label text="kb/s" />
 	</s:HGroup>
 	

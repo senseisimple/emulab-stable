@@ -41,5 +41,12 @@ package protogeni
 			var upTo:int = (phrase.length / 2) - (removeChars / 2);
 			return phrase.substring(0, upTo) + "..." +  phrase.substring(upTo + removeChars);
 		}
+		
+		public static function makeSureEndsWith(original:String, letter:String):String {
+			if(original.charAt(original.length-1) != letter)
+				return original + letter;
+			else
+				return original;
+		}
 	}
 }

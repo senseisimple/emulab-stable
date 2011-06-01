@@ -968,7 +968,7 @@ package protogeni.resources
 				}
 			}
 			
-			if (vl.linkType != VirtualLink.TYPE_TUNNEL && vl.capacity) {
+			if (vl.linkType != VirtualLink.TYPE_TUNNEL && vl.capacity != -1) {
 				if(manager.inputRspecVersion < 1)
 					linkXml.appendChild(XML("<bandwidth>" + vl.capacity + "</bandwidth>"));
 				else {
