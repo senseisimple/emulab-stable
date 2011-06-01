@@ -162,7 +162,7 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 
 		/* Get boot drive from DB */
 		res2 = mydb_query("select attrvalue from node_attributes as a, nodes as n, interfaces as i where "
-				  "i.IP = '%s' and i.node_id = n.node_id and n.type = a.type and a.attrkey = 'bootdisk_bios_id';",
+				  "i.IP = '%s' and i.node_id = n.node_id and n.node_id = a.node_id and a.attrkey = 'bootdisk_bios_id';",
 				  1, inet_ntoa(ipaddr));
 
 		if (!res2) {
