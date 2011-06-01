@@ -260,7 +260,7 @@ hexstr_to_mem(unsigned char * dest, const char * source, int memsize)
  * So we don't have to worry about UUID_LENGTH constant there.
  */
 char *
-str_to_imageid(char *srcstr)
+str_to_uuid(char *srcstr)
 {
 	unsigned char *buf = calloc(UUID_LENGTH, 1);
 	
