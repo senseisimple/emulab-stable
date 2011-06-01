@@ -161,7 +161,7 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 				 16, inet_ntoa(ipaddr));
 
 		/* Get boot drive from DB */
-		res2 = mydb_query("select attrvalue from node_type_attributes as a, nodes as n, interfaces as i where "
+		res2 = mydb_query("select attrvalue from node_attributes as a, nodes as n, interfaces as i where "
 				  "i.IP = '%s' and i.node_id = n.node_id and n.type = a.type and a.attrkey = 'bootdisk_bios_id';",
 				  1, inet_ntoa(ipaddr));
 
@@ -171,12 +171,25 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 			return 0;
 		}
 
+		if (!mysql_num_rows(res2)) {
+			mysql_free_result(res2);
+			res2 = mydb_query("select attrvalue from node_type_attributes as a, nodes as n, interfaces as i where "
+					  "i.IP = '%s' and i.node_id = n.node_id and n.type = a.type and a.attrkey = 'bootdisk_bios_id';",
+					  1, inet_ntoa(ipaddr));
+
+			if (!res2) {
+				error("Query failed for host %s\n", node_id ? node_id : ipstr);
+				/* XXX Wrong. Should fail so client can request again later */
+				return 0;
+			}
+		}
+
 		if (mysql_num_rows(res2)) {
 			row2 = mysql_fetch_row(res2);
 			bootdisk_bios_id = atoi(row2[0]);
-			mysql_free_result(res2);
 		}
-
+		
+		mysql_free_result(res2);
 	}
 	else { /* User provided a widearea hostkey, so they don't have a necessarily-unique IP address. */
 		/* This is meant to be similar to the above, but queries on the wideareanodekey instead. */
