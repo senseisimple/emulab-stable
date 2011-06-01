@@ -25,10 +25,10 @@ package protogeni.resources
 		public function PlanetlabAggregateManager()
 		{
 			super();
-			this.Url = "https://planet-lab.org:12346/";
-			this.registryUrl = "https://planet-lab.org:12345/";
-			this.Hrn = "planet-lab.am";
-			this.Urn = new IdnUrn("urn:publicid:IDN+planet-lab.org+authority+am");
+			//this.Url = "https://planet-lab.org:12346/";
+			//this.registryUrl = "https://planet-lab.org:12345/";
+			//this.Hrn = "planet-lab.am";
+			//this.Urn = new IdnUrn("urn:publicid:IDN+planet-lab.org+authority+am");
 			this.sites = new Vector.<Site>();
 			this.type = GeniManager.TYPE_PLANETLAB;
 			

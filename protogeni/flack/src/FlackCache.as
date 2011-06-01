@@ -85,6 +85,15 @@ package
 			}
 		}
 		
+		public static function clearManagersOffline():void {
+			if(_offlineSharedObject == null)
+				loadOfflineSharedObject();
+			if(_offlineSharedObject == null)
+				return;
+			
+			_offlineSharedObject.data.managers = [];
+		}
+		
 		public static function setManagerOffline(manager:GeniManager):void {
 			if(_offlineSharedObject == null)
 				loadOfflineSharedObject();

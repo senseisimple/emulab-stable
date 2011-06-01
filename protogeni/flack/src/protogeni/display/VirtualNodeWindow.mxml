@@ -223,12 +223,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 						var firstPipe:Pipe = node.pipes.getFor(first, second);
 						if(firstPipe == null)
-							firstPipe = new Pipe(first, second);
+							firstPipe = new Pipe(first, second, Math.min(first.capacity, second.capacity));
 						pipes.addItem(firstPipe);
 						
 						var secondPipe:Pipe = node.pipes.getFor(second, first);
 						if(secondPipe == null)
-							secondPipe = new Pipe(second, first);
+							secondPipe = new Pipe(second, first, Math.min(first.capacity, second.capacity));
 						pipes.addItem(secondPipe);
 					}
 				}

@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.StringUtil;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
@@ -48,27 +49,40 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				Main.geniHandler.clearComponents();
+				FlackCache.clearManagersOffline();
 				
 				for each(var obj:Object in response.value)
 				{
-					var newGm:GeniManager = null;
-					var url:String = obj.url;
-					// ProtoGENI Component Manager
-					if(url.substring(url.length-3) == "/cm") {
-						var ts:String = obj.url.substr(0, obj.url.length-3);
-						var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
-						newCm.Hrn = obj.hrn;
-						newCm.Url = ts;
-						newCm.Urn = new IdnUrn(obj.urn);
-						// Quick hack, giving exceptions in forge
-						if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.full.toLowerCase().indexOf("etri") > 0)
-							continue;
-						if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
-							newCm.supportsIon = true;
-						if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
-							newCm.supportsGpeni = true;
-						Main.geniHandler.GeniManagers.add(newCm);
-						newGm = newCm;
+					try {
+						var newGm:GeniManager = null;
+						var url:String = obj.url;
+						var newUrn:IdnUrn = new IdnUrn(obj.urn);
+						// ProtoGENI Component Manager
+						if(newUrn.name == "cm") {
+							var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
+							newCm.Hrn = obj.hrn;
+							newCm.Url = obj.url.substr(0, obj.url.length-3);
+							newCm.Urn = newUrn;
+							newGm = newCm;
+							// Quick hack, giving exceptions in forge
+							if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.full.toLowerCase().indexOf("etri") > 0)
+								continue;
+							if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
+								newCm.supportsIon = true;
+							if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
+								newCm.supportsGpeni = true;
+							
+						} else if(!Main.protogeniOnly)
+						{
+							var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
+							planetLabAm.Hrn = obj.hrn;
+							planetLabAm.Url = StringUtil.makeSureEndsWith(obj.url, "/"); // needs this for forge...
+							planetLabAm.registryUrl = planetLabAm.Url.replace("12346", "12345");
+							planetLabAm.Urn = newUrn;
+							newGm = planetLabAm;
+						}
+						
+						Main.geniHandler.GeniManagers.add(newGm);
 						if(startDiscoverResources)
 						{
 							newGm.Status = GeniManager.STATUS_INPROGRESS;
@@ -77,18 +91,10 @@ package protogeni.communication
 							else if(newGm is ProtogeniComponentManager)
 								newCalls.push(new RequestGetVersion(newGm as ProtogeniComponentManager));
 						}
+						Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
+					} catch(e:Error) {
+						LogHandler.appendMessage(new LogMessage("", "ListComponents", "Couldn't add manager from list:\n" + obj.toString(), true, LogMessage.TYPE_END));
 					}
-					
-					Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
-				}
-				
-				if(!Main.protogeniOnly)
-				{
-					var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
-					Main.geniHandler.GeniManagers.add(planetLabAm);
-					planetLabAm.Status = GeniManager.STATUS_INPROGRESS;
-					newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
-					Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
 				}
 				
 				if(startSlices)
