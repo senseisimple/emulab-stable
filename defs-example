@@ -283,6 +283,21 @@ DISABLE_NAMED_SETUP=0
 DISABLE_EXPORTS_SETUP=0
 
 #
+# Frisbee address/port parameters (and yes meant to spell it that way).
+#
+# FRISEBEEMCASTADDR	Starting multicast address to use. Each frisbeed
+# 			download server instance gets a unique address.
+# FRISEBEEMCASTPORT	Starting port for download and upload servers.
+#			Each server gets a unique port number.
+# FRISEBEENUMPORTS	When non-zero, limits the range of ports used for
+# 			download/upload to MCASTPORT to MCASTPORT+NUMPORTS-1.
+#			When zero, any port can be used.
+#
+FRISEBEEMCASTADDR="234.5.6"
+FRISEBEEMCASTPORT=3564
+FRISEBEENUMPORTS=0
+
+#
 # Only supported on the Mother Ship (emulab.net) right now.
 #
 WIKISUPPORT=0
@@ -307,8 +322,6 @@ TBDBNAME=tbdb
 IPBASE=10
 DELAYCAPACITY=2
 DISABLE_NSE=1
-FRISEBEEMCASTADDR="234.5.6"
-FRISEBEEMCASTPORT=3564
 
 # Sometimes the main page is down in a directory on WWWHOST
 # No trailing '/'!

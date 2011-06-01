@@ -634,7 +634,6 @@ sub isSwitchPort($) {
             return 1;
         }
     }
-
     return 0;
 }
 

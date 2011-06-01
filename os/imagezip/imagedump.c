@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -21,6 +21,8 @@
 #define WITH_HASHCMD
 #endif
 
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -34,10 +36,12 @@
 #include <openssl/md5.h>
 #endif
 #include "imagehdr.h"
+#include "checksum.h"
 
 static int detail = 0;
 static int dumpmap = 0;
 static int ignorev1 = 0;
+static int checksums = 0; // On by default?
 static int infd = -1;
 static char *chkpointdev;
 static int dumphash = 0;
@@ -49,7 +53,7 @@ static uint32_t relocs;
 static unsigned long long relocbytes;
 
 static void usage(void);
-static void dumpfile(char *name, int fd);
+static int dumpfile(char *name, int fd);
 static int dumpchunk(char *name, char *buf, int chunkno, int checkindex);
 #ifdef WITH_HASHCMD
 static void dumpchunkhash(char *name, char *buf, int chunkno, int checkindex);
@@ -62,8 +66,9 @@ main(int argc, char **argv)
 {
 	int ch, version = 0;
 	extern char build_info[];
+	int errors = 0;
 
-	while ((ch = getopt(argc, argv, "C:dimvH")) != -1)
+	while ((ch = getopt(argc, argv, "C:dimvHc")) != -1)
 		switch(ch) {
 		case 'd':
 			detail++;
@@ -81,13 +86,8 @@ main(int argc, char **argv)
 		case 'v':
 			version++;
 			break;
-		case 'H':
-#ifdef WITH_HASHCMD
-			dumphash = 1;
-#else
-			fprintf(stderr,
-				"Not built with WITH_HASHCMD, -H ignored\n");
-#endif
+		case 'c':
+			checksums++;
 			break;
 		case 'h':
 		case '?':
@@ -106,27 +106,45 @@ main(int argc, char **argv)
 	if (argc < 1)
 		usage();
 
-	while (argc > 0) {
+	for (; argc > 0; argc--, argv++) {
 		int isstdin = !strcmp(argv[0], "-");
 
 		if (!isstdin) {
 			if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
 				perror(argv[0]);
-				argc--;
-				argv++;
 				continue;
 			}
 		} else
 			infd = fileno(stdin);
 
-		dumpfile(isstdin ? "<stdin>" : argv[0], infd);
+#ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
+		if (checksums > 0) {
+			char *keyfile = checksum_keyfile(argv[0]);
+
+			if (!init_checksum(keyfile)) {
+				fprintf(stderr,
+					"%s: Cannot validate checksum signing key\n",
+					argv[0]);
+				continue;
+			}
+		}
+#endif
+#endif
+
+		errors = dumpfile(isstdin ? "<stdin>" : argv[0], infd);
+
+#ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
+		if (checksums > 0)
+			cleanup_checksum();
+#endif
+#endif
 
 		if (!isstdin)
 			close(infd);
-		argc--;
-		argv++;
 	}
-	exit(0);
+	exit(errors);
 }
 
 static void
@@ -135,9 +153,10 @@ usage(void)
 	fprintf(stderr, "usage: "
 		"imagedump options <image filename> ...\n"
 		" -v              Print version info and exit\n"
-		" -d              Turn on progressive levels of detail\n");
+		" -d              Turn on progressive levels of detail\n"
+		" -c              Verify chunk checksums\n");
 	exit(1);
-}	
+}
 
 static char chunkbuf[CHUNKSIZE];
 static unsigned int magic;
@@ -147,8 +166,10 @@ static uint32_t fmax, fmin, franges, amax, amin, aranges;
 static uint32_t adist[8]; /* <4k, <8k, <16k, <32k, <64k, <128k, <256k, >=256k */
 static int regmax, regmin;
 static uint32_t losect, hisect;
+static uint8_t imageid[UUID_LENGTH];
+static int sigtype, enctype;
 
-static void
+static int
 dumpfile(char *name, int fd)
 {
 	unsigned long long tbytes, dbytes, cbytes;
@@ -156,6 +177,7 @@ dumpfile(char *name, int fd)
 	off_t filesize;
 	int isstdin;
 	char *bp;
+	int errors = 0;
 
 	isstdin = (fd == fileno(stdin));
 	wasted = sectinuse = sectfree = 0;
@@ -176,7 +198,7 @@ dumpfile(char *name, int fd)
 
 		if (fstat(fd, &st) < 0) {
 			perror(name);
-			return;
+			return 1;
 		}
 		if ((st.st_size % CHUNKSIZE) != 0)
 			printf("%s: WARNING: "
@@ -189,14 +211,14 @@ dumpfile(char *name, int fd)
 	for (chunkno = 0; ; chunkno++) {
 		bp = chunkbuf;
 
-		if (isstdin)
+		if (isstdin || checksums)
 			count = sizeof(chunkbuf);
 		else {
 			count = DEFAULTREGIONSIZE;
 			if (lseek(infd, (off_t)chunkno*sizeof(chunkbuf),
 				  SEEK_SET) < 0) {
 				perror("seeking on zipped image");
-				return;
+				return 1;
 			}
 		}
 
@@ -207,12 +229,12 @@ dumpfile(char *name, int fd)
 		 */
 		while (count) {
 			int cc;
-			
+
 			if ((cc = read(infd, bp, count)) <= 0) {
 				if (cc == 0)
 					goto done;
 				perror("reading zipped image");
-				return;
+				return 1;
 			}
 			count -= cc;
 			bp += cc;
@@ -224,7 +246,13 @@ dumpfile(char *name, int fd)
 			if (magic < COMPRESSED_MAGIC_BASE ||
 			    magic > COMPRESSED_MAGIC_CURRENT) {
 				printf("%s: bad version %x\n", name, magic);
-				return;
+				return 1;
+			}
+
+			if (checksums && magic < COMPRESSED_V4) {
+			    printf("%s: WARNING: -c given, but file version "
+				    "doesn't support checksums!\n",name);
+			    checksums = 0;
 			}
 
 			if (ignorev1) {
@@ -256,11 +284,35 @@ dumpfile(char *name, int fd)
 				}
 			}
 
-			if (!dumphash)
-				printf("%s: %llu bytes, %lu chunks, version %d\n",
+			if (!dumphash) {
+				printf("%s: %llu bytes, %lu chunks, version %d",
 				       name, (unsigned long long)filesize,
 				       (unsigned long)(filesize / CHUNKSIZE),
-				       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
+				       magic - COMPRESSED_MAGIC_BASE + 1);
+				if (magic >= COMPRESSED_V4) {
+					sigtype = hdr->csum_type;
+					if (sigtype != CSUM_NONE) {
+						printf(", ");
+						if (sigtype & CSUM_SIGNED)
+							printf("signed ");
+						printf("csum (0x%x)", sigtype);
+					}
+					enctype = hdr->enc_cipher;
+					if (enctype != ENC_NONE)
+						printf(", encrypted (%d)",
+						       enctype);
+					memcpy(imageid, hdr->imageid,
+					       UUID_LENGTH);
+					if (detail > 0) {
+						char idbuf[UUID_LENGTH*2+1];
+						mem_to_hexstr(idbuf,
+							      hdr->imageid,
+							      UUID_LENGTH);
+						printf("\n  uuid: %s", idbuf);
+					}
+				}
+				printf("\n");
+			}
 		} else if (chunkno == 1 && !ignorev1) {
 			blockhdr_t *hdr = (blockhdr_t *)chunkbuf;
 
@@ -277,8 +329,10 @@ dumpfile(char *name, int fd)
 			dumpchunkhash(name, chunkbuf, chunkno, checkindex);
 		else
 #endif
-		if (dumpchunk(name, chunkbuf, chunkno, checkindex))
+		if (dumpchunk(name, chunkbuf, chunkno, checkindex)) {
+			errors++;
 			break;
+		}
 	}
  done:
 
@@ -290,7 +344,7 @@ dumpfile(char *name, int fd)
 	tbytes = SECTOBYTES(sectinuse + sectfree);
 
 	if (dumphash)
-		return;
+		return 0;
 
 	if (detail > 0)
 		printf("\n");
@@ -342,6 +396,8 @@ dumpfile(char *name, int fd)
 			       (double)adist[i]/aranges*100);
 		}
 	}
+
+	return errors;
 }
 
 #ifdef WITH_HASHCMD
@@ -388,6 +444,35 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 	case COMPRESSED_V3:
 		reg = (struct region *)((struct blockhdr_V2 *)hdr + 1);
 		break;
+	case COMPRESSED_V4:
+		reg = (struct region *)((struct blockhdr_V4 *)hdr + 1);
+		if (chunkno > 0) {
+			if (sigtype != hdr->csum_type) {
+				printf("%s: wrong checksum type in chunk %d\n",
+				       name, chunkno);
+				return 1;
+			}
+			if (enctype != hdr->enc_cipher) {
+				printf("%s: wrong cipher type in chunk %d\n",
+				       name, chunkno);
+				return 1;
+			}
+			if (memcmp(imageid, hdr->imageid, UUID_LENGTH)) {
+				printf("%s: wrong image ID in chunk %d\n",
+				       name, chunkno);
+				return 1;
+			}
+		}
+		if (checksums && hdr->csum_type != CSUM_NONE) {
+			if ((hdr->csum_type & CSUM_TYPE) != CSUM_SHA1) {
+				printf("%s: unsupported checksum type %d in "
+				       "chunk %d", name,
+				       (hdr->csum_type & CSUM_TYPE),
+				       chunkno);
+				return 1;
+			}
+		}
+		break;
 	default:
 		printf("%s: bad magic (%x!=%x) in chunk %d\n",
 		       name, hdr->magic, magic, chunkno);
@@ -429,7 +514,49 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 				printf("%d relocs, ", hdr->reloccount);
 		}
 		printf("%d regions\n", hdr->regioncount);
+		if (hdr->magic >= COMPRESSED_V4) {
+			int len;
+
+			if (hdr->csum_type != CSUM_NONE) {
+				len = 0;
+				switch (hdr->csum_type) {
+				case CSUM_SIGNED|CSUM_SHA1:
+					len = CSUM_MAX_LEN;
+					break;
+				case CSUM_SHA1:
+					len = CSUM_SHA1_LEN;
+					break;
+				}
+				if (len) {
+					char csumstr[CSUM_MAX_LEN*2+1];
+
+					mem_to_hexstr(csumstr,
+						      hdr->checksum, len);
+					printf("    Checksum: 0x%s", csumstr);
+				}
+				printf("\n");
+			}
+
+			if (hdr->enc_cipher != ENC_NONE) {
+				len = 0;
+				switch (hdr->enc_cipher) {
+				case ENC_BLOWFISH_CBC:
+					len = ENC_MAX_KEYLEN;
+					break;
+				}
+				if (len) {
+					char ivstr[ENC_MAX_KEYLEN*2+1];
+
+					mem_to_hexstr(ivstr,
+						      hdr->enc_iv, len);
+					printf("    CipherIV: 0x%s", ivstr);
+				}
+				printf("\n");
+
+			}
+		}
 	}
+
 	if (hdr->regionsize != DEFAULTREGIONSIZE)
 		printf("  WARNING: "
 		       "unexpected region size (%d!=%d) in chunk %d\n",
@@ -593,6 +720,19 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 			       reloc->sectoff + reloc->size);
 		}
 	}
+
+#ifdef WITH_CRYPTO
+	/*
+	 * Checksum this image.  Assumes SHA1, because we check for this above.
+	 */
+	if (checksums && hdr->csum_type != CSUM_NONE) {
+		if (!verify_checksum(hdr, (unsigned char *)buf,
+				     hdr->csum_type)) {
+			printf("ERROR: chunk %d fails checksum!\n", chunkno);
+			return 1;
+		}
+	}
+#endif
 
 	return 0;
 }

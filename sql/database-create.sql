@@ -444,11 +444,14 @@ CREATE TABLE `delays` (
   `eid` varchar(32) default NULL,
   `pid` varchar(32) default NULL,
   `vname` varchar(32) default NULL,
+  `vlan0` varchar(32) default NULL,
+  `vlan1` varchar(32) default NULL,
   `vnode0` varchar(32) default NULL,
   `vnode1` varchar(32) default NULL,
   `card0` tinyint(3) unsigned default NULL,
   `card1` tinyint(3) unsigned default NULL,
   `noshaping` tinyint(1) default '0',
+  `isbridge` tinyint(1) default '0',
   PRIMARY KEY  (`node_id`,`iface0`,`iface1`),
   KEY `pid` (`pid`,`eid`),
   KEY `exptidx` (`exptidx`)
@@ -1777,6 +1780,7 @@ CREATE TABLE `interfaces` (
   `whol` tinyint(4) NOT NULL default '0',
   `trunk` tinyint(1) NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
+  `logical` tinyint(1) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`card`,`port`),
   KEY `mac` (`mac`),
   KEY `IP` (`IP`),
@@ -2571,6 +2575,27 @@ CREATE TABLE `nonces` (
   `nonce` mediumtext,
   `expires` int(10) NOT NULL,
   PRIMARY KEY  (`node_id`,`purpose`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `nonlocal_user_accounts`
+--
+
+DROP TABLE IF EXISTS `nonlocal_user_accounts`;
+CREATE TABLE `nonlocal_user_accounts` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `uid_uuid` varchar(40) NOT NULL default '',
+  `unix_uid` smallint(5) unsigned NOT NULL auto_increment,
+  `created` datetime default NULL,
+  `urn` tinytext,
+  `name` tinytext,
+  `email` tinytext,
+  `exptidx` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`unix_uid`),
+  KEY `uid` (`uid`),
+  KEY `urn` (`urn`(255)),
+  KEY `uid_uuid` (`uid_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3587,7 +3612,9 @@ CREATE TABLE `testbed_stats` (
   `log_session` int(10) unsigned default NULL,
   PRIMARY KEY  (`idx`),
   KEY `rsrcidx` (`rsrcidx`),
-  KEY `exptidx` (`exptidx`)
+  KEY `exptidx` (`exptidx`),
+  KEY `uid_idx` (`uid_idx`),
+  KEY `idxdate` (`end_time`,`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -4006,6 +4033,22 @@ CREATE TABLE `virt_blobs` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `virt_bridges`
+--
+
+DROP TABLE IF EXISTS `virt_bridges`;
+CREATE TABLE `virt_bridges` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `vname` varchar(32) NOT NULL default '',
+  `vlink` varchar(32) NOT NULL default '',
+  `vport` tinyint(3) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`vname`,`vlink`,`vport`),
+  KEY `pideid` (`pid`,`eid`,`vname`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `virt_client_service_ctl`
 --
 
@@ -4190,6 +4233,7 @@ CREATE TABLE `virt_lans` (
   `implemented_by_link` tinytext,
   `ofenabled` tinyint(1) default '0',
   `ofcontroller` tinytext,
+  `bridge_vname` varchar(32) default NULL,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),
@@ -4272,6 +4316,7 @@ CREATE TABLE `virt_nodes` (
   `plab_plcnet` varchar(32) NOT NULL default 'none',
   `numeric_id` int(11) default NULL,
   `sharing_mode` varchar(32) default NULL,
+  `role` enum('node','bridge') NOT NULL default 'node',
   PRIMARY KEY  (`exptidx`,`vname`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`vname`),
   KEY `pid` (`pid`,`eid`,`vname`)
@@ -4707,13 +4752,14 @@ DROP TABLE IF EXISTS `wires`;
 CREATE TABLE `wires` (
   `cable` smallint(3) unsigned default NULL,
   `len` tinyint(3) unsigned NOT NULL default '0',
-  `type` enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl') NOT NULL default 'Node',
+  `type` enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl','Unused') NOT NULL default 'Node',
   `node_id1` char(32) NOT NULL default '',
   `card1` tinyint(3) unsigned NOT NULL default '0',
   `port1` tinyint(3) unsigned NOT NULL default '0',
   `node_id2` char(32) NOT NULL default '',
   `card2` tinyint(3) unsigned NOT NULL default '0',
   `port2` tinyint(3) unsigned NOT NULL default '0',
+  `logical` tinyint(1) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id1`,`card1`,`port1`),
   KEY `node_id2` (`node_id2`,`card2`),
   KEY `dest` (`node_id2`,`card2`,`port2`),

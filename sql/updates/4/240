@@ -1,0 +1,36 @@
+#
+# Rework nonlocal users for Protogeni
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("nonlocal_user_accounts")) {
+	DBQueryFatal("CREATE TABLE `nonlocal_user_accounts` ( ".
+		     " `uid` varchar(8) NOT NULL default '', ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0',".
+		     " `uid_uuid` varchar(40) NOT NULL default '', ".
+		     " `unix_uid` smallint(5) unsigned NOT NULL auto_increment,".
+		     " `created` datetime default NULL, ".
+		     " `urn` tinytext, ".
+		     " `name` tinytext, ".
+		     " `email` tinytext, ".
+		     " `exptidx` int(11) NOT NULL default '0', ".
+		     " PRIMARY KEY  (`exptidx`,`unix_uid`), ".
+		     " KEY `uid` (`uid`), ".
+		     " KEY `urn` (`urn`(255)), ".
+		     " KEY `uid_uuid` (`uid_uuid`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    DBQueryFatal("replace into nonlocal_user_accounts ".
+		 " (uid,uid_idx,uid_uuid,created,name,email,exptidx) ".
+		 "select b.uid,b.uid_idx,u.uid_uuid,now(), ".
+		 "    u.name,u.email,b.exptidx ".
+		 "  from nonlocal_user_bindings as b ".
+		 "left join nonlocal_users as u on u.uid_idx=b.uid_idx");
+    return 0;
+}
+1;

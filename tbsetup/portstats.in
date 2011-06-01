@@ -49,6 +49,15 @@ Usage: $0 [-h] <-p | <pid> <eid> > [vname ...] [vname:port ...]
       eid should be given when using this option.
 -s    Ports are specified in switch.port syntax
 -C    List control net, rather than experimental net, ports
+-i <device>
+      Operate on <device>, overriding default device list. Can be
+          given multiple times
+-S <stack>
+      Operate on the given stack, instead of the default of the
+          experimental network
+--skip-supplied
+      If the -S option was given, start with the default stacks, 
+          but skip any switches in the stacks listed in -S.
 
 If only pid and eid are given, prints out information about all ports in the
 experiment. Otherwise, output is limited to the nodes and/or ports given.
@@ -69,7 +78,8 @@ END
 #
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
-GetOptions(\%opt,'h','a','e','p','b','z','q','c','s','C');
+GetOptions(\%opt,'h','a','e','p','b','z','q','c','s','C','i=s@','S=s@',
+                 'skip-supplied');
 
 if ($opt{h}) {
     exit &usage;
@@ -286,8 +296,55 @@ elsif ($opt{p}) {
 #
 my %portMap = mapPortsToDevices(@ports);
 
+#
+# User-supplied switch lists
+#
+
+# See if we should we flip the behavior of -S and -i ?
+my $skip_supplied = 0;
+if ($opt{'skip-supplied'} && $opt{S}) {
+    $skip_supplied = 1;
+}
+
+my @supplied_switches = ();
+my @supplied_stacks   = ();
+my $supplied_switches = 0; # Whether -i or -S was given
+if ($opt{i}) {
+    $supplied_switches = 1;
+    push @supplied_switches, @{$opt{i}};
+}
+if ($opt{S}) {
+    foreach my $stack (@{$opt{S}}) {
+	$supplied_switches = 1;
+	my @switches = getSwitchesInStack($stack);
+	if (@switches) {
+	    push @supplied_stacks, $stack;
+	    push @supplied_switches, @switches;
+	}
+	else {
+	    print STDERR "Warning: no such switch stack $stack, skipping!";
+	}
+    }
+}
+@supplied_switches = uniq(@supplied_switches);
+@supplied_stacks   = uniq(@supplied_stacks);
+
+my %supplied_switch_map = ();
+foreach my $ss (@supplied_switches) {
+    $supplied_switch_map{$ss} = $ss;
+}
+
 my @stats;
 DEVICE: foreach my $name (keys %portMap) {
+    if ($supplied_switches && !$skip_supplied) {
+	next 
+	    if (!exists($supplied_switch_map{$name}));
+    }
+    elsif ($skip_supplied) {
+	next 
+	    if (exists($supplied_switch_map{$name}));
+    }
+
     my @ports = @{$portMap{$name}};
     my %oidwarned = ();
 

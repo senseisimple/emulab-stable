@@ -1,11 +1,12 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+use Data::Dumper;
 
 #
 # usage: gentopofile <pid> <eid>
@@ -146,6 +147,46 @@ while (my ($vnode,$vport,$ip) = $query_result->fetchrow_array()) {
 }
 
 #
+# Thanks Jon. I took this from ipassign_wrapper.
+#
+my %bridges = ();
+# Link parent in an equivalence class.
+# ! exists implies that this is the root
+our %linkparents = ();
+
+sub getRoot($) {
+    my ($link) = @_;
+    while (exists($linkparents{$link})) {
+	$link = $linkparents{$link};
+    }
+    return $link;
+}
+
+sub mergeLink($$)
+{
+    my ($leftlink, $rightlink) = @_;
+    my $left = getRoot($leftlink);
+    my $right = getRoot($rightlink);
+    $linkparents{$left} = $right;
+}
+
+$query_result =
+    DBQueryFatal("select vname, vlink from virt_bridges ".
+		 " where pid='$pid' and eid='$eid'");
+while (my ($bridgeid, $linkid) = $query_result->fetchrow_array) {
+    if (! exists($bridges{$bridgeid})) {
+	$bridges{$bridgeid} = [];
+    }
+    foreach $oldlink (@{ $bridges{$bridgeid} }) {
+	mergeLink($linkid, $oldlink);
+    }
+    push(@{ $bridges{$bridgeid} }, $linkid);
+}
+
+#print STDERR Dumper(\%bridges);
+#print STDERR Dumper(\%linkparents);
+
+#
 # Generate the linktest config for links, which looks like:
 #
 #   l node0 node1 bw delay loss lname dropstyle
@@ -167,6 +208,7 @@ $query_result =
 while (my $rowref = $query_result->fetchrow_hashref()) {
     my $vname  = $rowref->{"vname"};
     my $member = $rowref->{"member"};
+    my ($vnode, $port) = split(":", $member);
 
     #
     # Create a row for this lan, if we have not seen it already.
@@ -181,8 +223,49 @@ while (my $rowref = $query_result->fetchrow_hashref()) {
     push(@{$virt_lans{$vname}->{"MEMBERLIST"}}, $member);
 }
 
+#
+# Post process for bridge nodes. 
+#
+if (0 && keys(%bridges)) {
+    my %tmp_lans = ();
+    
+    foreach my $lan (keys(%virt_lans)) {
+	my $vname   = getRoot($lan);
+	my @members = @{$virt_lans{$lan}->{"MEMBERLIST"}};
+	my $rec;
+
+	print "$lan:$vname @members\n";
+
+	if (!exists($tmp_lans{$vname})) {
+	    $rec = {};
+	    $rec->{"MEMBERLIST"} = [];
+	    $rec->{"MEMBERS"}    = {};
+	    $tmp_lans{$vname}   = $rec;
+	}
+	$rec = $tmp_lans{$vname};
+
+	foreach my $memb (@members) {
+	    my $member = $virt_lans{$lan}->{"MEMBERS"}->{$memb};
+	    my $node   = $member->{"vnode"};
+	    my $port   = $member->{"vport"};
+	    my $mem    = "$node:$port";
+	
+	    $rec->{"MEMBERS"}->{$mem} = $member;
+	    push(@{$rec->{"MEMBERLIST"}}, $mem);
+	}
+    }
+    foreach my $lan (keys(%tmp_lans)) {
+	my @members = @{$tmp_lans{$lan}->{"MEMBERLIST"}};
+
+	print "B $lan: @members\n";
+
+    }
+}
+
 foreach my $lan (keys(%virt_lans)) {
     my @members = @{$virt_lans{$lan}->{"MEMBERLIST"}};
+
+#    print "$lan: @members\n";
 
     if (@members == 2) {
 	my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$members[0]};
@@ -308,18 +391,29 @@ while (my ($sim) = $query_result->fetchrow_array) {
 # we need to convert port:ip above to lan:ip.
 # 
 $query_result =
-    DBQueryFatal("select vname,member,mask,cost from virt_lans as v ".
+    DBQueryFatal("select v.vname,member,mask,cost,vlink from virt_lans as v ".
+		 "left join virt_bridges as b on b.vname=v.bridge_vname and ".
+		 "     b.pid=v.pid and b.eid=v.eid ".
 		 "where v.pid='$pid' and v.eid='$eid' ");
 
-while (my ($vname,$member,$mask,$cost) = $query_result->fetchrow_array) {
+while (my ($vname,$member,$mask,$cost,$bridgelink) =
+       $query_result->fetchrow_array()) {
+    my ($node,$port) = split(":", $member);
+    
+    # If this is a bridge node, skip address assignment for it.
+    next
+	if (exists($bridges{$node}));
+
+    $vname = getRoot($vname);
     # One entry per lan.
     if (! defined($lans{$vname})) {
 	$lans{$vname} = {};
-	$lans{$vname}->{"mask"} = $mask;
-	$lans{$vname}->{"cost"} = $cost;
+	$lans{$vname}->{"mask"}    = $mask;
+	$lans{$vname}->{"cost"}    = $cost;
+	$lans{$vname}->{"members"} = {};
     }
+
     # Store lan:ip into the portlist for the node.
-    my ($node,$port) = split(":", $member);
     my $ip = $ips{$member};
     $nodes{$node}->{$port} = "$vname:$ip";
 }
@@ -394,7 +488,7 @@ foreach my $lan (sort keys(%lans)) {
 my $havepmap = 0;
 $query_result =
     DBQueryFatal("select v.vname,n.node_id,n.phys_nodeid,n.type,".
-		 " o.osid,o.OS,o.version,o.osfeatures".
+		 " o.osid,o.OS,o.version,o.osfeatures,r.erole".
 		 " from virt_nodes as v,reserved as r,nodes as n,os_info as o".
 		 " where v.pid=r.pid and v.eid=r.eid and v.vname=r.vname".
 		 " and r.node_id=n.node_id and n.def_boot_osid=o.osid and".
@@ -416,11 +510,28 @@ if ($query_result->numrows) {
     # Version 2 added osfeatures field
     #
     print $LTPOUT "V 2\n";
-    while (my ($vname,$node,$pnode,$ptype,$osid,$os,$osvers,$osfeatures) =
-	   $query_result->fetchrow_array) {
+    while (my ($vname,$node,$pnode,$ptype,$osid,$os,$osvers,$osfeatures,$role)
+	   = $query_result->fetchrow_array) {
 	$os = "UNKNOWN" if (!$os);
 	$osvers = "0" if (!$osvers);
 	$osfeatures = "UNKNOWN" if (!$osfeatures);
+	#
+	# Ugh. Nodes with role "virthost" can now be part of the explicit
+	# topology. Nothing wrong with that except that those nodes will
+	# not run linktest! To ensure that such a node does not get nominated
+	# as the coordinator for a linktest run, we remove the "linktest"
+	# attribute from osfeatures. This will tell the linktest script not
+	# to consider the node for that honor.
+	#
+	# One would think that we should just pass the node's role to linktest
+	# and let it decide for itself, but that would create another level
+	# of backward incompatibility.
+	#
+	if ($role eq "virthost" && $osfeatures =~ /linktest/) {
+	    $osfeatures = join(',',
+			       grep($_ ne "linktest",
+				    split(',', $osfeatures)));
+	}
 	print $LTPOUT
 	    "H $vname $node $pnode $ptype $osid $os $osvers $osfeatures\n";
     }

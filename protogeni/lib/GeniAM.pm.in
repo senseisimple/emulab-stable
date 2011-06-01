@@ -17,8 +17,6 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniCMV2;
 use GeniResponse;
 use GeniCredential;
@@ -28,6 +26,7 @@ use emutil;
 use Compress::Zlib;
 use MIME::Base64;
 use XML::LibXML;
+use Data::Dumper;
 
 # Disable UUID checks in GeniCredential.
 $GeniCredential::CHECK_UUID = 0;
@@ -82,6 +81,52 @@ sub GetVersion()
     my $url = $me->url();
     $url =~ s/cm$/am/;
 
+    my $default_ad = {
+	"type" => "ProtoGENI",
+	"version" => "0.1" };
+    my $request_0_1 = {
+	"type" => "ProtoGENI",
+	"version" => "0.1",
+	"schema" => "http://www.protogeni.net/resources/rspec/0.1/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/0.1",
+	"extensions" => []
+    };
+    my $request_0_2 = {
+	"type" => "ProtoGENI",
+	"version" => "0.2",
+	"schema" => "http://www.protogeni.net/resources/rspec/0.2/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/0.2",
+	"extensions" => []
+    };
+    my $request_2 = {
+	"type" => "ProtoGENI",
+	"version" => "2",
+	"schema" => "http://www.protogeni.net/resources/rspec/2/request.xsd",
+	"namespace" => "http://www.protogeni.net/resources/rspec/2",
+	"extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
+    };
+    my $ad_0_1 = {
+        "type" => "ProtoGENI",
+        "version" => "0.1",
+        "schema" => "http://www.protogeni.net/resources/rspec/0.1/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/0.1",
+        "extensions" => []
+    };
+    my $ad_0_2 = {
+        "type" => "ProtoGENI",
+        "version" => "0.2",
+        "schema" => "http://www.protogeni.net/resources/rspec/0.2/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/0.2",
+        "extensions" => []
+    };
+    my $ad_2 = {
+        "type" => "ProtoGENI",
+        "version" => "2",
+        "schema" => "http://www.protogeni.net/resources/rspec/2/ad.xsd",
+        "namespace" => "http://www.protogeni.net/resources/rspec/2",
+        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
+    };
+
     my $blob = {
 	"geni_api"   => $API_VERSION,
 	"urn"        => $me->urn(),
@@ -91,6 +136,9 @@ sub GetVersion()
 	"code_tag"   => $commithash,
 	# XXX
 	"hostname"   => $hostname,
+	"request_rspec_versions" => [$request_0_1, $request_0_2, $request_2],
+	"ad_rspec_versions" => [$ad_0_1, $ad_0_2, $ad_2],
+	"default_ad_rspec" => $default_ad
     };
     $blob->{"peers"} = $peers
 	if ($MAINSITE);
@@ -135,12 +183,22 @@ sub ListResources()
         $xml = GeniResponse::value($response)->{'manifest'};
 
     } else {
-
+	my $pgversion = undef;
+	if (! defined($version)) {
+	    $pgversion = "0.2";
+	} elsif (defined($version->{'type'}) &&
+		 ($version->{'type'} eq "ProtoGENI" ||
+		  $version->{'type'} eq "protogeni")) {
+	    $pgversion = $version->{'version'};
+	} else {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Only ProtoGENI RSpec advertisements are supported");
+	}
         # No slice was specified, so get the advertisement RSpec.
         my $discover_args = {
             'credentials' => $credentials,
             'available' => $available,
-	    'rspec_version' => $version,
+	    'rspec_version' => $pgversion,
         };
         my $response = GeniCMV2::DiscoverResources($discover_args);
         if (GeniResponse::IsError($response)) {
@@ -240,35 +298,25 @@ sub CreateSliver()
         auto_add_sa($cred);
     }
 
-    # circulate through the users and bind them to the slice
-    my $caller_urn = $ENV{'GENIURN'};
-    my $caller_keys = undef;
-    foreach my $user (@$users) {
-        my $user_urn = $user->{'urn'};
-        # Skip if it is not the caller
-        next if ($user_urn ne $caller_urn);
-        $caller_keys = $user->{keys};
-    }
-
     # Package the caller_keys in a list of hashes the way the CM wants
     # it. Each hash has two keys ('type' and 'key'). 'type' is always
     # 'ssh' for us, and 'key' is the key.
-
     my $sliver_keys = undef;
-    if (defined($caller_keys)) {
-        $sliver_keys = [];
-        foreach my $key (@$caller_keys) {
-            # The CMV2 does not like newlines at the end of the keys.
-            chomp($key);
-            push(@$sliver_keys, {'type' => 'ssh', 'key' => $key});
-        }
+    if (@$users) {
+	$sliver_keys = [];
+	foreach my $user (@$users) {
+	    my $user_urn  = $user->{'urn'};
+	    my @user_keys = ();
+
+	    foreach my $key (@{ $user->{keys} }) {
+		# The CMV2 does not like newlines at the end of the keys.
+		chomp($key);
+		push(@user_keys, {'type' => 'ssh', 'key' => $key});
+	    }
+	    push(@{$sliver_keys}, {'urn'  => $user_urn,
+				   'keys' => \@user_keys});
+	}
     }
-
-    # This only gets us part of the way there. For users that are not
-    # *this* user, we need to somehow add their keys, which also
-    # requires adding them as a user *without* their certificate. Not
-    # sure we'll be able to do that.
-
     # Invoke CreateSliver
     my $create_args = {
         'slice_urn' => $slice_urn,
@@ -276,7 +324,6 @@ sub CreateSliver()
         'credentials' => $credentials,
         'keys' => $sliver_keys
     };
-
     my $response = GeniCMV2::CreateSliver($create_args);
     if (!ref($response)) {
 	# This is cause GeniCMV2::CreateSliver does a fork, and the child

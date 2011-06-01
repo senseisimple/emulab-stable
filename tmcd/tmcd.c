@@ -2069,10 +2069,9 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "left join virt_lan_lans as vll on "
 			 "  vll.idx=v.virtlanidx and vll.exptidx=v.exptidx "
 			 "left join lans as l on "
-			 "  l.exptidx=vll.exptidx and l.vname=vll.vname and "
-			 "  l.link is null "
+			 "  l.exptidx=vll.exptidx and l.vname=vll.vname "
 			 "left join vlans on "
-			 "  vlans.id=l.lanid "
+			 "  vlans.id=v.vlanid "
 			 "left join lan_attributes as la2 on "
 			 "  la2.lanid=v.vlanid and la2.attrkey='stack' "
 			 "where v.exptidx='%d' and v.node_id='%s' and "
@@ -2811,15 +2810,18 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Need a list of keys for this user.
 		 */
-		pubkeys_res = mydb_query("select idx,pubkey "
-					 " from %s "
-					 "where uid_idx='%s'",
-					 2,
-					 (didnonlocal ?
-					  "nonlocal_user_pubkeys" :
-					  "user_pubkeys"),
-					 row[17]);
-
+		if (didnonlocal) {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from nonlocal_user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
+		else {
+			pubkeys_res = mydb_query("select idx,pubkey "
+						 " from user_pubkeys "
+						 "where uid_idx='%s'",
+						 2, row[17]);
+		}
 		if (!pubkeys_res) {
 			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
 			goto skipkeys;
@@ -2958,22 +2960,30 @@ COMMAND_PROTOTYPE(doaccounts)
 	if (reqp->genisliver_idx && !didnonlocal &&
 	    (reqp->isvnode || !reqp->sharing_mode[0])) {
 	        didnonlocal = 1;
-
+		
+		/*
+		 * Within the nonlocal_user_accounts table, we do not
+		 * maintain globally unique unix_uid numbers, since these
+		 * accounts are per slice (experiment). Instead, just
+		 * use an auto_increment field, which always starts at
+		 * 1, and so to create a unix_gid, we just bump the
+		 * number into a typically unused area of the space.
+		 */
 		res = mydb_query("select distinct "
-				 "  u.uid,'*',u.uid_idx,u.name, "
+				 "  u.uid,'*', "
+				 "  u.unix_uid+20000,"
+				 "  u.name, "
 				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
 				 "  NULL,NULL, "
 				 "  UNIX_TIMESTAMP(now()), "
 				 "  u.email,'csh', "
 				 "  0,0, "
 				 "  NULL,u.uid_idx "
-				 "from nonlocal_user_bindings as b "
-				 "join nonlocal_users as u on "
-				 "     b.uid_idx=u.uid_idx "
+				 "from nonlocal_user_accounts as u "
 				 "join groups as g on "
 				 "     g.pid='%s' and "
 				 "     (g.pid=g.gid or g.gid='%s') "
-				 "where (b.exptidx='%d') "
+				 "where (u.exptidx='%d') "
 				 "order by u.uid",
 				 18, reqp->pid, reqp->gid,
 				 reqp->exptidx);
@@ -3013,14 +3023,14 @@ COMMAND_PROTOTYPE(dodelay)
 		 "q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm, "
 		 "q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit, "
 		 "q1_droptail,q1_gentle,vnode0,vnode1,noshaping, "
-		 "backfill0,backfill1"
+		 "backfill0,backfill1,isbridge,vlan0,vlan1"
                  " from delays as d "
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=iface0 "
 		 "left join interfaces as j on "
 		 " j.node_id=d.node_id and j.iface=iface1 "
 		 " where d.node_id='%s'",
-		 42, reqp->nodeid);
+		 45, reqp->nodeid);
 	if (!res) {
 		error("DELAY: %s: DB Error getting delays!\n", reqp->nodeid);
 		return 1;
@@ -3032,6 +3042,8 @@ COMMAND_PROTOTYPE(dodelay)
 	}
 	while (nrows) {
 		char	*bufp = buf;
+		int     isbridge;
+		char    *vnode0, *vnode1;
 
 		row = mysql_fetch_row(res);
 
@@ -3045,7 +3057,15 @@ COMMAND_PROTOTYPE(dodelay)
 			mysql_free_result(res);
 			return 1;
 		}
-
+		isbridge = atoi(row[42]);
+		if (isbridge) {
+			vnode0 = row[43];
+			vnode1 = row[44];
+		}
+		else {
+			vnode0 = (row[37] ? row[37] : "foo");
+			vnode1 = (row[38] ? row[38] : "bar");
+		}
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			"DELAY INT0=%s INT1=%s "
 			"PIPE0=%s DELAY0=%s BW0=%s PLR0=%s "
@@ -3075,9 +3095,7 @@ COMMAND_PROTOTYPE(dodelay)
 			row[25], row[26], row[27], row[28],
 			row[29], row[30], row[31],
 			row[32], row[33], row[34],
-			row[35], row[36],
-			(row[37] ? row[37] : "foo"),
-			(row[38] ? row[38] : "bar"),
+			row[35], row[36], vnode0, vnode1,
 			row[39],
 			row[40], row[41]);
 
@@ -3976,6 +3994,15 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSGROUPDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", GROUPDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
 		return 0;
 	}
 	else if (!usesfs) {
@@ -3991,6 +4018,23 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		/*
+		 * If pid!=gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(reqp->pid, reqp->gid)) {
+			bufp = buf;
+			if (!nomounts)
+				bufp += OUTPUT(bufp, ebufp-bufp,
+					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
+					       reqp->pid, reqp->gid);
+			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
+			       GROUPDIR, reqp->pid, reqp->gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			/* Leave this logging on all the time for now. */
+			info("MOUNTS: %s", buf);
+		}
 
 		/*
 		 * Skip all this for a vnode; client does not ask.
@@ -4026,22 +4070,6 @@ COMMAND_PROTOTYPE(domounts)
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		/*
-		 * If pid!=gid, then this is group experiment, and we return
-		 * a mount for the group directory too.
-		 */
-		if (strcmp(reqp->pid, reqp->gid)) {
-			bufp = buf;
-			if (!nomounts)
-				bufp += OUTPUT(bufp, ebufp-bufp,
-					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
-					       reqp->pid, reqp->gid);
-			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
-			       GROUPDIR, reqp->pid, reqp->gid);
-			client_writeback(sock, buf, strlen(buf), tcp);
-			/* Leave this logging on all the time for now. */
-			info("MOUNTS: %s", buf);
-		}
 	}
 	else if (usesfs) {
 		/*
@@ -4522,17 +4550,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 		prepare = row[6];
 
 		res2 = mydb_query("select IP "
-				  "from subboss_images as i "
-				  "left join subbosses as s "
-				  "  on s.subboss_id=i.subboss_id "
-				  "left join interfaces as n "
-				  "  on n.node_id=s.subboss_id "
-				  "where s.node_id='%s' and "
-				  "  s.service='frisbee' and "
-				  "  i.imageid='%s' and "
-				  "  n.role='ctrl' and i.sync!=1",
-				  1, reqp->nodeid, row[5]);
-
+				  " from interfaces as i, subbosses as s "
+				  " where i.node_id=s.subboss_id and "
+				  " i.role='ctrl' and "
+				  " s.node_id='%s' and s.service='frisbee'",
+				  1, reqp->nodeid);
 		if (!res2) {
 			error("doloadinfo: %s: DB Error getting subboss info!\n",
 			       reqp->nodeid);

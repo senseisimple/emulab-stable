@@ -78,6 +78,8 @@ static int	GotBlock(Packet_t *p);
 static void	RequestChunk(int timedout);
 static int	RequestStamp(int chunk, int block, int count, void *arg);
 static int	RequestRedoTime(int chunk, unsigned long long curtime);
+extern int	ImageUnzipInitKeys(char *uuidstr, char *sig_keyfile,
+				   char *enc_keyfile);
 extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero,
 			       int nothreads, int dostype, int dodots,
 			       unsigned long writebufmem);
@@ -172,6 +174,11 @@ char *usagestr =
  " -X method       Transfer method for -F, one of: ucast, mcast or bcast.\n"
  " -K seconds      Send a multicast keep alive after a period of inactivity.\n"
  "\n"
+ "security options:\n"
+ " -u UUID         Expect all chunks to have this unique ID\n"
+ " -c sigkeyfile   File containing pubkey used for signing image\n"
+ " -e enckeyfile   File containing secret used for encrypting image\n"
+ "\n"
  "tuning options (if you don't know what they are, don't use em!):\n"
  " -C MB           Max MB of memory to use for network chunk buffering.\n"
  " -W MB           Max MB of memory to use for disk write buffering.\n"
@@ -212,8 +219,9 @@ main(int argc, char **argv)
 	char   *filename = NULL;
 	int	dostype = -1;
 	int	slice = 0;
+	char	*sig_keyfile = 0, *enc_keyfile = 0, *uuidstr = 0;
 
-	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:B:F:Q:P:X:")) != -1)
+	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONc:e:u:K:B:F:Q:P:X:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -374,6 +382,18 @@ main(int argc, char **argv)
 			nodecompress = 1;
 			break;
 
+		case 'c':
+			sig_keyfile = optarg;
+			break;
+
+		case 'e':
+			enc_keyfile = optarg;
+			break;
+
+		case 'u':
+			uuidstr = optarg;
+			break;
+
 		case 'K':
 			keepalive = atoi(optarg);
 			if (keepalive < 0)
@@ -401,6 +421,7 @@ main(int argc, char **argv)
 	ClientLogInit();
 #ifdef MASTER_SERVER
 	if (imageid) {
+		struct in_addr pif;
 		GetReply reply;
 		int method = askonly ? MS_METHOD_ANY : xfermethods;
 		int timo = 5; /* XXX */
@@ -418,7 +439,7 @@ main(int argc, char **argv)
 			if (!ClientNetFindServer(ntohl(serverip.s_addr),
 						 portnum, host, imageid,
 						 method, askonly, timo,
-						 &reply, NULL))
+						 &reply, &pif))
 				fatal("Could not get download info for '%s'",
 				      imageid);
 
@@ -441,6 +462,14 @@ main(int argc, char **argv)
 			serverip.s_addr = htonl(reply.servaddr);
 			mcastaddr.s_addr = htonl(reply.addr);
 			portnum = reply.port;
+
+			/*
+			 * Unless the user explicitly specified the interface
+			 * to use, default to the one on which we got a
+			 * response from the server.
+			 */
+			if (mcastif.s_addr == 0)
+				mcastif = pif;
 
 			if (serverip.s_addr == mcastaddr.s_addr)
 				log("%s: address: %s:%d",
@@ -591,8 +620,12 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * Prepare the unzipper.
-	 * This call fires off the disk writer thread as required.
+	 * Initialize keys for authentication/encryption.
+	 */
+	ImageUnzipInitKeys(uuidstr, sig_keyfile, enc_keyfile);
+
+	/*
+	 * Pass in assorted parameters and fire off the disk writer thread.
 	 * The writer thread synchronizes only with us (the decompresser).
 	 */
 	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype,

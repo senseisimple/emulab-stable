@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -122,6 +122,9 @@ my %virtual_tables =
      "virt_paths"               => { rows  => undef,
 				     tag   => "path_members",
 				     row   => "path_member"},
+     "virt_bridges"             => { rows  => undef,
+				     tag   => "bridge_members",
+				     row   => "bridge_member"},
      "experiment_blobs"         => { rows => undef,
 				     tag   => "blobs",
 				     row   => "blob"},

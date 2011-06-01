@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,17 +16,20 @@ use XML::Simple;
 sub usage()
 {
     print(STDERR
-	  "Usage: delay_config [-m] [-d] [-s vnode] <pid> <eid> <link>".
+	  "Usage: delay_config [-m] [-d] [-s vnode] <pid> <eid> <link | bridge>".
 	  " PARAM=VALUE ...\n".
 	  "       delay_config [-d] -X <xmlfile>\n".
 	  "Required: pid, eid, link, and at least one parameter to change!\n".
-	  "  pid = Project ID\n".
-	  "  eid = Experiment ID\n".
-	  " link = link name from ns file, ie. 'link1' in\n".
-	  "        'set link1 [\$ns duplex-link \$A \$B 10Kb 0ms DropTail]'\n".
+	  "  pid   = Project ID\n".
+	  "  eid   = Experiment ID\n".
+	  " link   = link name from ns file, ie. 'link1' in\n".
+	  "          'set link1 [\$ns duplex-link \$A \$B 10Kb 0ms DropTail]'\n".
+	  " bridge = or the bridge name, if explicitly using a bridge node\n".
 	  "Options:\n".
 	  "   -d = turn on debugging\n".
+	  "   -b = bridge mode; operating on a bridge node instead of link\n".
 	  "   -s = Select the source of the link to determine which pipe\n".
+	  "        In bridge mode (-b) these are the link names attached\n".
 	  "   -m = Modify the base experiment in addition to current state.\n".
 	  "   -X = Get args and parameters from an XML file.\n".
 	  "Parameters:\n".
@@ -43,7 +46,7 @@ sub usage()
     # Web interface cares about this return value!
     exit(2);
 }
-my  $optlist = "dms:cX:";
+my  $optlist = "dms:cX:b";
 
 #
 # Configure variables
@@ -64,6 +67,7 @@ my $pipeno;
 my $pipe;
 my $debug      = 0;
 my $compatmode = 0;
+my $bridemode  = 0;
 
 #
 # Testbed Support libraries
@@ -71,6 +75,8 @@ my $compatmode = 0;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
+use User;
 
 #
 # Function prototypes
@@ -87,7 +93,6 @@ sub fatal($);
 my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
 my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
 my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
-my $this_user;			# Used for $SLOT_ADMINONLY.
 my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
     ("pid"		=> ["pid",		$SLOT_REQUIRED],
@@ -135,6 +140,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"c"})) {
     $compatmode = 1;
+}
+if (defined($options{"b"})) {
+    $bridgemode = 1;
 }
 if (!defined($options{"X"})) {
     $pid  = shift(@ARGV);
@@ -193,6 +201,7 @@ if (defined($options{"m"})) {
 if (defined($options{"s"})) {
     $srcvnode = $options{"s"};
 
+    # Taint check cause it goes to a shell command.
     if ($srcvnode =~ /^([-\w]+)$/) {
 	$srcvnode = $1;
     }
@@ -201,50 +210,42 @@ if (defined($options{"s"})) {
     }
 }
 
-#
-# Untaint args.
-#
-if ($pid =~ /^([-\w]+)$/) {
-    $pid = $1;
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal("No such experiment $pid,$eid");
 }
-else {
-    die("*** Bad data in pid: $pid.\n");
-}
-if ($eid =~ /^([-\w]+)$/) {
-    $eid = $1;
-}
-else {
-    die("*** Bad data in eid: $eid.\n");
-}
+# Untaint args for shell later.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+
+# Taint check link cause it goes to a shell command.
 if ($link =~ /^([-\w]+)$/) {
     $link = $1;
 }
 else {
-    die("*** Bad data in link: $link.\n");
+    fatal("Bad link name: $link");
 }
 
 #
 # Permission check.
 #
-if ($UID && !TBAdmin($UID) &&
-    ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-    die("*** $0:\n".
-	"    You do not have permission to modify the delay parameters!\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+if ($UID && !$this_user->IsAdmin() &&
+    ! $experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    fatal("You do not have permission to modify the delay parameters!\n");
 }
 
 #
 # No transitional experiments.
 #
-my $estate = ExpState($pid, $eid);
-if (! $estate) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid exists!\n");
-}
+my $estate = $experiment->state();
 if ($estate ne EXPTSTATE_ACTIVE &&
     $estate ne EXPTSTATE_SWAPPED) {
-    die("*** $0:\n".
-	"    Experiment $pid/$eid must be ACTIVE or SWAPPED\n".
-	"    to alter its delay configuration.\n");
+    fatal("Experiment must be ACTIVE or SWAPPED to change delays");
 }
 
 #
@@ -344,16 +345,38 @@ my %agentmap =
     );
 
 #
-# Link or Lan!
-# 
-$query_result =
-    DBQueryFatal("select member from virt_lans ".
-		 "where pid='$pid' and eid='$eid' and vname='$link'");
-if (!$query_result->numrows) {
-    die("*** $0:\n".
-	"    $link is not a link in $pid/$eid!\n");
+# Link or Lan or Bridge.
+#
+if ($bridgemode) {
+    $query_result =
+	DBQueryFatal("select * from virt_bridges where vname='$link'");
+
+    if (!$query_result->numrows) {
+	fatal("$link is not a bridge in $pid/$eid!\n");
+    }
+}
+else {
+    $query_result =
+	DBQueryFatal("select member,bridge_vname from virt_lans ".
+		     "where pid='$pid' and eid='$eid' and vname='$link'");
+    if (!$query_result->numrows) {
+	fatal("$link is not a link in $pid/$eid!\n");
+    }
 }
 my $islink = ($query_result->numrows == 2 ? 1 : 0);
+
+#
+# When a link is bridged, must call this script with the bridge name
+# instead of the link name, since a link can potentially be bridged on
+# both sides, and because a bridge connects two *different* links.
+#
+if (!$bridgemode) {
+    while (my ($member,$bridge_vname) = $query_result->fetchrow_array()) {
+	if (defined($bridge_vname)) {
+	    fatal("$link is bridged; please use the -b option instead.\n");
+	}
+    }
+}
 
 #
 # If experiment is not active, all we can do is change virt_lans.
@@ -445,8 +468,15 @@ sub ChangeDelayConfig() {
     $query_string = "select * from delays ".
 	"where pid='$pid' and eid='$eid' and vname='$link' and noshaping=0 ";
 
-    $query_string .= "and (vnode0='$srcvnode' or vnode1='$srcvnode')"
-	if (defined($srcvnode));
+    if (defined($srcvnode)) {
+	if ($bridgemode) {
+	    # The src is the name of the link.
+	    $query_string .= "and (vlan0='$srcvnode' or vlan1='$srcvnode')";
+	}
+	else {
+	    $query_string .= "and (vnode0='$srcvnode' or vnode1='$srcvnode')";
+	}
+    }
 
     #
     # Okay, see if there is a delay node.
@@ -469,7 +499,7 @@ sub ChangeDelayConfig() {
 	}
 	my %row = $query_result->fetchhash();
 
-	if ($row{'vnode0'} eq $srcvnode) {
+	if ($row{'vnode0'} eq $srcvnode || $row{'vlan0'} eq $srcvnode) {
 	    $pipe   = 0;
 	}
 	else {
@@ -517,7 +547,8 @@ sub ChangeDelayConfig() {
 		# is that the user intended to change both directions to
 		# exactly this value.
 		#
-		if (!$islink && !defined($srcvnode) && !$compatmode) {
+		if (!$bridgemode &&
+		    !$islink && !defined($srcvnode) && !$compatmode) {
 		    if ($key eq "delay") {
 			# This follows what is done in the parser.
 			$val = $val / 2.0;

@@ -13,12 +13,12 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
 FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
-IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp
+IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp GetVnodeId
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
 GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
-CreateDocument AddElement RemoveChild PolicyExists);
+CreateDocument AddElement RemoveChild PolicyExists GetMask);
 
 use English;
 use XML::LibXML;
@@ -28,14 +28,19 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2);
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS);
 $RSPEC_0_1 = "0.1";
 $RSPEC_0_2 = "0.2";
 $RSPEC_2 = "2";
 
+$EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
+
 # Configure variables
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
+
+# Name Space stuff
+my $DELAY_NS = "http://www.protogeni.net/resources/rspec/ext/delay/1";
 
 # Returns the document element by parsing a given string. If the
 # string fails to parse, returns undefined.
@@ -315,7 +320,7 @@ sub GetBandwidth($)
     return $result;
 }
 
-sub GetIp($$)
+sub GetMask($$)
 {
     my ($ifaceref, $node) = @_;
     my $result = undef;
@@ -329,10 +334,51 @@ sub GetIp($$)
 	    if (defined($id) && defined($testid) && $testid eq $id) {
 		my $ip = FindFirst("n:ip", $iface);
 		if (defined($ip)) {
+		    $result = GetText("mask", $ip);
+		}
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub GetIp($$)
+{
+    my ($ifaceref, $node) = @_;
+    my $result = undef;
+    if (! IsVersion0($ifaceref)) {
+	my $id = GetInterfaceId($ifaceref);
+	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
+	foreach my $iface (@ifaces) {
+	    my $testid = GetInterfaceId($iface);
+	    if (defined($id) && defined($testid) && $testid eq $id) {
+		my $ip = FindFirst("n:ip", $iface);
+		if (defined($ip)) {
 		    $result = GetText("address", $ip);
 		}
 		last;
 	    }
+	}
+    }
+    return $result;
+}
+
+# Returns the vnode id in the emulab extension or failing that the component_id
+sub GetVnodeId($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = GetNodeId($node);
+    } else {
+	my $vnoderef = GeniXML::FindNodesNS("vnode", $node,
+					    $EMULAB_NS)->pop();
+	if (defined($vnoderef)) {
+	    $result = GetText("name", $vnoderef);
+	}
+	if (! defined($result)) {
+	    $result = GetNodeId($node);
 	}
     }
     return $result;
@@ -530,6 +576,24 @@ sub GetLinkManager($)
     return GetFirstText($link, "id", "name");
 }
 
+sub GetDelayPipes($)
+{
+    my ($node) = @_;
+    my @result = ();
+    
+    if (! IsVersion0($node)) {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (defined($type)) {
+	    my $name = GetText("name", $type);
+	    if (defined($name) && $name eq "delay") {
+		@result = FindNodesNS("n:sliver_type_shaping/n:pipe", $type,
+				      $DELAY_NS)->get_nodelist();
+	    }
+	}
+    }
+    return @result;
+}
+
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets
 # the text of that node to a particular value. If the node is an
 # attribute, the value is set. If it is an element with just a text
@@ -635,10 +699,13 @@ sub CreateDocument($$)
 
 # Add a new element to a node. The new element will have the given
 # name and be otherwise empty.
-sub AddElement($$)
+sub AddElement($$;$)
 {
-    my ($name, $node) = @_;
-    my $ns = $node->namespaceURI();
+    my ($name, $node, $namespace) = @_;
+    my $ns = $namespace;
+    if (! defined($namespace)) {
+	$ns = $node->namespaceURI();
+    }
     my $child = $node->addNewChild($ns, "rs:$name");
     return $child;
 }

@@ -630,6 +630,15 @@ GetMSError(int error)
 	case MS_ERROR_TRYAGAIN:
 		err = "image busy, try again later";
 		break;
+	case MS_ERROR_TOOBIG:
+		err = "upload too large for target image";
+		break;
+	case MS_ERROR_BADMTIME:
+		err = "bad image modification time";
+		break;
+	case MS_ERROR_NOTIMPL:
+		err = "operation not implemented";
+		break;
 	default:
 		err = "unknown error";
 		break;
@@ -685,7 +694,7 @@ PrintGetInfo(char *imageid, GetReply *reply, int raw)
 
 		printf("method=0x%x\n", reply->method);
 		isize = ((uint64_t)reply->hisize << 32) | reply->losize;
-		printf("size=%llu\n", isize);
+		printf("size=%llu\n", (unsigned long long)isize);
 		printf("sigtype=0x%x\n", reply->sigtype);
 		switch (reply->sigtype) {
 		case MS_SIGTYPE_MTIME:
@@ -741,7 +750,7 @@ PrintGetInfo(char *imageid, GetReply *reply, int raw)
 		    imageid, GetMSMethods(reply->method));
 
 	isize = ((uint64_t)reply->hisize << 32) | reply->losize;
-	printf("  size=%llu\n", isize);
+	printf("  size=%llu\n", (unsigned long long)isize);
 
 	switch (reply->sigtype) {
 	case MS_SIGTYPE_MTIME:
@@ -752,5 +761,109 @@ PrintGetInfo(char *imageid, GetReply *reply, int raw)
 	default:
 		break;
 	}
+}
+
+/*
+ * Print the contents of a PUT reply to stdout.
+ * The reply struct fields should be in HOST order.
+ */
+void
+PrintPutInfo(char *imageid, PutReply *reply, int raw)
+{
+	struct in_addr in;
+	uint64_t isize;
+	int len;
+
+	if (raw) {
+		printf("imageid=%s\n", imageid);
+		printf("error=%d\n", reply->error);
+		if (reply->error) {
+			if (reply->error == MS_ERROR_TOOBIG) {
+				isize = ((uint64_t)reply->himaxsize << 32) |
+					reply->lomaxsize;
+				printf("maxsize=%llu\n",
+				       (unsigned long long)isize);
+			}
+			return;
+		}
+
+		printf("exists=%d\n", reply->exists);
+		if (reply->exists) {
+			isize = ((uint64_t)reply->hisize << 32) |
+				reply->losize;
+			printf("size=%llu\n", (unsigned long long)isize);
+			printf("sigtype=0x%x\n", reply->sigtype);
+			switch (reply->sigtype) {
+			case MS_SIGTYPE_MTIME:
+				printf("sig=0x%x\n",
+				       *(uint32_t *)reply->signature);
+				len = 0;
+				break;
+			case MS_SIGTYPE_MD5:
+				len = 16;
+				break;
+			case MS_SIGTYPE_SHA1:
+				len = 20;
+				break;
+			default:
+				len = 0;
+				break;
+			}
+			if (len > 0) {
+				char sigbuf[MS_MAXSIGLEN*2+1], *sbp;
+				int i;
+
+				sbp = sigbuf;
+				for (i = 0; i < len; i++) {
+					sprintf(sbp, "%02x",
+						reply->signature[i]);
+					sbp += 2;
+				}
+				*sbp = '\0';
+				printf("sig=0x%s\n", sigbuf);
+			}
+		}
+		isize = ((uint64_t)reply->himaxsize << 32) | reply->lomaxsize;
+		printf("maxsize=%llu\n", (unsigned long long)isize);
+		in.s_addr = htonl(reply->addr);
+		printf("servaddr=%s\n", inet_ntoa(in));
+		in.s_addr = htonl(reply->addr);
+		printf("addr=%s\n", inet_ntoa(in));
+		printf("port=%d\n", reply->port);
+		return;
+	}
+
+	if (reply->error) {
+		printf("%s: server denied access: %s\n",
+		    imageid, GetMSError(reply->error));
+		if (reply->error == MS_ERROR_TOOBIG) {
+			isize = ((uint64_t)reply->himaxsize << 32) |
+				reply->lomaxsize;
+			printf("  max allowed size=%llu\n",
+			       (unsigned long long)isize);
+		}
+		return;
+	}
+
+	if (reply->exists) {
+		printf("%s: currently exists\n", imageid);
+		isize = ((uint64_t)reply->hisize << 32) | reply->losize;
+		printf("  size=%llu\n", (unsigned long long)isize);
+		switch (reply->sigtype) {
+		case MS_SIGTYPE_MTIME:
+		{
+			time_t mt = *(time_t *)reply->signature;
+			printf("  modtime=%s\n", ctime(&mt));
+		}
+		default:
+			break;
+		}
+	}
+	isize = ((uint64_t)reply->himaxsize << 32) | reply->lomaxsize;
+	printf("  max allowed size=%llu\n", (unsigned long long)isize);
+	in.s_addr = htonl(reply->addr);
+	printf("%s: access OK, upload via %s:%d, maxsize=%llu\n",
+	       imageid, inet_ntoa(in), reply->port,
+	       (unsigned long long)isize);
 }
 #endif

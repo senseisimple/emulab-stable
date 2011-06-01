@@ -102,8 +102,8 @@ my @PIDONLYTABLES = ("os_info");
 my $q = DBQueryFatal("select pid_idx from projects ".
 		     "where pid='$TBOPSPID'");
 my ($npid) = $q->fetchrow_array();
-my $q = DBQueryFatal("select gid_idx from groups ".
-		     "where pid='$TBOPSPID' and gid=pid");
+$q = DBQueryFatal("select gid_idx from groups ".
+		  "where pid='$TBOPSPID' and gid=pid");
 my ($ngid) = $q->fetchrow_array();
 
 foreach my $table (@PIDGIDTABLES) {
@@ -191,6 +191,18 @@ while (my ($uid,$uid_idx,$admin,$status) = $users_result->fetchrow_array()) {
 #
 mysystem("$TB/sbin/genelists -a");
 mysystem("$TB/sbin/exports_setup");
+
+#
+# Set some sitevars that are different for inner elabs
+#
+if (TBSiteVarExists("images/frisbee/maxrate_std")) {
+    # XXX traditional value for elabinelab
+    TBSetSiteVar("images/frisbee/maxrate_std", "54000000");
+}
+if (TBSiteVarExists("images/frisbee/maxrate_usr")) {
+    # XXX traditional value for elabinelab
+    TBSetSiteVar("images/frisbee/maxrate_usr", "54000000");
+}
 
 #
 # Fixup pxeboot and MFS info.

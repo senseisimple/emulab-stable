@@ -286,7 +286,8 @@ sub readTranslationTable($) {
 
     print "FILLING %Interfaces\n" if $self->{DEBUG};
     my $result =
-	DBQueryFatal("select node_id,card,port,mac,iface from interfaces");
+	DBQueryFatal("select node_id,card,port,mac,iface from interfaces" . 
+		     "  where logical != 1");
     while ( @_ = $result->fetchrow_array()) {
         $name = "$_[0]:$_[1]";
         $iface = "$_[0]:$_[4]";
@@ -305,7 +306,7 @@ sub readTranslationTable($) {
 
     print "FILLING %Ports\n" if $self->{DEBUG};
     $result = DBQueryFatal("select node_id1,card1,port1,node_id2,card2,port2 ".
-	    "from wires;");
+	    "from wires where logical != 1");
     while ( my @row = $result->fetchrow_array()) {
         my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
         my $oldname = "$node_id1:$card1";

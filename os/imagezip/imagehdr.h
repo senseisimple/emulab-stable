@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,13 +19,18 @@
  *	V3 introduced LILO relocations for Linux partition images.
  *	Since an older imageunzip would still work, but potentially
  *	lay down an incorrect images, I bumped the version number.
+ *	Note that there is no change to the header structure however.
+ *
+ *	V4 of the block descriptor adds support for integrety protection
+ *	and encryption.
  */
 #define COMPRESSED_MAGIC_BASE		0x69696969
 #define COMPRESSED_V1			(COMPRESSED_MAGIC_BASE+0)
 #define COMPRESSED_V2			(COMPRESSED_MAGIC_BASE+1)
 #define COMPRESSED_V3			(COMPRESSED_MAGIC_BASE+2)
+#define COMPRESSED_V4			(COMPRESSED_MAGIC_BASE+3)
 
-#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V3
+#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V4
 
 /*
  * Each compressed block of the file has this little header on it.
@@ -63,6 +68,76 @@ struct blockhdr_V2 {
 	int32_t		reloccount;	/* number of reloc entries */
 };
 
+#define UUID_LENGTH		16
+
+/*
+ * Authentication/integrity/encryption constants for V4.
+ */
+#define ENC_MAX_KEYLEN		32	/* XXX same as EVP_MAX_KEY_LENGTH */
+#define CSUM_MAX_LEN		64
+#define SIG_MAX_KEYLEN		256	/* must be > CSUM_MAX_LEN+41 */
+
+/*
+ * Version 4 of the block descriptor adds support for authentication,
+ * integrety protection and encryption.
+ *
+ * An optionally-signed checksum (hash) of each header+chunk is stored in
+ * the header (checksum) along with the hash algorithm used (csum_type).
+ * The pubkey used to sign the hash is transfered out-of-band.
+ *
+ * To ensure that all valid signed chunks are part of the same image,
+ * a unique identifier is stored in the header (imageid) of each chunk
+ * associated with the same image.
+ *
+ * Optionally, the contents of each chunk (but not the header) is encrypted
+ * using the indicated cipher (enc_cipher) and initialization vector (enc_iv).
+ */
+struct blockhdr_V4 {
+	uint32_t	magic;		/* magic/version */
+	uint32_t	size;		/* Size of compressed part */
+	int32_t		blockindex;	/* netdisk: which block we are */
+	int32_t		blocktotal;	/* netdisk: total number of blocks */
+	int32_t		regionsize;	/* sizeof header + regions */
+	int32_t		regioncount;	/* number of regions */
+	/* V2 follows */
+	uint32_t	firstsect;	/* first sector described by block */
+	uint32_t	lastsect;	/* last sector described by block */
+	int32_t		reloccount;	/* number of reloc entries */
+	/* V4 follows */
+	uint16_t	enc_cipher;	/* cipher was used to encrypt */
+	uint16_t	csum_type;	/* checksum algortihm used */
+	uint8_t		enc_iv[ENC_MAX_KEYLEN];
+					/* Initialization vector */
+	unsigned char	checksum[SIG_MAX_KEYLEN];
+					/* (Signed) checksum */
+	unsigned char	imageid[UUID_LENGTH];
+					/* Unique ID for the whole image */
+};
+
+/*
+ * Checksum types supported
+ */
+#define CSUM_NONE		0  /* must be zero */
+#define CSUM_SHA1		1  /* SHA1: default */
+#define CSUM_SHA1_LEN		20
+
+/* type field */
+#define CSUM_TYPE		0xFF
+
+/* flags */
+#define CSUM_SIGNED		0x8000	/* checksum is signed */
+
+/*
+ * Ciphers supported
+ */
+#define ENC_NONE		0  /* must be zero */
+#define ENC_BLOWFISH_CBC	1
+
+/*
+ * Authentication ciphers supported
+ */
+#define AUTH_RSA		0
+
 /*
  * Relocation descriptor.
  * Certain data structures like BSD disklabels and LILO boot blocks require
@@ -90,7 +165,7 @@ struct blockreloc {
 #define RELOC_XOR16CKSUM	101	/* 16-bit XOR checksum */
 #define RELOC_CKSUMRANGE	102	/* range of previous checksum */
 
-typedef struct blockhdr_V2 blockhdr_t;
+typedef struct blockhdr_V4 blockhdr_t;
 
 /*
  * This little struct defines the pair. Each number is in sectors. An array

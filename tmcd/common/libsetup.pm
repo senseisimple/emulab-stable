@@ -1135,6 +1135,9 @@ sub getifconfig($;$)
     my $setpat  = q(INTERFACE_SETTING MAC=(\w*) );
     $setpat    .= q(KEY='([-\w\.\:]*)' VAL='([-\w\.\:]*)');
 
+    # XXX see very**3 special hack below
+    my $hastvirt = 0;
+
     foreach my $str (@tmccresults) {
 	my $ifconfig = {};
 
@@ -1243,6 +1246,7 @@ sub getifconfig($;$)
 		}
 	    }
 
+	    $hasvirt++;
 	    $ifconfig->{"ISVIRT"}   = 1;
 	    $ifconfig->{"ITYPE"}    = $ifacetype;
 	    $ifconfig->{"IPADDR"}   = $inet;
@@ -1265,6 +1269,64 @@ sub getifconfig($;$)
 	else {
 	    warn "*** WARNING: Bad ifconfig line: $str\n";
 	}
+    }
+
+    #
+    # XXX "optimize" the interface list. We do this here rather than in the
+    # interface configuration script so that the delay/linkdelay scripts will
+    # get the same info.
+    #
+    # This is a very, very, very special case. If a non-encapsulating veth
+    # interface (veth-ne) maps 1-to-1 with an underlying physical interface,
+    # we want to just use the physical interface instead. This allows OSes
+    # (on physical nodes) which don't support a veth device (i.e., most of
+    # them) to talk to vnodes which are using veth-ne style.
+    #
+    # This can go away once we have separated the notion of multiplexing
+    # links from encapsulating links (a historical conflation) so that we
+    # don't have to force virtual devices onto physical nodes just because
+    # some virtual nodes in the same experiment require multiplexed links.
+    #
+    if ($hasvirt && !JAILED() && !JAILHOST() && !GENVNODE() &&
+	!REMOTE() && !PLAB()) {
+	#
+	# Prelim: find out how many virt interfaces mapped to each phys
+	# interface and locate the entry for each phys interface.
+	#
+	my %vifcount = ();
+	my %pifs = ();
+	foreach my $ifconfig (@ifacelist) {
+	    if ($ifconfig->{"ISVIRT"}) {
+		if ($ifconfig->{"PMAC"} ne "none") {
+		    $vifcount{$ifconfig->{"PMAC"}}++;
+		}
+	    } else {
+		$pifs{$ifconfig->{"MAC"}} = $ifconfig;
+	    }
+	}
+	#
+	# Now for each 1-to-1 non-encap virt interface, move IP info
+	# onto physical interface, remember VMAC and toss veth entry.
+	#
+	my @nifacelist = ();
+	foreach my $ifconfig (@ifacelist) {
+	    if ($ifconfig->{"ISVIRT"} && $ifconfig->{"ITYPE"} eq "veth" &&
+		$ifconfig->{"ENCAP"} == 0 && $ifconfig->{"PMAC"} ne "none" &&
+		$vifcount{$ifconfig->{"PMAC"}} == 1) {
+		my $pif = $pifs{$ifconfig->{"PMAC"}};
+		$pif->{"IPADDR"} = $ifconfig->{"IPADDR"};
+		$pif->{"IPMASK"} = $ifconfig->{"IPMASK"};
+		$pif->{"IFACE"} = $ifconfig->{"IFACE"};
+		$pif->{"RTABID"} = $ifconfig->{"RTABID"};
+		$pif->{"LAN"} = $ifconfig->{"LAN"};
+		$pif->{"FROMVMAC"} = $ifconfig->{"VMAC"};
+		print STDERR "NOTE: remapping ", $ifconfig->{"VIFACE"},
+		" to ", $ifconfig->{"IFACE"}, "\n";
+	    } else {
+		push(@nifacelist, $ifconfig);
+	    }
+	}
+	@ifacelist = @nifacelist;
     }
 
     @$rptr = @ifacelist;

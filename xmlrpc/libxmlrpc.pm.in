@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -27,8 +27,6 @@ use vars qw(@ISA @EXPORT);
 	       ParseResponse CallMethod0 CallMethod CallMethodHTTP Config
 );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use English;
 use XML::Parser;
 use RPC::XML;

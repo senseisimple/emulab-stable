@@ -23,6 +23,7 @@ sub usage()
 my $optlist   = "di";
 my $debug     = 0;
 my $idlecheck = 0;
+my $impotent  = 0;
 
 #
 # Configure variables
@@ -89,6 +90,7 @@ require GeniSlice;
 require GeniCM;
 require GeniCertificate;
 require GeniCredential;
+require GeniAggregate;
 use Experiment;
 use Node;
 use libtestbed;
@@ -174,6 +176,136 @@ sub ExpireTickets()
 }
 
 #
+# Keep track of who has been warned. Do not expire until 24 hours after
+# warning.
+#
+my %warned  = ();
+my %expires = ();
+my $hours   = 24;
+my $grace   = $hours * 3600;
+
+#
+# Send out warnings about 24 hours ahead of time.
+#
+sub WarnSlices()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx,expires,UNIX_TIMESTAMP(expires), ".
+			    "   UNIX_TIMESTAMP(created) ".
+			    "  from geni_slices ".
+			    "where shutdown is null and isplaceholder=0");
+
+    while (my ($idx,$expires,$stamp,$created) =
+	   $query_result->fetchrow_array()) {
+	if (exists($expires{$idx})) {
+	    if ($expires{$idx} == $stamp) {
+		# Already warned, skip.
+	    }
+	    else {
+		# Expiration changed, delete and catch in the next loop
+		print STDERR "Expiration changed for slice $idx to $expires\n";
+		delete($expires{$idx});
+		delete($warned{$idx});
+	    }
+	    next;
+	}
+	#
+	# If expiration is greater then 24 hours out, skip. 
+	#
+	print STDERR "$stamp, $created, $grace, ". time() . "\n";
+
+	if ($stamp > time() + $grace) {
+	    delete($expires{$idx});
+	    delete($warned{$idx});
+	    next;
+	}
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    delete($expires{$idx});
+	    delete($warned{$idx});
+	    next;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+
+	# We want the aggregate for the sliver urn, but it might
+	# not actually exist yet.
+	my $aggregate = GeniAggregate->SliceAggregate($slice);
+	if (!defined($aggregate)) {
+	    print STDERR "No aggregate created yet for $slice\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	my $geniuser  = GeniUser->Lookup($slice->creator_uuid(), 1);
+	my $emailaddr = $geniuser->email();
+	my $urn       = $slice->urn();
+	my $hrn       = $slice->hrn();
+	my $sliver_urn= $aggregate->urn();
+	my $diff      = $stamp - time();
+	my $unit;
+	if ($diff < 0) {
+	    $diff = 0;
+	    $unit = "minutes";
+	}
+	elsif ($diff < 60) {
+	    $diff = POSIX::ceil($diff / 60);
+	    $unit = "minutes";
+	}
+	else {
+	    $diff = POSIX::ceil($diff / 3600);
+	    $unit = "hours";
+	}
+	
+	if ($impotent) {
+	    if ($stamp - $created < $grace) {
+		print STDERR
+		    "Short lived sliver is going to expire: ".
+		    "$geniuser,$idx,$hrn,$diff $unit\n";
+	    }
+	    else {
+		print STDERR
+		    "Would send mail to $geniuser: $idx,$hrn,$diff $unit\n";
+	    }
+	    $warned{$idx}  = time();
+	    $expires{$idx} = $stamp;
+	    $slice->UnLock();
+	    goto skip;
+	}
+	#
+	# If this is a short lived slice then do not bother to send
+	# email. Assume negative reenforcement will teach users what
+	# to do.
+	#
+	if ($stamp - $created < $grace) {
+	    print STDERR
+		"Short lived sliver is going to expire: ".
+		"$geniuser,$idx,$hrn,$diff $unit\n";
+	}
+	else {
+	    print STDERR
+		"Sending mail to $geniuser about expiring sliver $aggregate\n";
+	    SENDMAIL($emailaddr, "Sliver $sliver_urn expiring",
+		     "Sliver $sliver_urn\n".
+		     "from slice $urn,\n".
+		     "is going to expire in approximately $diff $unit.\n".
+		     "Please renew it or let it expire if you not using it.\n",
+		     undef, "CC: $TBOPS");
+	}
+	$warned{$idx}  = time();
+	$expires{$idx} = $stamp;
+	$slice->UnLock();
+	
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+    }
+}
+
+#
 # Look for slices that need to be expired. Do not expire shutdown slices;
 # Handled below, and we want to keep the record around.
 #
@@ -251,6 +383,8 @@ sub ExpireSlices()
 	    # Leave it locked. 
 	    goto skip;
 	}
+	delete($warned{"$idx"});
+	delete($expires{"$idx"});
 	$slice->UnLock();
       skip:
 	$slice->Flush()
@@ -441,6 +575,7 @@ while (1) {
 	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
     
     ExpireTickets();
+    WarnSlices();
     ExpireSlices();
     ShutdownSlices();
     RegisterSlices();

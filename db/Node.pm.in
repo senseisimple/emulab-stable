@@ -216,6 +216,12 @@ sub node_id($)
     return checknodeid($self->{"DBROW"}->{'node_id'}, "node_id method");
 }
 
+sub phys_nodeid($)
+{
+    my $self = shift;
+    return $self->{"DBROW"}->{'phys_nodeid'};
+}
+
 #
 # Stringify for output.
 #
@@ -1688,16 +1694,23 @@ sub LoadInterfaces($)
 sub GetInterface($$$)
 {
     my ($self, $iface, $pref) = @_;
+    my $interface;
 
     # Must be a real reference. 
     return -1
 	if (! (ref($self) && ref($pref)));
 
-    $self->LoadInterfaces() == 0
-	or return -1;
+    if (exists($self->{'IFACES'}->{$iface})) {
+	# Might be undef if we already tried.
+	$interface = $self->{'IFACES'}->{$iface};
+    }
+    else {
+	$interface = Interface->LookupByIface($self, $iface);
+	$self->{'IFACES'}->{$iface} = $interface;
+    }
+    $$pref = $interface;    
     return -1
-	if (!exists($self->{'IFACES'}->{$iface}));
-    $$pref = $self->{'IFACES'}->{$iface};
+	if (!defined($interface));
     return 0;
 }
 
@@ -1793,11 +1806,13 @@ sub GetBootLog($$)
 		    "where node_id='$node_id'");
     return -1
 	if (! $query_result);
-    return 0
-	if (! $query_result->numrows);
 
-    my ($bootlog) = $query_result->fetchrow_array();
-    $$pref = $bootlog;
+    if ($query_result->numrows) {
+	my ($bootlog) = $query_result->fetchrow_array();
+	$$pref = $bootlog;
+    } else {
+	$$pref = "";
+    }
     return 0;
 }
 
@@ -2607,6 +2622,22 @@ sub OSSelect($$$$)
 		"where node_id='$nodeid'")
 	or return -1;
 
+    return -1 
+	if ($self->ResetNextOpMode($debug) < 0);
+
+    return Refresh($self);
+}
+
+sub ResetNextOpMode($$)
+{
+    my ($self,$debug) = @_;
+    my $nodeid  = $self->node_id();
+    my $curmode = $self->op_mode();
+
+    # Why? When will this happen?
+    return 0
+	if (!$curmode);
+
     #
     # Determine what osid the node will now boot. We need to know this so we
     # can set the next opmode. This call has to return *something* or we are
@@ -2633,7 +2664,7 @@ sub OSSelect($$$$)
 		 "where node_id='$nodeid'")
 	or return -1;
 
-    return Refresh($self);
+    return 0;
 }
 
 #

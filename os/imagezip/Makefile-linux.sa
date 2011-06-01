@@ -1,14 +1,17 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 # 
 # Makefile for the standalone version of imagezip/unzip.
-# (Standalone meaning not part of the Netbed build environment.)
+# (Standalone meaning not part of the Emulab build environment.)
 #
 BINDIR=	/usr/local/bin
+
+# Set to 1 for "secure frisbee" support.  Requires openssl libraries.
+WITH_CRYPTO	= 1
 
 #
 # Which filesystems to support
@@ -17,6 +20,7 @@ WITH_EXTFS	= 1
 WITH_FFS	= 1
 WITH_FAT	= 1
 WITH_NTFS	= 1
+WITH_HASH	= 0
 WITH_EXT4FS	= 0
 
 PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
@@ -31,44 +35,59 @@ LIBS 		= -lz $(PTHREADLIBS)
 UNZIPCFLAGS	= $(CFLAGS) -Wall
 UNZIPLIBS	= $(LIBS)
 
-ifeq ($(WITH_EXTFS), 1)
+# Secure images
+ifeq ($(WITH_CRYPTO),1)
+CFLAGS		+= -DWITH_CRYPTO -DSIGN_CHECKSUM
+LIBS		+= -lcrypto
+endif
+
+ifeq ($(WITH_EXTFS),1)
 FSOBJS		+= extfs/extfs.o extfs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXTFS -Iextfs
 endif
 
-ifeq ($(WITH_EXT4FS), 1)
+ifeq ($(WITH_EXT4FS),1)
 FSOBJS		+= ext4fs/ext4fs.o ext4fs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXT4FS -Iext4fs
 endif
 
-ifeq ($(WITH_FFS), 1)
+ifeq ($(WITH_FFS),1)
 FSOBJS		+= ffs/ffs.o
 CFLAGS		+= -DWITH_FFS -Iffs
 endif
 
-ifeq ($(WITH_FAT), 1)
+ifeq ($(WITH_FAT),1)
 FSOBJS		+= fat/fat_fat.o fat/fat_boot.o fat/fat_glue.o
 CFLAGS		+= -DWITH_FAT -Ifat
 endif
 
-ifeq ($(WITH_NTFS), 1)
+ifeq ($(WITH_NTFS),1)
 FSOBJS		+= ntfs/ntfs_glue.o
 FSLIBS		+= ntfs/libntfs/libntfs.a
 CFLAGS		+= -DWITH_NTFS -DOLD_LIBNTFS -Intfs/libntfs/ntfsprogs-1.7.1.linux/include
 endif
 
+# with HASH
+ifeq ($(WITH_HASH),1)
+CFLAGS		+= -DWITH_HASH -DHASHSTATS
+SUBDIRCFLAGS	+= -DHASHSTATS
+SUBDIRS		+= hashmap
+ZIPLIBS		+= hashmap/libhashmap.a
+LIBS		+= -lcrypto $(PTHREADLIBS)
+endif
+
 all:	imagezip imageunzip imagedump
 
-imagezip: imagezip.o version.o $(FSOBJS) $(FSLIBS)
+imagezip: imagezip.o checksum.o version.o $(FSOBJS) $(FSLIBS)
 	$(CC) $(CFLAGS) $^ $(LIBS) -o imagezip
 
-imageunzip: imageunzip.o crc.o version.o disksize.o
+imageunzip: imageunzip.o checksum.o crc.o version.o disksize.o
 	$(CC) $(CFLAGS) $^ $(UNZIPLIBS) -o imageunzip
 
 imageunzip.o: imageunzip.c
-	$(CC) $(UNZIPCFLAGS) -o $@ -c $<
+	$(CC) -c $(UNZIPCFLAGS) -o $@ $<
 
-imagedump: imagedump.o version.o
+imagedump: imagedump.o checksum.o version.o
 	$(CC) $(CFLAGS) $^ $(LIBS) -o imagedump
 
 version.c: imagezip.c imageunzip.c imagedump.c

@@ -59,6 +59,9 @@ use vars qw(@ISA @EXPORT);
 	 TBWideareaNodeID TBTipServers
 	 TBSiteVarExists TBGetSiteVar TBSetSiteVar
 	 TBActivityReport GatherAssignStats
+         AddPerExperimentSwitchStack UpdatePerExperimentSwitchStack
+         DeletePerExperimentSwitchStack GetPerExperimentSwitchStack
+         GetPerExperimentSwitchStackName
 	 TBAvailablePCs
          max min 
 	 hash_recurse array_recurse hash_recurse2 array_recurse2
@@ -2521,6 +2524,185 @@ sub GatherAssignStats($$%)
     DBQueryFatal("update experiment_resources ".
 		 "set " . join(",", @updates) . " ".
 		 "where idx=$rsrcidx");
+}
+
+sub GetPerExperimentSwitchStackName($) {
+    my ($expt) = @_;
+    return "ExpStack" . $expt->idx();
+}
+
+#
+# Get per-experiment switch stack id, the leader, and the switches.
+#
+sub GetPerExperimentSwitchStack($) {
+    my ($expt) = @_;
+    my $leader;
+    my @switches;
+
+    my $stack_id = GetPerExperimentSwitchStackName($expt);
+
+    my $qres = DBQueryFatal("select leader from switch_stack_types" . 
+			    " where stack_id='$stack_id'");
+    if (!defined($qres) || $qres->numrows() == 0) {
+	if (wantarray) {
+	    return ();
+	}
+	else {
+	    return undef;
+	}
+    }
+    ($leader) = $qres->fetchrow_array();
+
+    $qres = DBQueryFatal("select node_id from switch_stacks" . 
+			 " where stack_id='$stack_id'");
+    while (my ($node_id) = $qres->fetchrow_array()) {
+	push @switches, $node_id
+	    if ($node_id ne $leader);
+    }
+
+    return ($stack_id,$leader,@switches);
+}
+
+#
+# Add a per-experiment switch stack type, and add switches to that stack.
+#
+sub AddPerExperimentSwitchStack($@;$$$) {
+    my ($expt,@switches,$leader,$snmp_community,$min_vlan,$max_vlan) = @_;
+    my $scomm = $snmp_community;
+
+    my $stack_id = GetPerExperimentSwitchStackName($expt);
+
+    return 1 
+	if (!@switches);
+
+    if (!defined($leader)) {
+	$leader = $switches[0];
+    }
+    if (!defined($snmp_community)) {
+	$scomm = int(rand(100000000));
+    }
+    if (!defined($min_vlan)) {
+	$min_vlan = 256;
+    }
+    if (!defined($max_vlan)) {
+	$max_vlan = 999;
+    }
+
+    my $query = "replace into switch_stack_types" .
+	" (stack_id,stack_type,supports_private,single_domain," . 
+	"  snmp_community,min_vlan,max_vlan,leader)" . 
+	" values ( '$stack_id','generic',0,0," . 
+	"          '$scomm',$min_vlan,$max_vlan,'$leader')";
+    DBQueryFatal($query);
+
+    foreach my $switch (@switches) {
+	my $is_primary = 0;
+	if ($switch eq $leader) {
+	    $is_primary = 1;
+	}
+
+	# for each switch, if the caller didn't supply snmp_community, then
+	# check node_type_attributes to see if there is a fixed community we
+	# must use -- i.e., if we can't reconfig this switch with a generated
+	# one.
+	if (!defined($snmp_community)) {
+	    my $qres = DBQueryFatal("select nta.attrvalue" . 
+				    " from nodes as n " . 
+				    " left join node_type_attributes as nta" . 
+				    "  on n.type=nta.type " . 
+				    " where n.node_id='$switch'" . 
+				    "  and nta.attrkey='snmp_community'");
+	    if ($qres && $qres->numrows()) {
+		($scomm,) = $qres->fetchrow_array();
+	    }
+	}
+
+	DBQueryFatal("replace into switch_stacks (node_id,stack_id,is_primary,snmp_community)" . 
+		     " values ('$switch','$stack_id',$is_primary,'$scomm')");
+    }
+
+    return 0;
+}
+
+#
+# Update a per-experiment switch stack type (i.e., during an expt modify).
+#
+sub UpdatePerExperimentSwitchStack($@) {
+    my ($expt,@switches) = @_;
+
+    my $stack_id = GetPerExperimentSwitchStackName($expt);
+
+    if (!@switches) {
+	DBQueryFatal("delete from switch_stacks where stack_id='$stack_id'");
+	return 0;
+    }
+
+    my $qres = DBQueryFatal("select leader,snmp_community from switch_stack_types" . 
+			    "  where stack_id='$stack_id'");
+    if (!$qres || !$qres->numrows) {
+	tbwarn("No such switch stack id '$stack_id'!");
+	return 1;
+    }
+    my ($leader,$scomm) = $qres->fetchrow_array;
+    my $need_new_leader = 1;
+    foreach my $switch (@switches) {
+	if ($switch eq '$leader') {
+	    $need_new_leader = 0;
+	    last;
+	}
+    }
+
+    if ($need_new_leader) {
+	DBQueryFatal("delete from switch_stacks" . 
+		     "  where stack_id='$stack_id' and node_id='$leader'");
+	$leader = $switches[0];
+    }
+
+    # delete them all, and add them all back -- easier than querying and 
+    # diff'ing
+    DBQueryFatal("delete from switch_stacks where stack_id='$stack_id'");
+
+    foreach my $switch (@switches) {
+	my $is_primary = 0;
+	if (1 || $switch eq $leader) {
+	    $is_primary = 1;
+	}
+
+	# for each switch, if the caller didn't supply snmp_community, then
+	# check node_type_attributes to see if there is a fixed community we
+	# must use -- i.e., if we can't reconfig this switch with a generated
+	# one.
+	if (!defined($scomm) || $scomm eq '') {
+	    my $qres = DBQueryFatal("select nta.attrvalue" . 
+				    " from nodes as n " . 
+				    " left join node_type_attributes as nta" . 
+				    "  on n.type=nta.type " . 
+				    " where n.node_id='$switch'" . 
+				    "  and nta.attrkey='snmp_community'");
+	    if ($qres && $qres->numrows()) {
+		($scomm,) = $qres->fetchrow_array();
+	    }
+	}
+
+	DBQueryFatal("replace into switch_stacks (node_id,stack_id,is_primary)" . 
+		     " values ('$switch','$stack_id',$is_primary)");
+    }
+
+    return 0;
+}
+
+#
+# Delete a per-experiment switch stack type.
+#
+sub DeletePerExperimentSwitchStack($) {
+    my ($expt) = @_;
+
+    my $stack_id = GetPerExperimentSwitchStackName($expt);
+
+    DBQueryFatal("delete from switch_stacks where stack_id='$stack_id'");
+    DBQueryFatal("delete from switch_stack_types where stack_id='$stack_id'");
+
+    return 0;
 }
 
 sub max ( $$ ) {

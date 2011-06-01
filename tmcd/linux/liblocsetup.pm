@@ -639,6 +639,10 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	    elsif ($speed == 10) {
 		$media = $IFC_10MBS;
 	    }
+	    elsif ($speed == 0) {
+		warn("*** Speed was 0 in ifconfig, defaulting to auto negotiation (and Gb media)\n");
+		$media = $IFC_1000MBS;
+	    }
 	    else {
 		warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
 		$speed = 100;
@@ -672,9 +676,21 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	if (defined($ethtool)) {
 	    # this seems to work for returning an error on eepro100
 	    $uplines =
-		"if $ethtool $iface >/dev/null 2>&1; then\n    " .
-		"  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
-		"  sleep 2 # needed due to likely bug in e100 driver on pc850s\n".
+		"if $ethtool $iface >/dev/null 2>&1; then\n    ";
+	    if ($speed eq '0') {
+		$uplines .= "  $ethtool -s $iface autoneg on\n";
+	    }
+	    else {
+		# If we're gigabit, we *must* turn on autoneg -- it's part
+		# of the GbE protocol.
+		if ($speed eq '1000') {
+		    $uplines .= "  $ethtool -s $iface autoneg on\n";
+		}
+		$uplines .=
+		    "  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
+		    "  sleep 2 # needed due to likely bug in e100 driver on pc850s\n";
+	    }
+	    $uplines .= 
 		"else\n    " .
 		"  /sbin/mii-tool --force=$media $iface\n    " .
 		"fi\n    ";

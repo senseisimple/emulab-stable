@@ -16,7 +16,7 @@ SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir nseparse checkup template_cvsroot
+SUBDIRS		= checkpass ns2ir nseparse checkup template_cvsroot snmpit_test
 ifeq ($(NSVERIFY),1)
 SUBDIRS		+= nsverify
 endif
@@ -88,7 +88,9 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
 		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm \
 		  power_ipmi.pm libosload_new.pm libosload_switch.pm \
-		  libossetup_switch.pm power_icebox.pm
+		  libossetup_switch.pm power_icebox.pm \
+		  libvtop_stable.pm libvtop_test.pm
+
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
@@ -100,11 +102,8 @@ SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeehelper \
 SETUID_LIBX_SCRIPTS  = console_setup spewlogfile
 
 ifeq ($(SYSTEM),FreeBSD)
-FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
-ifeq ($(FBSDVERSION),FreeBSD4)
 SUBDIRS  += ipassign
 IPASSIGN  = Yes
-endif
 endif
 
 #

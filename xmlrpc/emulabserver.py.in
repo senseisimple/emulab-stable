@@ -2164,6 +2164,11 @@ class experiment:
                     argstr += " -m "
                     pass
                 pass
+            elif opt == "bridge":
+                if xbool(val):
+                    argstr += " -b "
+                    pass
+                pass
             elif opt == "src":
                 argstr += " -s "
                 argstr += escapeshellarg(val)

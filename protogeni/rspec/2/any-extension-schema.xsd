@@ -3,11 +3,11 @@
   <xs:group name="AnyExtension">
     <xs:sequence>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:any namespace="##other" processContents="strict"/>
+        <xs:any namespace="##other" processContents="lax"/>
       </xs:choice>
     </xs:sequence>
   </xs:group>
   <xs:attributeGroup name="AnyExtension">
-    <xs:anyAttribute namespace="##other" processContents="strict"/>
+    <xs:anyAttribute namespace="##other" processContents="lax"/>
   </xs:attributeGroup>
 </xs:schema>

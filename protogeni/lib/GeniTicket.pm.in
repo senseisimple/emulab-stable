@@ -790,13 +790,14 @@ sub Release($$)
 	    if (!GeniXML::IsLocalNode($ref));
 	
 	my $resource_id = GeniXML::GetNodeId($ref);
-	if (!defined($resource_id)) {
+	my $vnode_id    = GeniXML::GetVnodeId($ref);
+	if (!defined($resource_id) || !defined($vnode_id)) {
 	    print STDERR "No resource id for node in ticket\n";
 	    print GeniXML::Serialize($ref);
 	    return -1;
 	}
 
-	my $node = GeniUtil::LookupNode($resource_id);
+	my $node = GeniUtil::LookupNode($vnode_id);
 	next
 	    if (!defined($node));
 

@@ -1,0 +1,18 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# XXX this is an Emulab-only script to optimize the upload process.
+# Since the master server runs on boss, but most images live on ops,
+# we wind up writing images across the network twice: once uploading to
+# boss and then again writing the image across NFS to ops.
+#
+# Note that this same problem exists for frisbeed and multicasting images,
+# so this should really be generalized to handle that as well.
+#
+use English;
+use Getopt::Std;

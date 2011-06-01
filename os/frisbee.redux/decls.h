@@ -351,6 +351,30 @@ typedef struct {
 } __attribute__((__packed__)) GetReply;
 
 typedef struct {
+	uint32_t	hostip;
+	uint8_t		status;
+	uint16_t	idlen;
+	uint8_t		imageid[MS_MAXIDLEN];
+	uint32_t	hisize;
+	uint32_t	losize;
+	uint32_t	mtime;
+	uint32_t	timeout;
+} __attribute__((__packed__)) PutRequest;
+
+typedef struct {
+	uint16_t	error;	
+	uint32_t	addr;
+	uint16_t	port;
+	uint8_t		exists;
+	uint16_t	sigtype;
+	uint8_t		signature[MS_MAXSIGLEN];
+	uint32_t	hisize;
+	uint32_t	losize;
+	uint32_t	himaxsize;
+	uint32_t	lomaxsize;
+} __attribute__((__packed__)) PutReply;
+
+typedef struct {
 	struct {
 		int8_t		version[4];
 		int32_t		type;
@@ -358,6 +382,8 @@ typedef struct {
 	union {
 		GetRequest	getrequest;
 		GetReply	getreply;
+		PutRequest	putrequest;
+		PutReply	putreply;
 	} body;
 } MasterMsg_t;
 
@@ -386,6 +412,9 @@ typedef struct {
 #define MS_ERROR_NOMETHOD	5	/* not avail to host via method */
 #define MS_ERROR_INVALID	6	/* invalid argument */
 #define MS_ERROR_TRYAGAIN	7	/* try again later */
+#define MS_ERROR_TOOBIG		8	/* attempted PUT is too large */
+#define MS_ERROR_BADMTIME	9	/* attempt to set bad mtime */
+#define MS_ERROR_NOTIMPL	10	/* operation not implemented */
 #endif
 
 /*

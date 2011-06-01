@@ -37,7 +37,7 @@ my $TB		= "@prefix@";
 my $NETMASK	= "255.255.255.0";
 my $EXPTNETMASK = "255.255.0.0";
 
-my $debug       = 0;
+my $debug       = 1;
 my $memdebug    = 0;
 my $routecalc   = "$TB/libexec/routecalc";
 my $impotent    = 0;
@@ -125,7 +125,7 @@ else {
 # Get the list of nodes.
 # 
 my $query_result =
-    DBQueryFatal("select vname,ips,routertype from virt_nodes ".
+    DBQueryFatal("select vname,ips,routertype,role from virt_nodes ".
 		 "where pid='$pid' and eid='$eid'");
 
 if (!$query_result->numrows) {
@@ -184,12 +184,17 @@ my $staticO = 0;
 my $staticN = 0;
 
 if (!$force) {
-    while (my (undef,undef,$routertype) = $query_result->fetchrow_array()) {
+    while (my (undef,undef,$routertype,$role) =
+	   $query_result->fetchrow_array()) {
 	if ($routertype eq "static-old") {
 	    $staticO++;
 	}
 	elsif ($routertype eq "static") {
 	    $staticN++;
+	}
+	if ($role eq "bridge") {
+	    # Need to figure this out.
+	    exit(0);
 	}
     }
 

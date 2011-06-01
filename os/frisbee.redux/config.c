@@ -11,7 +11,9 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <errno.h>
 #include <assert.h>
+#include <sys/stat.h>
 #include "decls.h"
 #include "configdefs.h"
 #include "log.h"
@@ -30,6 +32,7 @@ config_signal(int sig)
 	if (myconfig == NULL)
 		return;
 
+	log("Reading new configuration.");
 	savedconfig = myconfig->config_save();
 	if (myconfig->config_read() != 0) {
 		warning("WARNING: could not load new configuration, "
@@ -154,12 +157,13 @@ config_free_host_authinfo(struct config_host_authinfo *ai)
  * on success, an error code otherwise.
  */
 int
-config_auth_by_IP(struct in_addr *reqip, struct in_addr *hostip, char *imageid,
-		  struct config_host_authinfo **aip)
+config_auth_by_IP(int isget, struct in_addr *reqip, struct in_addr *hostip,
+		  char *imageid, struct config_host_authinfo **aip)
 {
 	struct config_host_authinfo *ai;
 
-	if (config_get_host_authinfo(reqip, hostip, imageid, &ai, 0))
+	if (config_get_host_authinfo(reqip, hostip, imageid,
+				     isget ? &ai : 0, isget ? 0 : &ai))
 		return MS_ERROR_FAILED;
 	if (ai->hostid == NULL) {
 		config_free_host_authinfo(ai);
@@ -198,4 +202,325 @@ config_dump(FILE *fd)
 	else
 		myconfig->config_dump(fd);
 	signal(SIGHUP, config_signal);
+}
+
+/*
+ * Utility functions for all configurations.
+ */
+
+/*
+ * Return 'dir' if 'path' is in 'dir'; i.e., is 'dir' a prefix of 'path'?
+ * Return NULL if 'path' is not in 'dir'.
+ * Note: returns NULL if path == dir.
+ * Note: assumes realpath has been run on both.
+ */
+char *
+isindir(char *dir, char *path)
+{
+	int len = dir ? strlen(dir) : 0;
+	char *rv = dir;
+
+	if (dir == NULL || path == NULL || *dir == '\0' || *path == '\0' ||
+	    strncmp(dir, path, len) || path[len] != '/')
+		rv = NULL;
+#if 0
+	fprintf(stderr, "isindir(dir=%s, path=%s) => %s\n",
+		dir ? dir : "", path ? path : "", rv ? rv : "NULL");
+#endif
+	return rv;
+}
+
+/*
+ * Account for differences between BSD and Linux realpath.
+ *
+ * BSD realpath() apparently doesn't even test the final component.
+ * It will return success even if the final component doesn't exist.
+ * Settle on the Linux behavior, which does return an error if the
+ * final component does not exist.
+ *
+ * BSD realpath() is documented to, on error, return the canonicalized
+ * version of the path up to and including the component that caused the
+ * error. While this behavior is not documented in the Linux version,
+ * it is the observed behavior, so we assume it (making only a feeble
+ * check to verify).
+ *
+ * Returns a pointer to the 'rpath' buffer if 'path' fully resolves,
+ * and 'rpath' is filled with the complete canonicalized path.
+ *
+ * Returns NULL if there was an error resolving any component of 'path'
+ * with errno set to the cause of the failure (e.g., ENOENT if a component
+ * is missing) and 'rpath' is filled with the canonicalized path up to and
+ * including the component that caused the error.
+ */
+char *
+myrealpath(char *path, char rpath[PATH_MAX])
+{
+	char *rv;
+
+	assert(path[0] != '\0');
+
+	rpath[0] = '\0';
+	rv = realpath(path, rpath);
+	assert(rpath[0] != '\0');
+#ifndef linux
+	if (rv != NULL) {
+		struct stat sb;
+		/* also sets errno correctly */
+		if (stat(path, &sb) < 0)
+			rv = NULL;
+	}
+#endif
+	return rv;
+}
+
+#define INDIR(d, dl, p) ((p)[dl] == '/' && strncmp(p, d, dl) == 0)
+
+/*
+ * "Resolve" a pathname.
+ *
+ * Makes sure that 'path' falls within the 'dir' after application of
+ * realpath to resolve "..", symlinks, etc. If 'create' is set, it will
+ * create missing intermediate directories. In detail:
+ *
+ * The path (and dir) must be absolute, or it is an error.
+ * If 'create' is zero, then all components of the path must exist
+ *   or it is an error.
+ * If 'create' is non-zero, then missing components except the last
+ *   will be created.
+ * If 'dir' is non-null, the existing part of the path must resolve
+ *   within this directory or it is an error.
+ * If 'dir' is null, then the path is resolved as far as it exists
+ *  ('create' is ignored and assumed to be zero).
+ *   
+ * Returns NULL on an error, a malloc'ed pointer to a canonicalized
+ * path otherwise.
+ */
+char *
+resolvepath(char *path, char *dir, int create)
+{
+	char rpath[PATH_MAX], *next, *ep, *pathcopy;
+	struct stat sb;
+	int pathlen = strlen(path);
+	int dirlen = 0;
+	int rpathlen;
+	mode_t omask, cmask;
+	char *npath;
+
+	if (debug > 1)
+		info("resolvepath '%s' in dir '%s'", path, dir);
+	/* validate path */
+	if (path == NULL) {
+		if (debug > 1)
+			info(" null path");
+		return NULL;
+	}
+	if (path[0] != '/') {
+		if (debug > 1)
+			info(" path is not absolute");
+		return NULL;
+	}
+	if (pathlen >= sizeof rpath) {
+		if (debug > 1)
+			info(" path is too long");
+		return NULL;
+	}
+
+	/* validate dir */
+	if (dir) {
+		dirlen = strlen(dir);
+		if (dir[0] != '/') {
+			if (debug > 1)
+				info(" path and dir (%s) must be absolute",
+				     dir);
+			return NULL;
+		}
+		/* XXX make dir=='/' work */
+		if (dirlen == 1)
+			dirlen = 0;
+	} else {
+		create = 0;
+	}
+
+	/*
+	 * If the full path resolves, make sure it falls in dir (if given)
+	 * and is a regular file.
+	 */
+	if (myrealpath(path, rpath) != NULL) {
+		if (dir && !INDIR(dir, dirlen, rpath)) {
+			if (debug > 1)
+				info(" resolved path (%s) not in dir (%s)",
+				     rpath, dir);
+			return NULL;
+		}
+		if (stat(rpath, &sb) < 0 || !S_ISREG(sb.st_mode)) {
+			if (debug > 1)
+				info(" not a regular file");
+			return NULL;
+		}
+		return strdup(rpath);
+	}
+	if (debug > 1) {
+		int oerrno = errno;
+		info(" partially resolved to '%s' (errno %d)", rpath, errno);
+		errno = oerrno;
+	}
+
+	/*
+	 * If create is not set or we failed for any reason other than
+	 * a non-existent component, we return an error.
+	 */
+	if (!create || errno != ENOENT) {
+		if (debug > 1)
+			info(" realpath failed at %s with %d",
+			     rpath, errno);
+		return NULL;
+	}
+
+	/*
+	 * Need to create intermediate directories.
+	 *
+	 * First, check that what does exist of the path falls within
+	 * the directory given.
+	 */
+	assert(dir != NULL);
+	if (!INDIR(dir, dirlen, rpath)) {
+		if (debug > 1)
+			info(" resolved path (%s) not in dir (%s)",
+			     rpath, dir);
+		return NULL;
+	}
+
+	/*
+	 * Establish permission (mode) for new directories.
+	 * Start with permission of 'dir'; this will get updated with
+	 * every component that resolves, so that new directories will
+	 * get created with the permission of the most recent ancestor.
+	 */
+	if (stat(dir, &sb) < 0) {
+		if (debug > 1)
+			info(" stat failed on dir (%s)?!", dir);
+		return NULL;
+	}
+	cmask = (sb.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO)) | S_IRWXU;
+	omask = umask(0);
+	if (debug > 1)
+		info(" umask=0 (was 0%o), initial cmask=0%o", omask, cmask);
+
+	/*
+	 * Find the first component of the original path that does not
+	 * exist (i.e., what part of the original path maps to what realpath
+	 * returned) and create everything from there on.
+	 *
+	 * Note that if what realpath returned is a prefix of the original
+	 * path then nothing was translated and we are already at the first
+	 * component that needs creation. So we find the appropriate location
+	 * in the original string and go from there.
+	 */
+	npath = NULL;
+	if ((pathcopy = strdup(path)) == NULL)
+		goto done;
+	rpathlen = strlen(rpath);
+	assert(rpathlen <= pathlen);
+	if (rpathlen > 1 && strncmp(pathcopy, rpath, rpathlen) == 0 &&
+	    (pathcopy[rpathlen] == '\0' || pathcopy[rpathlen] == '/')) {
+		/* same string, start at last slash in path */
+		if (pathcopy[rpathlen] == '\0') {
+			next = rindex(pathcopy, '/');
+			assert(next != NULL);
+		}
+		/* rpath is a prefix, start at last slash in that prefix */
+		else {
+			next = rindex(rpath, '/');
+			assert(next != NULL);
+			next = &pathcopy[next-rpath];
+		}
+	}
+	/* rpath is not a prefix, must scan entire path */
+	else {
+		next = pathcopy;
+	}
+	assert(next >= pathcopy && next < &pathcopy[pathlen]);
+	assert(*next == '/');
+	next++;
+	if (debug > 1)
+		info(" pathscan: path='%s', rpath='%s', start at '%s'",
+		     pathcopy, rpath, next);
+
+	while ((ep = index(next, '/')) != NULL) {
+		*ep = '\0';
+		if (debug > 1)
+			info(" testing: %s", pathcopy);
+
+		/*
+		 * We use realpath here instead of just stat to make
+		 * sure someone isn't actively tweaking the filesystem
+		 * and messing with our head.
+		 *
+		 * If realpath fails, it should fail with ENOENT and
+		 * the realpath-ified part should fall in our directory.
+		 * Otherwise, someone really is playing games.
+		 */
+		if (myrealpath(pathcopy, rpath) == NULL) {
+			if (errno != ENOENT ||
+			    (dir && !INDIR(dir, dirlen, rpath))) {
+				if (debug > 1)
+					info("  resolves bad (%s)\n",
+					     rpath);
+				goto done;
+			}
+			/*
+			 * We have hit a missing component.
+			 * Create the component and carry on.
+			 */
+			if (mkdir(rpath, cmask) < 0) {
+				if (debug > 1)
+					info("  create failed (%s)\n",
+					     rpath);
+				goto done;
+			}
+			if (debug > 1)
+				info("  created (%s)", rpath);
+		} else {
+			if (debug > 1)
+				info("  exists (%s)", rpath);
+			/*
+			 * Update the creation permission; see comment above.
+			 */
+			if (stat(rpath, &sb) < 0) {
+				if (debug > 1)
+					info(" stat failed (%s)?!", rpath);
+				goto done;
+			}
+			cmask = (sb.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO)) |
+				S_IRWXU;
+		}
+		*ep = '/';
+		next = ep+1;
+	}
+
+	/*
+	 * We are down to the final component of the original path.
+	 * It should either exist and be a regular file or not
+	 * exist at all.
+	 */
+	if (myrealpath(pathcopy, rpath) == NULL &&
+	    (errno != ENOENT || !INDIR(dir, dirlen, rpath))) {
+		if (debug > 1)
+			info(" final resolved path (%s) bad (%d)",
+			     rpath, errno);
+		goto done;
+	}
+
+	/*
+	 * We are in our happy place. rpath is the canonicalized path.
+	 */
+	npath = strdup(rpath);
+	if (debug > 1)
+		info("resolvepath: '%s' resolved to '%s'", path, npath);
+
+ done:
+	umask(omask);
+	if (pathcopy)
+		free(pathcopy);
+	return npath;
 }

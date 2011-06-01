@@ -195,6 +195,7 @@ AC_SUBST(SSLCERT_LOCALITY)
 AC_SUBST(SSLCERT_ORGNAME)
 AC_SUBST(FRISEBEEMCASTADDR)
 AC_SUBST(FRISEBEEMCASTPORT)
+AC_SUBST(FRISEBEENUMPORTS)
 AC_SUBST(WINSUPPORT)
 AC_SUBST(NSVERIFY)
 AC_SUBST(CVSSUPPORT)
@@ -222,6 +223,7 @@ AC_SUBST(EXP_VIS_SUPPORT)
 AC_SUBST(NOSHAREDFS)
 AC_SUBST(SELFLOADER_DATA)
 AC_SUBST(TBUSEDBI)
+AC_SUBST(NEEDMROUTED)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -295,6 +297,7 @@ BOSSEVENTPORT=16505
 UNIFIED_BOSS_AND_OPS=0
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
+FRISEBEENUMPORTS=0
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 DELAYTHRESH=2
@@ -314,6 +317,7 @@ NOSTACKMIB=0
 NOSHAREDFS=0
 NFSRACY=1
 SELFLOADER_DATA="__DATA__"
+NEEDMROUTED=0
 
 #
 # XXX You really don't want to change these!
@@ -410,6 +414,7 @@ fi
 AC_DEFINE_UNQUOTED(BOSSEVENTPORT, "$BOSSEVENTPORT")
 AC_DEFINE_UNQUOTED(FRISEBEEMCASTADDR, "$FRISEBEEMCASTADDR")
 AC_DEFINE_UNQUOTED(FRISEBEEMCASTPORT, "$FRISEBEEMCASTPORT")
+AC_DEFINE_UNQUOTED(FRISEBEENUMPORTS, "$FRISEBEENUMPORTS")
 
 if test $OPSDBSUPPORT -eq 1; then
     AC_DEFINE_UNQUOTED(OPSDBSUPPORT, 1)
@@ -903,6 +908,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	backend/editnodetype backend/editsitevars backend/newimageid \
 	backend/editgroup backend/newimageid_ez \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
+	tbsetup/snmpit_test/GNUmakefile  \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/power_mail.pm tbsetup/power_whol.pm \

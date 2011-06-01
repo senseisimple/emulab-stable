@@ -442,7 +442,6 @@ sub Register($)
     if ($type eq "user") {
 	my $name    = $info->{'name'};
 	my $email   = $info->{'email'};
-	my $keys    = undef;
 
 	if (! TBcheck_dbslot($name, "users", "usr_name",
 			     TBDB_CHECKDBSLOT_ERROR)) {
@@ -474,9 +473,9 @@ sub Register($)
 					    "Not allowed to change hrn");
 	    }
 	    #
-	    # Update operation, but only name, email, and keys for now.
+	    # Update operation, but only name, email
 	    #
-	    if ($existing->Modify($name, $email, $keys) != 0) {
+	    if ($existing->Modify($name, $email) != 0) {
 		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					    "Could not update user");
 	    }
@@ -502,8 +501,7 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"user already registered");
 	}
-	my $newuser = GeniUser->Create($certificate, $slice_authority,
-				       $info, $keys);
+	my $newuser = GeniUser->Create($certificate, $slice_authority, $info);
 	if (!defined($newuser)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not be registered");

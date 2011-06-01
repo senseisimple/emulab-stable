@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <assert.h>
 #include <mysql/mysql.h>
 #include "log.h"
@@ -24,6 +25,21 @@
 /* Emulab includes */
 #include "tbdb.h"	/* the DB library */
 #include "config.h"	/* the defs-* defines */
+
+extern int debug;
+
+/*
+ * Private configuration state that can be saved/restored.
+ *
+ * For Emulab, there are only a couple of DB values that don't change
+ * that often.
+ */
+struct emulab_configstate {
+	int image_maxsize;	/* sitevar:images/create/maxsize (in GB) */
+	int image_maxwait;	/* sitevar:images/create/maxwait (in min) */
+	int image_maxrate_std;	/* sitevar:images/frisbee/maxrate_std (in MB/s) */
+	int image_maxrate_usr;	/* sitevar:images/frisbee/maxrate_usr (in MB/s) */
+};
 
 /* Extra info associated with a image information entry */
 struct emulab_ii_extra_info {
@@ -42,27 +58,71 @@ struct emulab_ha_extra_info {
 
 static char *MC_BASEADDR = FRISEBEEMCASTADDR;
 static char *MC_BASEPORT = FRISEBEEMCASTPORT;
+#ifdef FRISEBEENUMPORTS
+static char *MC_NUMPORTS = FRISEBEENUMPORTS;
+#else
+static char *MC_NUMPORTS = "0";
+#endif
 static char *SHAREDIR	 = SHAREROOT_DIR;
 static char *PROJDIR	 = PROJROOT_DIR;
 static char *GROUPSDIR	 = GROUPSROOT_DIR;
 static char *USERSDIR	 = USERSROOT_DIR;
 static char *SCRATCHDIR	 = SCRATCHROOT_DIR;
-
-#ifndef ELABINELAB
-/* XXX should be autoconfiged as part of Emulab build */
-static char *IMAGEDIR    = "/usr/testbed/images";
+#ifdef ELABINELAB
+static int INELABINELAB  = ELABINELAB;
+#else
+static int INELABINELAB  = 0;
 #endif
+
+static uint64_t	put_maxsize = 10000000000ULL;	/* zero means no limit */
+static uint32_t put_maxwait = 2000;		/* zero means no limit */
+static uint32_t get_maxrate_std = 72000000;	/* zero means no limit */
+static uint32_t get_maxrate_usr = 54000000;	/* zero means no limit */
+
+/* Standard image directory: assumed to be "TBROOT/images" */
+static char *STDIMAGEDIR;
 
 /* Emit aliases when dumping the config info; makes it smaller */
 static int dump_doaliases = 1;
 
 /* Multicast address/port base info */
-static int mc_a, mc_b, mc_c, mc_port;
+static int mc_a, mc_b, mc_c, mc_port_lo, mc_port_num;
 
 /* Memory alloc functions that abort when no memory */
 static void *mymalloc(size_t size);
 static void *myrealloc(void *ptr, size_t size);
 static char *mystrdup(const char *str);
+
+/*
+ * Return the value of a sitevar as a string.
+ * Returns in order: the value if set, default_value if set, NULL
+ */
+static char *
+emulab_getsitevar(char *name)
+{
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+	char *value = NULL;
+
+	res = mydb_query("SELECT value,defaultvalue FROM sitevariables "
+			 " WHERE name='%s'", 2, name);
+	if (res == NULL)
+		return NULL;
+
+	if (mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return NULL;
+	}
+
+	row = mysql_fetch_row(res);
+	if (row[0])
+		value = mystrdup(row[0]);
+	else if (row[1])
+		value = mystrdup(row[1]);
+	mysql_free_result(res);
+
+	return value;
+}
 
 static void
 emulab_deinit(void)
@@ -73,67 +133,129 @@ emulab_deinit(void)
 static int
 emulab_read(void)
 {
-	/* "Reading" the config file is a no-op. */
+	char *val;
+	int ival;
+
+	/*
+	 * Grab a couple of image creation related sitevars that don't
+	 * change that often. We don't want to be reading these everytime
+	 * set_put_values() gets called, so we do it explicitly here.
+	 */
+	val = emulab_getsitevar("images/create/maxsize");
+	if (val) {
+		ival = atoi(val);
+		/* in GB, allow up to 10TB */
+		if (ival >= 0 && ival < 10000)
+			put_maxsize = (uint64_t)ival * 1024 * 1024 * 1024;
+		free(val);
+	}
+	log("  image_put_maxsize = %d GB",
+	    (int)(put_maxsize/(1024*1024*1024)));
+
+	val = emulab_getsitevar("images/create/maxwait");
+	if (val) {
+		ival = atoi(val);
+		/* in minutes, allow up to about 10TB @ 10MB/sec */
+		if (ival >= 0 && ival < 20000)
+			put_maxwait = (uint32_t)ival * 60;
+		free(val);
+	}
+	log("  image_put_maxwait = %d min",
+	    (int)(put_maxwait/60));
+
+	val = emulab_getsitevar("images/frisbee/maxrate_std");
+	if (val) {
+		ival = atoi(val);
+		/* in bytes/sec, allow up to 2Gb/sec */
+		if (ival >= 0 && ival < 2000000000)
+			get_maxrate_std = (uint32_t)ival;
+		free(val);
+	}
+	log("  image_get_maxrate_std = %d MB/sec",
+	    (int)(get_maxrate_std/1000000));
+
+	val = emulab_getsitevar("images/frisbee/maxrate_usr");
+	if (val) {
+		ival = atoi(val);
+		/* in bytes/sec, allow up to 2Gb/sec */
+		if (ival >= 0 && ival < 2000000000)
+			get_maxrate_usr = (uint32_t)ival;
+		free(val);
+	}
+	log("  image_get_maxrate_usr = %d MB/sec",
+	    (int)(get_maxrate_usr/1000000));
+
 	return 0;
 }
 
 static void *
 emulab_save(void)
 {
-	static int dummy;
+	struct emulab_configstate *cs = mymalloc(sizeof(cs));
 
-	/* Just return non-zero value */
-	return (void *)&dummy;
+	cs->image_maxsize = put_maxsize;
+	cs->image_maxwait = put_maxwait;
+	cs->image_maxrate_std = get_maxrate_std;
+	cs->image_maxrate_usr = get_maxrate_usr;
+
+	return (void *)cs;
 }
 
 static int
 emulab_restore(void *state)
 {
+	struct emulab_configstate *cs = state;
+
+	put_maxsize = cs->image_maxsize;
+	log("  image_put_maxsize = %d GB",
+	    (int)(put_maxsize/(1024*1024*1024)));
+	put_maxwait = cs->image_maxwait;
+	log("  image_put_maxwait = %d min",
+	    (int)(put_maxwait/60));
+	get_maxrate_std = cs->image_maxrate_std;
+	log("  image_get_maxrate_std = %d MB/sec",
+	    (int)(get_maxrate_std/1000000));
+	get_maxrate_usr = cs->image_maxrate_usr;
+	log("  image_get_maxrate_usr = %d MB/sec",
+	    (int)(get_maxrate_usr/1000000));
+
 	return 0;
 }
 
 static void
 emulab_free(void *state)
 {
-}
-
-/*
- * Set the allowed GET methods.
- * XXX for now, just multicast.
- */
-static void
-set_get_methods(struct config_host_authinfo *ai, int ix)
-{
-	ai->imageinfo[ix].get_methods = CONFIG_IMAGE_MCAST;
-#if 1
-	ai->imageinfo[ix].get_methods |= CONFIG_IMAGE_UCAST;
-#endif
+	free(state);
 }
 
 /*
  * Set the GET options for a particular node/image.
- * XXX right now these are implied by various bits of state in the DB:
  *
- * running in elabinelab:      54Mb/sec, keepalive of 15 sec.
- * loading a "standard" image: 72Mb/sec
- * any other image:            54Mb/sec
+ * Methods:
+ *   XXX for now, just multicast and unicast
+ * Options:
+ *   loading a "standard" image: 72Mb/sec
+ *   any other image:            54Mb/sec
+ *   running in elabinelab:      add keepalive of 15 sec.
  */
 static void
-set_get_options(struct config_host_authinfo *ai, int ix)
+set_get_values(struct config_host_authinfo *ai, int ix)
 {
+	struct config_imageinfo *ii = &ai->imageinfo[ix];
 	char str[256];
 
-	strcpy(str, "");
-#ifdef ELABINELAB
-	strcat(str, " -W 54000000 -K 15");
-#else
-	if (!strncmp(ai->imageinfo[ix].path, IMAGEDIR, strlen(IMAGEDIR)))
-		strcat(str, " -W 72000000");
-	else
-		strcat(str, " -W 54000000");
+	/* get_methods */
+	ii->get_methods = CONFIG_IMAGE_MCAST;
+#if 1
+	/*
+	 * XXX the current frisbee server allows only a single client
+	 * in unicast mode, which makes this option rather limited.
+	 * So you may not want to allow it by default.
+	 */
+	ii->get_methods |= CONFIG_IMAGE_UCAST;
 #endif
 
-#if 1
+	/* get_timeout */
 	/*
 	 * In the short run, we leave this at pre-master-server levels
 	 * for compatibility (we still support advance startup of servers
@@ -142,17 +264,73 @@ set_get_options(struct config_host_authinfo *ai, int ix)
 	 * We also need this at Utah while we work out some MC problems on
 	 * our control net (sometimes nodes can take minutes before they
 	 * actually hook up with the server.
+	 *
+	 * In an inner elab, neither of these apply.
 	 */
-	strcat(str, " -T 1800");
-#else
+	if (!INELABINELAB)
+		ii->get_timeout = 1800;
 	/*
 	 * We use a small server inactive timeout since we no longer have
 	 * to start up a frisbeed well in advance of the client(s).
 	 */
-	strcat(str, " -T 60");
-#endif
+	else
+		ii->get_timeout = 60;
 
-	ai->imageinfo[ix].get_options = mystrdup(str);
+	/* get_options */
+	snprintf(str, sizeof str, " -W %u",
+		 isindir(STDIMAGEDIR, ii->path) ?
+		 get_maxrate_std : get_maxrate_usr);
+	if (INELABINELAB)
+		strcat(str, " -K 15");
+	ii->get_options = mystrdup(str);
+
+	/* and whack the put_* fields */
+	ii->put_maxsize = 0;
+	ii->put_timeout = 0;
+	ii->put_options = NULL;
+	ii->put_oldversion = NULL;
+}
+
+/*
+ * Set the PUT maxsize/options for a particular node/image.
+ * XXX right now these are completely pulled out of our posterior.
+ */
+static void
+set_put_values(struct config_host_authinfo *ai, int ix)
+{
+	struct config_imageinfo *ii = &ai->imageinfo[ix];
+
+	/* put_maxsize */
+	ii->put_maxsize = put_maxsize;
+
+	/* put_timeout */
+	ii->put_timeout = put_maxwait;
+
+	/* put_oldversion */
+	/*
+	 * For standard images, we keep ALL old versions as:
+	 * <path>.<timestamp>, just because we are extra paranoid about those.
+	 */
+	if (isindir(STDIMAGEDIR, ii->path)) {
+		time_t curtime;
+		char *str;
+		int len;
+
+		curtime = time(NULL);
+		len = strlen(ii->path) + 11;
+		str = mymalloc(len);
+		snprintf(str, len, "%s.%09u", ii->path, (unsigned)curtime);
+		ii->put_oldversion = str;
+	} else
+		ii->put_oldversion = NULL;
+
+	/* put_options */
+	ii->put_options = NULL;
+
+	/* and whack the get_* fields */
+	ii->get_methods = 0;
+	ii->get_timeout = 0;
+	ii->get_options = NULL;
 }
 
 #define FREE(p) { if (p) free(p); }
@@ -175,6 +353,7 @@ emulab_free_host_authinfo(struct config_host_authinfo *ai)
 			FREE(ai->imageinfo[i].path);
 			FREE(ai->imageinfo[i].sig);
 			FREE(ai->imageinfo[i].get_options);
+			FREE(ai->imageinfo[i].put_oldversion);
 			FREE(ai->imageinfo[i].put_options);
 			FREE(ai->imageinfo[i].extra);
 		}
@@ -229,6 +408,7 @@ emulab_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		error("get_server_address: DB update error!");
 		return 1;
 	}
+ again:
 	idx = mydb_insertid();
 	assert(idx > 0);
 
@@ -258,52 +438,66 @@ emulab_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		 * but because of the way IP multicast addresses map
 		 * onto ethernet addresses (only the low 23 bits are used)
 		 * ANY MC address (224-239) with those bits will also flood.
-		 * So avoid those.
+		 * So avoid those, by skipping over the problematic range
+		 * in the index.
+		 *
+		 * Note that because of the way the above increment process
+		 * works, this should never happen except when the initial
+		 * MC_BASEADDR is bad in this way (i.e., because of the
+		 * "c = (c % 254) + 1" this function will never generate
+		 * a zero value for c).
 		 */
-		if (c == 0 && (b == 0 || b == 128))
-			c++;
+		if (c == 0 && (b == 0 || b == 128)) {
+			if (!mydb_update("UPDATE emulab_indicies "
+					 " SET idx=LAST_INSERT_ID(idx+254) "
+					 " WHERE name='frisbee_index'")) {
+				error("get_server_address: DB update error!");
+				return 1;
+			}
+			goto again;
+		}
 
 		*methp = CONFIG_IMAGE_MCAST;
 		*addrp = (a << 24) | (b << 16) | (c << 8) | d;
 	} else if (methods & CONFIG_IMAGE_UCAST) {
 		*methp = CONFIG_IMAGE_UCAST;
-		*addrp = 0;
+		/* XXX on retries, we don't mess with the address */
+		if (first)
+			*addrp = 0;
 	}
-	*portp = mc_port + (((c << 8) | d) & 0x7FFF);
+
+	/*
+	 * In the interest of uniform distribution, if we have a maximum
+	 * number of ports to use we just use the index directly.
+	 */
+	if (mc_port_num) {
+		*portp = mc_port_lo + (idx % mc_port_num);
+	}
+	/*
+	 * In the interest of backward compat, if there is no maximum
+	 * number of ports, we use the "classic" formula.
+	 */
+	else {
+		*portp = mc_port_lo + (((c << 8) | d) & 0x7FFF);
+	}
 
 	return 0;
-}
-
-/*
- * Return one if 'path' is in 'dir'; i.e., is 'dir' a prefix of 'path'?
- * Note: returns zero if path == dir.
- * Note: assumes realpath has been run on both.
- */
-static int
-isindir(char *dir, char *path)
-{
-	int len = dir ? strlen(dir) : 0;
-	int rv = 1;
-
-	if (dir == NULL || path == NULL || *dir == '\0' || *path == '\0' ||
-	    strncmp(dir, path, len) || path[len] != '/')
-		rv = 0;
-	if (0)
-		fprintf(stderr, "isindir(dir=%s, path=%s) => %d\n",
-			dir ? dir : "", path ? path : "", rv);
-	return rv;
 }
 
 /*
  * Check and see if the given image is in the set of standard directories
  * to which this node (actually pid/gid/eid/uid) has access.  The set is:
  *  - /share		      (GET only)
- *  - /proj/<pid>	      (GET only right now)
- *  - in /groups/<pid>/<gid>  (GET only right now)
- *  - in /users/<swapper-uid> (GET only right now)
+ *  - /proj/<pid>	      (GET or PUT)
+ *  - in /groups/<pid>/<gid>  (GET or PUT)
+ *  - in /users/<swapper-uid> (GET or PUT)
  * and, if it exists:
  *  - in /scratch/<pid>	      (GET or PUT)
+ * For a GET, the entire path must exist and be accessible. For a PUT,
+ * everything up to the final component must.
  *
+ * If imageid is NULL, then we just return 
+
  * We assume the get and put structures have been initialized, in particular
  * that they contain the "extra" info which has the pid/gid/eid/uid.
  */
@@ -313,20 +507,24 @@ allow_stddirs(char *imageid,
 	      struct config_host_authinfo *put)
 {
 	char tpath[PATH_MAX];
-	char *fpath, *shdir, *pdir, *gdir, *scdir, *udir;
-	int doput = 0, doget = 0;
+	char *fpath, *fdir;
+	char *shdir, *pdir, *gdir, *scdir, *udir;
 	struct emulab_ha_extra_info *ei;
 	struct config_imageinfo *ci;
 	struct stat sb;
+	int exists;
 
 	if (get == NULL && put == NULL)
 		return;
 
-	ei = get ? get->extra : put->extra;
 	fpath = NULL;
+
+	/* XXX extra info is the same for both, we just need a valid one */
+	ei = get ? get->extra : put->extra;
 
 	/*
 	 * Construct the allowed directories for this pid/gid/eid/uid.
+	 * Note that these paths are "realpath approved".
 	 */
 	shdir = SHAREDIR;
 	snprintf(tpath, sizeof tpath, "%s/%s", PROJDIR, ei->pid);
@@ -354,11 +552,14 @@ allow_stddirs(char *imageid,
 		char *dirs[8];
 
 		/*
-		 * Right now, only allow PUT to scratchdir if it exists.
+		 * Put allows all but SHAREDIR
 		 */
-		if (put != NULL && scdir) {
-			dirs[0] = scdir;
-			ni = put->numimages + 1;
+		if (put != NULL) {
+			dirs[0] = pdir;
+			dirs[1] = gdir;
+			dirs[2] = udir;
+			dirs[3] = scdir;
+			ni = put->numimages + (scdir ? 4 : 3);
 			ns = ni * sizeof(struct config_imageinfo);
 			if (put->imageinfo)
 				put->imageinfo = myrealloc(put->imageinfo, ns);
@@ -367,18 +568,19 @@ allow_stddirs(char *imageid,
 			for (i = put->numimages; i < ni; i++) {
 				ci = &put->imageinfo[i];
 				ci->imageid = NULL;
+				ci->dir = NULL;
 				ci->path = mystrdup(dirs[i - put->numimages]);
 				ci->flags = CONFIG_PATH_ISDIR;
 				if (stat(ci->path, &sb) == 0) {
+					ci->flags |= CONFIG_PATH_EXISTS;
 					ci->sig = mymalloc(sizeof(time_t));
 					*(time_t *)ci->sig = sb.st_mtime;
 					ci->flags |= CONFIG_SIG_ISMTIME;
 				} else
 					ci->sig = NULL;
-				ci->get_options = NULL;
-				ci->get_methods = 0;
-				ci->get_uid = ci->get_gid = -1;
-				ci->put_options = NULL;
+				ci->uid = ei->suid;
+				ci->gid = ei->egid;
+				set_put_values(put, i);
 				ci->extra = NULL;
 			}
 			put->numimages = ni;
@@ -401,19 +603,19 @@ allow_stddirs(char *imageid,
 			for (i = get->numimages; i < ni; i++) {
 				ci = &get->imageinfo[i];
 				ci->imageid = NULL;
+				ci->dir = NULL;
 				ci->path = mystrdup(dirs[i - get->numimages]);
 				ci->flags = CONFIG_PATH_ISDIR;
 				if (stat(ci->path, &sb) == 0) {
+					ci->flags |= CONFIG_PATH_EXISTS;
 					ci->sig = mymalloc(sizeof(time_t));
 					*(time_t *)ci->sig = sb.st_mtime;
 					ci->flags |= CONFIG_SIG_ISMTIME;
 				} else
 					ci->sig = NULL;
-				set_get_options(get, i);
-				set_get_methods(get, i);
-				ci->get_uid = ei->suid;
-				ci->get_gid = ei->egid;
-				ci->put_options = NULL;
+				ci->uid = ei->suid;
+				ci->gid = ei->egid;
+				set_get_values(get, i);
 				ci->extra = NULL;
 			}
 			get->numimages = ni;
@@ -422,68 +624,79 @@ allow_stddirs(char *imageid,
 	}
 
 	/*
-	 * Image was specified; find the real path for the targetted file.
-	 * Don't want users symlinking to files outside their allowed space.
+	 * Image was specified.
+	 *
+	 * At this point we cannot do a full path check since the full path
+	 * need not exist and we are possibly running with enhanced privilege.
+	 * So we only weed out obviously bogus paths here (possibly checking
+	 * just the partial path returned by realpath) and mark the imageinfo
+	 * as needed a full resolution later.
 	 */
-	if (realpath(imageid, tpath) == NULL)
-		goto done;
+	if (myrealpath(imageid, tpath) == NULL) {
+		if (errno != ENOENT)
+			goto done;
+		exists = 0;
+	} else
+		exists = 1;
 	fpath = mystrdup(tpath);
+	if (debug)
+		info("%s: exists=%d, resolves to: '%s'",
+		     imageid, exists, tpath);
 
 	/*
 	 * Make the appropriate access checks for get/put
 	 */
 	if (put != NULL &&
-	    (isindir(scdir, fpath)))
-		doput = 1;
-	if (get != NULL &&
-	    (isindir(shdir, fpath) ||
-	     isindir(pdir, fpath) ||
-	     isindir(gdir, fpath) ||
-	     isindir(scdir, fpath) ||
-	     isindir(udir, fpath)))
-		doget = 1;
-
-	if (doput) {
+	    ((fdir = isindir(pdir, fpath)) ||
+	     (fdir = isindir(gdir, fpath)) ||
+	     (fdir = isindir(udir, fpath)) ||
+	     (fdir = isindir(scdir, fpath)))) {
 		assert(put->imageinfo == NULL);
 
 		put->imageinfo = mymalloc(sizeof(struct config_imageinfo));
 		put->numimages = 1;
 		ci = &put->imageinfo[0];
 		ci->imageid = mystrdup(imageid);
-		ci->path = mystrdup(fpath);
-		ci->flags = CONFIG_PATH_ISFILE;
-		if (stat(ci->path, &sb) == 0) {
+		ci->dir = mystrdup(fdir);
+		ci->path = mystrdup(imageid);
+		ci->flags = CONFIG_PATH_ISFILE|CONFIG_PATH_RESOLVE;
+		if (exists && stat(ci->path, &sb) == 0) {
+			ci->flags |= CONFIG_PATH_EXISTS;
 			ci->sig = mymalloc(sizeof(time_t));
 			*(time_t *)ci->sig = sb.st_mtime;
 			ci->flags |= CONFIG_SIG_ISMTIME;
 		} else
 			ci->sig = NULL;
-		ci->get_options = NULL;
-		ci->get_methods = 0;
-		ci->get_uid = ci->get_gid = -1;
-		ci->put_options = NULL;
+		ci->uid = ei->suid;
+		ci->gid = ei->egid;
+		set_put_values(put, 0);
 		ci->extra = NULL;
 	}
-	if (doget) {
+	if (get != NULL &&
+	    ((fdir = isindir(shdir, fpath)) ||
+	     (fdir = isindir(pdir, fpath)) ||
+	     (fdir = isindir(gdir, fpath)) ||
+	     (fdir = isindir(scdir, fpath)) ||
+	     (fdir = isindir(udir, fpath)))) {
 		assert(get->imageinfo == NULL);
 
 		get->imageinfo = mymalloc(sizeof(struct config_imageinfo));
 		get->numimages = 1;
 		ci = &get->imageinfo[0];
 		ci->imageid = mystrdup(imageid);
-		ci->path = mystrdup(fpath);
-		ci->flags = CONFIG_PATH_ISFILE;
-		if (stat(ci->path, &sb) == 0) {
+		ci->dir = mystrdup(fdir);
+		ci->path = mystrdup(imageid);
+		ci->flags = CONFIG_PATH_ISFILE|CONFIG_PATH_RESOLVE;
+		if (exists && stat(ci->path, &sb) == 0) {
+			ci->flags |= CONFIG_PATH_EXISTS;
 			ci->sig = mymalloc(sizeof(time_t));
 			*(time_t *)ci->sig = sb.st_mtime;
 			ci->flags |= CONFIG_SIG_ISMTIME;
 		} else
 			ci->sig = NULL;
-		set_get_options(get, 0);
-		set_get_methods(get, 0);
-		ci->get_uid = ei->suid;
-		ci->get_gid = ei->egid;
-		ci->put_options = NULL;
+		ci->uid = ei->suid;
+		ci->gid = ei->egid;
+		set_get_values(get, 0);
 		ci->extra = NULL;
 	}
 
@@ -542,7 +755,7 @@ emulab_nodeid(struct in_addr *cnetip)
  *
  * - all "global" images (GET only)
  * - all "shared" images in the project and any group (GET only)
- * - all images in the project and group of the node
+ * - all images in the project and group of the node (GET and PUT)
  *
  * For a single image this will either return a single image or no image.
  * The desired image must be one of the images that would be returned in
@@ -553,6 +766,19 @@ emulab_nodeid(struct in_addr *cnetip)
  * per-project, per-group namespace).
  *
  * Return zero on success, non-zero otherwise.
+ *
+ * Notes on validating paths:
+ *
+ *    For a GET of a DB-registered image (imageid in "pid/imageid" format),
+ *    we just return the path recorded in the DB without any validation.
+ *    That path can point anywhere and the file does not have to exist.
+ *
+ *    For a GET of a file (imageid starts with '/'), we canonicalize
+ *    (via realpath) the user-provided path and ensure that the portion
+ *    of the path that exists falls within one of the allowed directories.
+ *    Note that this is still susceptible to time-of-check-to-time-of-use
+ *    attacks by using symlinks, but the actual frisbeed that feeds the
+ *    image will run as the user.
  */
 static int
 emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
@@ -829,24 +1055,44 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			    !row[3] || !row[3][0] ||
 			    !row[4] || !row[4][0])
 				continue;
+
+			/*
+			 * XXX if image is in the standard image directory,
+			 * disallow PUTs.
+			 *
+			 * We would like to allow PUTs to the standard image
+			 * directory, but I am not sure how to authenticate
+			 * them. Checking that the swapper of the experiment
+			 * (that the node is in) is an admin or otherwise
+			 * "special" won't work because nodes get put into
+			 * hwdown and other special experiments possibly
+			 * without revoking the access of the previous user.
+			 */
+			if (isindir(STDIMAGEDIR, row[3])) {
+				error("%s: cannot update standard images "
+				      "right now", row[3]);
+				continue;
+			}
+
 			iid = mymalloc(strlen(row[0]) + strlen(row[2]) + 2);
 			strcpy(iid, row[0]);
 			strcat(iid, "/");
 			strcat(iid, row[2]);
 			ci = &put->imageinfo[put->numimages];
 			ci->imageid = iid;
+			ci->dir = NULL;
 			ci->path = mystrdup(row[3]);
 			ci->flags = CONFIG_PATH_ISFILE;
 			if (stat(ci->path, &sb) == 0) {
+				ci->flags |= CONFIG_PATH_EXISTS;
 				ci->sig = mymalloc(sizeof(time_t));
 				*(time_t *)ci->sig = sb.st_mtime;
 				ci->flags |= CONFIG_SIG_ISMTIME;
 			} else
 				ci->sig = NULL;
-			ci->get_methods = 0;
-			ci->get_options = NULL;
-			ci->get_uid = ci->get_gid = -1;
-			ci->put_options = NULL;
+			ci->uid = ei->suid;
+			ci->gid = ei->egid;
+			set_put_values(put, put->numimages);
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);
 			ci->extra = ii;
@@ -904,19 +1150,19 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			strcat(iid, row[2]);
 			ci = &get->imageinfo[get->numimages];
 			ci->imageid = iid;
+			ci->dir = NULL;
 			ci->path = mystrdup(row[3]);
 			ci->flags = CONFIG_PATH_ISFILE;
 			if (stat(ci->path, &sb) == 0) {
+				ci->flags |= CONFIG_PATH_EXISTS;
 				ci->sig = mymalloc(sizeof(time_t));
 				*(time_t *)ci->sig = sb.st_mtime;
 				ci->flags |= CONFIG_SIG_ISMTIME;
 			} else
 				ci->sig = NULL;
-			set_get_methods(get, get->numimages);
-			set_get_options(get, get->numimages);
-			ci->get_uid = ei->suid;
-			ci->get_gid = ei->egid;
-			ci->put_options = NULL;
+			ci->uid = ei->suid;
+			ci->gid = ei->egid;
+			set_get_values(get, get->numimages);
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);
 			ci->extra = ii;
@@ -1165,6 +1411,7 @@ emulab_init(void)
 {
 	static int called;
 	char pathbuf[PATH_MAX], *path;
+	int len;
 
 	if (!dbinit())
 		return NULL;
@@ -1179,7 +1426,13 @@ emulab_init(void)
 		      MC_BASEADDR);
 		return NULL;
 	}
-	mc_port = atoi(MC_BASEPORT);
+	mc_port_lo = atoi(MC_BASEPORT);
+	mc_port_num = atoi(MC_NUMPORTS);
+	if (mc_port_num < 0 || mc_port_num >= 65536) {
+		error("emulab_init: MC_NUMPORTS '%s' not in valid range!",
+		      MC_NUMPORTS);
+		return NULL;
+	}
 
 	if ((path = realpath(SHAREROOT_DIR, pathbuf)) == NULL) {
 		error("emulab_init: could not resolve '%s'", SHAREROOT_DIR);
@@ -1215,7 +1468,14 @@ emulab_init(void)
 	} else
 		SCRATCHDIR = NULL;
 
-	log("Read Emulab configuration");
+	/*
+	 * Construct the standard image directory path.
+	 * XXX Should we run realpath on this? I don't think so.
+	 */
+	len = strlen(TBROOT) + strlen("/images") + 1;
+	STDIMAGEDIR = mymalloc(len);
+	snprintf(STDIMAGEDIR, len, "%s/images", TBROOT);
+
 	return &emulab_config;
 }
 

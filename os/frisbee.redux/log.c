@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -43,6 +43,19 @@ ServerLogInit(void)
 	}
 
 	openlog("frisbeed", LOG_PID, LOG_TESTBED);
+
+	return 0;
+}
+
+int
+UploadLogInit(void)
+{
+	if (debug) {
+		usesyslog = 0;
+		return 1;
+	}
+
+	openlog("frisuploadd", LOG_PID, LOG_TESTBED);
 
 	return 0;
 }

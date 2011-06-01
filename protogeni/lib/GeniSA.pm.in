@@ -418,22 +418,27 @@ sub Register($)
 	    # Do we need a policy limit?
 	    # A sitevar controls the sliver lifetime.
 	    #
-	    my $max_sliver_lifetime = 0; 
-	    if (!libEmulab::GetSiteVar('protogeni/max_sliver_lifetime', 
-				       \$max_sliver_lifetime)) {
+	    my $max_slice_lifetime = 0; 
+	    if (!libEmulab::GetSiteVar('protogeni/max_slice_lifetime', 
+				       \$max_slice_lifetime)) {
 		# Cannot get the value, default it to 90 days.
-		$max_sliver_lifetime = 90;
+		$max_slice_lifetime = 90;
 	    }
 
 	    my $diff = $when - time();
-
-	    if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
-		$message = "valid_until out of range";
+	    if ($diff < (60 * 5)) {
+		$message = "such a short life for a slice? More time please.";
+		goto bad;
+	    }
+	    elsif ($diff > (3600 * 24 * $max_slice_lifetime)) {
+		$message = "expiration is greater then the maximum number ".
+		    "of minutes " . (60 * 24 * $max_slice_lifetime);
 		goto bad;
 	    }
 	  bad:
 	    if (defined($message)) {
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
+		return GeniResponse->Create(GENIRESPONSE_ERROR,
+					    undef, $message);
 	    }
 	    $expires = $when;
 	}
@@ -651,7 +656,9 @@ sub Remove($)
 sub GetKeys($)
 {
     my ($argref) = @_;
-    my $cred  = $argref->{'credential'};
+    my $cred     = $argref->{'credential'};
+    # Hidden option. Remove later.
+    my $version  = $argref->{'version'} || 1;
 
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
@@ -676,12 +683,31 @@ sub GetKeys($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Who are you? No local record");
     }
+    my $blob;
     my @keys;
     if ($this_user->GetKeyBundle(\@keys) != 0) {
 	print STDERR "Could not get keys for $this_user\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);	
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@keys);
+    if ("$version" eq "am") {
+	# Just for debugging the AM interface.
+	my @tmp = ();
+	foreach my $key (@keys) {
+	    push(@tmp, $key->{'key'});
+	}
+	$blob = [{'urn'   => $this_user->urn(),
+		  'keys'  => \@tmp}];
+    }
+    elsif ($version > 1) {
+	# Note new format.
+	$blob = [{'urn'   => $this_user->urn(),
+		  'login' => $this_user->uid(),
+		  'keys'  => \@keys}];
+    }
+    else {
+	$blob = \@keys;
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
 #
@@ -843,17 +869,22 @@ sub RenewSlice($)
     # Do we need a policy limit?
     # A sitevar controls the sliver lifetime.
     #
-    my $max_sliver_lifetime = 0; 
-    if (!libEmulab::GetSiteVar('protogeni/max_sliver_lifetime', 
-			       \$max_sliver_lifetime)) {
+    my $max_slice_lifetime = 0; 
+    if (!libEmulab::GetSiteVar('protogeni/max_slice_lifetime', 
+			       \$max_slice_lifetime)) {
         # Cannot get the value, default it to 90 days.
-        $max_sliver_lifetime = 90;
+        $max_slice_lifetime = 90;
     }
 
     my $diff = $when - time();
 
-    if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
-	$message = "expiration out of range";
+    if ($diff < (60 * 5)) {
+	$message = "such a short life for a slice? More time please.";
+	goto bad;
+    }
+    elsif ($diff > (3600 * 24 * $max_slice_lifetime)) {
+	$message = "expiration is greater then the maximum number of minutes ".
+	    (60 * 24 * $max_slice_lifetime);
 	goto bad;
     }
     if ($when < time()) {

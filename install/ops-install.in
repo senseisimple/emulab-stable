@@ -1057,6 +1057,12 @@ Phase "ssh", "Allowing root ssh", sub {
 	AppendToFileFatal($SSHD_CONFIG,
 			  "PermitRootLogin yes",
 			  "Protocol 2,1");
+	# HUP the server so the changes take effect
+	if (-r "/var/run/sshd.pid") {
+	    my $dpid = `cat /var/run/sshd.pid`;
+	    chomp($dpid);
+	    ExecQuiet("kill -HUP $dpid");
+	}
     };
     Phase "dotssh", "Making root's .ssh directory", sub {
 	DoneIfExists("/root/.ssh");

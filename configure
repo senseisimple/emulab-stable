@@ -1503,6 +1503,9 @@ done
 
 
 
+
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -1575,6 +1578,7 @@ BOSSEVENTPORT=16505
 UNIFIED_BOSS_AND_OPS=0
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
+FRISEBEENUMPORTS=0
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 DELAYTHRESH=2
@@ -1594,6 +1598,7 @@ NOSTACKMIB=0
 NOSHAREDFS=0
 NFSRACY=1
 SELFLOADER_DATA="__DATA__"
+NEEDMROUTED=0
 
 #
 # XXX You really don't want to change these!
@@ -1791,6 +1796,10 @@ EOF
 
 cat >> confdefs.h <<EOF
 #define FRISEBEEMCASTPORT "$FRISEBEEMCASTPORT"
+EOF
+
+cat >> confdefs.h <<EOF
+#define FRISEBEENUMPORTS "$FRISEBEENUMPORTS"
 EOF
 
 
@@ -2231,17 +2240,17 @@ for ac_hdr in ulxmlrpcpp/ulxr_config.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2234: checking for $ac_hdr" >&5
+echo "configure:2244: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2239 "configure"
+#line 2249 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2244: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2254: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2280,17 +2289,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2283: checking for $ac_hdr" >&5
+echo "configure:2293: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2288 "configure"
+#line 2298 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2293: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2303: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2323,7 +2332,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2326: checking for $ac_word" >&5
+echo "configure:2336: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2380,7 +2389,7 @@ ac_link='${CXX-g++} -o conftest${ac_exeext} $CXXFLAGS $CPPFLAGS $LDFLAGS conftes
 cross_compiling=$ac_cv_prog_cxx_cross
 
 echo $ac_n "checking how to run the C++ preprocessor""... $ac_c" 1>&6
-echo "configure:2383: checking how to run the C++ preprocessor" >&5
+echo "configure:2393: checking how to run the C++ preprocessor" >&5
 if test -z "$CXXCPP"; then
 if eval "test \"`echo '$''{'ac_cv_prog_CXXCPP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2393,12 +2402,12 @@ ac_link='${CXX-g++} -o conftest${ac_exeext} $CXXFLAGS $CPPFLAGS $LDFLAGS conftes
 cross_compiling=$ac_cv_prog_cxx_cross
   CXXCPP="${CXX-g++} -E"
   cat > conftest.$ac_ext <<EOF
-#line 2396 "configure"
+#line 2406 "configure"
 #include "confdefs.h"
 #include <stdlib.h>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2401: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2411: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -2424,17 +2433,17 @@ echo "$ac_t""$CXXCPP" 1>&6
 
 ac_safe=`echo "xercesc/dom/DOM.hpp" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for xercesc/dom/DOM.hpp""... $ac_c" 1>&6
-echo "configure:2427: checking for xercesc/dom/DOM.hpp" >&5
+echo "configure:2437: checking for xercesc/dom/DOM.hpp" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2432 "configure"
+#line 2442 "configure"
 #include "confdefs.h"
 #include <xercesc/dom/DOM.hpp>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2437: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2447: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2498,7 +2507,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:2501: checking for a BSD compatible install" >&5
+echo "configure:2511: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2559,7 +2568,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2562: checking for $ac_word" >&5
+echo "configure:2572: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2672,6 +2681,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	backend/editnodetype backend/editsitevars backend/newimageid \
 	backend/editgroup backend/newimageid_ez \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
+	tbsetup/snmpit_test/GNUmakefile  \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/power_mail.pm tbsetup/power_whol.pm \
@@ -3062,7 +3072,6 @@ s%@TBCOOKIESUFFIX@%$TBCOOKIESUFFIX%g
 s%@TBAUTHDOMAIN@%$TBAUTHDOMAIN%g
 s%@TBAUTHTIMEOUT@%$TBAUTHTIMEOUT%g
 s%@TBMAINSITE@%$TBMAINSITE%g
-s%@TBUSEDBI@%$TBUSEDBI%g
 s%@FANCYBANNER@%$FANCYBANNER%g
 s%@SFSSUPPORT@%$SFSSUPPORT%g
 s%@ELABINELAB@%$ELABINELAB%g
@@ -3108,6 +3117,7 @@ s%@SSLCERT_LOCALITY@%$SSLCERT_LOCALITY%g
 s%@SSLCERT_ORGNAME@%$SSLCERT_ORGNAME%g
 s%@FRISEBEEMCASTADDR@%$FRISEBEEMCASTADDR%g
 s%@FRISEBEEMCASTPORT@%$FRISEBEEMCASTPORT%g
+s%@FRISEBEENUMPORTS@%$FRISEBEENUMPORTS%g
 s%@WINSUPPORT@%$WINSUPPORT%g
 s%@NSVERIFY@%$NSVERIFY%g
 s%@CVSSUPPORT@%$CVSSUPPORT%g
@@ -3134,6 +3144,8 @@ s%@NOSTACKMIB@%$NOSTACKMIB%g
 s%@EXP_VIS_SUPPORT@%$EXP_VIS_SUPPORT%g
 s%@NOSHAREDFS@%$NOSHAREDFS%g
 s%@SELFLOADER_DATA@%$SELFLOADER_DATA%g
+s%@TBUSEDBI@%$TBUSEDBI%g
+s%@NEEDMROUTED@%$NEEDMROUTED%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBROBOCOPSEMAIL@%$TBROBOCOPSEMAIL%g

@@ -175,6 +175,8 @@ if (system("parse-ns $zeeopt $pid $gid $eid $nsfile")) {
 TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
 
+$experiment->Refresh();
+
 #
 # XXX Until link agent runs on linux.
 #

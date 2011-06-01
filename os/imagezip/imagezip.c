@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -12,6 +12,15 @@
  *	and overlapping IO with compression.  Maybe a third thread for
  *	doing output.
  */
+#ifdef WITH_CRYPTO
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <openssl/rsa.h>
+#include <openssl/rand.h>
+#ifdef SIGN_CHECKSUM
+#include <openssl/err.h>
+#endif
+#endif
 #include <ctype.h>
 #include <err.h>
 #include <fcntl.h>
@@ -28,10 +37,14 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <zlib.h>
+#ifndef WITH_CRYPTO
+#include <sha.h>
+#endif
 
 #include "imagehdr.h"
 #include "sliceinfo.h"
 #include "global.h"
+#include "checksum.h"
 
 /* XXX this is a hack right now */
 #define USE_HACKSORT 0
@@ -43,14 +56,14 @@ int	infd, outfd, outcanseek;
 int	secsize	  = 512;	/* XXX bytes. */
 int	debug	  = 0;
 int	dots	  = 0;
-int     info      = 0;
-int     version   = 0;
-int     slicemode = 0;
-int     maxmode   = 0;
-int     slice     = 0;
+int	info	  = 0;
+int	version	  = 0;
+int	slicemode = 0;
+int	maxmode	  = 0;
+int	slice	  = 0;
 int	level	  = 4;
 long	dev_bsize = 1;
-int	oldstyle  = 0;
+uint32_t compat   = 0;
 int	frangesize= 64;	/* 32k */
 int	forcereads= 0;
 int	badsectors= 0;
@@ -58,12 +71,28 @@ int	retrywrites= 1;
 int	dorelocs  = 1;
 int	metaoptimize = 0;
 int	filemode  = 0;
+int	do_encrypt = 0;
+int	cipher = ENC_NONE;
+int	do_checksum = 0;
+int	csumalg = CSUM_NONE;
 off_t	datawritten;
 partmap_t ignore, forceraw;
+static	int got_imageid;
+static unsigned char imageid[UUID_LENGTH];
 
 #ifdef WITH_HASH
 char	*hashfile;
 #endif
+
+#ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
+RSA		*sig_key = NULL;	/* signing key */
+static void output_public_key(char *, RSA *);
+#endif
+unsigned char	*enc_key = NULL;	/* encryption key */
+static void output_encrypt_key(char *, unsigned char *, int);
+#endif
+static void output_uuid(char *, char *);
 
 #define HDRUSED(reg, rel) \
     (sizeof(blockhdr_t) + \
@@ -72,7 +101,7 @@ char	*hashfile;
 /*
  * We want to be able to compress slices by themselves, so we need
  * to know where the slice starts when reading the input file for
- * compression. 
+ * compression.
  *
  * These numbers are in sectors.
  */
@@ -81,7 +110,7 @@ unsigned long inputminsec	= 0;
 unsigned long inputmaxsec	= 0;	/* 0 means the entire input image */
 
 /*
- * A list of data ranges. 
+ * A list of data ranges.
  */
 struct range {
 	uint32_t	start;		/* In sectors */
@@ -99,7 +128,7 @@ static void	sortrange(struct range **head, int domerge,
 		  int (*rangecmp)(struct range *, struct range *));
 int	mergeskips(int verbose);
 int	mergeranges(struct range *head);
-void    makeranges(void);
+void	makeranges(void);
 void	freeranges(struct range *);
 void	dumpranges(int verbose);
 void	dumpfixups(int verbose);
@@ -130,7 +159,9 @@ struct slicemap fsmap[] = {
 #endif
 #ifdef WITH_EXTFS
 	{ DOSPTYP_LINUX,	"Linux EXT",	read_linuxslice },
-//	{ DOSPTYP_EXT4,		"Linux EXT4",	read_ext4slice },
+#if 0
+	{ DOSPTYP_EXT4,		"Linux EXT4",	read_ext4slice },
+#endif
 	{ DOSPTYP_LINSWP,	"Linux SWP",	read_linuxswap },
 #endif
 #ifdef WITH_NTFS
@@ -170,7 +201,7 @@ slowread(int fd, void *buf, size_t nbytes, off_t startoffset)
 
 	fprintf(stderr, "read failed: will retry by sector %d more times\n",
 		READ_RETRIES);
-	
+
 	count = 0;
 	for (i = 0; i < READ_RETRIES; i++) {
 		if (lseek(fd, startoffset, SEEK_SET) < 0) {
@@ -271,7 +302,7 @@ devread(int fd, void *buf, size_t nbytes)
 
 /*
  * Wrap up write in a retry mechanism to protect against transient NFS
- * errors causing a fatal error. 
+ * errors causing a fatal error.
  */
 ssize_t
 devwrite(int fd, const void *buf, size_t nbytes)
@@ -299,9 +330,9 @@ devwrite(int fd, const void *buf, size_t nbytes)
 			if (!retrywrites)
 				return cc;
 
-			if (i == 0) 
+			if (i == 0)
 				perror("write error: will retry");
-	
+
 			sleep(1);
 			nbytes += count;
 			buf     = (void *)((char *)buf - count);
@@ -369,8 +400,10 @@ main(int argc, char *argv[])
 	struct timeval sstamp;
 	extern char build_info[];
 
+	memset(imageid, UUID_LENGTH, '\0');
+
 	gettimeofday(&sstamp, 0);
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:ofI:1F:DR:S:XH:M")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:ofI:13F:DR:S:XH:Me:k:u:a:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -428,7 +461,10 @@ main(int argc, char *argv[])
 				usage();
 			break;
 		case '1':
-			oldstyle = 1;
+			compat = COMPRESSED_V1;
+			break;
+		case '3':
+			compat = COMPRESSED_V3;
 			break;
 		case 'F':
 			frangesize = atoi(optarg);
@@ -452,6 +488,66 @@ main(int argc, char *argv[])
 		case 'f':
 			filemode++;
 			rawmode++;
+			break;
+		case 'a':
+#ifdef WITH_CRYPTO
+			/* Authentication (checksum) hash algorithm */
+			if (strcmp(optarg, "SHA1") == 0) {
+				csumalg = CSUM_SHA1;
+			}
+			else {
+				fprintf(stderr, "Only know \"SHA1\"\n");
+				usage();
+			}
+			do_checksum++;
+#ifdef SIGN_CHECKSUM
+			csumalg |= CSUM_SIGNED;
+#else
+			fprintf(stderr, "WARNING: checksum is not signed\n");
+#endif
+#else
+			fprintf(stderr, "'a' option not supported\n");
+			usage();
+#endif
+			break;
+
+		case 'e':
+#ifdef WITH_CRYPTO
+			/* Encryption cipher */
+			if (strcmp(optarg, "bf_cbc") == 0) {
+				cipher = ENC_BLOWFISH_CBC;
+			}
+			else {
+				fprintf(stderr,
+					"Only know \"bf_cbc\" (blowfish CBC)\n");
+				usage();
+			}
+			do_encrypt++;
+#else
+			fprintf(stderr, "'e' option not supported\n");
+			usage();
+#endif
+			break;
+		case 'k':
+#ifdef WITH_CRYPTO
+			/* Encryption key file */
+			enc_key = calloc(1, ENC_MAX_KEYLEN);
+			if (enc_key == NULL ||
+			    !encrypt_readkey(optarg, enc_key, ENC_MAX_KEYLEN))
+				usage();
+			/* XXX can you intuit the cipher from the key? */
+			if (cipher == ENC_NONE)
+				cipher = ENC_BLOWFISH_CBC;
+#else
+			fprintf(stderr, "'k' option not supported\n");
+			usage();
+#endif
+			break;
+		case 'u':
+			/* UUID for image id. */
+			if (!hexstr_to_mem(imageid, optarg, UUID_LENGTH))
+				usage();
+			got_imageid = 1;
 			break;
 		case 'h':
 		case '?':
@@ -481,6 +577,15 @@ main(int argc, char *argv[])
 	if (argc < 1 || argc > 2)
 		usage();
 
+	if (compat &&
+	    (
+#ifdef WITH_CRYPTO
+	     do_encrypt || do_checksum ||
+#endif
+	     got_imageid)) {
+		fprintf(stderr, "Cannot use uuid/encrypt/checksum with -3\n");
+		usage();
+	}
 	if (slicemode && (slice < 1 || slice > MAXSLICES)) {
 		fprintf(stderr, "Slice must be a DOS partition (1-4) "
 			"or extended DOS partition (5-%d)\n\n", MAXSLICES);
@@ -505,6 +610,78 @@ main(int argc, char *argv[])
 	if ((infd = open(infilename, O_RDONLY, 0)) < 0) {
 		perror(infilename);
 		exit(1);
+	}
+
+#ifdef WITH_CRYPTO
+	/*
+	 * Let's get random!
+	 */
+	if (!RAND_load_file("/dev/urandom", 1024))
+		fprintf(stderr, "Error getting random seed\n");
+
+#ifdef SIGN_CHECKSUM
+	/*
+	 * Generate a signing pubkey.
+	 * The pubkey is written to <imagename>.skey.
+	 */
+	if (do_checksum) {
+		sig_key = RSA_generate_key(CSUM_MAX_LEN*8, 17, NULL, NULL);
+		if (!info)
+			output_public_key(outfilename, sig_key);
+	}
+#endif
+
+	/*
+	 * Generate an encryption key if none was given on the command line.
+	 * The key is written to <imagename>.ekey.
+	 */
+	if (do_encrypt && enc_key == NULL) {
+		enc_key = calloc(1, ENC_MAX_KEYLEN);
+		if (enc_key == NULL || !RAND_bytes(enc_key, ENC_MAX_KEYLEN)) {
+			fprintf(stderr, "Unable to generate random key\n");
+			exit(1);
+		}
+		if (!info)
+			output_encrypt_key(outfilename, enc_key,
+					   ENC_MAX_KEYLEN);
+	}
+#endif
+
+#ifdef WITH_V3COMPAT
+	/*
+	 * Deal with pre-crypto backward compatibility.
+	 * We don't want to generate V4 images unless we really need it.
+	 * Note that this means we do NOT generate a UUID if none was provided.
+	 */
+	if (!compat &&
+#ifdef WITH_CRYPTO
+	    !do_encrypt && !do_checksum &&
+#endif
+	    !got_imageid)
+		compat = COMPRESSED_V3;
+#endif
+
+	/*
+	 * Generate a random UUID if one was not provided and we are
+	 * not operating in compatibility mode.
+	 */
+	if (!compat && !got_imageid) {
+		int fd = open("/dev/urandom", O_RDONLY, 0);
+
+		if (fd < 0 ||
+		    read(fd, imageid, sizeof(imageid)) != sizeof(imageid)) {
+			fprintf(stderr, "WARNING: no UUID generated\n");
+			memset(imageid, UUID_LENGTH, '\0');
+		} else {
+			char uuidstr[UUID_LENGTH*2+1];
+
+			mem_to_hexstr(uuidstr, imageid, UUID_LENGTH);
+			output_uuid(outfilename, uuidstr);
+			got_imageid = 1;
+		}
+
+		if (fd >= 0)
+			close(fd);
 	}
 
 #if 0
@@ -602,7 +779,7 @@ main(int argc, char *argv[])
 		}
 		compress_image();
 		assert(fixups == NULL);
-	
+
 		if (outcanseek)
 			close(outfd);
 	}
@@ -625,6 +802,13 @@ main(int argc, char *argv[])
 	}
 	fflush(stderr);
 
+#ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
+	if (do_checksum)
+		RSA_free(sig_key);
+#endif
+#endif
+
 	exit(0);
 }
 
@@ -636,7 +820,7 @@ read_slice(int snum, int stype, u_int32_t start, u_int32_t size,
 
 	if (smap && smap->process)
 		return (*smap->process)(snum, stype, start, size, sname, sfd);
-	
+
 	fprintf(stderr, "Slice %d is an unknown type %#x (%s)",
 		snum+1, stype, smap ? smap->desc : "??");
 	return -1;
@@ -661,12 +845,12 @@ read_doslabel(int infd, int lsect, int pstart, struct doslabel *label)
 	}
 	if (cc != DOSPARTSIZE) {
 		warnx("Incomplete read of DOS label at sector %u", lsect);
- 		return 1;
+		return 1;
 	}
 	if (label->magic != BOOT_MAGIC) {
 		warnx("Wrong magic number in DOS partition table at sector %u",
 		      lsect);
- 		return 1;
+		return 1;
 	}
 
 	if (debug) {
@@ -760,7 +944,7 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 
 		if (slicemode && bsdix + 1 != slice && !ISEXT(type))
 			continue;
-		
+
 		if (ignore[bsdix]) {
 			if (!ISBSD(type) || ignore[bsdix] == ~0)
 				type = DOSPTYP_UNUSED;
@@ -814,7 +998,7 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 					bsdix + 1, bsdix + 1);
 			break;
 		}
-		
+
 	skipcheck:
 		/*
 		 * In slicemode, we need to set the bounds of compression.
@@ -867,16 +1051,25 @@ read_raw(void)
 	return 0;
 }
 
-char *usagestr = 
+char *usagestr =
  "usage: imagezip [-vihor] [-s #] <image | device> [outputfilename]\n"
  " -v             Print version info and exit\n"
  " -i             Info mode only.  Do not write an output file\n"
  " -h             Print this help message\n"
  " -o             Print progress indicating dots\n"
  " -r             Generate a `raw' image.  No FS compression is attempted\n"
+ " -f             Generate an image from a regular file (implies -r)\n"
  " -s slice       Compress a particular slice (DOS numbering 1-4)\n"
  " image | device The input image or a device special file (ie: /dev/ad0)\n"
  " outputfilename The output file ('-' for stdout)\n"
+ "\n"
+ " Authentication and integrity options\n"
+ " -a hashalg     Create per-chunk signatures using the hash algorithm given\n"
+ " -u uuid        Assign the given value as the image UUID\n"
+ "\n"
+ " Encryption options\n"
+ " -e cipher      Encrypt the image with the given cipher\n"
+ " -k keyfile     File containing a key to use for encrypting\n"
  "\n"
  " Advanced options\n"
  " -z level       Set the compression level.  Range 0-9 (0==none, default==4)\n"
@@ -916,7 +1109,7 @@ addskip(uint32_t start, uint32_t size)
 			frangesize);
 		exit(1);
 	}
-	
+
 	skip->start = start;
 	skip->size  = size;
 	skip->next  = skips;
@@ -939,7 +1132,7 @@ addvalid(uint32_t start, uint32_t size)
 		fprintf(stderr, "No memory for valid range\n");
 		exit(1);
 	}
-	
+
 	valid->start = start;
 	valid->size  = size;
 	valid->next  = 0;
@@ -975,7 +1168,7 @@ dumpskips(int verbose)
 		nranges++;
 		pskip  = pskip->next;
 	}
-	
+
 	fprintf(stderr,
 		"Total Number of Free Sectors: %d (bytes %lld) in %d ranges\n",
 		total, (long long)sectobytes(total), nranges);
@@ -1120,7 +1313,7 @@ sortrange(struct range **headp, int domerge,
 
 	if (head == NULL)
 		return;
-	
+
 #if USE_HACKSORT > 0
 	{
 		int count = 0;
@@ -1194,7 +1387,7 @@ mergeranges(struct range *head)
 					prange->next->start,
 					prange->next->start+prange->next->size-1);
 			prange->size += prange->next->size;
-			
+
 			ptmp = prange->next;
 			prange->next = ptmp->next;
 			free(ptmp);
@@ -1216,14 +1409,14 @@ makeranges(void)
 {
 	struct range	*pskip, *ptmp;
 	uint32_t	offset;
-	
+
 	offset = inputminsec;
 
 	pskip = skips;
 	while (pskip) {
 		addvalid(offset, pskip->start - offset);
 		offset = pskip->start + pskip->size;
-		
+
 		ptmp  = pskip;
 		pskip = pskip->next;
 		free(ptmp);
@@ -1311,7 +1504,7 @@ addfixupentry(off_t offset, off_t poffset, off_t size, void *data, off_t dsize,
 	struct fixup *fixup;
 	void *fdata;
 
-	if (oldstyle) {
+	if (compat == COMPRESSED_V1) {
 		static int warned;
 
 		if (!warned) {
@@ -1334,11 +1527,11 @@ addfixupentry(off_t offset, off_t poffset, off_t size, void *data, off_t dsize,
 
 	fixup = &buf->_fixup;
 	fdata = dsize ? buf->_fdata : NULL;
-	
+
 	entry->start = bytestosec(offset);
 	entry->size  = bytestosec(size + secsize - 1);
 	entry->data  = fixup;
-	
+
 	fixup->offset    = offset;
 	fixup->poffset   = poffset;
 	fixup->size      = size;
@@ -1581,7 +1774,7 @@ addreloc(off_t offset, off_t size, int reloctype)
 {
 	struct blockreloc *reloc;
 
-	assert(!oldstyle);
+	assert(compat != COMPRESSED_V1);
 
 	numrelocs++;
 	if (HDRUSED(numregions, numrelocs) > DEFAULTREGIONSIZE) {
@@ -1614,7 +1807,7 @@ freerelocs(void)
 /*
  * Compress the image.
  */
-static uint8_t  output_buffer[CHUNKSIZE];
+static uint8_t	output_buffer[CHUNKSIZE];
 static int	buffer_offset;
 static off_t	inputoffset;
 static struct timeval cstamp;
@@ -1623,6 +1816,15 @@ static long long bytescompressed;
 static off_t	compress_chunk(off_t, off_t, int *, uint32_t *);
 static int	compress_finish(uint32_t *subblksize);
 static void	compress_status(int sig);
+#ifdef WITH_CRYPTO
+static void	checksum_start(blockhdr_t *hdr, int alg);
+static void	checksum_chunk(uint8_t *buf, off_t size);
+static void	checksum_finish(blockhdr_t *hdr);
+static void	encrypt_start(blockhdr_t *hdr);
+static void	encrypt_chunk(uint8_t *buf, off_t size, off_t maxsize);
+static void	encrypt_finish(blockhdr_t *hdr,
+			       uint8_t *outbuf, uint32_t *out_size);
+#endif
 
 /*
  * Loop through the image, compressing the allocated ranges.
@@ -1636,7 +1838,7 @@ compress_image(void)
 	struct range	*prange;
 	blockhdr_t	*blkhdr;
 	struct region	*curregion, *regions;
-	struct timeval  estamp;
+	struct timeval	estamp;
 	uint8_t		*buf;
 	uint32_t	cursect = 0;
 	struct region	*lreg;
@@ -1650,10 +1852,19 @@ compress_image(void)
 	buf = output_buffer;
 	memset(buf, 0, DEFAULTREGIONSIZE);
 	blkhdr = (blockhdr_t *) buf;
-	if (oldstyle)
+	switch (compat) {
+	case COMPRESSED_V1:
 		regions = (struct region *)((struct blockhdr_V1 *)blkhdr + 1);
-	else
+		break;
+	case COMPRESSED_V2:
+	case COMPRESSED_V3:
+		regions = (struct region *)((struct blockhdr_V2 *)blkhdr + 1);
+		break;
+	default:
+		assert(compat == 0);
 		regions = (struct region *)(blkhdr + 1);
+		break;
+	}
 	curregion = regions;
 	numregions = 0;
 	chunkno = 0;
@@ -1665,7 +1876,7 @@ compress_image(void)
 	 * the block.
 	 */
 	buffer_offset = DEFAULTREGIONSIZE;
-	
+
 	prange = ranges;
 	while (prange) {
 		inputoffset = sectobytes(prange->start);
@@ -1692,7 +1903,7 @@ compress_image(void)
 
 		size = compress_chunk(inputoffset, rangesize,
 				      &full, &blkhdr->size);
-	
+
 		if (debug > 2) {
 			fprintf(stderr, "%14lld -> %12lld %10ld %10u %10d %d\n",
 				inputoffset, inputoffset + size,
@@ -1781,12 +1992,11 @@ compress_image(void)
 		 * Go back and stick in the block header and the region
 		 * information.
 		 */
-		blkhdr->magic = oldstyle ? COMPRESSED_V1 :
-			(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
+		blkhdr->magic = compat ? compat : COMPRESSED_MAGIC_CURRENT;
 		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
-		if (!oldstyle) {
+		if (compat != COMPRESSED_V1) {
 			blkhdr->firstsect   = cursect;
 			if (size == rangesize) {
 				/*
@@ -1821,12 +2031,51 @@ compress_image(void)
 		 * Dump relocation info
 		 */
 		if (numrelocs) {
-			assert(!oldstyle);
+			assert(compat != COMPRESSED_V1);
 			assert(relocs != NULL);
 			memcpy(curregion, relocs,
 			       numrelocs * sizeof(struct blockreloc));
 			freerelocs();
 		}
+
+		if (!compat)
+			memcpy(blkhdr->imageid, imageid, UUID_LENGTH);
+
+#ifdef WITH_CRYPTO
+		/*
+		 * Encrypt the chunk if needed.
+		 * Otherwise enc_cipher will be ENC_NONE.
+		 *
+		 * XXX this has been broken into start/encrypt/finish
+		 * so that someday it could be done in the loop along
+		 * with the compression.
+		 */
+		if (do_encrypt) {
+			assert(!compat);
+			encrypt_start(blkhdr);
+			encrypt_chunk(output_buffer + blkhdr->regionsize,
+				      blkhdr->size, CHUNKMAX);
+			encrypt_finish(blkhdr,
+				       output_buffer + blkhdr->regionsize,
+				       &(blkhdr->size));
+		}
+
+		/*
+		 * Checksum header+chunk if needed.
+		 * If no signature, csum_type will be CSUM_NONE.
+		 *
+		 * XXX this has been broken into start/encrypt/finish
+		 * so that someday it could be done in the loop along
+		 * with the compression.
+		 */
+		if (do_checksum) {
+			assert(!compat);
+			checksum_start(blkhdr, csumalg);
+			checksum_chunk(output_buffer,
+				       blkhdr->size + blkhdr->regionsize);
+			checksum_finish(blkhdr);
+		}
+#endif
 
 		/*
 		 * Write out the finished chunk to disk.
@@ -1863,11 +2112,11 @@ compress_image(void)
 		 * Zero indicated that we just read until EOF cause we have
 		 * no idea how big it really is.
 		 */
-		if (size == rangesize) 
+		if (size == rangesize)
 			prange = prange->next;
 		else {
 			uint32_t sectors = bytestosec(size);
-			
+
 			prange->start += sectors;
 			if (prange->size)
 				prange->size -= sectors;
@@ -1880,13 +2129,12 @@ compress_image(void)
 	 */
 	if (curregion != regions) {
 		compress_finish(&blkhdr->size);
-		
-		blkhdr->magic = oldstyle ? COMPRESSED_V1 :
-			(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
+
+		blkhdr->magic = compat ? compat : COMPRESSED_MAGIC_CURRENT;
 		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
-		if (!oldstyle) {
+		if (compat != COMPRESSED_V1) {
 			blkhdr->firstsect = cursect;
 			if (inputmaxsec > 0)
 				blkhdr->lastsect = inputmaxsec - inputminsec;
@@ -1911,12 +2159,51 @@ compress_image(void)
 		 * Dump relocation info
 		 */
 		if (numrelocs) {
-			assert(!oldstyle);
+			assert(compat != COMPRESSED_V1);
 			assert(relocs != NULL);
 			memcpy(curregion, relocs,
 			       numrelocs * sizeof(struct blockreloc));
 			freerelocs();
 		}
+
+		if (!compat)
+			memcpy(blkhdr->imageid, imageid, UUID_LENGTH);
+
+#ifdef WITH_CRYPTO
+		/*
+		 * Encrypt the chunk if needed.
+		 * Otherwise enc_cipher will be ENC_NONE.
+		 *
+		 * XXX this has been broken into start/encrypt/finish
+		 * so that someday it could be done in the loop along
+		 * with the compression.
+		 */
+		if (do_encrypt) {
+			assert(!compat);
+			encrypt_start(blkhdr);
+			encrypt_chunk(output_buffer + blkhdr->regionsize,
+				      blkhdr->size, CHUNKMAX);
+			encrypt_finish(blkhdr,
+				       output_buffer + blkhdr->regionsize,
+				       &(blkhdr->size));
+		}
+
+		/*
+		 * Checksum header+chunk if needed.
+		 * If no signature, csum_type will be CSUM_NONE.
+		 *
+		 * XXX this has been broken into start/encrypt/finish
+		 * so that someday it could be done in the loop along
+		 * with the compression.
+		 */
+		if (do_checksum) {
+			assert(!compat);
+			checksum_start(blkhdr, csumalg);
+			checksum_chunk(output_buffer,
+				       blkhdr->size + blkhdr->regionsize);
+			checksum_finish(blkhdr);
+		}
+#endif
 
 		/*
 		 * Write out the finished chunk to disk, and
@@ -1946,9 +2233,9 @@ compress_image(void)
 	 * blockcount.  Imageunzip and frisbee don't use it.  We still
 	 * do it if creating V1 images and we can seek on the output.
 	 */
-	if (!oldstyle || !outcanseek)
+	if (compat != COMPRESSED_V1 || !outcanseek)
 		return 0;
-	
+
 	/*
 	 * Get the total filesize, and then number the subblocks.
 	 * Useful, for netdisk.
@@ -1961,7 +2248,7 @@ compress_image(void)
 
 	for (i = 0, outputoffset = 0; i < count;
 	     i++, outputoffset += CHUNKSIZE) {
-		
+
 		if (lseek(outfd, (off_t) outputoffset, SEEK_SET) < 0) {
 			perror("seeking to read block header");
 			exit(1);
@@ -1978,7 +2265,7 @@ compress_image(void)
 		blkhdr = (blockhdr_t *) buf;
 		assert(blkhdr->blockindex == i);
 		blkhdr->blocktotal = count;
-		
+
 		if ((cc = devwrite(outfd, buf, sizeof(blockhdr_t))) < 0) {
 			perror("writing new subblock header");
 			exit(1);
@@ -2018,7 +2305,7 @@ compress_status(int sig)
 
 /*
  * Compress a chunk. The next bit of input stream is read in and compressed
- * into the output file. 
+ * into the output file.
  */
 #define BSIZE		(128 * 1024)
 static char		inbuf[BSIZE];
@@ -2027,8 +2314,8 @@ static z_stream		d_stream;	/* Compression stream */
 
 #define CHECK_ZLIB_ERR(err, msg) { \
     if (err != Z_OK) { \
-        fprintf(stderr, "%s error: %d\n", msg, err); \
-        exit(1); \
+	fprintf(stderr, "%s error: %d\n", msg, err); \
+	exit(1); \
     } \
 }
 
@@ -2092,7 +2379,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 			perror("reading input file");
 			exit(1);
 		}
-		
+
 		if (cc == 0) {
 			/*
 			 * If hit the end of the file, then finish off
@@ -2137,7 +2424,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		outsize = CHUNKSIZE - buffer_offset;
 
 		/* XXX match behavior of original compressor */
-		if (oldstyle && outsize > 0x20000)
+		if (compat == COMPRESSED_V1 && outsize > 0x20000)
 			outsize = 0x20000;
 
 		d_stream.next_in   = (Bytef *)inbuf;
@@ -2150,7 +2437,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		CHECK_ZLIB_ERR(err, "deflate");
 
 		if (d_stream.avail_in != 0 ||
-		    (!oldstyle && d_stream.avail_out == 0)) {
+		    (compat != COMPRESSED_V1 && d_stream.avail_out == 0)) {
 			fprintf(stderr, "Something went wrong, ");
 			if (d_stream.avail_in)
 				fprintf(stderr, "not all input deflated!\n");
@@ -2169,8 +2456,8 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		 * this simpler, I do not allow a partial output
 		 * buffer to be written to the file. No carryover to the
 		 * next block, and thats nice. I also avoid anything
-		 * being left in the input buffer. 
-		 * 
+		 * being left in the input buffer.
+		 *
 		 * The downside of course is wasted space, since I have to
 		 * quit early to avoid not having enough output space to
 		 * compress all the input. How much wasted space is kinda
@@ -2181,7 +2468,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		 */
 		subblockleft -= count;
 		assert(subblockleft >= 0);
-		
+
 		if (subblockleft < 0x2000) {
 			finish = 1;
 			*full  = 1;
@@ -2206,7 +2493,7 @@ compress_finish(uint32_t *subblksize)
 
 	if (subblockleft == CHUNKMAX)
 		return 0;
-	
+
 	d_stream.next_in   = 0;
 	d_stream.avail_in  = 0;
 	d_stream.next_out  = &output_buffer[buffer_offset];
@@ -2236,7 +2523,7 @@ compress_finish(uint32_t *subblksize)
 	 * The caller needs to know how big the actual data is.
 	 */
 	*subblksize  = CHUNKMAX - subblockleft;
-		
+
 	/*
 	 * Pad the subblock out.
 	 */
@@ -2246,3 +2533,295 @@ compress_finish(uint32_t *subblksize)
 	subblockleft = CHUNKMAX;
 	return 1;
 }
+
+#ifdef WITH_CRYPTO
+/*
+ * Checksum functions
+ */
+SHA_CTX sha_ctx;
+void
+checksum_start(blockhdr_t *hdr, int alg)
+{
+	/*
+	 * Start with the checksum zeroed out - this way, we can put the
+	 * checksum in the header, but don't have to worry about skipping over
+	 * it.
+	 */
+	memset(hdr->checksum, 0, sizeof(hdr->checksum));
+
+	/* type is part of the checksum */
+	hdr->csum_type = alg;
+
+	SHA1_Init(&sha_ctx);
+}
+
+static void
+output_encrypt_key(char *imagename, unsigned char *keybuf, int buflen)
+{
+	char akeybuf[ENC_MAX_KEYLEN*2+1];
+	FILE *file;
+	char *fname;
+	int omask;
+
+	if (strcmp(imagename, "-")) {
+		fname = malloc(strlen(imagename) + 8);
+		if (fname == NULL) {
+			fprintf(stderr, "No memory\n");
+			exit(1);
+		}
+		strcpy(fname, imagename);
+		strcat(fname, ".ekey");
+	} else {
+		fname = strdup("stdout.ekey");
+	}
+
+	/* XXX */
+	if (buflen > ENC_MAX_KEYLEN)
+		buflen = ENC_MAX_KEYLEN;
+	mem_to_hexstr(akeybuf, keybuf, buflen);
+
+	unlink(fname);
+	omask = umask(077);
+	if ((file = fopen(fname, "w")) == NULL) {
+		umask(omask);
+		fprintf(stderr, "Cannot create keyfile %s\n", fname);
+		exit(1);
+	}
+	umask(omask);
+	fputs(akeybuf, file);
+	fputc('\n', file);
+	fclose(file);
+
+	fprintf(stderr, "Encryption key written to %s\n", fname);
+	free(fname);
+}
+
+#ifdef SIGN_CHECKSUM
+static void
+output_public_key(char *imagename, RSA *key)
+{
+	FILE *file;
+	char *fname;
+
+	if (strcmp(imagename, "-")) {
+		fname = malloc(strlen(imagename) + 8);
+		if (fname == NULL) {
+			fprintf(stderr, "No memory\n");
+			exit(1);
+		}
+		strcpy(fname, imagename);
+		strcat(fname, ".skey");
+	} else {
+		fname = strdup("stdout.skey");
+	}
+
+	file = fopen(fname, "w");
+	if (file == NULL) {
+		fprintf(stderr, "Cannot create keyfile %s\n", fname);
+		exit(1);
+	}
+	BN_print_fp(file, key->n);
+	fprintf(file, "\n");
+	BN_print_fp(file, key->e);
+	fprintf(file, "\n");
+	BN_print_fp(file, key->dmp1);
+	fprintf(file, "\n");
+	BN_print_fp(file, key->dmq1);
+	fprintf(file, "\n");
+	BN_print_fp(file, key->iqmp);
+	fprintf(file, "\n");
+	fclose(file);
+
+	fprintf(stderr, "Signing pubkey written to %s\n", fname);
+	free(fname);
+}
+#endif
+
+static void
+output_uuid(char *imagename, char *uuidstr)
+{
+	FILE *file;
+	char *fname;
+
+	if (strcmp(imagename, "-")) {
+		fname = malloc(strlen(imagename) + 8);
+		if (fname == NULL) {
+			fprintf(stderr, "No memory\n");
+			exit(1);
+		}
+		strcpy(fname, imagename);
+		strcat(fname, ".uuid");
+	} else {
+		fname = strdup("stdout.uuid");
+	}
+
+	file = fopen(fname, "w");
+	if (file == NULL) {
+		fprintf(stderr, "Cannot create keyfile %s\n", fname);
+		exit(1);
+	}
+
+	fprintf(file, "%s\n", uuidstr);
+	fclose(file);
+
+	fprintf(stderr, "UUID written to %s\n", fname);
+	free(fname);
+}
+
+void
+checksum_chunk(uint8_t *buf, off_t size)
+{
+	/*
+	 * Easy, just call the update function
+	 */
+	SHA1_Update(&sha_ctx,buf,size);
+}
+
+void
+checksum_finish(blockhdr_t *hdr)
+{
+	/*
+	 * Important! The digest field in the header MUST be big enough to hold
+	 * the digest output by the finalizing function!
+	 */
+#ifdef SIGN_CHECKSUM
+	unsigned char checksum[CSUM_MAX_LEN - 11];
+	int result = 0;
+
+	SHA1_Final(checksum, &sha_ctx);
+
+	result = RSA_private_encrypt(sizeof(checksum), checksum,
+				     hdr->checksum, sig_key,
+				     RSA_PKCS1_PADDING);
+	if (result == -1) {
+		char errstr[128];
+		int errornum = ERR_get_error();
+
+		ERR_load_crypto_strings();
+		ERR_error_string_n(errornum, errstr, sizeof(errstr));
+		fprintf(stderr, "Failed signing checksum: %s\n", errstr);
+		exit(1);
+	}
+#else
+	SHA1_Final(hdr->checksum, &sha_ctx);
+#endif
+}
+
+/*
+ * Encryption functions
+ */
+static EVP_CIPHER_CTX cipher_ctx;
+static const EVP_CIPHER *ecipher;
+/* XXX: the size of the IV may have to change with different ciphers */
+static uint8_t iv[ENC_MAX_KEYLEN];
+
+/*
+ * For the time being, at least, we have to encrypt into a seperate buffer
+ */
+static uint8_t  encryption_buffer[CHUNKSIZE];
+static uint8_t  *ebuffer_current;
+static uint32_t encrypted_bytes;
+
+void
+encrypt_start(blockhdr_t *hdr)
+{
+	static int first_chunk = 1;
+
+	/*
+	 * Pick our cipher - currently, only Blowfish in CBC mode is supported
+	 */
+	EVP_CIPHER_CTX_init(&cipher_ctx);
+	ecipher = EVP_bf_cbc();
+
+	/*
+	 * If this is the first chunk, generate a new IV. Otherwise, we use
+	 * the CBC residue from the last chunk as the IV for this chunk.
+	 * This way, the decryptor can tell that both chunks are from the
+	 * same file.
+	 */
+	if (first_chunk) {
+		first_chunk = 0;
+#if 1
+		if (!RAND_bytes(iv, sizeof(iv))) {
+			fprintf(stderr,"Unable to generate random IV\n");
+			exit(1);
+		}
+#else
+		/*
+		 * Zero IV for debugging
+		 */
+		memset(iv, 0, sizeof(iv));
+#endif
+	} else {
+#if 1	
+		/*
+		 * TODO: Figure out how to get CBC residue!
+		 */
+		if (!RAND_bytes(iv, sizeof(iv))) {
+			fprintf(stderr,"Unable to generate random IV\n");
+			exit(1);
+		}
+#else
+		/*
+		 * Zero IV for debugging
+		 */
+		memset(iv, 0, sizeof(iv));
+#endif
+	}
+
+	/*
+	 * Set the cipher and IV
+	 */
+	EVP_EncryptInit(&cipher_ctx, ecipher, NULL, iv);
+
+	/*
+	 * Bump up the key length and set the key
+	 */
+	EVP_CIPHER_CTX_set_key_length(&cipher_ctx, ENC_MAX_KEYLEN);
+	EVP_EncryptInit(&cipher_ctx, NULL, enc_key, NULL);
+
+	/*
+	 * Copy the IV into the header
+	 */
+	memcpy(hdr->enc_iv, iv, sizeof(hdr->enc_iv));
+
+	/*
+	 * Prepare the buffer! (Preparing the buffer!)
+	 */
+	ebuffer_current = encryption_buffer;
+	encrypted_bytes = 0;
+}
+
+void
+encrypt_chunk(uint8_t *buf, off_t size, off_t maxsize)
+{
+	int encrypted_this_round = 0;
+
+	/* man page says encrypted output could be this large */
+	assert(size + EVP_CIPHER_CTX_block_size(&cipher_ctx) - 1 <= maxsize);
+
+	EVP_EncryptUpdate(&cipher_ctx, ebuffer_current, &encrypted_this_round,
+			  buf, size);
+	encrypted_bytes += encrypted_this_round;
+	ebuffer_current = encryption_buffer + encrypted_bytes;
+}
+
+void
+encrypt_finish(blockhdr_t *hdr, uint8_t *outbuf, uint32_t *out_size)
+{
+	int encrypted_this_round = 0;
+
+	EVP_EncryptFinal(&cipher_ctx, ebuffer_current, &encrypted_this_round);
+	encrypted_bytes += encrypted_this_round;
+
+	/*
+	 * Copy the encrypted buffer back to the chunk buffer
+	 */
+	assert(encrypted_bytes <= CHUNKMAX);
+	memcpy(outbuf, encryption_buffer, encrypted_bytes);
+
+	hdr->enc_cipher = cipher;
+
+	*out_size = encrypted_bytes;
+}
+#endif

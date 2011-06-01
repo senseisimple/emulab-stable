@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -226,8 +226,8 @@ main(int argc, char **argv)
 	if (gethashinfo(argv[0], &hashinfo))
 		exit(2);
 	dumphash(argv[0], hashinfo);
-	(void) checkhash(argv[1], hashinfo);
-
+	if (checkhash(argv[1], hashinfo))
+		exit(1);
 	exit(0);
 }
 
@@ -367,11 +367,11 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 	int nreg;
 
 	if (report) {
-		static int first = 1;
-		printf("%s\t%u\t%u\t%u\tU\t%s\n",
-		       spewhash(hash, hashlen), start, size, chunkno,
-		       first ? fileid : "-");
-		first = 0;
+		printf("%s\t%u\t%u",
+		       spewhash(hash, hashlen), start, size);
+		if (report > 1)
+			printf("\t%u\tU\t%s", chunkno, fileid);
+		putchar('\n');
 		return;
 	}
 
@@ -523,7 +523,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	struct hashregion *reg;
 	int chunkno;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	char *hashstr;
 	readbuf_t *rbuf;
@@ -644,7 +644,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	printf("%llu bytes: read cycles: %llu, hash cycles: %llu, cmp cycles: %llu\n",
 	       ndatabytes, rcycles, hcycles, ccycles);
 #endif
-	return 0;
+	return badhashes;
 }
 
 static int
@@ -863,7 +863,7 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	z_stream z;
 	int err, nreg;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	readbuf_t *rbuf;
 	int errors = 0;
@@ -1101,7 +1101,7 @@ hashfilechunk(int chunkno, char *chunkbufp, int chunksize,
 	int resid;
 	uint32_t cursect = 0, nbytes;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	unsigned char *bufp = (unsigned char *)chunkbufp;
 	int errors = 0;

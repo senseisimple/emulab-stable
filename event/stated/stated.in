@@ -1729,29 +1729,23 @@ END {
 	info("Recursive call to END block. Returning ...\n");
 	return;
     }
-    if (!defined($eventchild)) {
-	#
-	# No eventchild, nothing interesting happening. 
-	#
+    if (defined($eventchild) && $eventchild == 0) {
+	# We are the event child; just exit.
 	return;
     }
     $ending = 1;
-    debug("Ending stated...\n");
     my $stat = $?;
     $lastmail=0;
     notify("",1);
     if (defined($lockfile) && $lockfile ne "") {
 	unlink $lockfile;
-	announce("Stated exiting, cleaning up\n");
-    } else {
-	# Must be a child
-	info("Stated child exiting\n");
     }
+    announce("Stated exiting, cleaning up\n");
     debug("Announced. Cleaning up...\n");
-    if ($eventchild) {
+    if (defined($eventchild) && $eventchild) {
 	debug("Killing event reader child ...\n");
 	if (! kill('TERM', $eventchild)) {
-	    info("Could not kill event reader child\n");
+	    announce("Could not kill event reader child: $eventchild\n");
 	}
     }
     debug("Cleaned up. Bye!\n");
@@ -1820,14 +1814,23 @@ sub StartEvents()
     # We want to exit on any warning. Let the caller notice.
     $SIG{__WARN__} = sub { print STDERR $_[0]; exit(-1); };
 
+    # Plain exit in the child.
+    $SIG{TERM} = sub {
+	print STDERR "Caught a TERM in child. Exiting ...\n";
+	exit(0);
+    };
+
     # Make sure this child starts writing into the new logfile.
     $SIG{USR2} = sub {
 	print STDERR "Caught a USR2 in child\n";
 	# Only STDERR can be redirected to the newfile. STDOUT is writing
 	# to the parent process.
+	close(STDERR);
 	open(STDERR, ">> $LOGFILE") or fatal("reopening $LOGFILE: $!");	
 	select STDERR;
 	$OUTPUT_AUTOFLUSH = 1;
+	# restore default output.
+	select STDOUT;
 	print STDERR "Opened new logfile in child\n";
     };
 
@@ -1882,22 +1885,35 @@ sub PollEvents($$)
     }
     if ($pollval > 0) {
 	my $buf;
+	my $lastline = "";
 	
 	while (sysread($childpipe, $buf, 8192)) {
 	    #
-	    # It is possible that we will get multiple lines
-	    # of output in one read. Hopefully not so much that we get
-	    # a partial line. Will need to deal with that at some
-	    # point.
+	    # It is possible that we will get multiple lines of output
+	    # in one read, so we split the input and loop over that.
+	    # It is also possible that we will read a partial line at
+	    # the end. We make a less-than heroic attempt to catch these
+	    # by remembering any unrecognized line that starts with "O"
+	    # and prepending that to the next set of lines read.
 	    #
 	    my @foo = split(/^/m, $buf);
+	    if ($lastline ne "") {
+		$foo[0] = $lastline . $foo[0];
+		debug("reconstruct split line: '" . $foo[0] . "'\n");
+		$lastline = "";
+	    }
 	    foreach my $line (@foo) {
 		if ($line =~
 		    /^OBJTYPE='([^\']*)', OBJNAME='([^\']*)', EVENTTYPE='([^\']*)'$/) {
 		    handleEvent($1, $2, $3);
 		}
+		elsif ($lastline eq "" && $line =~ /^O/) {
+		    # probably an incomplete read
+		    debug("remembering possible split line: '$line'\n");
+		    $lastline = $line;
+		}
 		else {
-		    fatal("unrecognizable line $line from event reader");
+		    fatal("unrecognizable line '$line' from event reader");
 		}
 	    }
 	    #

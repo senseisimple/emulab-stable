@@ -1,0 +1,51 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/snmpit_test
+ISMAINSITE	= @TBMAINSITE@
+SYSTEM         := $(shell uname -s)
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS		= 
+
+BIN_STUFF	= snmpit_test
+LIB_STUFF       = snmpit_intel.pm \
+                  snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm \
+		  snmpit_cisco_stack.pm snmpit_intel_stack.pm \
+		  snmpit_foundry.pm snmpit_stack.pm snmpit_remote.pm \
+		  snmpit_nortel.pm snmpit_hp.pm snmpit_apcon.pm
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(LIB_STUFF) $(BIN_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: all script-install
+
+script-install:	 $(addprefix $(INSTALL_LIBDIR)/snmpit_test/, $(LIB_STUFF)) \
+		$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF))
+
+control-install:
+
+fs-install:
+
+tipserv-install:
+
+clrhouse-install:
+
+clean:	
+
+$(INSTALL_DIR)/lib/snmpit_test/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/lib/snmpit_test
+	$(INSTALL) $< $@
