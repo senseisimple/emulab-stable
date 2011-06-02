@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -30,6 +30,7 @@ my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $CMCERT	  = "$TB/etc/genicm.pem";
+my $SACERT	  = "$TB/etc/genisa.pem";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -50,6 +51,7 @@ use GeniCertificate;
 use GeniAuthority;
 use GeniComponent;
 use Genixmlrpc;
+use GeniHRN;
 use Carp;
 
 $Carp::Verbose = 1;
@@ -64,6 +66,13 @@ if (! getopts($optlist, \%options)) {
 usage()
     if (@ARGV != 1);
 my $token = $ARGV[0];
+if (!GeniHRN::IsValid($token)) {
+    fatal("Bad urn!");
+}
+my ($auth,$type,$id) = GeniHRN::Parse($token);
+if ($type eq "authority") {
+    $type = $id;
+}
 
 #
 # Load the CM cert to act as caller context.
@@ -74,13 +83,13 @@ if (!defined($certificate)) {
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
-my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+my $clearinghouse = GeniRegistry->Create($token);
 if (!defined($clearinghouse)) {
     fatal("Could not create a clearinghouse client object");
 }
 
 my $result;
-if ($clearinghouse->Resolve($token, "", \$result) != 0) {
+if ($clearinghouse->Resolve($token, $type, \$result) != 0) {
     fatal("Could not resolve $token\n");
 }
 print Dumper($result);
