@@ -536,6 +536,8 @@ LanLink instproc SetDelayParams {node todelay tobw toloss} {
     $self set delay([list $node $vport]) $realtodelay
     $self set loss([list $node $vport]) $toloss
     $self set bandwidth([list $node $vport]) $realtobw
+    # XXX To make gentopofile happy when generating ltmap.
+    $self set rbandwidth([list $node $vport]) $realtobw
 }
 
 #
