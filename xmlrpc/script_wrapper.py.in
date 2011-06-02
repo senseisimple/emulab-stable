@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -746,6 +746,9 @@ class delay_config:
             elif opt == "-m":
                 params["persist"] = "yes";
                 pass
+            elif opt == "-b":
+                params["bridge"] = "yes";
+                pass
             elif opt == "-s":
                 params["src"] = val;
                 pass
@@ -800,9 +803,11 @@ class delay_config:
 	print "delay_config [options] pid eid link PARAM=value ...";
 	print "where:";
 	print "     -m   - Modify virtual experiment as well as current state";
+        print "     -b   - bridge mode; operating on a bridge node instead of link";
 	print "     -s   - Select the source of the link to change";
  	print "     -e   - Project and Experiment ID to operate on";
         print "   link   - Name of link from your NS file (ie: 'link1')";
+        print "            Or the bridge name, if explicitly using a bridge node";
         print "";
         print "PARAMS";
         print " BANDWIDTH=NNN   - N=bandwidth (10-100000 Kbits per second)";
