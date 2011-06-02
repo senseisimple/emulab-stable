@@ -26,7 +26,7 @@ use Data::Dumper;
 # with multiple clearinghouses/registries. For now, we know about PLC
 # or the Protogeni clearinghouse.
 #
-sub Create($$$$)
+sub Create($$;$$)
 {
     my ($class, $target, $context, $credential) = @_;
 
@@ -34,8 +34,8 @@ sub Create($$$$)
     return undef
 	if (!defined($auth));
 
-    if ($auth =~ /^plc:/) {
-	return GeniRegistry::PLC->Create("plc", $context);
+    if ($auth =~ /^plc:/ || $auth eq "ple" || $auth eq "plc") {
+	return GeniRegistry::PLC->Create($auth, $context);
     }
     else {
 	return GeniRegistry::ClearingHouse->Create($context, $credential);
@@ -610,11 +610,24 @@ sub Create($;$$)
     }
 
     #
-    # At the moment, we support only plc. Eventually support others once
-    # plc exports proper certs and resolve of aggregates (that include url).
+    # At the moment, we hardwire all this.
     #
+    my $url;
+    if ($aggregate =~ /maxpl/) {
+	$url = "https://max-myplc.dragon.maxgigapop.net:12345";
+    }
+    elsif ($aggregate =~ /ple/) {
+	$url = "https://www.planet-lab.eu:12345";
+    }
+    elsif ($aggregate =~ /plc/) {
+	$url = "https://www.planet-lab.org:12345";
+    }
+    else {
+	print STDERR "Do not know anything about $aggregate\n";
+	return undef;
+    }
     my $self              = {};
-    $self->{'url'}        = "https://www.planet-lab.org:12345";
+    $self->{'url'}        = $url;
     $self->{'context'}    = $context;
     $self->{'credential'} = $credential;
     $self->{'aggregate'}  = $aggregate;
