@@ -1,0 +1,25 @@
+#
+# Add new sitevar for protogeni.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!TBSiteVarExists("protogeni/max_slice_lifetime")) {
+        DBQueryFatal("insert into `sitevariables` values " . 
+          "('protogeni/max_slice_lifetime', '90', '90', " . 
+          "'The maximum slice credential lifetime. When set limits the " . 
+          "lifetime of a slice credential. ".
+	  "Also see protogeni/max_sliver_lifetime.',0)");
+    }
+    DBQueryFatal("update sitevariables set description = " .
+		 "'The maximum sliver lifetime. When set limits the lifetime " .
+		 "of a sliver on your CM. ".
+		 "Also see protogeni/max_slice_lifetime.' ".
+		 "where name = 'protogeni/max_sliver_lifetime'");
+    return 0;
+}
+1;
