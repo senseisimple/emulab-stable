@@ -71,6 +71,7 @@ my $NAMEDSETUP     = "$TB/sbin/named_setup";
 my $EXPORTS_SETUP  = "$TB/sbin/exports_setup";
 my $VNODESETUP     = "$TB/sbin/vnode_setup";
 my $GENTOPOFILE    = "$TB/libexec/gentopofile";
+my $IPASSIGN       = "$TB/libexec/ipassign_wrapper";
 my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
 my $MAPPER         = "$TB/bin/mapper";
 my $VTOPGEN        = "$TB/bin/vtopgen";
@@ -529,9 +530,15 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	}
 	my $diff = $when - time();
-	if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
+	if ($diff < (60 * 5)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					"valid_until out of range");
+					"such a short life for a sliver? ".
+					"More time please.");
+	}
+	elsif ($diff > (3600 * 24 * $max_sliver_lifetime)) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+			"expiration is greater then the maximum number ".
+			"of minutes " . (60 * 24 * $max_sliver_lifetime));
 	}
 
 	#
@@ -1474,6 +1481,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	goto bad;
     }
 
+    # Do IP assignment.
+    system("$IPASSIGN -d $pid $eid");
+    if ($?) {
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef);
+	goto bad;
+    }
+
     # Do a render cause its nice to have on the show experiment page.
     system("$PRERENDER -r $pid $eid");
     system("$PRERENDER -t $pid $eid");
@@ -2152,11 +2166,12 @@ sub SliverWorkAux($$$$$$$)
 					
 	}
 	#
-	# Do we need a policy limit?
+	# Do we need a policy limit? No, since we actually made this
+	# check when we granted the ticket (see above). 
 	#
 	my $diff = $when - time();
 	if ($diff < (60 * 5) || $diff > (3600 * 24 * 100)) {
-	    $message = "valid_until out of range";
+	    $message = "expiration is out of range";
 	    goto bad;
 	}
 
@@ -4259,11 +4274,28 @@ sub CreateSliceFromCertificate($$)
     return undef
 	if (!defined($slice));
 
-    # The slice expires when the credential expires. The slice must be
-    # renewed to extend it.
+    #
+    # The slice expires when the credential expires, or when the local policy
+    # limit says, which ever is shorter. 
+    #
+    my $max_sliver_lifetime = 0;
+    if (!GetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)) {
+	# Cannot get the value, default it to 90 days.
+	$max_sliver_lifetime = 90;
+    }
     my $expires = $credential->expires();
-    $slice->SetExpiration($expires);
+    # This is already a localtime.
+    my $when = strptime($expires);
+    # Reverts to default in Create if this fails
+    if (defined($when)) {
+	my $diff = $when - time();
 
+	if ($diff > (3600 * 24 * $max_sliver_lifetime)) {
+	    # Shorten to policy maximum. Okay to use a unix time.
+	    $expires = time() + (3600 * 24 * $max_sliver_lifetime);
+	}
+    }
+    $slice->SetExpiration($expires);
     return $slice;
 }
 
@@ -4321,11 +4353,62 @@ sub CreateUserFromCertificate($)
 				"Could not create authority object")
 	if (!defined($authority));
 
+    #
+    # We want an email address to send expiration notifications to,
+    # but PLC user certs do not have them. So, resolve the user at
+    # the PLC to get it (and a proper name).
+    #
+    my $modify = 0;
+    my $email  = $certificate->email();
+    my $username;
+    if (!defined($email) || $email eq "" || $email eq "unknown") {
+	if (! $authority->IsSFA()) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Your certificate does not include ".
+					"an email address");
+	}
+	#
+	# XXX: The SFA stores all records in the central registry, not at
+	# the SA like we do. 
+	#
+	my $registry = GeniRegistry->Create($certificate->urn());
+	if (!defined($registry)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not connect to PLC registry ".
+					"to get your email address");
+	}
+	my $blob;
+	    
+	if ($registry->Resolve($certificate->urn(), "User", \$blob) != 0) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not resolve you at the PLC ".
+					"registry to get your email address");
+	}
+	# Why does PLC resolve return an array of length one?
+	$email = $blob->[0]->{'email'};
+	if (!defined($email) || $email eq "") {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Your PLC registry record did ".
+					"not include your email address");
+	}
+	$username = $blob->[0]->{'first_name'}
+	    if (exists($blob->[0]->{'first_name'}));
+	$username = ($username ? "$username " : "") . $blob->[0]->{'last_name'}
+	    if (exists($blob->[0]->{'last_name'}));
+	$modify = 1;
+    }
     $user = GeniUser->Create($certificate, $authority);
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Could not create user from your certificate")
 	if (!defined($user));
-    
+
+    if ($modify) {
+	if ($user->Modify($username, $email)) {
+	    $user->Delete();
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not update record ");
+	}
+    }
     return $user;
 }
 
