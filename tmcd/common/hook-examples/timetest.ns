@@ -1,0 +1,11 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set NodeA [$ns node]
+
+tb-set-node-os $NodeA FEDORA10-STD
+
+tb-add-node-service-hook "rc.isup" -script "/proj/tbres/duerig/timetest.pl" -op boot -whence every -env boot -point post -fatal 0
+
+# Go!
+$ns run
