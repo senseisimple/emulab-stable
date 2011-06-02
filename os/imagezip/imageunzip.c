@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -10,6 +10,12 @@
  * Writes the uncompressed data to stdout.
  */
 
+#ifdef WITH_CRYPTO
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#endif
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -21,8 +27,12 @@
 #include <sys/time.h>
 #include "imagehdr.h"
 #include "queue.h"
+#include "checksum.h"
 #ifndef NOTHREADS
 #include <pthread.h>
+#endif
+#ifndef WITH_CRYPTO
+#include <sha.h>
 #endif
 
 /*
@@ -47,7 +57,7 @@ int totalchunks, donechunks;
 /*
  * In slice mode, we read the DOS MBR to find out where the slice is on
  * the raw disk, and then seek to that spot. This avoids sillyness in
- * the BSD kernel having to do with disklabels. 
+ * the BSD kernel having to do with disklabels.
  *
  * These numbers are in sectors.
  */
@@ -59,8 +69,8 @@ static long		outputmaxsec	= 0;
 
 #define CHECK_ERR(err, msg) { \
     if (err != Z_OK) { \
-        fprintf(stderr, "%s error: %d\n", msg, err); \
-        exit(1); \
+	fprintf(stderr, "%s error: %d\n", msg, err); \
+	exit(1); \
     } \
 }
 
@@ -120,6 +130,10 @@ static int	dofrisbee;
 static int	*chunklist, *nextchunk;
 #endif
 
+/* UUID for the current image, all chunks must have the same ID */
+static unsigned char uuid[UUID_LENGTH];
+static int has_id = 0;
+
 /*
  * Some stats
  */
@@ -144,9 +158,9 @@ static void	*DiskWriter(void *arg);
 
 static int	writeinprogress; /* XXX */
 static pthread_t child_pid;
-static pthread_mutex_t	writequeue_mutex;	
+static pthread_mutex_t	writequeue_mutex;
 #ifdef CONDVARS_WORK
-static pthread_cond_t	writequeue_cond;	
+static pthread_cond_t	writequeue_cond;
 #endif
 #endif
 
@@ -182,6 +196,14 @@ static volatile int	writebufwanted;
 unsigned long		maxbufsalloced, maxmemalloced;
 unsigned long		splits;
 
+#ifdef WITH_CRYPTO
+/* security */
+static int do_checksum = 0;
+static int do_decrypt = 0;
+static int cipher = ENC_NONE;
+static unsigned char encryption_key[ENC_MAX_KEYLEN];
+#endif
+
 #ifndef CONDVARS_WORK
 int fsleep(unsigned int usecs);
 #endif
@@ -197,7 +219,7 @@ dump_stats(int sig)
 	if (sig == 0 && debug != 1 && dots) {
 		while (dotcol++ <= 66)
 			fprintf(stderr, " ");
-		
+
 		fprintf(stderr, "%4ld %6d\n",
 			(long)estamp.tv_sec, totalchunks - donechunks);
 	}
@@ -284,7 +306,7 @@ void dodots(int dottype, off_t cc)
 		fputc(chr, stderr);
 		if (dotcol++ > 65) {
 			struct timeval estamp;
-		
+
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= stamp.tv_sec;
 			fprintf(stderr, "%4ld %6d\n",
@@ -422,7 +444,7 @@ dowrite_request(writebuf_t *wbuf)
 {
 	off_t offset, size;
 	void *buf;
-	
+
 	offset = wbuf->offset;
 	size = wbuf->size;
 	buf = wbuf->data;
@@ -525,9 +547,14 @@ usage(void)
 		" -n              Single threaded (slow) mode\n"
 		" -d              Turn on progressive levels of debugging\n"
 		" -r retries      Number of image read retries to attempt\n"
-		" -W size         MB of memory to use for write buffering\n");
+		" -W size         MB of memory to use for write buffering\n"
+		" -c              Check per-chunk checksum\n"
+		" -a keyfile      File containing pubkey used to sign checksum (implies -c)\n"
+		" -e cipher       Decrypt the image with the given cipher\n"
+		" -k keyfile      File containing key used for encryption/decryption\n"
+		" -u uuid         UUID for image\n");
 	exit(1);
-}	
+}
 
 int
 main(int argc, char *argv[])
@@ -540,7 +567,7 @@ main(int argc, char *argv[])
 #ifdef NOTHREADS
 	nothreads = 1;
 #endif
-	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:N")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:Na:ck:eu:")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
 		case 'F':
@@ -603,6 +630,56 @@ main(int argc, char *argv[])
 			maxwritebufmem *= (1024 * 1024);
 			break;
 #endif
+#ifdef WITH_CRYPTO
+		case 'c':
+#ifndef SIGN_CHECKSUM
+			do_checksum = 1;
+			break;
+#else
+			fprintf(stderr, "Unsigned checksums not supported\n");
+			exit(1);
+#endif
+
+		case 'a':
+#ifdef SIGN_CHECKSUM
+			if (!init_checksum(optarg))
+				exit(1);
+			do_checksum = 1;
+			break;
+#else
+			fprintf(stderr, "Signed checksums not supported\n");
+			exit(1);
+#endif
+
+		case 'e':
+			/* Encryption cipher */
+			if (strcmp(optarg, "bf_cbc") == 0) {
+				cipher = ENC_BLOWFISH_CBC;
+			}
+			else {
+				fprintf(stderr,
+					"Only know \"bf_cbc\" (blowfish CBC)\n");
+				usage();
+			}
+			do_decrypt = 1;
+			break;
+
+		case 'k':
+			if (!encrypt_readkey(optarg, encryption_key,
+					     ENC_MAX_KEYLEN))
+				exit(1);
+			/* XXX can you intuit the cipher from the key? */
+			if (cipher == ENC_NONE)
+				cipher = ENC_BLOWFISH_CBC;
+			do_decrypt = 1;
+			break;
+#endif
+		case 'u':
+			/* UUID for image id. */
+			if (!hexstr_to_mem(uuid, optarg, UUID_LENGTH))
+				usage();
+			has_id = 1;
+			break;
 
 		case 'h':
 		case '?':
@@ -702,13 +779,13 @@ main(int argc, char *argv[])
 
 	if (slice) {
 		off_t	minseek;
-		
+
 		if (readmbr(slice)) {
 			fprintf(stderr, "Failed to read MBR\n");
 			exit(1);
 		}
 		minseek = sectobytes(outputminsec);
-		
+
 		if (lseek(outfd, minseek, SEEK_SET) < 0) {
 			perror("Setting seek pointer to slice");
 			exit(1);
@@ -732,7 +809,7 @@ main(int argc, char *argv[])
 
 	threadinit();
 	gettimeofday(&stamp, 0);
-	
+
 #ifdef FAKEFRISBEE
 	if (dofrisbee) {
 		int i;
@@ -771,7 +848,7 @@ main(int argc, char *argv[])
 	while (1) {
 		int	count = sizeof(chunkbuf);
 		char	*bp   = chunkbuf;
-		
+
 #ifdef FAKEFRISBEE
 		if (dofrisbee) {
 			if (*nextchunk == -1)
@@ -791,7 +868,7 @@ main(int argc, char *argv[])
 		 */
 		while (count) {
 			int	cc;
-			
+
 			if ((cc = read_withretry(infd, bp, count, foff)) <= 0) {
 				if (cc == 0)
 					goto done;
@@ -819,7 +896,7 @@ main(int argc, char *argv[])
 
 	/* This causes the output queue to drain */
 	threadquit();
-	
+
 	/* Set the MBR type if necesary */
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
@@ -828,12 +905,55 @@ main(int argc, char *argv[])
 	if (docrconly)
 		fprintf(stderr, "%s: CRC=%u\n", argv[0], ~crc);
 	dump_writebufs();
+#ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
+	if (do_checksum)
+		cleanup_checksum();
+#endif
+#endif
 	return 0;
 }
 #else
 /*
  * When compiled for frisbee, act as a library.
  */
+int
+ImageUnzipInitKeys(char *uuidstr, char *sig_keyfile, char *enc_keyfile)
+{
+	if (uuidstr) {
+		if (!hexstr_to_mem(uuid, uuidstr, UUID_LENGTH)) {
+			fprintf(stderr, "Bogus UUID\n");
+			exit(1);
+		}
+		has_id = 1;
+	}
+
+#ifdef WITH_CRYPTO
+	if (sig_keyfile) {
+#ifdef SIGN_CHECKSUM
+		if (!init_checksum(sig_keyfile))
+			exit(1);
+		do_checksum = 1;
+#else
+		fprintf(stderr, "Signed checksums not supported\n");
+		exit(1);
+#endif
+	}
+	if (enc_keyfile) {
+		if (!encrypt_readkey(enc_keyfile,
+				     encryption_key, sizeof(encryption_key)))
+			exit(1);
+		do_decrypt = 1;
+	}
+#else
+	if (sig_keyfile != NULL || enc_keyfile != NULL) {
+		fprintf(stderr, "Authentication/encryption not supported\n");
+		exit(1);
+	}
+#endif
+
+	return 0;
+}
 int
 ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 	       int _nothreads, int _dostype, int _dodots,
@@ -880,13 +1000,13 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 
 	if (slice) {
 		off_t	minseek;
-		
+
 		if (readmbr(slice)) {
 			fprintf(stderr, "Failed to read MBR\n");
 			exit(1);
 		}
 		minseek = sectobytes(outputminsec);
-		
+
 		if (lseek(outfd, minseek, SEEK_SET) < 0) {
 			perror("Setting seek pointer to slice");
 			exit(1);
@@ -942,6 +1062,13 @@ ImageUnzipQuit(void)
 	/* Set the MBR type if necesary */
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
+
+#ifdef WITH_CRYPTO
+#ifdef SIGN_CHECKSUM
+	if (do_checksum)
+		cleanup_checksum();
+#endif
+#endif
 
 	fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
 		totaledata, totalrdata);
@@ -1103,6 +1230,44 @@ write_subblock(int chunkno, const char *chunkbufp, int chunksize)
 	return 0;
 }
 
+#ifdef WITH_CRYPTO
+/* returns the number of characters decrypted */
+static int
+decrypt_buffer(unsigned char *dest, const unsigned char *source,
+	       const blockhdr_t *header)
+{
+	/* init */
+	int update_count = 0;
+	int final_count = 0;
+	int error = 0;
+	EVP_CIPHER_CTX context;
+	EVP_CIPHER const *ecipher;
+
+	EVP_CIPHER_CTX_init(&context);
+	ecipher = EVP_bf_cbc();
+
+	EVP_DecryptInit(&context, ecipher, NULL, header->enc_iv);
+	EVP_CIPHER_CTX_set_key_length(&context, ENC_MAX_KEYLEN);
+	EVP_DecryptInit(&context, NULL, encryption_key, NULL);
+
+	/* decrypt */
+	EVP_DecryptUpdate(&context, dest, &update_count, source, header->size);
+
+	/* cleanup */
+	error = EVP_DecryptFinal(&context, dest + update_count, &final_count);
+	if (!error) {
+		char keystr[ENC_MAX_KEYLEN*2 + 1];
+		fprintf(stderr, "Padding was incorrect.\n");
+		mem_to_hexstr(keystr, encryption_key, ENC_MAX_KEYLEN);
+		fprintf(stderr, "  Key: %s\n", keystr);
+		mem_to_hexstr(keystr, header->enc_iv, ENC_MAX_KEYLEN);
+		fprintf(stderr, "  IV:  %s\n", keystr);
+		exit(1);
+	}
+	return update_count + final_count;
+}
+#endif
+
 static int
 inflate_subblock(const char *chunkbufp)
 {
@@ -1114,7 +1279,10 @@ inflate_subblock(const char *chunkbufp)
 	off_t		offset, size;
 	char		resid[SECSIZE];
 	writebuf_t	*wbuf;
-	
+#ifdef WITH_CRYPTO
+	char		plaintext[CHUNKMAX];
+#endif
+
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
 	d_stream.opaque   = (voidpf)0;
@@ -1131,7 +1299,24 @@ inflate_subblock(const char *chunkbufp)
 	 */
 	blockhdr    = (const blockhdr_t *) chunkbufp;
 	chunkbufp  += DEFAULTREGIONSIZE;
-	
+
+#ifdef WITH_CRYPTO
+	/*
+	 * If decryption and/or signing is required and the image is too
+	 * old, bail.
+	 *
+	 * XXX this assumes that version nums are monotonically increasing,
+	 * I cannot imagine why they would not be in the future!
+	 */
+	if (blockhdr->magic < COMPRESSED_V4 &&
+	    (do_checksum || do_decrypt)) {
+		fprintf(stderr,
+			"%s requested but image is old format (V%d)\n",
+			do_checksum ? "checksum" : "decryption",
+			blockhdr->magic - COMPRESSED_MAGIC_BASE);
+		exit(1);
+	}
+#endif
 	switch (blockhdr->magic) {
 	case COMPRESSED_V1:
 	{
@@ -1159,6 +1344,72 @@ inflate_subblock(const char *chunkbufp)
 		getrelocinfo(blockhdr);
 		break;
 
+	case COMPRESSED_V4:
+#ifdef WITH_CRYPTO
+		/*
+		 * Verify the checksum before looking at anything else.
+		 */
+		if (do_checksum &&
+		    !verify_checksum((blockhdr_t *)blockhdr,
+				     (const unsigned char *)blockhdr,
+				     blockhdr->csum_type))
+			exit(1);
+#endif
+
+		/*
+		 * Track the current image UUID.
+		 *
+		 * If a UUID was specified on the command line, use that as
+		 * the expected UUID. All chunks much match this UUID.
+		 *
+		 * XXX if no UUID was specified, we use the one from the
+		 * first chunk received and match all others against that.
+		 * This is not ideal, since it is vulnerable to spoofing if
+		 * the client is not using a signature and/or encryption.
+		 */
+		if (has_id == 0) {
+			has_id = 1;
+			memcpy(uuid, blockhdr->imageid, UUID_LENGTH);
+		} else if (memcmp(uuid, blockhdr->imageid, UUID_LENGTH)) {
+			char uuidstr[UUID_LENGTH*2 + 1];
+
+			fprintf(stderr, "Incorrect Image ID in chunk %d:\n",
+				blockhdr->blockindex);
+			mem_to_hexstr(uuidstr, blockhdr->imageid, UUID_LENGTH);
+			fprintf(stderr, "  In chunk:  0x%s\n", uuidstr);
+			mem_to_hexstr(uuidstr, uuid, UUID_LENGTH);
+			fprintf(stderr, "  Should be: 0x%s\n", uuidstr);
+			exit(1);
+		}
+
+#ifdef WITH_CRYPTO
+		/*
+		 * Decrypt the rest of the chunk if encrypted.
+		 */
+		if (do_decrypt) {
+			if (blockhdr->enc_cipher == ENC_NONE) {
+				fprintf(stderr, "Chunk has no cipher\n");
+				exit(1);
+			}
+			if (blockhdr->enc_cipher != cipher) {
+				fprintf(stderr,
+					"Wrong cipher type %d in chunk\n",
+					blockhdr->enc_cipher);
+				exit(1);
+			}
+
+			((blockhdr_t *)blockhdr)->size
+				= decrypt_buffer((unsigned char *)plaintext,
+						 (unsigned char *)chunkbufp,
+						 blockhdr);
+			chunkbufp = plaintext;
+		}
+#endif
+		imageversion = 4;
+		curregion = (struct region *) (blockhdr + 1);
+		getrelocinfo(blockhdr);
+		break;
+
 	default:
 		fprintf(stderr, "Bad Magic Number!\n");
 		exit(1);
@@ -1178,9 +1429,9 @@ inflate_subblock(const char *chunkbufp)
 			totaledata += size;
 		}
 	}
- 
+
 	/*
-	 * Start with the first region. 
+	 * Start with the first region.
 	 */
 	offset = sectobytes(curregion->start);
 	size   = sectobytes(curregion->size);
@@ -1374,7 +1625,7 @@ inflate_subblock(const char *chunkbufp)
 		}
 		offset += size;
 	}
- 
+
 	donechunks++;
 	if (debug == 1) {
 		fprintf(stderr, "%14lld\n", (long long)offset);
@@ -1422,7 +1673,7 @@ writezeros(off_t offset, off_t zcount)
 			zcc = zcount;
 		else
 			zcc = OUTSIZE;
-		
+
 #ifndef FRISBEE
 		if (docrconly)
 			compute_crc((u_char *)zeros, zcc, &crc);
@@ -1482,7 +1733,7 @@ writedata(off_t offset, size_t size, void *buf)
 			(long long)offset, (long long)nextwriteoffset);
 		exit(1);
 	}
-		
+
 	if (cc != size) {
 		if (cc < 0)
 			perror("write error");
@@ -1552,7 +1803,7 @@ static long long outputmaxsize = 0;
 
 /*
  * Parse the DOS partition table to set the bounds of the slice we
- * are writing to. 
+ * are writing to.
  */
 int
 readmbr(int slice)
@@ -1562,7 +1813,7 @@ readmbr(int slice)
 
 	if (slice < 1 || slice > 4) {
 		fprintf(stderr, "Slice must be 1, 2, 3, or 4\n");
- 		return 1;
+		return 1;
 	}
 
 	if ((cc = devread(outfd, doslabel.pad2, DOSPARTSIZE)) < 0) {
@@ -1571,16 +1822,16 @@ readmbr(int slice)
 	}
 	if (cc != DOSPARTSIZE) {
 		fprintf(stderr, "Could not get the entire DOS label\n");
- 		return 1;
+		return 1;
 	}
 	if (doslabel.magic != BOOT_MAGIC) {
 		fprintf(stderr, "Wrong magic number in DOS partition table\n");
- 		return 1;
+		return 1;
 	}
 
 	outputminsec  = doslabel.parts[slice-1].dp_start;
 	outputmaxsec  = doslabel.parts[slice-1].dp_start +
-		        doslabel.parts[slice-1].dp_size;
+			doslabel.parts[slice-1].dp_size;
 	outputmaxsize = (long long)sectobytes(outputmaxsec - outputminsec);
 
 	if (debug) {
@@ -1606,11 +1857,11 @@ fixmbr(int slice, int dtype)
 	}
 	if (cc != DOSPARTSIZE) {
 		fprintf(stderr, "Could not get the entire DOS label\n");
- 		return 1;
+		return 1;
 	}
 	if (doslabel.magic != BOOT_MAGIC) {
 		fprintf(stderr, "Wrong magic number in DOS partition table\n");
- 		return 1;
+		return 1;
 	}
 
 	if (doslabel.parts[slice-1].dp_typ != dostype) {
