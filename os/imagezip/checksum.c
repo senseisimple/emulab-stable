@@ -254,22 +254,3 @@ hexstr_to_mem(unsigned char * dest, const char * source, int memsize)
 	}
 	return result;
 }
-
-/*
- * XXX hack for frisbee use.
- * So we don't have to worry about UUID_LENGTH constant there.
- */
-char *
-str_to_uuid(char *srcstr)
-{
-	unsigned char *buf = calloc(UUID_LENGTH, 1);
-	
-	if (!buf)
-		return NULL;
-	if (!hexstr_to_mem(buf, srcstr, UUID_LENGTH)) {
-		free(buf);
-		return NULL;
-	}
-
-	return (char *)buf;
-}

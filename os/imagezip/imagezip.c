@@ -72,9 +72,9 @@ int	dorelocs  = 1;
 int	metaoptimize = 0;
 int	filemode  = 0;
 int	do_encrypt = 0;
-char	*cipherarg = NULL;
+int	cipher = ENC_NONE;
 int	do_checksum = 0;
-char	*sighasharg = NULL;
+int	csumalg = CSUM_NONE;
 off_t	datawritten;
 partmap_t ignore, forceraw;
 static	int got_imageid;
@@ -492,14 +492,17 @@ main(int argc, char *argv[])
 		case 'a':
 #ifdef WITH_CRYPTO
 			/* Authentication (checksum) hash algorithm */
-			sighasharg = optarg;
-			if (strcmp(sighasharg, "SHA1") != 0) {
-				fprintf(stderr,
-					"Only know \"SHA1\"\n");
+			if (strcmp(optarg, "SHA1") == 0) {
+				csumalg = CSUM_SHA1;
+			}
+			else {
+				fprintf(stderr, "Only know \"SHA1\"\n");
 				usage();
 			}
 			do_checksum++;
-#ifndef SIGN_CHECKSUM
+#ifdef SIGN_CHECKSUM
+			csumalg |= CSUM_SIGNED;
+#else
 			fprintf(stderr, "WARNING: checksum is not signed\n");
 #endif
 #else
@@ -511,8 +514,10 @@ main(int argc, char *argv[])
 		case 'e':
 #ifdef WITH_CRYPTO
 			/* Encryption cipher */
-			cipherarg = optarg;
-			if (strcmp(cipherarg, "bf_cbc") != 0) {
+			if (strcmp(optarg, "bf_cbc") == 0) {
+				cipher = ENC_BLOWFISH_CBC;
+			}
+			else {
 				fprintf(stderr,
 					"Only know \"bf_cbc\" (blowfish CBC)\n");
 				usage();
@@ -530,6 +535,9 @@ main(int argc, char *argv[])
 			if (enc_key == NULL ||
 			    !encrypt_readkey(optarg, enc_key, ENC_MAX_KEYLEN))
 				usage();
+			/* XXX can you intuit the cipher from the key? */
+			if (cipher == ENC_NONE)
+				cipher = ENC_BLOWFISH_CBC;
 #else
 			fprintf(stderr, "'k' option not supported\n");
 			usage();
@@ -1809,7 +1817,7 @@ static off_t	compress_chunk(off_t, off_t, int *, uint32_t *);
 static int	compress_finish(uint32_t *subblksize);
 static void	compress_status(int sig);
 #ifdef WITH_CRYPTO
-static void	checksum_start(blockhdr_t *hdr);
+static void	checksum_start(blockhdr_t *hdr, int alg);
 static void	checksum_chunk(uint8_t *buf, off_t size);
 static void	checksum_finish(blockhdr_t *hdr);
 static void	encrypt_start(blockhdr_t *hdr);
@@ -2062,7 +2070,7 @@ compress_image(void)
 		 */
 		if (do_checksum) {
 			assert(!compat);
-			checksum_start(blkhdr);
+			checksum_start(blkhdr, csumalg);
 			checksum_chunk(output_buffer,
 				       blkhdr->size + blkhdr->regionsize);
 			checksum_finish(blkhdr);
@@ -2190,7 +2198,7 @@ compress_image(void)
 		 */
 		if (do_checksum) {
 			assert(!compat);
-			checksum_start(blkhdr);
+			checksum_start(blkhdr, csumalg);
 			checksum_chunk(output_buffer,
 				       blkhdr->size + blkhdr->regionsize);
 			checksum_finish(blkhdr);
@@ -2532,7 +2540,7 @@ compress_finish(uint32_t *subblksize)
  */
 SHA_CTX sha_ctx;
 void
-checksum_start(blockhdr_t *hdr)
+checksum_start(blockhdr_t *hdr, int alg)
 {
 	/*
 	 * Start with the checksum zeroed out - this way, we can put the
@@ -2542,10 +2550,7 @@ checksum_start(blockhdr_t *hdr)
 	memset(hdr->checksum, 0, sizeof(hdr->checksum));
 
 	/* type is part of the checksum */
-	hdr->csum_type = CSUM_SHA1;
-#ifdef SIGN_CHECKSUM
-	hdr->csum_type |= CSUM_SIGNED;
-#endif
+	hdr->csum_type = alg;
 
 	SHA1_Init(&sha_ctx);
 }
@@ -2706,7 +2711,7 @@ checksum_finish(blockhdr_t *hdr)
  * Encryption functions
  */
 static EVP_CIPHER_CTX cipher_ctx;
-static const EVP_CIPHER *cipher;
+static const EVP_CIPHER *ecipher;
 /* XXX: the size of the IV may have to change with different ciphers */
 static uint8_t iv[ENC_MAX_KEYLEN];
 
@@ -2726,7 +2731,7 @@ encrypt_start(blockhdr_t *hdr)
 	 * Pick our cipher - currently, only Blowfish in CBC mode is supported
 	 */
 	EVP_CIPHER_CTX_init(&cipher_ctx);
-	cipher = EVP_bf_cbc();
+	ecipher = EVP_bf_cbc();
 
 	/*
 	 * If this is the first chunk, generate a new IV. Otherwise, we use
@@ -2767,7 +2772,7 @@ encrypt_start(blockhdr_t *hdr)
 	/*
 	 * Set the cipher and IV
 	 */
-	EVP_EncryptInit(&cipher_ctx, cipher, NULL, iv);
+	EVP_EncryptInit(&cipher_ctx, ecipher, NULL, iv);
 
 	/*
 	 * Bump up the key length and set the key
@@ -2815,7 +2820,7 @@ encrypt_finish(blockhdr_t *hdr, uint8_t *outbuf, uint32_t *out_size)
 	assert(encrypted_bytes <= CHUNKMAX);
 	memcpy(outbuf, encryption_buffer, encrypted_bytes);
 
-	hdr->enc_cipher = ENC_BLOWFISH_CBC;
+	hdr->enc_cipher = cipher;
 
 	*out_size = encrypted_bytes;
 }

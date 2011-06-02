@@ -78,7 +78,7 @@ static int	GotBlock(Packet_t *p);
 static void	RequestChunk(int timedout);
 static int	RequestStamp(int chunk, int block, int count, void *arg);
 static int	RequestRedoTime(int chunk, unsigned long long curtime);
-extern int	ImageUnzipInitKeys(char *uuid, char *sig_keyfile,
+extern int	ImageUnzipInitKeys(char *uuidstr, char *sig_keyfile,
 				   char *enc_keyfile);
 extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero,
 			       int nothreads, int dostype, int dodots,
@@ -219,7 +219,7 @@ main(int argc, char **argv)
 	char   *filename = NULL;
 	int	dostype = -1;
 	int	slice = 0;
-	char	*sig_keyfile = 0, *enc_keyfile = 0, *uuid = 0;
+	char	*sig_keyfile = 0, *enc_keyfile = 0, *uuidstr = 0;
 
 	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONc:e:u:K:B:F:Q:P:X:")) != -1)
 		switch(ch) {
@@ -391,12 +391,8 @@ main(int argc, char **argv)
 			break;
 
 		case 'u':
-		{
-			extern char *str_to_uuid(char *);
-
-			uuid = str_to_uuid(optarg);
+			uuidstr = optarg;
 			break;
-		}
 
 		case 'K':
 			keepalive = atoi(optarg);
@@ -626,7 +622,7 @@ main(int argc, char **argv)
 	/*
 	 * Initialize keys for authentication/encryption.
 	 */
-	ImageUnzipInitKeys(uuid, sig_keyfile, enc_keyfile);
+	ImageUnzipInitKeys(uuidstr, sig_keyfile, enc_keyfile);
 
 	/*
 	 * Pass in assorted parameters and fire off the disk writer thread.

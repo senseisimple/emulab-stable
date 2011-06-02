@@ -291,9 +291,12 @@ dumpfile(char *name, int fd)
 				       magic - COMPRESSED_MAGIC_BASE + 1);
 				if (magic >= COMPRESSED_V4) {
 					sigtype = hdr->csum_type;
-					if (sigtype != CSUM_NONE)
-						printf(", signed (%d)",
-						       sigtype);
+					if (sigtype != CSUM_NONE) {
+						printf(", ");
+						if (sigtype & CSUM_SIGNED)
+							printf("signed ");
+						printf("csum (0x%x)", sigtype);
+					}
 					enctype = hdr->enc_cipher;
 					if (enctype != ENC_NONE)
 						printf(", encrypted (%d)",
@@ -461,10 +464,10 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 			}
 		}
 		if (checksums && hdr->csum_type != CSUM_NONE) {
-			if (hdr->csum_type != CSUM_SHA1) {
+			if ((hdr->csum_type & CSUM_TYPE) != CSUM_SHA1) {
 				printf("%s: unsupported checksum type %d in "
 				       "chunk %d", name,
-				       hdr->csum_type,
+				       (hdr->csum_type & CSUM_TYPE),
 				       chunkno);
 				return 1;
 			}
@@ -517,6 +520,9 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 			if (hdr->csum_type != CSUM_NONE) {
 				len = 0;
 				switch (hdr->csum_type) {
+				case CSUM_SIGNED|CSUM_SHA1:
+					len = CSUM_MAX_LEN;
+					break;
 				case CSUM_SHA1:
 					len = CSUM_SHA1_LEN;
 					break;

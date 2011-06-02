@@ -131,7 +131,7 @@ static int	*chunklist, *nextchunk;
 #endif
 
 /* UUID for the current image, all chunks must have the same ID */
-static unsigned char imageid[UUID_LENGTH];
+static unsigned char uuid[UUID_LENGTH];
 static int has_id = 0;
 
 /*
@@ -200,7 +200,7 @@ unsigned long		splits;
 /* security */
 static int do_checksum = 0;
 static int do_decrypt = 0;
-static char *cipherarg = NULL;
+static int cipher = ENC_NONE;
 static unsigned char encryption_key[ENC_MAX_KEYLEN];
 #endif
 
@@ -653,8 +653,10 @@ main(int argc, char *argv[])
 
 		case 'e':
 			/* Encryption cipher */
-			cipherarg = optarg;
-			if (strcmp(cipherarg, "bf_cbc") != 0) {
+			if (strcmp(optarg, "bf_cbc") == 0) {
+				cipher = ENC_BLOWFISH_CBC;
+			}
+			else {
 				fprintf(stderr,
 					"Only know \"bf_cbc\" (blowfish CBC)\n");
 				usage();
@@ -666,12 +668,15 @@ main(int argc, char *argv[])
 			if (!encrypt_readkey(optarg, encryption_key,
 					     ENC_MAX_KEYLEN))
 				exit(1);
+			/* XXX can you intuit the cipher from the key? */
+			if (cipher == ENC_NONE)
+				cipher = ENC_BLOWFISH_CBC;
 			do_decrypt = 1;
 			break;
 #endif
 		case 'u':
 			/* UUID for image id. */
-			if (!hexstr_to_mem(imageid, optarg, UUID_LENGTH))
+			if (!hexstr_to_mem(uuid, optarg, UUID_LENGTH))
 				usage();
 			has_id = 1;
 			break;
@@ -913,14 +918,17 @@ main(int argc, char *argv[])
  * When compiled for frisbee, act as a library.
  */
 int
-ImageUnzipInitKeys(char *uuid, char *sig_keyfile, char *enc_keyfile)
+ImageUnzipInitKeys(char *uuidstr, char *sig_keyfile, char *enc_keyfile)
 {
-	if (uuid) {
-		memcpy(imageid, uuid, UUID_LENGTH);
+	if (uuidstr) {
+		if (!hexstr_to_mem(uuid, uuidstr, UUID_LENGTH)) {
+			fprintf(stderr, "Bogus UUID\n");
+			exit(1);
+		}
 		has_id = 1;
 	}
-#ifdef WITH_CRYPTO
 
+#ifdef WITH_CRYPTO
 	if (sig_keyfile) {
 #ifdef SIGN_CHECKSUM
 		if (!init_checksum(sig_keyfile))
@@ -1233,12 +1241,12 @@ decrypt_buffer(unsigned char *dest, const unsigned char *source,
 	int final_count = 0;
 	int error = 0;
 	EVP_CIPHER_CTX context;
-	EVP_CIPHER const *cipher;
+	EVP_CIPHER const *ecipher;
 
 	EVP_CIPHER_CTX_init(&context);
-	cipher = EVP_bf_cbc();
+	ecipher = EVP_bf_cbc();
 
-	EVP_DecryptInit(&context, cipher, NULL, header->enc_iv);
+	EVP_DecryptInit(&context, ecipher, NULL, header->enc_iv);
 	EVP_CIPHER_CTX_set_key_length(&context, ENC_MAX_KEYLEN);
 	EVP_DecryptInit(&context, NULL, encryption_key, NULL);
 
@@ -1361,15 +1369,15 @@ inflate_subblock(const char *chunkbufp)
 		 */
 		if (has_id == 0) {
 			has_id = 1;
-			memcpy(imageid, blockhdr->imageid, UUID_LENGTH);
-		} else if (memcmp(imageid, blockhdr->imageid, UUID_LENGTH)) {
+			memcpy(uuid, blockhdr->imageid, UUID_LENGTH);
+		} else if (memcmp(uuid, blockhdr->imageid, UUID_LENGTH)) {
 			char uuidstr[UUID_LENGTH*2 + 1];
 
 			fprintf(stderr, "Incorrect Image ID in chunk %d:\n",
 				blockhdr->blockindex);
 			mem_to_hexstr(uuidstr, blockhdr->imageid, UUID_LENGTH);
 			fprintf(stderr, "  In chunk:  0x%s\n", uuidstr);
-			mem_to_hexstr(uuidstr, imageid, UUID_LENGTH);
+			mem_to_hexstr(uuidstr, uuid, UUID_LENGTH);
 			fprintf(stderr, "  Should be: 0x%s\n", uuidstr);
 			exit(1);
 		}
@@ -1383,9 +1391,9 @@ inflate_subblock(const char *chunkbufp)
 				fprintf(stderr, "Chunk has no cipher\n");
 				exit(1);
 			}
-			if (blockhdr->enc_cipher != ENC_BLOWFISH_CBC) {
+			if (blockhdr->enc_cipher != cipher) {
 				fprintf(stderr,
-					"Chunk cipher type %d not supported\n",
+					"Wrong cipher type %d in chunk\n",
 					blockhdr->enc_cipher);
 				exit(1);
 			}
