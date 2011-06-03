@@ -5514,7 +5514,8 @@ COMMAND_PROTOTYPE(doimagekey)
 	int		nrows;
         unsigned long   *nlen;
 
-        /* No arguments - we don't allow the client to ask for a specific image
+        /*
+	 * No arguments - we don't allow the client to ask for a specific image
          * key, just the one for the image they are supposed to be loading
          * according to the database
          */
@@ -5523,17 +5524,16 @@ COMMAND_PROTOTYPE(doimagekey)
          * Make sure that this node is in the right state - hardcoding it is
          * probably not a good idea, but the right way to get it isn't clear
          */
-        res = mydb_query("select op_mode, eventstate from nodes where "
-                "node_id='%s'",2,reqp->nodeid);
-
+        res = mydb_query("select op_mode,eventstate from nodes where "
+			 "node_id='%s'", 2, reqp->nodeid);
 	if (!res) {
 		error("IMAGEKEY: %s: DB Error getting event state\n",
-                        reqp->nodeid);
+		      reqp->nodeid);
 		return 1;
 	}
 	if ((nrows = (int)mysql_num_rows(res)) != 1) {
 		error("IMAGEKEY: %s: DB Error getting event state\n",
-                        reqp->nodeid);
+		      reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
 	}
@@ -5542,15 +5542,15 @@ COMMAND_PROTOTYPE(doimagekey)
 	nlen = mysql_fetch_lengths(res);
 	if (!nlen) {
 		error("IMAGEKEY: %s: DB Error getting event state\n",
-                        reqp->nodeid);
+		      reqp->nodeid);
 		mysql_free_result(res);
                 return 1;
         }
 
-        if (strncmp(row[0],SECURELOAD_OPMODE,nlen[0]) ||
-            strncmp(row[1],SECURELOAD_STATE,nlen[1])) {
+        if (strncmp(row[0],SECURELOAD_OPMODE, nlen[0]) ||
+            strncmp(row[1],SECURELOAD_STATE, nlen[1])) {
 		error("IMAGEKEY: %s: Node is in the wrong state\n",
-                        reqp->nodeid);
+		      reqp->nodeid);
 		mysql_free_result(res);
                 return 1;
         }
@@ -5559,47 +5559,88 @@ COMMAND_PROTOTYPE(doimagekey)
         /*
          * Grab and return the key itself
          */
-	res = mydb_query("select i.auth_uuid,i.auth_key,i.decryption_key "
+	res = mydb_query("select i.auth_uuid,i.auth_key,i.decryption_key,"
+			 " i.imagename,p.pid,g.gid "
 			 "from current_reloads as r "
 			 "left join images as i on i.imageid=r.image_id "
+			 "left join projects as p on i.pid_idx=p.pid_idx "
+			 "left join groups as g on i.gid_idx=g.gid_idx "
 			 "where node_id='%s' order by r.idx",
-			 3, reqp->nodeid);
+			 6, reqp->nodeid);
 	if (!res) {
 		error("IMAGEKEY: %s: DB Error getting key\n", reqp->nodeid);
 		return 1;
 	}
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
 		info("IMAGEKEY: %s: No current reload for this node\n",
-                        reqp->nodeid);
+		     reqp->nodeid);
 		mysql_free_result(res);
 		return 0;
 	}
 
 	/*
+	 * Prior to version 33 there was no extended image info send along
+	 * in loadinfo and thus no way to match an image with the
+	 * corresponding secure load info. Hence we allow only a single
+	 * image in this case and return it in the old format of one field
+	 * per line.
+	 */
+	if (vers < 33) {
+		if (nrows > 1) {
+			info("IMAGEKEY: %s: client cannot handle multiple images\n",
+			     reqp->nodeid);
+			mysql_free_result(res);
+			return 0;
+		}
+		row = mysql_fetch_row(res);
+		if (row[0])
+			bufp += OUTPUT(bufp, bufe - bufp,
+				       "UUID=%s\n", row[0]);
+		if (row[1])
+			bufp += OUTPUT(bufp, bufe - bufp,
+				       "SIGKEY=%s\n", row[1]);
+		if (row[2])
+			bufp += OUTPUT(bufp, bufe - bufp,
+				       "ENCKEY=%s\n", row[2]);
+		nrows = 0;
+	}
+	/*
 	 * Note: if there is more than one reload, we are only grabbing the
 	 * 'most recent' due to the 'order by' clause.
 	 */
-	row = mysql_fetch_row(res);
-	nlen = mysql_fetch_lengths(res);
-	if (!row || !nlen) {
-		error("IMAGEKEY: %s: no auth/encryption key information\n",
-		      reqp->nodeid);
-		mysql_free_result(res);
-		return 1;
-	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+		nlen = mysql_fetch_lengths(res);
+		if (!row || !nlen) {
+			error("IMAGEKEY: %s: no auth/encryption key info\n",
+			      reqp->nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
         
-	/*
-	 * Put out the authentication UUID and signing key.
-	 * XXX these don't need to be protected as the encryption key,
-	 * they could be sent back via "loadinfo".
-	 */
-	if (row[0])
-		bufp += OUTPUT(bufp, bufe - bufp, "UUID=%s\n", row[0]);
-	if (row[1])
-		bufp += OUTPUT(bufp, bufe - bufp, "SIGKEY=%s\n", row[1]);
-	if (row[2])
-		bufp += OUTPUT(bufp, bufe - bufp, "ENCKEY=%s\n", row[2]);
+		if (!row[3] || !row[3][0] || !row[4] || !row[4][0] ||
+		    !row[5] || !row[5][0]) {
+			error("IMAGEKEY: %s: missing or incomplete imageinfo\n",
+			      reqp->nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
 
+		bufp += OUTPUT(bufp, bufe - bufp,
+			       "IMAGEID=%s,%s,%s", row[4], row[5], row[3]);
+		if (row[0])
+			bufp += OUTPUT(bufp, bufe - bufp,
+				       " UUID=%s", row[0]);
+		if (row[1])
+			bufp += OUTPUT(bufp, bufe - bufp,
+				       " SIGKEY=%s", row[1]);
+		if (row[2])
+			bufp += OUTPUT(bufp, bufe - bufp,
+				       " ENCKEY=%s", row[2]);
+		bufp += OUTPUT(bufp, bufe - bufp, "\n");
+
+		nrows--;
+	}
 	client_writeback(sock, buf, strlen(buf), tcp);
 
         mysql_free_result(res);

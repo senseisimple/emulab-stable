@@ -79,7 +79,7 @@ tweakmbr()
 			    echo "WARNING: custom MBR on $disk, not changed"
 			    return 0
 			fi
-    			;;
+			;;
 	esac
 
 	if [ "$cur_mbr_ver" = $new_mbr_ver ]; then
@@ -285,6 +285,28 @@ handle_loadinfo()
 	local PREPARE=`get_value "$LOADINFO" PREPARE`
 	local PTYPE=''
 
+	#
+	# XXX check for secure diskloading info.
+	# XXX only return info for a single image right now
+	#
+	if [ -r /tmp/secureloadinfo.out ]; then
+		local SINFO=`grep $IMAGEID /tmp/secureloadinfo.out`
+		local UUID=`get_value "$SINFO" UUID`
+		if [ -n "$UUID" ]; then
+			FRISBEE_OPTS="$FRISBEE_OPTS -u $UUID"
+		fi
+		local SIGKEY=`get_value "$SINFO" SIGKEY`
+		if [ -n "$SIGKEY" ]; then
+			echo "$SIGKEY" | tr ',' '\n' > /tmp/sig.key
+			FRISBEE_OPTS="$FRISBEE_OPTS -c /tmp/sig.key"
+		fi
+		local ENCKEY=`get_value "$SINFO" ENCKEY`
+		if [ -n "$ENCKEY" ]; then
+			echo "$ENCKEY" > /tmp/enc.key
+			FRISBEE_OPTS="$FRISBEE_OPTS -e /tmp/enc.key"
+		fi
+	fi
+
 	if [ -z "$ADDRESS" ]; then
 		if [ -z "$IMAGEID" ]; then
 		    echo "Unable to get imageid or address for loading image"
@@ -348,6 +370,11 @@ handle_loadinfo()
 	if [ $rc -ne 0 ]; then
 		echo "Failed to write image to disk, status $rc"
 		exit 1
+	fi
+
+	# remove keyfiles
+	if [ -r /tmp/secureloadinfo.out ]; then
+	    rm -f /tmp/enc.key /tmp/sig.key
 	fi
 
 	# we resize the 4th partition after writing the image
@@ -482,7 +509,7 @@ while read line; do
 		exit 1
 	fi
 done < /tmp/loadinfo.out
-rm -f /tmp/loadinfo.out
+rm -f /tmp/loadinfo.out /tmp/secureloadinfo.out
 
 #
 # If requested to reboot, do so.
