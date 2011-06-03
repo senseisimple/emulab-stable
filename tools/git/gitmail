@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # To set this script up:
@@ -129,7 +129,13 @@ my $defmail = get_config("defmail",undef);
 # If set, *always* send mail to this address (even if one or more regexps
 # match). ($defmail will still be used if no regexps match)
 #
-my $alwaysmail = get_config("alwaysmail",undef);
+my @alwaysmail = get_config("alwaysmail",undef);
+
+#
+# If set, set the 'Reply-To' header in the mail, so that discussion can
+# take place on, for example, a particular development mailing list
+#
+my $replyto = get_config("replyto",undef);
 
 #
 # If set to true, detach and run in background - the push doesn't return until
@@ -511,9 +517,9 @@ sub get_mail_addresses($@) {
     #
     # If there's an address we're always supposed to send to, include that now
     #
-    if (defined($alwaysmail)) {
-        push @addrs, flatten_arrayref($alwaysmail);
-        debug("Used alwaysmail address $alwaysmail");
+    if (@alwaysmail) {
+        push @addrs, @alwaysmail;
+        debug("Used alwaysmail address(es) " . join(",",@alwaysmail));
     }
 
     #
@@ -596,7 +602,7 @@ sub get_mail_addresses($@) {
     #
     if (!$matched && defined($defmail)) {
         @addrs = flatten_arrayref($defmail);
-        debug("Used default address $alwaysmail");
+        debug("Used default address $defmail");
     }
 
     #
@@ -867,6 +873,11 @@ sub send_mail($$@) {
 
     print MAIL "To: " . join(", ",@to) . "\n";
     print MAIL "Subject: $subject\n";
+    
+    # If requested, set the Reply-To header
+    if (defined($replyto)) {
+        print MAIL "Reply-To: $replyto\n"
+    }
 
     #
     # Add an X-Git-Repo header to help people procmail
@@ -923,27 +934,60 @@ sub debug(@) {
 sub get_config($$) {
     my ($var,$default) = @_;
 
+    my $multivalue = 0;
+
+    # This lets us check whether the caller wanted multiple values or not -
+    # if we were called in list context, this will be true
+    if (wantarray()) {
+        $multivalue = 1;
+    }
+
     #
     # Allow the user to override on command line
     #
     if ($opt{o}) {
+        my @values;
         foreach my $pair (@{$opt{o}}) {
             my ($name,$value) = split /=/, $pair;
             if ($name eq $var) {
                 debug("Using config value $value for $name from command line");
-                return $value;
+                if ($multivalue) {
+                    push @values, $value;
+                } else {
+                    return $value;
+                }
             }
+        }
+        if ($multivalue && (@values > 0)) {
+            return @values;
         }
     }
 
-    my $value = `git config $CONFIGBASE.$var`;
-    chomp $value;
-    if ($value ne "") {
-        debug("Got $value from git config for $var");
-        return $value;
+    my $getcommand = "--get";
+    if ($multivalue) {
+        $getcommand = "--get-all";
+    }
+
+    my @value = `git config $getcommand $CONFIGBASE.$var`;
+    chomp @value;
+
+    if (@value) {
+        if ($multivalue) {
+            foreach my $value (@value) {
+                debug("Got $value from git config for $var");
+            }
+            return @value;
+        } else {
+            debug("Got $value[0] from git config for $var");
+            return $value[0];
+        }
     } else {
         debug("Using " , defined($default)?$default : "(undef)" , " for $var");
-        return $default;
+        if ($multivalue) {
+            return ($default);
+        } else {
+            return $default;
+        }
     }
 }
 
