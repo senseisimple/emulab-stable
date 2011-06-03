@@ -1,9 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
-		  width="180" height="170"
-		  horizontalAlign="center" gap="2" xmlns:display="protogeni.display.*">
+		  xmlns:display="protogeni.display.*"
+		  xmlns:components="protogeni.display.components.*"
+		  width="210" height="180"
+		  horizontalAlign="center" gap="2" paddingLeft="0">
 	<fx:Script>
 		<![CDATA[
 			import com.google.maps.LatLng;
@@ -16,41 +36,31 @@
 			import mx.core.FlexGlobals;
 			
 			import protogeni.display.DisplayUtil;
+			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeGroup;
 			
-			private var nodes:ArrayCollection;
+			private var nodes:Vector.<PhysicalNode>;
 			
-			public function Load(cluster:ArrayCollection):void 
+			public function Load(cluster:Vector.<PhysicalNodeGroup>):void 
 			{
-				nodes = new ArrayCollection();
-				var nodeCount:int = 0;
-				var coords:Array = new Array();
+				nodes = new Vector.<PhysicalNode>();
+				var coords:Vector.<LatLng> = new Vector.<LatLng>();
 				for each(var ng:PhysicalNodeGroup in cluster)
 				{
 					addNodeGroup(ng);
-					nodeCount += ng.collection.length;
-					nodes.addAll(ng.collection);
+					for each(var node:PhysicalNode in ng.collection)
+						nodes.push(node);
 					coords.push(new LatLng(ng.latitude, ng.longitude));
 				}
 				setZoomButton(GeniMapHandler.getBounds(coords));
-				clusterLabel.text = nodeCount + " Nodes in " + cluster.length + " Groups";
+				clusterLabel.text = nodes.length + " Nodes in " + cluster.length + " Groups";
 			}	
 			
 			public function addNodeGroup(ng:PhysicalNodeGroup):void {
-				var ngButton:Button = new Button();
-				ngButton.height = 24;
+				var ngButton:Button = DisplayUtil.getPhysicalNodeGroupButton(ng);
 				ngButton.percentWidth = 100;
-				ngButton.label = ng.collection.length.toString() + " Nodes";
-				ngButton.addEventListener(MouseEvent.CLICK,
-					function openNodeGroup(evt:Event):void
-					{
-						if(ng.collection.length > 1)
-							DisplayUtil.viewNodeGroup(ng);
-						else
-							DisplayUtil.viewPhysicalNode(ng.collection[0]);
-					});
 				
-				if(ng.city.length == 0)
+				if(ng.original.city.length == 0)
 				{
 					var geocoder:ClientGeocoder = new ClientGeocoder();
 					
@@ -61,8 +71,8 @@
 							if (placemarks.length > 0) {
 								try {
 									var p:Placemark = event.response.placemarks[0] as Placemark;
-									var fullAddress : String = p.address;
-									var splitAddress : Array = fullAddress.split(',');
+									var fullAddress:String = p.address;
+									var splitAddress:Array = fullAddress.split(',');
 									if(splitAddress.length == 3)
 										city = splitAddress[0];
 									else 
@@ -70,7 +80,7 @@
 											city = splitAddress[1];
 										else
 											city = fullAddress;
-									ng.city = city;
+									ng.original.city = city;
 									ngButton.label = city + " (" + ng.collection.length + ")";
 								} catch (err:Error) { }
 							}
@@ -83,7 +93,7 @@
 					
 					geocoder.reverseGeocode(new LatLng(ng.latitude, ng.longitude));
 				} else {
-					ngButton.label = ng.city + " (" + ng.collection.length + ")";
+					ngButton.label = ng.original.city + " (" + ng.collection.length + ")";
 				}
 				nodeGroupButtonsVbox.addElement(ngButton);
 			}
@@ -99,17 +109,25 @@
 					});
 				
 			}
+			
+			public function view():void
+			{
+				var newCollection:ArrayCollection = new ArrayCollection();
+				for each(var node:PhysicalNode in nodes)
+					newCollection.addItem(node);
+				DisplayUtil.viewNodeCollection(newCollection);
+			}
 		]]>
 	</fx:Script>
 	
-	<s:Label text="Label" id="clusterLabel" maxWidth="{this.width}"/>
+	<s:Label text="Label" id="clusterLabel" maxWidth="{this.width}" maxDisplayedLines="1" />
 	<s:Scroller width="170" height="114">
 		<s:VGroup width="100%" height="100%" id="nodeGroupButtonsVbox" gap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
 	</s:Scroller>
 	<s:HGroup>
 		<s:Button label="All" id="allButton" height="24"
-				   click="DisplayUtil.viewNodeCollection(nodes);" />
-		<display:ImageButton label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
+				   click="view()" />
+		<components:ImageButton label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
 	</s:HGroup>
 
 </s:VGroup>

@@ -1,15 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx"
 						xmlns:display="protogeni.display.*"
-						title="Log Message">
-	<display:layout>
+						title="Log Message" xmlns:components="protogeni.display.components.*">
+	<components:layout>
 		<s:VerticalLayout paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10"/>
-	</display:layout>
+	</components:layout>
 	
 	<fx:Script>
 		<![CDATA[
+			import protogeni.NetUtil;
+			
 			private var message:LogMessage;
 			
 			public function setMessage(log:LogMessage):void
@@ -20,15 +40,15 @@
 				if(log.isError)
 				{
 					nameField.setStyle("color","red");
-					this.typeImage.source = DisplayUtil.errorIcon;
+					this.typeImage.source = ImageUtil.errorIcon;
 				} else
 				{
 					if(log.type == LogMessage.TYPE_START)
-						this.typeImage.source = DisplayUtil.rightIcon;
+						this.typeImage.source = ImageUtil.rightIcon;
 					else if(log.type == LogMessage.TYPE_END)
-						this.typeImage.source = DisplayUtil.leftIcon;
+						this.typeImage.source = ImageUtil.leftIcon;
 					else
-						this.typeImage.source = DisplayUtil.availableIcon;
+						this.typeImage.source = ImageUtil.availableIcon;
 				}
 				nameField.text = log.name;
 				groupId.text = log.groupId;
@@ -38,38 +58,23 @@
 		]]>
 	</fx:Script>
 	
-	<mx:Grid width="100%">
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem height="100%" horizontalAlign="right" verticalAlign="middle">
-				<mx:Image id="typeImage" />
-			</mx:GridItem>
-			<mx:GridItem width="100%" height="100%">
-				<s:Label id="nameField" fontSize="17" fontWeight="bold" color="green" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem height="100%">
-				<s:Label text="Group ID"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%" height="100%">
-				<s:Label id="groupId"/>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem height="100%">
-				<s:Label text="Time"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%" height="100%">
-				<s:Label id="time" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem height="100%">
-			</mx:GridItem>
-			<mx:GridItem width="100%" height="100%">
-				<s:Button label="Copy to clipboard" click="System.setClipboard(message.toString())" />
-			</mx:GridItem>
-		</mx:GridRow>
-	</mx:Grid>
+	<s:HGroup width="100%" verticalAlign="middle">
+		<s:Image id="typeImage" />
+		<s:Label id="nameField" fontSize="17" fontWeight="bold" color="green" width="100%" />
+		<components:ImageButton icon="{ImageUtil.emailIcon}"
+							 toolTip="Open an email"
+							 click="System.setClipboard(message.toString()); NetUtil.openMail('mstrum@flux.utah.edu', message.name, 'The message has already been copied into the clipboard, just paste here.\n\n')" />
+		<components:ImageButton icon="{ImageUtil.copyIcon}"
+							 toolTip="Copy to clipboard"
+							 click="System.setClipboard(message.toString())" />
+	</s:HGroup>
+	<s:HGroup>
+		<s:Label text="Group ID" />
+		<s:Label id="groupId" fontWeight="bold" />
+	</s:HGroup>
+	<s:HGroup>
+		<s:Label text="@" />
+		<s:Label id="time" fontWeight="bold" />
+	</s:HGroup>
 	<s:TextArea width="100%" height="100%" id="details" editable="false" />
-</display:DefaultWindow>
+</components:DefaultWindow>

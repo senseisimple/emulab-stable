@@ -1,19 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
-		  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*">
+		  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
 			
-			import protogeni.resources.NodeType;
+			import protogeni.resources.DiskImage;
 			import protogeni.resources.PhysicalLink;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeInterface;
+			import protogeni.resources.SliverType;
 			import protogeni.resources.VirtualLink;
+			import protogeni.resources.VirtualLinkCollection;
 			import protogeni.resources.VirtualNode;
 			
+			import spark.components.Button;
 			import spark.primitives.Rect;
 			
 			[Bindable]
@@ -25,18 +46,25 @@
 			[Bindable]
 			private var nodeTypes:ArrayCollection = null;
 			
+			[Bindable]
+			private var sliverTypes:ArrayList;
+			
 			public function load(n:PhysicalNode):void {
 				node = n;
 				virtualNode = null;
 				
 				imgAvailable.source = DisplayUtil.assignAvailabilityIcon(n);
-				imgExclusive.source = DisplayUtil.assignIcon(n.exclusive);
-				if(n.exclusive) imgExclusive.toolTip = "Exclusive";
-				else imgExclusive.toolTip = "Not exclusive";
-				if(n.virtualNodes != null && n.virtualNodes.length > 0) imgAvailable.toolTip = "Allocated";
+				if(n.virtualNodes != null && n.virtualNodes.length > 0)
+					imgAvailable.toolTip = "Allocated, ";
 				else
-					if(n.available) imgAvailable.toolTip = "Available";
-					else imgAvailable.toolTip = "Not available";
+					if(n.available)
+						imgAvailable.toolTip = "Available, ";
+					else
+						imgAvailable.toolTip = "Not available, ";
+				if(n.exclusive)
+					imgAvailable.toolTip += "Exclusive";
+				else
+					imgAvailable.toolTip += "Not exclusive";
 				
 				physicalLinksVbox.removeAllElements();
 				
@@ -47,9 +75,9 @@
 					&& Main.geniHandler.mapHandler.selectedSlice.hrn != null
 					&& Main.geniHandler.mapHandler.selectedSlice.hrn.length>0)
 				{
-					for each(var vn:VirtualNode in node.virtualNodes)
+					for each(var vn:VirtualNode in node.virtualNodes.collection)
 					{
-						if(vn.slivers[0].slice == Main.geniHandler.mapHandler.selectedSlice)
+						if(vn.slivers.collection[0].slice == Main.geniHandler.mapHandler.selectedSlice)
 						{
 							virtualNode = vn;
 							break;
@@ -61,12 +89,26 @@
 				sliverButton.includeInLayout = virtualNode != null;
 
 				nodeTypes = new ArrayCollection();
-				for each(var nt:NodeType in node.types)
+				for each(var nt:String in node.hardwareTypes)
 					nodeTypes.addItem(nt);
 				
 				loadPhysicalLinks();
 				loadSlices();
 				loadHierarchy();
+				
+				sliverTypes = new ArrayList();
+				for each(var sliverType:SliverType in node.sliverTypes) {
+					for each(var diskImage:DiskImage in sliverType.diskImages) {
+						var newSliverType:Object = new Object();
+						newSliverType.name = sliverType.name;
+						newSliverType.diskLongName = diskImage.name;
+						newSliverType.diskShortName = DiskImage.getDiskImageShort(diskImage.name, node.manager);
+						newSliverType.diskDescription = diskImage.description;
+						newSliverType.diskOs = diskImage.os;
+						newSliverType.diskVersion = diskImage.version;
+						sliverTypes.addItem(newSliverType);
+					}
+				}
 			}
 			
 			public function loadHierarchy():void
@@ -77,41 +119,33 @@
 					
 					// Manager
 					var managerHbox:HGroup = new HGroup();
-					var managerLabel:Label = new Label();
-					managerLabel.text = "Hosted on";
-					managerHbox.addElement(managerLabel);
+					managerHbox.verticalAlign = "middle";
+					managerHbox.gap = 4;
+					managerHbox.addElement(DisplayUtil.getLabel("Hosted on"));
 					managerHbox.addElement(DisplayUtil.getGeniManagerButton(node.manager));
 					hierarchyVbox.addElement(managerHbox);
 					
 					// Parent node info
-					var parentNodeHbox:HGroup = new HGroup();
-					var parentNodeLabel:Label = new Label();
-					parentNodeHbox.addElement(parentNodeLabel);
-					hierarchyVbox.addElement(parentNodeHbox);
 					if(node.subNodeOf != null)
 					{
-						parentNodeLabel.text = "Subnode of";
+						var parentNodeHbox:HGroup = new HGroup();
+						parentNodeHbox.verticalAlign = "middle";
+						parentNodeHbox.gap = 4;
+						parentNodeHbox.addElement(DisplayUtil.getLabel("Subnode of"));
 						parentNodeHbox.addElement(DisplayUtil.getPhysicalNodeButton(node.subNodeOf));
-					}
-					else
-					{
-						parentNodeLabel.text = "No parent node";
+						hierarchyVbox.addElement(parentNodeHbox);
 					}
 					
 					// Child node info
-					var subNodesLabel:Label = new Label();
-					hierarchyVbox.addElement(subNodesLabel);
 					if(node.subNodes.length > 0)
 					{
+						var subNodesLabel:Label = new Label();
+						hierarchyVbox.addElement(subNodesLabel);
 						subNodesLabel.text = "Subnodes:";
 						for each(var subNode:PhysicalNode in node.subNodes)
 						{
 							hierarchyVbox.addElement(DisplayUtil.getPhysicalNodeButton(subNode));
 						}
-					}
-					else
-					{
-						subNodesLabel.text = "No subnodes";
 					}
 				}
 			}
@@ -120,23 +154,22 @@
 				if(sliceLinksVbox != null) {
 					sliceLinksVbox.removeAllElements();
 					if(virtualNode != null) {
-						linkTabs.addChild(sliceLinksVbox);
-						var connectedNodes:ArrayCollection = virtualNode.GetPhysicalNodes();
+						var connectedNodes:Vector.<PhysicalNode> = virtualNode.GetPhysicalNodes();
 						
 						sliceLinksNavigator.label = "Slice (" + connectedNodes.length + " Nodes)"
 						var connectedLabel:Label = new Label();
 						if(connectedNodes.length > 0)
-							connectedLabel.text = "Connected on " + virtualNode.slivers[0].slice.hrn + " to";
+							connectedLabel.text = "Connected on " + virtualNode.sliver.slice.hrn + " to";
 						else
-							connectedLabel.text = "No linked nodes on " + virtualNode.slivers[0].slice.hrn;
+							connectedLabel.text = "No linked nodes on " + virtualNode.sliver.slice.hrn;
 						sliceLinksVbox.addElement(connectedLabel);
 						
 						for each(var connectedNode:PhysicalNode in connectedNodes)
 						{
 							sliceLinksVbox.addElement(DisplayUtil.getPhysicalNodeButton(connectedNode));
 							
-							var connectedLinks:ArrayCollection = virtualNode.GetLinksForPhysical(connectedNode);
-							for each(var connectedLink:VirtualLink in connectedLinks)
+							var connectedLinks:VirtualLinkCollection = virtualNode.GetLinksForPhysical(connectedNode);
+							for each(var connectedLink:VirtualLink in connectedLinks.collection)
 							{
 								var pointLinkHbox:HGroup = new HGroup();
 								var space:Rect = new Rect();
@@ -147,7 +180,7 @@
 							}
 						}
 					} else if(linkTabs.getChildren().length > 1)
-						linkTabs.removeChild(sliceLinksVbox);
+						sliceLinksNavigator.visible = false;
 				}
 			}
 			
@@ -155,7 +188,7 @@
 				if(physicalLinksVbox != null)
 				{
 					physicalLinksVbox.removeAllElements();
-					var nodes:ArrayCollection = node.GetNodes();
+					var nodes:Vector.<PhysicalNode> = node.GetNodes();
 					physicalLinksNavigator.label = "Physical (" + nodes.length + " Nodes)"
 					var connectedLabel:Label = new Label();
 					if(nodes.length > 0)
@@ -167,20 +200,21 @@
 					for each(var n:PhysicalNode in nodes) {
 						physicalLinksVbox.addElement(DisplayUtil.getPhysicalNodeButton(n));
 						
-						var nodeLinks:ArrayCollection = n.GetNodeLinks(node);
+						var nodeLinks:Vector.<PhysicalLink> = n.GetNodeLinks(node);
 						for each(var l:PhysicalLink in nodeLinks) {
 							var endInterface:PhysicalNodeInterface;
-							if(l.interface1.owner == n)
-								endInterface = l.interface1;
-							else
-								endInterface = l.interface2;
+							for each(var testInterface:PhysicalNodeInterface in l.interfaceRefs.collection) {
+								if(testInterface.owner == n) {
+									endInterface = testInterface;
+									break;
+								}
+							}
 							
 							var linkHbox:HGroup = new HGroup();
 							var space:Rect = new Rect();
 							space.width = 16;
 							linkHbox.addElement(space);
-							var endInterfaceButton:mx.controls.Button = DisplayUtil.getPhysicalLinkWithInterfaceButton(endInterface, l);
-							endInterfaceButton.label = endInterface.id;
+							var endInterfaceButton:Button = DisplayUtil.getPhysicalLinkWithInterfaceButton(endInterface, l);
 							linkHbox.addElement(endInterfaceButton);
 							physicalLinksVbox.addElement(linkHbox);
 						}
@@ -189,109 +223,89 @@
 			}
 			
 			public function viewComponentRspec():void {
-				var rspecView:XmlWindow = new XmlWindow();
-				rspecView.title = "Advertisement RSPEC for " + node.name;
-				rspecView.showWindow();
-				rspecView.loadXml(node.rspec);
+				DisplayUtil.viewXml(node.rspec, "Advertisement RSPEC for " + node.name);
 			}
 			
 			public function viewSliverRspec():void {
 				if(virtualNode == null)
 					Alert.show("No Sliver RSPEC!");
 				else {
-					var rspecView:XmlWindow = new XmlWindow();
-					rspecView.title = "Request RSPEC for " + node.name;
-					rspecView.showWindow();
-					rspecView.loadXml(virtualNode.rspec);
+					DisplayUtil.viewXml(virtualNode.rspec, "Request RSPEC for " + node.name);
 				}
 			}
 		]]>
 	</fx:Script>
 	
-	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
-		<mx:GridRow width="100%">
-			<mx:GridItem width="30">
-				
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.name}" fontSize="17" fontWeight="bold" width="100%" />
-				<display:ImageButton id="locateButton"
-									  icon="{DisplayUtil.mapIcon}"
-									 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
-									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="componentButton"
-									  icon="{DisplayUtil.pageWhiteCodeIcon}"
-									 click="viewComponentRspec()"
-									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="sliverButton"
-									 icon="{DisplayUtil.pageCodeIcon}"
-									 click="viewSliverRspec()"
-									 toolTip="View Request RSPEC" visible="false" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				
-			</mx:GridItem>
-			<mx:GridItem width="100%" id="quickInfoHbox">
-				<s:HGroup>
-					<s:Label text="Exclusive" fontWeight="bold"/>
-					<mx:Image id="imgExclusive"/>
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="Availability" fontWeight="bold"/>
-					<mx:Image id="imgAvailable"/>
-				</s:HGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="URN" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.urn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="86">
-			<mx:GridItem>
-				<s:Label text="Types" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<mx:DataGrid width="100%" height="100%" id="gridTypes" dataProvider="{nodeTypes}">
-					<mx:columns>
-						<mx:DataGridColumn headerText="Name" dataField="name"/>
-						<mx:DataGridColumn headerText="Slots" dataField="slots"/>
-						<mx:DataGridColumn headerText="Static" dataField="isStatic"/>
-					</mx:columns>
-				</mx:DataGrid>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Hierarchy" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%" height="100%" id="hierarchyVbox" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem>
-				<s:Label text="Links to" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<mx:TabNavigator id="linkTabs" width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
-					<s:NavigatorContent label="Physical" width="100%" height="100%" id="physicalLinksNavigator">
-						<s:Scroller width="100%" height="100%">
-							<s:VGroup id="physicalLinksVbox" width="100%" height="100%" />
-						</s:Scroller>
-					</s:NavigatorContent>
-					<s:NavigatorContent label="Slice" width="100%" height="100%" id="sliceLinksNavigator">
-						<s:Scroller width="100%" height="100%">
-							<s:VGroup id="sliceLinksVbox" width="100%" height="100%" />
-						</s:Scroller>
-					</s:NavigatorContent>
-				</mx:TabNavigator>
-			</mx:GridItem>
-		</mx:GridRow>
-	</mx:Grid>
+	<s:HGroup width="100%" verticalAlign="middle">
+		<s:Image id="imgAvailable" />
+		<s:Label text="{node.name}" toolTip="{node.id}" fontSize="17" fontWeight="bold" width="100%" />
+		<components:ImageButton id="locateButton"
+							 icon="{ImageUtil.mapIcon}"
+							 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
+							 toolTip="View Advertisement RSPEC" />
+		<components:ImageButton id="componentButton"
+							 icon="{ImageUtil.pageWhiteCodeIcon}"
+							 click="viewComponentRspec()"
+							 toolTip="View Advertisement RSPEC" />
+		<components:ImageButton id="sliverButton"
+							 icon="{ImageUtil.pageCodeIcon}"
+							 click="viewSliverRspec()"
+							 toolTip="View Request RSPEC" visible="false" />
+	</s:HGroup>
+	<s:HGroup width="100%">
+		<s:Label text="Types" fontWeight="bold" />
+		<s:List id="typeList" dataProvider="{nodeTypes}" labelField="name" height="68" />
+		<s:VGroup width="100%">
+			<s:Label text="Hierarchy" fontWeight="bold"/>
+			<s:VGroup width="100%" height="100%" gap="4" id="hierarchyVbox" />
+		</s:VGroup>
+	</s:HGroup>
+	
+	<s:Label text="Sliver Types / Disk Images" fontWeight="bold" />
+	<s:DataGrid id="sliverGrid" dataProvider="{sliverTypes}" width="100%" height="106">
+		<s:columns>
+			<s:ArrayList>
+				<s:GridColumn dataField="name" headerText="Sliver Type"/>
+				<s:GridColumn headerText="OSID">
+					<s:itemRenderer>
+						<fx:Component>
+							<s:GridItemRenderer>
+								<s:Label text="{data.diskShortName}" toolTip="{data.diskLongName}"
+										 maxDisplayedLines="1"
+										 left="10" right="5" paddingTop="10" paddingBottom="5"/>
+							</s:GridItemRenderer>
+						</fx:Component>
+					</s:itemRenderer>
+				</s:GridColumn>
+				<s:GridColumn headerText="Description">
+					<s:itemRenderer>
+						<fx:Component>
+							<s:GridItemRenderer>
+								<s:Label text="{data.diskDescription}" toolTip="{data.diskOs} {data.diskVersion}"
+										 maxDisplayedLines="1"
+										 left="10" right="5" paddingTop="10" paddingBottom="5"/>
+							</s:GridItemRenderer>
+						</fx:Component>
+					</s:itemRenderer>
+				</s:GridColumn>
+			</s:ArrayList>
+		</s:columns>
+	</s:DataGrid>
+	
+	<s:HGroup width="100%" height="100%">
+		<s:Label text="Links to" fontWeight="bold"/>
+		<mx:TabNavigator id="linkTabs" width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
+			<s:NavigatorContent label="Physical" width="100%" height="100%" id="physicalLinksNavigator">
+				<s:Scroller width="100%" height="100%">
+					<s:VGroup id="physicalLinksVbox" width="100%" height="100%" />
+				</s:Scroller>
+			</s:NavigatorContent>
+			<s:NavigatorContent label="Slice" width="100%" height="100%" id="sliceLinksNavigator">
+				<s:Scroller width="100%" height="100%">
+					<s:VGroup id="sliceLinksVbox" width="100%" height="100%" />
+				</s:Scroller>
+			</s:NavigatorContent>
+		</mx:TabNavigator>
+	</s:HGroup>
 	
 </s:VGroup>

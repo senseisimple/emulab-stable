@@ -9,8 +9,6 @@
 
 package com.mattism.http.xmlrpc
 {
-	import com.mattism.http.xmlrpc.MethodFault;
-	
 	public class MethodFaultImpl 
 	implements MethodFault
 	{

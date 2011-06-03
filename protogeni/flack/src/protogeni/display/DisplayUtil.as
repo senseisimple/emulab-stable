@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -12,22 +12,15 @@
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
  
- /* Common.as
- 
-    Functions used all around the project
-*/
- 
- package protogeni.display
+package protogeni.display
 {
-	import flash.events.MouseEvent;
-	
 	import mx.collections.ArrayCollection;
-	import mx.controls.Alert;
-	import mx.controls.Button;
-	import mx.controls.ButtonLabelPlacement;
 	import mx.managers.PopUpManager;
 	
+	import protogeni.StringUtil;
 	import protogeni.communication.Request;
+	import protogeni.display.components.DataButton;
+	import protogeni.display.components.XmlWindow;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
@@ -41,388 +34,196 @@
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
 	
+	import spark.components.Button;
 	import spark.components.Label;
 	
-	public class DisplayUtil
+	public final class DisplayUtil
 	{
-		public static var successColorString:String = "#0E8219";
-		public static var failColorString:String = "#FE0000";
-		public static var waitColorString:String = "#FF7F00";
+		public static const windowHeight:int = 400;
+		public static const windowWidth:int = 700;
+		public static const minComponentHeight:int = 24;
+		public static const minComponentWidth:int = 24;
 		
-		public static var successColor:uint = 0x0E8219;
-		public static var failColor:uint = 0xFE0000;
-		public static var waitColor:uint = 0xFF7F00;
-		
-		public static var hideColor:Object = 0xCCCCCC;
-		public static var linkColor:Object = 0xFFCFD1;
-		public static var linkBorderColor:Object = 0xFF00FF;
-		public static var tunnelColor:uint = 0xFFAEAE;
-		public static var tunnelBorderColor:Object = 0xFF0000;
-		public static var nodeColor:Object = 0x092B9F;
-		public static var nodeBorderColor:Object = 0xD2E1F0;
-		
-		public static var windowHeight:int = 400;
-		public static var windowWidth:int = 700;
-		public static var minComponentHeight:int = 24;
-		public static var minComponentWidth:int = 24;
-		
-		// Embedded images used around the application
-		[Bindable]
-		[Embed(source="../../../images/chart_bar.png")]
-		public static var statisticsIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/help.png")]
-		public static var helpIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_left.png")]
-		public static var leftIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_right.png")]
-		public static var rightIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_up.png")]
-		public static var upIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_down.png")]
-		public static var downIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/status_online.png")]
-		public static var userIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/status_offline.png")]
-		public static var noUserIcon:Class;
-		
-		[Bindable]
-        [Embed(source="../../../images/tick.png")]
-        public static var availableIcon:Class;
-
-        [Bindable]
-        [Embed(source="../../../images/cross.png")]
-        public static var crossIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/administrator.png")]
-        public static var ownedIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/server.png")]
-		public static var exclusiveIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/server_stanchion.png")]
-		public static var sharedIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/drive_network.png")]
-		public static var physicalNodeIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/link.png")]
-        public static var linkIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_green.png")]
-        public static var flagGreenIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_red.png")]
-        public static var flagRedIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_yellow.png")]
-        public static var flagYellowIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_orange.png")]
-        public static var flagOrangeIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/error.png")]
-        public static var errorIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/exclamation.png")]
-        public static var exclamationIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/lightbulb.png")]
-		public static var onIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/lightbulb_off.png")]
-		public static var offIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/add.png")]
-		public static var addIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/cancel.png")]
-		public static var cancelIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/stop.png")]
-		public static var stopIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_stop_blue.png")]
-		public static var stopControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_pause_blue.png")]
-		public static var pauseControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_play_blue.png")]
-		public static var playControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_repeat_blue.png")]
-		public static var repeatControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/delete.png")]
-		public static var deleteIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_refresh.png")]
-		public static var refreshIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/find.png")]
-		public static var findIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/magnifier.png")]
-		public static var searchIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/map.png")]
-		public static var mapIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/graph.png")]
-		public static var graphIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page.png")]
-		public static var pageIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page_code.png")]
-		public static var pageCodeIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page_white.png")]
-		public static var pageWhiteIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page_white_code.png")]
-		public static var pageWhiteCodeIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/wand.png")]
-		public static var actionIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/ssl_certificates.png")]
-		public static var sslIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/keyboard.png")]
-		public static var keyboardIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/system_monitor.png")]
-		public static var consoleIcon:Class;
-		
-		public static function getLabel(text:String):Label
+		public static function getLabel(text:String, bold:Boolean = false):Label
 		{
 			var l:Label = new Label();
 			l.text = text;
+			if(bold)
+				l.setStyle("fontWeight", "bold");
 			return l;
 		}
 
         // Gets an icon for a boolean value
         public static function assignIcon(val:Boolean):Class {
 			if (val)
-	            return availableIcon;
+	            return ImageUtil.availableIcon;
 	        else
-	            return crossIcon;
+	            return ImageUtil.crossIcon;
         }
         
         // Gets the icon for the given node
         public static function assignAvailabilityIcon(val:PhysicalNode):Class {
 			if(val.virtualNodes != null && val.virtualNodes.length > 0)
-				return ownedIcon;
+				return ImageUtil.ownedIcon;
             else
             {
 	            if (val.available) {
 					if(val.exclusive)
-						return exclusiveIcon;
+						return ImageUtil.exclusiveIcon;
 					else
-						return sharedIcon;
+						return ImageUtil.sharedIcon;
 				}
 	            else
-	                return cancelIcon;
+	                return ImageUtil.cancelIcon;
             }
-        }
-        
-        // Get's the CM icon
-        public static function assignIconForGeniManager(val:GeniManager):Class {
-			if(val.Status == GeniManager.STATUS_VALID)
-				return availableIcon;
-			else
-				return crossIcon;
         }
 		
 		public static function getLogMessageButton(msg:LogMessage):Button {
-			var logButton:Button = getButton();
-			logButton.label = msg.name;
-			logButton.toolTip = msg.groupId;
+			var img:Class;
 			if(msg.isError)
-			{
-				logButton.setStyle("icon",DisplayUtil.errorIcon);
-				logButton.styleName = "failedStyle";
-			}
+				img = ImageUtil.errorIcon;
+			else if(msg.type == LogMessage.TYPE_START)
+				img = ImageUtil.rightIcon;
+			else if(msg.type == LogMessage.TYPE_END)
+				img = ImageUtil.rightIcon;
 			else
-			{
-				if(msg.type == LogMessage.TYPE_START) {
-					logButton.setStyle("icon",DisplayUtil.rightIcon);
-					logButton.labelPlacement = ButtonLabelPlacement.LEFT;
-				}
-				else if(msg.type == LogMessage.TYPE_END) {
-					logButton.setStyle("icon",DisplayUtil.rightIcon);
-					logButton.labelPlacement = ButtonLabelPlacement.RIGHT;
-				}
-				else {
-					logButton.setStyle("icon",DisplayUtil.availableIcon);
-				}
-			}
-			logButton.addEventListener(MouseEvent.CLICK,
-				function openLog():void {
-					var logw:LogMessageWindow = new LogMessageWindow();
-					logw.showWindow();
-					logw.setMessage(msg);
-				});
+				img = ImageUtil.availableIcon;
+
+			var logButton:DataButton = new DataButton(msg.name,
+				msg.groupId,
+				img,
+				msg);
+			
+			if(msg.isError)
+				logButton.styleName = "failedStyle";
+			
 			return logButton;
 		}
 		
 		public static function getRequestButton(r:Request):Button {
-			var requestButton:Button = getButton();
-			requestButton.label = r.name;
-			requestButton.toolTip = r.details;
-			requestButton.addEventListener(MouseEvent.CLICK,
-				function openRequest(event:MouseEvent):void {
-					viewRequest(r);
-				}
-			);
-			return requestButton;
+			return new DataButton(r.name, r.details, null, r);
 		}
 		
 		// Gets a button for the slice
 		public static function getSliceButton(s:Slice):Button {
-			var sButton:Button = getButton();
-			if(s.hrn != null && s.hrn.length > 0)
-				sButton.label = s.hrn;
-			else
-				sButton.label = s.urn;
-			sButton.addEventListener(MouseEvent.CLICK,
-				function openSlice(event:MouseEvent):void {
-					viewSlice(s);
-				}
-			);
-			return sButton;
+			return new DataButton(s.urn.name, s.urn.full, null, s);
 		}
 		
 		// Gets a button for the component manager
 		public static function getGeniManagerButton(gm:GeniManager):Button {
-			var cmButton:Button = getButton(DisplayUtil.assignIconForGeniManager(gm));
-			cmButton.label = gm.Hrn;
-			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
-			cmButton.addEventListener(MouseEvent.CLICK,
-				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewGeniManager(gm);
-				}
-			);
+			var cmButton:DataButton = new DataButton(gm.Hrn,
+													"@ " + gm.Url,
+													null,
+													gm,
+													"manager");
+			cmButton.setStyle("chromeColor", ColorUtil.colorsDark[gm.colorIdx]);
+			cmButton.setStyle("color", ColorUtil.colorsLight[gm.colorIdx]);
 			return cmButton;
 		}
 		
 		// Gets a button for the component manager
 		public static function getSiteButton(s:Site):Button {
-			var cmButton:Button = getButton();
-			cmButton.label = s.id + " (" + s.name + ")";
-			cmButton.addEventListener(MouseEvent.CLICK,
-				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewNodeCollection(s.nodes);
-				}
-			);
-			return cmButton;
+			return new DataButton(s.id + " (" + s.name + ")",
+									s.name,
+									null,
+									s,
+									"site");
 		}
 		
 		// Gets a button for the physical node
 		public static function getPhysicalNodeButton(n:PhysicalNode):Button {
-			var nodeButton:Button = getButton(DisplayUtil.assignAvailabilityIcon(n));
-			nodeButton.label = n.name;
-			nodeButton.toolTip = n.name + " on " + n.manager.Hrn;
-			nodeButton.addEventListener(MouseEvent.CLICK,
-				function openNode(event:MouseEvent):void {
-					DisplayUtil.viewPhysicalNode(n);
-				}
-			);
+			var nodeButton:DataButton = new DataButton(n.name,
+																"@" + n.manager.Hrn,
+																DisplayUtil.assignAvailabilityIcon(n),
+																n,
+																"physicalnode");
+			nodeButton.setStyle("chromeColor", ColorUtil.colorsDark[n.manager.colorIdx]);
+			nodeButton.setStyle("color", ColorUtil.colorsLight[n.manager.colorIdx]);
+			return nodeButton;
+		}
+		
+		public static function getPhysicalNodeGroupButton(ng:PhysicalNodeGroup):Button {
+			var newLabel:String;
+			if(ng.city.length == 0)
+				newLabel = ng.collection.length.toString() + " Nodes";
+			else
+				newLabel = ng.city + " (" + ng.collection.length + ")";
+			var nodeButton:DataButton = new DataButton(newLabel,
+														ng.GetManager().Hrn,
+														null,
+														ng,
+														"physicalnodegroup");
+			nodeButton.setStyle("chromeColor", ColorUtil.colorsDark[ng.GetManager().colorIdx]);
+			nodeButton.setStyle("color", ColorUtil.colorsLight[ng.GetManager().colorIdx]);
 			return nodeButton;
 		}
 		
 		// Gets a button for the physical node
 		public static function getVirtualNodeButton(n:VirtualNode):Button {
-			var nodeButton:Button = getButton();
-			nodeButton.label = n.id;
-			nodeButton.toolTip = n.id + " on " + n.manager.Hrn;
-			nodeButton.addEventListener(MouseEvent.CLICK,
-				function openNode(event:MouseEvent):void {
-					DisplayUtil.viewVirtualNode(n);
-				}
-			);
+			var nodeButton:DataButton = new DataButton(n.clientId,
+														"@"+n.manager.Hrn,
+														null,
+														n,
+														"virtualnode");
+			nodeButton.setStyle("chromeColor", ColorUtil.colorsDark[n.manager.colorIdx]);
+			nodeButton.setStyle("color", ColorUtil.colorsLight[n.manager.colorIdx]);
 			return nodeButton;
 		}
 		
 		// Gets a button for a physical link
 		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
-			var linkButton:Button = getButton(DisplayUtil.linkIcon);
-			linkButton.label = ni.id;
-			linkButton.addEventListener(MouseEvent.CLICK,
-				function openLink(event:MouseEvent):void {
-					DisplayUtil.viewPhysicalLink(nl);
-				}
-			);
-			return linkButton;
+			return new DataButton(StringUtil.shortenString(ni.id, 50),
+				ni.id + " on " + nl.name,
+				ImageUtil.linkIcon,
+				nl);
 		}
 		
 		// Gets a button for the virtual link
-		public static function getVirtualLinkButton(pl:VirtualLink):Button {
-			var linkButton:Button = new Button();
-			linkButton.label = pl.id;
-			linkButton.setStyle("icon", DisplayUtil.linkIcon);
-			linkButton.addEventListener(MouseEvent.CLICK,
-				function openLink(event:MouseEvent):void {
-					DisplayUtil.viewVirtualLink(pl);
-				}
-			);
-			return linkButton;
+		public static function getVirtualLinkButton(vl:VirtualLink):Button {
+			return new DataButton(vl.clientId,
+				vl.clientId,
+				ImageUtil.linkIcon,
+				vl);
+		}
+		
+		public static function view(data:*):void {
+			if(data is PhysicalNode)
+				DisplayUtil.viewPhysicalNode(data);
+			else if(data is PhysicalNodeGroup)
+				DisplayUtil.viewNodeGroup(data);
+			else if(data is GeniManager)
+				DisplayUtil.viewGeniManager(data);
+			else if(data is VirtualNode)
+				DisplayUtil.viewVirtualNode(data);
+			else if(data is PhysicalLink)
+				DisplayUtil.viewPhysicalLink(data);
+			else if(data is PhysicalLinkGroup)
+				DisplayUtil.viewPhysicalLinkGroup(data);
+			else if(data is Slice)
+				DisplayUtil.viewSlice(data);
+			else if(data is SliceNode)
+				DisplayUtil.viewSliceNode(data);
+			else if(data is SliceLink)
+				DisplayUtil.viewSliceLink(data);
+			else if(data is Site)
+				DisplayUtil.viewSite(data);
+			else if(data is Request)
+				DisplayUtil.viewRequest(data);
+			else if(data is LogMessage)
+				DisplayUtil.viewLogMessage(data);
+		}
+		
+		public static function viewLogMessage(msg:LogMessage):void {
+			var logw:LogMessageWindow = new LogMessageWindow();
+			logw.showWindow();
+			logw.setMessage(msg);
 		}
 		
 		// Opens a virtual link window
 		public static function viewVirtualLink(pl:VirtualLink):void {
 	    	var plWindow:VirtualLinkWindow = new VirtualLinkWindow();
 			plWindow.showWindow();
-       		plWindow.loadPointLink(pl);
+       		plWindow.loadLink(pl);
 	    }
 		
 		// Opens a physical link window
@@ -476,6 +277,14 @@
 			ngWindow.loadNode(n);
 		}
 		
+		public static function viewSliceNode(sn:SliceNode):void {
+			viewVirtualNode(sn.node);
+		}
+		
+		public static function viewSliceLink(sl:SliceLink):void {
+			viewVirtualLink(sl.virtualLink);
+		}
+		
 		// Opens a group of physical nodes in a window
 		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
 			var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
@@ -498,13 +307,20 @@
 		public static function viewSlice(s:Slice):void {
 			var sWindow:SliceWindow = new SliceWindow();
 			sWindow.showWindow();
-			try {
+			//try {
 				sWindow.loadSlice(s);
-			} catch(e:Error) {
-				LogHandler.appendMessage(new LogMessage("", "View slice fail", e.toString(), true, LogMessage.TYPE_END));
-				Alert.show("Problem loading slice, try refreshing the page");
-			}
+			//} catch(e:Error) {
+			//	LogHandler.appendMessage(new LogMessage("", "View slice fail", e.toString(), true, LogMessage.TYPE_END));
+			//	Alert.show("Problem loading slice, try refreshing the page");
+			//}
 			
+		}
+		
+		public static function viewSite(s:Site):void {
+			var newCollection:ArrayCollection = new ArrayCollection();
+			for each(var node:PhysicalNode in s.nodes)
+			newCollection.addItem(node);
+			DisplayUtil.viewNodeCollection(newCollection);
 		}
 		
 		public static function viewRequest(r:Request):void {
@@ -524,19 +340,16 @@
 			PopUpManager.centerPopUp(aboutWindow);
 		}
 		
-		public static function viewSlicesWindow():void {
-			var slicesWindow:SlicesWindow = new SlicesWindow();
-			slicesWindow.showWindow();
-		}
-		
 		public static function viewUserWindow():void {
 			var userWindow:UserWindow = new UserWindow();
 			userWindow.showWindow();
 		}
 		
-		public static function viewManagersWindow():void {
-			var managersWindow:GeniManagersWindow = new GeniManagersWindow();
-			managersWindow.showWindow();
+		public static function viewXml(xml:XML, title:String):void {
+			var xmlView:XmlWindow = new XmlWindow();
+			xmlView.title = title;
+			xmlView.showWindow();
+			xmlView.loadXml(xml);
 		}
 		
 		public static function getButton(img:Class = null, imgOnly:Boolean = false):Button {

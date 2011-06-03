@@ -1,22 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx"
 						xmlns:display="protogeni.display.*"
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
-						contentCreationComplete="onCreationComplete()">
+						contentCreationComplete="onCreationComplete()" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
-			import com.mattism.http.xmlrpc.JSLoader;
-			
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
 			
-			import protogeni.Util;
-			import protogeni.display.skins.CheckBoxSkin;
-			import protogeni.display.skins.TextAreaSkin;
+			import protogeni.NetUtil;
 			import protogeni.resources.SliceAuthority;
 
 			private var certLoader:URLLoader;
@@ -33,13 +47,15 @@
 				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
 				this.authorities.setFocus();
 				if(Main.useJavascript) {
+					this.passwordField.textInput.text = FlackCache.userPassword;
+					this.sslPem.text = FlackCache.userSslPem;
 					this.retrieveCertCheckbox.selected = sslPem.text.length == 0;
-					this.passwordField.textInput.text = Main.geniHandler.CurrentUser.getPassword();
+					if(this.sslPem.text.length > 0)
+						this.passwordField.textInput.setFocus();
 				} else {
 					this.height = 130;
 					this.width = 250;
 				}
-					
 			}
 			
 			public function trySubmit():void
@@ -65,14 +81,14 @@
 			{
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
 				if(Main.useJavascript) {
-					Main.geniHandler.CurrentUser.sslPem = sslPem.text;
+					FlackCache.userSslPem = sslPem.text;
+					FlackCache.saveBasic();
 					if(!Main.geniHandler.CurrentUser.setPassword(passwordField.textInput.text, cacheCheckbox.selected)) {
 						Alert.show("Incorrect password", "It appears that the password is incorrect");
 						return;
 					}
 				}
 
-				FlexGlobals.topLevelApplication.saveLocalUserData();
 				Main.geniHandler.mapHandler.clearAll();
 				Main.geniHandler.unauthenticatedMode = false;
 				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
@@ -81,9 +97,9 @@
 			
 			public function visitLogin():void
 			{
-				var url:String = Util.tryGetBaseUrl(selectedAuthority.Url) + loginLocation;
-				Main.checkLoadCrossDomain(url);
-				Util.openWebsite( url );
+				var url:String = NetUtil.tryGetBaseUrl(selectedAuthority.Url) + loginLocation;
+				NetUtil.checkLoadCrossDomain(url);
+				NetUtil.openWebsite( url );
 			}
 			
 			public function checkCloseAfter():void
@@ -100,7 +116,7 @@
 			public function tryLoadCert(url:String):void
 			{
 				certUrl = url;
-				Main.checkLoadCrossDomain(url, true, true);
+				NetUtil.checkLoadCrossDomain(url, true, true);
 				
 				var request:URLRequest = new URLRequest(url); 
 				certLoader = new URLLoader(); 
@@ -110,7 +126,8 @@
 				certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
 				try
 				{
-					waitingIcon.visible = true;
+					spinner.visible = true;
+					spinner.startSpin();
 					getLabel.styleName = "inprogressStyle";
 					getLabel.text = "Waiting...";
 					LogHandler.appendMessage(new LogMessage(url, "Getting SSL Cert", "Attempting to load user SSL certificate", false, LogMessage.TYPE_START));
@@ -118,9 +135,10 @@
 					asked = false;
 					certLoader.load(request);
 				}
-				catch (e : Error)
+				catch (e:Error)
 				{
-					waitingIcon.visible = false;
+					spinner.visible = false;
+					spinner.stopSpin();
 					LogHandler.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
 						+ e.toString() + "\n\n", true));
 					checkCloseAfter();
@@ -140,7 +158,8 @@
 					LogHandler.appendMessage(new LogMessage(certUrl, "Error", event.toString(), true, LogMessage.TYPE_END));
 					askToLogin();
 				}
-				waitingIcon.visible = false;
+				spinner.visible = false;
+				spinner.stopSpin();
 				
 			}
 			
@@ -151,7 +170,8 @@
 				asked = true;
 				getLabel.text = "Failed! Most likely not logged in.";
 				getLabel.styleName = "failedStyle";
-				waitingIcon.visible = false;
+				spinner.visible = false;
+				spinner.stopSpin();
 				checkCloseAfter();
 				Alert.show("You must be logged in on the authority's website in order to automatically retrieve your SSL Cert.  Visit the login page? After login, come back here and try again.", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
 					function handleAction(e:CloseEvent):void {
@@ -186,40 +206,48 @@
 		]]>
 	</fx:Script>
 
-	<s:Label text="Which authority are you registered with?" />
-	<s:DropDownList id="authorities" labelField="Name"  width="100%" height="24" requireSelection="true" 
-					dataProvider="{Main.geniHandler.GeniAuthorities}"
-					selectedItem="@{selectedAuthority}" />
+	<s:HGroup verticalAlign="middle" width="100%">
+		<s:Image source="{ImageUtil.authorityIcon}" toolTip="Which authority are you registered with?" />
+		<s:DropDownList id="authorities" labelField="Name"  width="100%" height="24" requireSelection="true" 
+						dataProvider="{Main.geniHandler.GeniAuthorities}"
+						selectedItem="@{selectedAuthority}" />
+	</s:HGroup>
+	
 	<s:VGroup width="100%" height="100%" visible="{Main.useJavascript}" includeInLayout="{Main.useJavascript}">
-		<s:Label text="SSL Certificate Password" />
-		<s:HGroup width="100%" verticalAlign="middle">
-			<display:KeyboardTextInput id="passwordField" width="100%" creationComplete="passwordField.textInput.displayAsPassword = true;" />
-			<s:CheckBox id="cacheCheckbox" label="Cache?" />
-		</s:HGroup>
 		<s:HGroup verticalAlign="middle">
 			<s:CheckBox id="retrieveCertCheckbox" enabled="{selectedAuthority.workingCertGet}"
 						label="Automatically retrieve SSL Certificate? If not signed in, please sign in to"
 						selected="true" />
-			<mx:Button label="{selectedAuthority.Authority}"  height="24" click="visitLogin();" />
+			<s:Button label="{selectedAuthority.Authority}"  height="24" click="visitLogin();" />
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle">
-			<mx:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
-					  icon="{DisplayUtil.sslIcon}"
-					  click="this.tryLoadCert(Util.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
-			<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
+			<s:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
+					  icon="{ImageUtil.sslIcon}"
+					  click="this.tryLoadCert(NetUtil.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
+			<components:Spinner id="spinner"
+					   width="21"
+					   height="21"
+					   x="{(width / 2) - (spinner.width / 2)}"
+					   y="{(height / 2) - (spinner.height / 2)}"
+					   visible="false" includeInLayout="{spinner.visible}" />
 			<s:Label id="getLabel" text="" />
 		</s:HGroup>
 		<s:Label text="If the automatic SSL Certificate retrieval doesn't work, copy and paste it here" />
-		<s:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}"
+		<s:TextArea id="sslPem" prompt="Copy your SSL Certificate here if automatically getting certificate doesn't work"
 					width="100%" height="100%" />
+		<s:HGroup width="100%" verticalAlign="middle">
+			<s:Image source="{ImageUtil.passwordIcon}" toolTip="SSL Certificate Password" />
+			<display:KeyboardTextInput id="passwordField" width="100%" creationComplete="passwordField.textInput.displayAsPassword = true; passwordField.setEnter(trySubmit);" prompt="Enter your passphrase" />
+			<s:CheckBox id="cacheCheckbox" label="Cache?" />
+		</s:HGroup>
 	</s:VGroup>
-	<display:controlBarLayout>
+	<components:controlBarLayout>
 		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
-	</display:controlBarLayout>
-	<display:controlBarContent>
-		<mx:Button id="okButton" label="OK" icon="{DisplayUtil.availableIcon}" height="24"
+	</components:controlBarLayout>
+	<components:controlBarContent>
+		<s:Button id="okButton" label="OK" icon="{ImageUtil.authenticationIcon}" height="24"
 				  click="trySubmit();" />
-		<mx:Button label="Cancel" icon="{DisplayUtil.crossIcon}" height="24"
+		<s:Button label="Cancel" icon="{ImageUtil.crossIcon}" height="24"
 				  click="closeWindow()" />
-	</display:controlBarContent>
-</display:DefaultWindow>
+	</components:controlBarContent>
+</components:DefaultWindow>

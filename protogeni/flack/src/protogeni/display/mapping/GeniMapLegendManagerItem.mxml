@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<s:HGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  verticalAlign="middle" width="100%" gap="2"
+		  creationComplete="init()">
+	<fx:Script>
+		<![CDATA[
+			import protogeni.GeniEvent;
+			import protogeni.display.DisplayUtil;
+			import protogeni.resources.GeniManager;
+			
+			import spark.components.Button;
+			
+			[Bindable]
+			public var manager:GeniManager;
+			private var status:int = -1;
+			
+			public function init():void
+			{
+				var managerButton:Button = DisplayUtil.getGeniManagerButton(manager);
+				managerButton.percentWidth = 100;
+				this.addElement(managerButton);
+				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, tryUpdate);
+				update();
+			}
+			
+			public function destroy():void {
+				Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, tryUpdate);
+			}
+			
+			public function tryUpdate(e:GeniEvent):void {
+				if(e.changedObject == manager)
+					update();
+			}
+			
+			public function update():void
+			{
+				// Don't do it if not needed
+				if(manager.Status == status)
+					return;
+				
+				if(manager.Status == GeniManager.STATUS_FAILED) {
+					showCheckbox.styleName = "failedStyle";
+					this.toolTip = manager.errorDescription;
+				}
+				else if(manager.Status == GeniManager.STATUS_UNKOWN) {
+					showCheckbox.styleName = "unknownStyle";
+					this.toolTip = "Unknown status";
+				}
+				else if(manager.Status == GeniManager.STATUS_INPROGRESS) {
+					showCheckbox.styleName = "inprogressStyle";
+					this.toolTip = "In progress...";
+				}
+				else if(manager.Status == GeniManager.STATUS_VALID)
+				{
+					showCheckbox.styleName = "validStyle";
+					this.toolTip = "Valid";
+				}
+			}
+			
+			public function setShow():void
+			{
+				if(manager.Show == showCheckbox.selected)
+					return;
+				manager.Show = showCheckbox.selected;
+				Main.geniHandler.mapHandler.drawMap();
+			}
+
+		]]>
+	</fx:Script>
+	<s:CheckBox id="showCheckbox"
+				selected="{manager.Show}"
+				change="setShow()" />
+</s:HGroup>

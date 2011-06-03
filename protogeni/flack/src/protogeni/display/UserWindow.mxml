@@ -1,26 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						width="400" height="300"
 						defaultButton="{okButton}"
 						creationComplete="onCreationComplete()"
 						title="User Information"
-						close="closeWindow()">
-	<display:layout>
-		<s:VerticalLayout/>
-	</display:layout>
+						close="closeWindow()" xmlns:components="protogeni.display.components.*">
+	<components:layout>
+		<s:VerticalLayout paddingBottom="4" paddingLeft="4" paddingRight="4" paddingTop="4" />
+	</components:layout>
 	<fx:Script>
 		<![CDATA[
 			import mx.controls.Alert;
-			import mx.core.FlexGlobals;
 			
 			import protogeni.GeniEvent;
+			import protogeni.resources.GeniUser;
 			import protogeni.resources.Slice;
-			import protogeni.resources.User;
 			
 			[Bindable]
-			private var user:User;
+			private var user:GeniUser;
 			
 			public function onCreationComplete():void
 			{
@@ -40,119 +57,50 @@
 			
 			public function refresh(junk:* = null):void
 			{
-				credentialBasicImage.source = DisplayUtil.assignIcon(user.credential != null && user.credential.length > 0);
-				credentialKeysImage.source = DisplayUtil.assignIcon(user.keys != null && user.keys.length > 0);
-				slices.removeAllElements()
+				this.credentialImage.visible = user.credential != null && user.credential.length > 0;
+				this.keysImage.visible = user.keys != null && user.keys.length > 0;
+				slices.removeAllElements();
 				for each(var s:Slice in user.slices)
-				slices.addElement(DisplayUtil.getSliceButton(s));
+					slices.addElement(DisplayUtil.getSliceButton(s));
 				if(sslPem != null)
-					this.sslPem.text = user.sslPem;
+					this.sslPem.text = FlackCache.userSslPem;
 			}
 			
 			public function save():void
 			{
-				user.sslPem = this.sslPem.text;
-				(Main.Application() as flack).saveLocalUserData();
+				FlackCache.userSslPem = this.sslPem.text;
+				FlackCache.saveBasic();
 			}
 		]]>
 	</fx:Script>
+	<s:HGroup width="100%">
+		<s:Label text="{user.uid} ({user.name})" toolTip="{user.urn.full}" fontSize="17" fontWeight="bold" width="100%" />
+		<s:Image id="credentialImage" source="{ImageUtil.credentialIcon}" toolTip="Has credential" />
+		<s:Image id="keysImage" source="{ImageUtil.sslIcon}" toolTip="Has SSL keys" />
+	</s:HGroup>
 	<mx:TabNavigator width="100%" height="100%" paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5">
-		<mx:Grid label="Basic" width="100%" height="100%" id="infoGrid" horizontalScrollPolicy="off" verticalScrollPolicy="off">
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Name" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.name}" />
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Authority" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
+		<s:NavigatorContent label="Basic" width="100%" height="100%">
+			<s:VGroup width="100%" height="100%">
+				<s:HGroup verticalAlign="middle">
+					<s:Image source="{ImageUtil.authorityIcon}" toolTip="Authority" />
 					<s:Label text="{user.authority.Name}" />
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Credentials" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="Basic"/>
-					<mx:Image width="16" height="16" id="credentialBasicImage"/>
-					<s:Group>
-						<display:DefaultLine percentHeight="90" />
-					</s:Group>
-					<s:Label text="Keys"/>
-					<mx:Image width="16" height="16" id="credentialKeysImage"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Password" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Button label="Force delete cache" click="user.encryptedPassword = ''; FlexGlobals.topLevelApplication.saveLocalUserData(); Alert.show('Password removed');" />
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Uid" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.uid}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Uuid" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.uuid}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Hrn" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.hrn}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Email" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.email}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Urn" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Label text="{user.urn}"/>
-				</mx:GridItem>
-			</mx:GridRow>
-			<mx:GridRow width="100%">
-				<mx:GridItem>
-					<s:Label text="Slices" fontWeight="bold"/>
-				</mx:GridItem>
-				<mx:GridItem width="100%">
-					<s:Scroller width="100%" height="100%">
-						<s:VGroup width="100%" height="100%" id="slices" />
-					</s:Scroller>
-				</mx:GridItem>
-			</mx:GridRow>
-		</mx:Grid>
+				</s:HGroup>
+				<s:HGroup verticalAlign="middle">
+					<s:Image source="{ImageUtil.passwordIcon}" toolTip="Password" />
+					<s:Button label="Force delete password" click="FlackCache.userPassword = ''; FlackCache.saveBasic(); Alert.show('Password removed');" />
+				</s:HGroup>
+				<s:Label text="Slices" fontWeight="bold"/>
+				<s:Scroller width="100%" height="100%">
+					<s:VGroup width="100%" height="100%" id="slices" />
+				</s:Scroller>
+			</s:VGroup>
+		</s:NavigatorContent>
 		<s:NavigatorContent height="100%" width="100%" label="SSL Certificate">
-			<s:TextArea id="sslPem" text="{user.sslPem}" width="100%" height="100%" />
+			<s:TextArea id="sslPem" text="{FlackCache.userSslPem}" width="100%" height="100%" />
 		</s:NavigatorContent>
 	</mx:TabNavigator>
-	<display:controlBarContent>
-		<s:Button id="okButton" label="OK" click="save(); closeWindow();" height="24" />
-		<s:Button label="Cancel" click="refresh(); closeWindow();" height="24" />
-	</display:controlBarContent>
-</display:DefaultWindow>
+	<components:controlBarContent>
+		<s:Button id="okButton" label="OK" click="save(); closeWindow();" height="24" icon="{ImageUtil.availableIcon}" />
+		<s:Button label="Cancel" click="refresh(); closeWindow();" height="24" icon="{ImageUtil.crossIcon}" />
+	</components:controlBarContent>
+</components:DefaultWindow>

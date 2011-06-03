@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
-* Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
 * All rights reserved.
 *
 * Permission to use, copy, modify and distribute this software is hereby
@@ -14,11 +14,13 @@
 
 package protogeni.communication
 {
-	public class RequestGetKeys extends Request
+	public final class RequestGetKeys extends Request
 	{
-		public function RequestGetKeys() : void
+		public function RequestGetKeys():void
 		{
-			super("GetKeys", "Getting the ssh credential", CommunicationUtil.getKeys);
+			super("GetKeys",
+				"Getting the ssh credential",
+				CommunicationUtil.getKeys);
 			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
@@ -28,7 +30,7 @@ package protogeni.communication
 			return op;
 		}
 		
-		override public function complete(code : Number, response : Object) : *
+		override public function complete(code:Number, response:Object):*
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{

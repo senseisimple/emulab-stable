@@ -9,20 +9,10 @@
 
 package com.mattism.http.xmlrpc
 {
-  import com.mattism.http.xmlrpc.Connection;
-  import com.mattism.http.xmlrpc.MethodCall;
-  import com.mattism.http.xmlrpc.MethodCallImpl;
-  import com.mattism.http.xmlrpc.MethodFault;
-  import com.mattism.http.xmlrpc.MethodFaultImpl;
-  import com.mattism.http.xmlrpc.Parser;
-  import com.mattism.http.xmlrpc.ParserImpl;
-  
   import flash.events.ErrorEvent;
   import flash.events.Event;
   import flash.events.EventDispatcher;
-  import flash.events.HTTPStatusEvent;
   import flash.events.IOErrorEvent;
-  import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
   import flash.events.TimerEvent;
   import flash.net.URLLoader;

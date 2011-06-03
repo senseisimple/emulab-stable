@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <maps:Map xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
@@ -19,11 +37,10 @@
 			import com.google.maps.MapType;
 			import com.google.maps.MapZoomEvent;
 			import com.google.maps.PaneId;
-			import com.google.maps.controls.ZoomControl;
+			import com.google.maps.controls.NavigationControl;
 			import com.google.maps.interfaces.IPane;
 			import com.google.maps.interfaces.IPaneManager;
 			
-			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			
 			public var ready:Boolean;
@@ -31,7 +48,7 @@
 			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
-				myMapOptions.zoom = 5;
+				myMapOptions.zoom = 4;
 				myMapOptions.center = new LatLng(38,-97);
 				myMapOptions.mapType = MapType.PHYSICAL_MAP_TYPE;
 				setInitOptions(myMapOptions);
@@ -39,13 +56,13 @@
 			
 			private function mappreinit():void {
 				// Force a key
-				if((Main.Application() as flack).forceMapKey != null) {
-					key = Main.(Application() as protogeniflash).forceMapKey;
+				if(Main.Application().forceMapKey != null) {
+					key = Main.Application().forceMapKey;
 				}
 				// else detect a key from our default list
 				else
 				{
-					var url : String = mx.core.FlexGlobals.topLevelApplication.url;
+					var url:String = mx.core.FlexGlobals.topLevelApplication.url;
 					
 					if(url.indexOf("https://users.emulab.net") > -1)
 						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
@@ -65,7 +82,7 @@
 			}
 			
 			private function onMapReady(event:Event):void {
-				addControl(new ZoomControl());
+				addControl(new NavigationControl());
 				enableScrollWheelZoom();
 				enableContinuousZoom();
 				
@@ -98,7 +115,7 @@
 			}
 			
 			public function setDefaultZoom():void {
-				setZoom(5);
+				setZoom(4);
 				panTo(new LatLng(38,-97));
 			}
 		]]>

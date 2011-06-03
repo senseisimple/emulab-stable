@@ -1,26 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-					   xmlns:s="library://ns.adobe.com/flex/spark" 
-					   xmlns:mx="library://ns.adobe.com/flex/mx"
-					   xmlns:display="protogeni.display.*"
-					   title="Start options"
-					   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
-					   width="200" height="180" close="closeWindow()" contentCreationComplete="this.closeButton = null">
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:display="protogeni.display.*"
+			   title="Welcome"
+			   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
+			   close="closeWindow()"
+			   defaultButton="{this.loginButton}"
+			   contentCreationComplete="this.closeButton = null; this.loginButton.setFocus();">
 	<s:layout>
-		<s:VerticalLayout paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" gap="5" horizontalAlign="center" />
+		<s:VerticalLayout horizontalAlign="center" />
 	</s:layout>
 	
 	<fx:Script>
 		<![CDATA[
-			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.core.IFlexDisplayObject;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.display.skins.TitleWindowSkin;
+			import protogeni.NetUtil;
+			import protogeni.display.ImageUtil;
+			
+			[Bindable]
+			private var showOffline:Boolean = false;
 			
 			public function showWindow():void
 			{
+				showOffline = FlackCache.offlineAvailable;
 				if(!this.isPopUp)
 					PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, true);
 				else
@@ -41,20 +65,44 @@
 			}
 			
 			public function doAuthenticate():void {
+				if(Main.useJavascript && Main.geniHandler.CurrentUser.hasSetupJavascript)
+					Main.geniHandler.unauthenticatedMode = false;
 				Main.geniHandler.requestHandler.startInitiationSequence(true);
 				this.closeWindow();
 			}
-
+			
+			public function doOffline():void {
+				Main.offlineMode = true;
+				FlackCache.loadOfflineSharedObject();
+				FlackCache.applyOffline();
+				this.closeWindow();
+			}
+			
 		]]>
 	</fx:Script>
 	
-	<s:Label text="Not a user?" />
-	<s:Button label="Show resources" width="100%" height="33%"
-			  click="doPublic()" />
-	<s:Button label="Become a user" width="100%" height="33%"
-			  click="Alert.show('Nothing to see here...')" />
-	<s:Label text="For users" />
-	<s:Button label="Authenticate" width="100%" height="33%"
-			  click="doAuthenticate()" />
-	
+	<s:BitmapImage source="{ImageUtil.logoIcon}" />
+	<s:VGroup width="50%" paddingTop="10" paddingBottom="10" horizontalAlign="center">
+		<s:Button label="Log in" id="loginButton"
+				  width="100%" height="28"
+				  icon="{ImageUtil.authenticationIcon}"
+				  toolTip="Log in to view and be able to allocate resources"
+				  click="doAuthenticate()" />
+		<s:Label text="Not a user?" />
+		<s:Button label="View resources"
+				  width="100%" height="28"
+				  toolTip="View resources available in GENI, but allocation of resources is not available"
+				  click="doPublic()" />
+		<s:Button label="Become a user"
+				  width="100%" height="28"
+				  toolTip="Follow a few simple steps to be able to allocate resources"
+				  click="NetUtil.openWebsite('https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup')" />
+		<s:Label text="Want to use the cached data?"
+				 visible="{showOffline}" includeInLayout="{showOffline}" />
+		<s:Button label="Load cached data"
+				  width="100%" height="28"
+				  visible="{showOffline}" includeInLayout="{showOffline}"
+				  toolTip="Use the last saved offline data"
+				  click="doOffline();" />
+	</s:VGroup>
 </s:TitleWindow>

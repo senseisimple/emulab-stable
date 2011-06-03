@@ -1,115 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						xmlns:components="protogeni.display.components.*"
 						title="Slice"
-						creationComplete="onCreationComplete()"
-						close="closeWindow();">
+						initialize="me = this;"
+						creationComplete="onCreationComplete()">
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
-			import mx.collections.Sort;
-			import mx.collections.SortField;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.managers.DragManager;
 			
 			import protogeni.GeniEvent;
-			import protogeni.GeniHandler;
+			import protogeni.display.components.AdvancedTextArea;
+			import protogeni.display.components.DataButton;
+			import protogeni.display.components.DefaultWindow;
+			import protogeni.display.mapping.GeniMapMarker;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.PhysicalNodeGroup;
+			import protogeni.resources.Site;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualNode;
 			
 			import spark.components.NavigatorContent;
-			import spark.components.TextArea;
+			import spark.components.Scroller;
 			import spark.layouts.VerticalLayout;
-			
-			[Bindable]
-			private var cms:Array;
-			
-			private var cmsSrc:Array;
-			
-			[Bindable]
-			public var nodes:ArrayCollection = new ArrayCollection();
-			
-			[Bindable]
-			public var nodesPredefined:ArrayCollection;
-			
-			private var gm:GeniManager;
 			
 			public var sliceStatusRefresher:Timer = new Timer(10000);
 			
+			private var fr:FileReference;
+			private var loading:Boolean;
+			
+			private var me:SliceWindow;
+			
 			public function onCreationComplete():void
 			{
-				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
+				fr = new FileReference();
+				fr.addEventListener(Event.SELECT, onFileSelect);
+				fr.addEventListener(Event.COMPLETE, onFileComplete);
+				fr.addEventListener(IOErrorEvent.IO_ERROR, onFileIoError);
+				fr.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onFileSecurityError);
+				//Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
 			}
 			
 			public override function closeWindow(event:Event=null):void {
+				if(sliceCanvas.isEdited()) {
+					Alert.show("The slice appears to have been edited.  Close and clear any changes?", "Confirm", Alert.YES|Alert.NO, Main.Application(),
+						function closeClear(e:CloseEvent):void {
+							if(e.detail == Alert.YES)
+								doCloseWindow(event);
+						});
+				} else
+					doCloseWindow(event);
+			}
+			
+			public function doCloseWindow(event:Event=null):void {
 				sliceStatusRefresher.stop();
-				Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
+				fr.removeEventListener(Event.SELECT, onFileSelect);
+				fr.removeEventListener(Event.COMPLETE, onFileComplete);
+				//Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
 				Main.geniDispatcher.removeEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
 				super.closeWindow(event);
 			}
 			
 			public function sliceChanged(e:GeniEvent):void
 			{
-				if(e.changedObject == sliceCanvas.slice)
-				{
+				if(e.changedObject.hrn == sliceCanvas.slice.hrn)
 					refreshSlice();
-				}
-			}
-			
-			public function cmChanged(e:GeniEvent):void
-			{
-				if(e.changedObject == gm)
-					loadNodes();
-			}
-			
-			public function loadNodes():void {
-				if(cms == null)
-					return;
-				gm = cmsSrc[selectCm.selectedIndex];
-				var nodes:ArrayCollection = new ArrayCollection();
-				for each(var node:PhysicalNode in gm.AllNodes)
-					nodes.addItem(node);
-				list.load(nodes);
-				
-				/*
-				if(this.hideUnavailableCheckBox.selected)
-				{
-					nodes = gm.getAvailableNodes();
-					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
-					{
-						if(!sn.node.isVirtual &&
-							sn.node.manager == gm &&
-							nodes.getItemIndex(sn.node.physicalNode) > -1)
-							nodes.removeItemAt(nodes.getItemIndex(sn.node.physicalNode));
-					}
-				}
-				else {
-					nodes = new ArrayCollection(gm.AllNodesAsArray());
-				}
-				*/
-				
-				//
-				nodesPredefined = new ArrayCollection();
-				
-				var exclusive:VirtualNode = new VirtualNode(null);
-				exclusive.id = "Exclusive";
-				exclusive.isShared = false;
-				exclusive.isVirtual = true;
-				exclusive.manager = gm;
-				
-				var shared:VirtualNode = new VirtualNode(null);
-				shared.id = "Shared";
-				shared.isShared = true;
-				shared.isVirtual = true;
-				shared.manager = gm;
-				
-				nodesPredefined.addItem(exclusive);
-				nodesPredefined.addItem(shared);
 			}
 			
 			public function refreshInterface():void
@@ -119,9 +101,9 @@
 				if(sliceCanvas.slice.slivers.length == 0)
 					isCreated = false;
 				
-				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				for each(var s:Sliver in sliceCanvas.slice.slivers.collection)
 				{
-					if(s.rspec != null)
+					if(s.rspec != null && s.staged != true)
 					{
 						isCreated = true;
 						break;
@@ -130,10 +112,10 @@
 				
 				if(isCreated)
 				{
-					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteCodeIcon);
+					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
 					this.rspecButton.toolTip = "View RSPEC(s) from the created sliver(s)";
 				} else {
-					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteIcon);
+					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteIcon);
 					this.rspecButton.toolTip = "Sliver(s) not created yet";
 				}
 				
@@ -168,24 +150,26 @@
 			{
 				sliceCanvas.load(s);
 				
-				cms = new Array();
+				/*
+				cms = new ArrayList();
 				cmsSrc = new Array();
 				for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
 				{
 					if(gm.Status == GeniManager.STATUS_VALID)
 					{
 						cmsSrc.push(gm);
-						cms.push(gm.Hrn);
+						cms.addItem(gm.Hrn);
 					}
-				}
+				}*/
 				
-				selectCm.selectedIndex = 0;
-				loadNodes();
+				//selectCm.selectedIndex = 0;
+				//loadNodes();
 				
 				refreshInterface();
 				
 				sliceStatusRefresher.addEventListener(TimerEvent.TIMER, autorefresh);
 				sliceStatusRefresher.start();
+				setSidePane();
 			}
 			
 			private function autorefresh(e:TimerEvent):void
@@ -193,9 +177,11 @@
 				if(this.autoRefreshCheckbox.selected
 					&& this.sliceCanvas.slice != null
 					&& this.sliceCanvas.slice.hasAllAllocatedResources()
+					&& !this.sliceCanvas.slice.isStaged()
 					&& Main.geniHandler.requestHandler.queue.isEmpty()
-					&& this.sliceCanvas.slice.Status() != Slice.READY
-					&& this.sliceCanvas.slice.Status() != Slice.FAILED)
+					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_READY
+					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_FAILED
+					&& !Main.offlineMode)
 					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice, true);
 			}
 			
@@ -206,7 +192,7 @@
 					Alert.show("There is no valid RSPEC for the slice yet", "No RSPEC");
 					return;
 				}
-				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				for each(var s:Sliver in sliceCanvas.slice.slivers.collection)
 				{
 					if(s.rspec == null)
 					{
@@ -220,33 +206,24 @@
 				tabs.percentHeight = 100;
 				tabs.percentWidth = 100;
 				viewRspec.addElement(tabs);
-				for each(s in sliceCanvas.slice.slivers)
+				for each(s in sliceCanvas.slice.slivers.collection)
 				{
 					var tab:NavigatorContent = new NavigatorContent();
 					var vertLayout:VerticalLayout = new VerticalLayout();
 					vertLayout.paddingBottom = 5;
 					vertLayout.paddingLeft = 5;
 					vertLayout.paddingRight = 5;
-					vertLayout.paddingTop = 5;
 					tab.layout = vertLayout;
 					tab.percentHeight = 100;
 					tab.percentWidth = 100;
 					tab.label = s.manager.Hrn;
-					var reviewRspecText:TextArea = new TextArea();
-					reviewRspecText.percentHeight = 100;
-					reviewRspecText.percentWidth = 100;
+					
+					var reviewRspecText:AdvancedTextArea = new AdvancedTextArea();
 					if(s.rspec != null)
 						reviewRspecText.text = s.rspec.toString();
 					else
 						reviewRspecText.text = "No valid RSPEC yet";
-					var copyButton:Button = new Button();
-					copyButton.data = reviewRspecText.text;
-					copyButton.label = "Copy to clipboard";
-					copyButton.addEventListener(MouseEvent.CLICK,
-						function copy(e:MouseEvent):void {
-							System.setClipboard(e.currentTarget.data);
-						});
-					tab.addElement(copyButton);
+					
 					tab.addElement(reviewRspecText);
 					tabs.addChild(tab);
 				}
@@ -261,7 +238,14 @@
 				tabs.percentHeight = 100;
 				tabs.percentWidth = 100;
 				previewRspec.addElement(tabs);
-				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				
+				var slivers:Vector.<Sliver> = new Vector.<Sliver>();
+				if(sliceCanvas.slice.slivers.length > 1)
+					slivers.push(sliceCanvas.slice.slivers.getCombined());
+				for each(var useSliver:Sliver in sliceCanvas.slice.slivers.collection)
+					slivers.push(useSliver);
+				
+				for each(var s:Sliver in slivers)
 				{
 					var tab:NavigatorContent = new NavigatorContent();
 					var vertLayout:VerticalLayout = new VerticalLayout();
@@ -273,89 +257,297 @@
 					tab.percentHeight = 100;
 					tab.percentWidth = 100;
 					tab.label = s.manager.Hrn;
-					var previewRspecText:TextArea = new TextArea();
-					previewRspecText.percentHeight = 100;
-					previewRspecText.percentWidth = 100;
-					previewRspecText.text = s.getRequestRspec().toString();
-					var copyButton:Button = new Button();
-					copyButton.data = previewRspecText.text;
-					copyButton.label = "Copy to clipboard";
-					copyButton.addEventListener(MouseEvent.CLICK,
-						function copy(e:MouseEvent):void {
-							System.setClipboard(e.currentTarget.data);
-						});
-					tab.addElement(copyButton);
-					tab.addElement(previewRspecText);
+
+					var previewTextArea:AdvancedTextArea = new AdvancedTextArea();
+					previewTextArea.text = s.getRequestRspec(true).toString();
+
+					tab.addElement(previewTextArea);
 					tabs.addChild(tab);
 				}
 				previewRspec.showWindow();
 			}
 			
 			private function assignAvailableIcon(item:Object):Class {
-				return DisplayUtil.availableIcon;
+				return ImageUtil.availableIcon;
 			}
+			
+			public function clearCanvas():void {
+				if(sliceCanvas.slice.isCreated())
+					Alert.show("The slice has resources allocated to it.  Please delete the slice before trying to create a new slice.", "Allocated Resources Exist");
+				else if(sliceCanvas.slice.GetAllNodes().length > 0)
+					Alert.show("The slice already has resources waiting to be allocated.  Clear the slice anyways?", "Resources Exist", Alert.YES|Alert.NO, Main.Application(),
+						function closeClear(e:CloseEvent):void {
+							if(e.detail == Alert.YES)
+								sliceCanvas.clear();
+						});
+			}
+			
+			// Import and save
+			
+			public function importRspec():void {
+				var importWindow:ImportSliceWindow = new ImportSliceWindow();
+				importWindow.setSlice(this.sliceCanvas.slice);
+				importWindow.showWindow();
+			}
+			
+			public function saveRspec():void {
+				loading = false;
+				fr.save(sliceCanvas.slice.slivers.getCombined().getRequestRspec(true).toXMLString(), "rspec.xml");
+			}
+			
+			protected function onFileBrowse(event:MouseEvent):void
+			{
+				loading = true;
+				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec)", "*.txt;*.xml;*.rspec")])
+			}
+			
+			public function onFileSelect(event:Event):void {
+				if(loading)
+					fr.load();
+			}
+			
+			public function onFileComplete(event:Event):void {
+				if(loading)
+					sliceCanvas.slice.tryImport(fr.data.readUTFBytes(fr.data.length));
+			}
+			
+			private function onFileIoError(event:IOErrorEvent):void {
+				Alert.show(event.toString(), "IO Error");
+			}
+			
+			private function onFileSecurityError(event:SecurityErrorEvent):void {
+				Alert.show(event.toString(), "Security Error");
+			}
+			
+			private const VIEW_MANAGERS:int = 0;
+			private const VIEW_MANAGER:int = 1;
+			private const VIEW_COLLECTION:int = 2;
+			private function setSidePane(type:int = VIEW_MANAGERS, data:* = null):void {
+				this.sidePane.removeAllElements();
+				switch(type) {
+					case VIEW_MANAGERS:
+						for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
+							if(manager.Status == GeniManager.STATUS_VALID)
+								this.addManagerOption(manager, false);
+						}
+						break;
+					case VIEW_MANAGER:
+						this.addManagerOption(data, true);
+						this.addNodeList(data.AllNodes);
+						break;
+					case VIEW_COLLECTION:
+						var toggleViewButton:ImageButton = new ImageButton();
+						toggleViewButton.setStyle("icon", ImageUtil.leftIcon);
+						toggleViewButton.toolTip = "View all the managers";
+						toggleViewButton.addEventListener(MouseEvent.CLICK,
+							function toggleViewClicked(e:MouseEvent):void {
+								me.setSidePane(VIEW_MANAGERS);
+							});
+						this.sidePane.addElement(toggleViewButton);
+						this.addNodeList(data);
+						break;
+				}
+			}
+			
+			private function addNodeList(nodes:Vector.<PhysicalNode>):void {
+				var nodeList:NodeList = new NodeList();
+				nodeList.percentHeight = 100;
+				nodeList.percentWidth = 100;
+				this.sidePane.addElement(nodeList);
+				var nodeCollection:ArrayCollection = new ArrayCollection();
+				for each(var node:PhysicalNode in nodes)
+					nodeCollection.addItem(node);
+				nodeList.load(nodeCollection);
+			}
+			
+			private function addManagerOption(manager:GeniManager, only:Boolean):void {
+				var managerHgroup:HGroup = new HGroup();
+				managerHgroup.percentWidth = 100;
+				managerHgroup.gap = 2;
+				var toggleViewButton:ImageButton = new ImageButton();
+				if(only) {
+					toggleViewButton.setStyle("icon", ImageUtil.leftIcon);
+					toggleViewButton.toolTip = "View all the managers";
+					toggleViewButton.addEventListener(MouseEvent.CLICK,
+						function toggleViewClicked(e:MouseEvent):void {
+							me.setSidePane(VIEW_MANAGERS);
+						});
+				} else {
+					toggleViewButton.setStyle("icon", ImageUtil.rightIcon);
+					toggleViewButton.toolTip = "Open the manager resources";
+					toggleViewButton.addEventListener(MouseEvent.CLICK,
+						function toggleViewClicked(e:MouseEvent):void {
+							me.setSidePane(VIEW_MANAGER, manager);
+						});
+				}
+				managerHgroup.addElement(toggleViewButton);
+				var managerButton:Button = DisplayUtil.getGeniManagerButton(manager);
+				managerButton.percentWidth = 100;
+				managerHgroup.addElement(managerButton);
+				
+				var delay:VirtualNode = new VirtualNode(null);
+				delay.clientId = "Delay";
+				delay.isDelayNode = true;
+				delay.manager = manager;
+				var addDelayButton:DataButton = new DataButton("",
+					"Add a delay node",
+					ImageUtil.timeIcon,
+					null,
+					"virtualnode");
+				addDelayButton.data = delay;
+				addDelayButton.addEventListener(MouseEvent.CLICK,
+					function addDelayClicked(e:MouseEvent):void {
+						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
+					});
+				managerHgroup.addElement(addDelayButton);
+
+				var exclusive:VirtualNode = new VirtualNode(null);
+				exclusive.clientId = "Exclusive";
+				exclusive.Exclusive = true;
+				exclusive.manager = manager;
+				var addExclusiveButton:DataButton = new DataButton("",
+					"Add an exclusive node",
+					ImageUtil.exclusiveIcon,
+					null,
+					"virtualnode");
+				addExclusiveButton.data = exclusive;
+				addExclusiveButton.addEventListener(MouseEvent.CLICK,
+					function addExclusiveClicked(e:MouseEvent):void {
+						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
+					});
+				managerHgroup.addElement(addExclusiveButton);
+				
+				var shared:VirtualNode = new VirtualNode(null);
+				shared.clientId = "Shared";
+				shared.Exclusive = false;
+				shared.manager = manager;
+				var addSharedButton:DataButton = new DataButton("",
+					"Add a shared node",
+					ImageUtil.sharedIcon, null, "virtualnode");
+				addSharedButton.data = shared;
+				addSharedButton.addEventListener(MouseEvent.CLICK,
+					function addSharedClicked(e:MouseEvent):void {
+						sliceCanvas.addBasicVirtualNode(shared);
+					});
+				managerHgroup.addElement(addSharedButton);
+				this.sidePane.addElement(managerHgroup);
+			}
+
+
+			protected function sidePane_dragEnterHandler(event:DragEvent):void
+			{
+				if (event.dragSource.hasFormat("site") ||
+					event.dragSource.hasFormat("manager") ||
+					event.dragSource.hasFormat("marker") ||
+					event.dragSource.hasFormat("physicalnodegroup"))
+				{
+					DragManager.acceptDragDrop(VGroup(event.currentTarget));
+				}
+			}
+
+
+			protected function sidePane_dragDropHandler(event:DragEvent):void
+			{
+				if(event.dragSource.hasFormat("marker"))
+				{
+					var dragMarker:GeniMapMarker = event.dragSource.dataForFormat('marker') as GeniMapMarker;
+					setSidePane(VIEW_COLLECTION, dragMarker.showGroups.GetAll());
+				} else if(event.dragSource.hasFormat("manager")) {
+					setSidePane(VIEW_MANAGER, event.dragSource.dataForFormat('manager'));
+				} else if(event.dragSource.hasFormat("site")) {
+					var dragSite:Site = event.dragSource.dataForFormat('site') as Site;
+					setSidePane(VIEW_COLLECTION, dragSite.nodes);
+				} else if(event.dragSource.hasFormat("physicalnodegroup")) {
+					var dragGroup:PhysicalNodeGroup = event.dragSource.dataForFormat('physicalnodegroup') as PhysicalNodeGroup;
+					setSidePane(VIEW_COLLECTION, dragGroup.collection);
+				}
+			}
+
 		]]>
 	</fx:Script>
 	
 	<s:HGroup width="100%" verticalAlign="middle">
-		<s:Label id="hrnLabel" text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" />
-		<s:Rect width="100%"/>
-		<s:Label id="urnLabel" text="{sliceCanvas.slice.urn}" />
-		<display:ImageButton id="rspecButton"
-							 icon="{DisplayUtil.pageWhiteIcon}"
+		<s:Label id="hrnLabel" text="{sliceCanvas.slice.urn.name}" toolTip="{sliceCanvas.slice.urn.full}" width="100%" fontSize="17" fontWeight="bold" />
+		<components:ImageButton id="clearCanvasButton"
+							 toolTip="Clear the canvas"
+							 click="clearCanvas()"
+							 icon="{ImageUtil.eraseIcon}" />
+		<components:DefaultLine height="14" visible="false" />
+		<components:ImageButton icon="{ImageUtil.pasteIcon}"
+							 toolTip="Paste RSPEC"
+							 click="importRspec()" />
+		<components:ImageButton icon="{ImageUtil.openIcon}"
+							 toolTip="Load RSPEC from file"
+							 click="onFileBrowse(event)" />
+		<components:ImageButton icon="{ImageUtil.saveIcon}"
+							 toolTip="Save preview RSPEC to file"
+							 click="saveRspec()" />
+		<components:DefaultLine height="14" visible="false" />
+		<components:ImageButton id="rspecButton"
+							 icon="{ImageUtil.pageWhiteIcon}"
 							 click="viewRspecs()"
 							 toolTip="View the most recent valid RSPEC" />
-		<display:ImageButton id="previewRspecButton"
-							  icon="{DisplayUtil.pageCodeIcon}"
+		<components:ImageButton id="previewRspecButton"
+							  icon="{ImageUtil.pageCodeIcon}"
 							 click="previewRspecs()"
 							 toolTip="Preview the Request RSPEC" />
+		<components:DefaultLine height="14" visible="false" />
+		<s:Label text="Use" />
 		<s:CheckBox id="ionCheckbox" color="{SliceLink.ION_COLOR}"
 					selected="{Main.useIon}"
-					label="Use ION"
+					label="ION"
 					valueCommit="Main.useIon = ionCheckbox.selected" />
 		<s:CheckBox id="pgeniCheckbox" color="{SliceLink.GPENI_COLOR}"
 					selected="{Main.useGpeni}"
-					label="Use GPENI"
+					label="GPENI"
 					valueCommit="Main.useGpeni = pgeniCheckbox.selected" />
 	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
-		<mx:VBox height="100%" verticalGap="2">
-			<mx:ComboBox id="selectCm" width="100%" dataProvider="{cms}" change="loadNodes()" height="24" />
-			<display:NodeList width="100%" height="100%" id="list" />
-			<mx:List width="100%" height="50" id="listNodesPredefined" rowHeight="24"
-					 dataProvider="{nodesPredefined}"
-					 labelField="id" dragEnabled="true"
-					 iconFunction="assignAvailableIcon">
-			</mx:List>
-		</mx:VBox>
+		<s:Scroller height="100%" minWidth="150">
+			<s:VGroup id="sidePane" height="100%" width="100%" gap="2"
+					  dragEnter="sidePane_dragEnterHandler(event)"
+					  dragDrop="sidePane_dragDropHandler(event)" />
+		</s:Scroller>
+
 		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />
 	</mx:HDividedBox>
-	<display:controlBarLayout>
-		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
-	</display:controlBarLayout>
-	<display:controlBarContent>
-		<mx:Button id="createButton" toolTip="Create slivers" label="Create" height="24"
-				   icon="{DisplayUtil.actionIcon}"
-				   click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
-		<display:ImageButton id="refreshButton" toolTip="Refresh slivers"
-							  click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.refreshIcon}"/>
-		<s:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
-		<display:ImageButton id="deleteButton" toolTip="Delete slivers"
-							  click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.deleteIcon}"/>
-		<display:DefaultLine percentHeight="90" />
-		<mx:Button id="embedButton" label="Embed" toolTip="Embed slivers"
-				   click="Main.geniHandler.requestHandler.embedSlice(sliceCanvas.slice)" />
-		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton id="startButton" toolTip="Start slivers"
+	<components:controlBarLayout>
+		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="12" paddingTop="2" />
+	</components:controlBarLayout>
+	<components:controlBarContent>
+		<s:Button id="createButton"
+				  toolTip="Create slivers"
+				  label="Create"
+				  height="24"
+				  icon="{ImageUtil.actionIcon}"
+				  click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
+		<components:ImageButton id="refreshButton"
+							 toolTip="Refresh slivers"
+							 click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"
+							 icon="{ImageUtil.refreshIcon}"/>
+		<s:CheckBox id="autoRefreshCheckbox"
+					label="Autorefresh"
+					toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
+		<components:ImageButton id="deleteButton"
+							 toolTip="Delete slivers"
+							 click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
+							 icon="{ImageUtil.deleteIcon}"/>
+		<components:DefaultLine percentHeight="90" />
+		<s:Button id="embedButton" label="Embed"
+				  toolTip="Embed slivers"
+				  click="Main.geniHandler.requestHandler.embedSlice(sliceCanvas.slice)" />
+		<components:DefaultLine percentHeight="90" />
+		<components:ImageButton id="startButton"
+							 toolTip="Start slivers"
 							  click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.playControlIcon}"/>
-		<display:ImageButton id="stopButton" toolTip="Stop slivers"
+							  icon="{ImageUtil.playControlIcon}"/>
+		<components:ImageButton id="stopButton"
+							 toolTip="Stop slivers"
 							  click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.stopControlIcon}"/>
-		<display:ImageButton id="restartButton" toolTip="Restart slivers"
+							  icon="{ImageUtil.stopControlIcon}"/>
+		<components:ImageButton id="restartButton"
+							 toolTip="Restart slivers"
 							  click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.repeatControlIcon}"/>
-	</display:controlBarContent>
-</display:DefaultWindow>
+							  icon="{ImageUtil.repeatControlIcon}"/>
+	</components:controlBarContent>
+</components:DefaultWindow>

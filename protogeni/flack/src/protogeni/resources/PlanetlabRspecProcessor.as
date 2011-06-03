@@ -1,3 +1,17 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.resources
 {
 	import flash.events.Event;
@@ -6,19 +20,18 @@ package protogeni.resources
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
 	
-	import protogeni.GeniEvent;
 	import protogeni.communication.RequestResolvePl;
 	import protogeni.communication.RequestSitesLocation;
 	
-
 	public class PlanetlabRspecProcessor implements RspecProcessorInterface
 	{
+		public var callGetSites:Boolean = true;
+		
+		private var manager:PlanetlabAggregateManager;
 		public function PlanetlabRspecProcessor(newGm:PlanetlabAggregateManager)
 		{
-			gm = newGm;
+			this.manager = newGm;
 		}
-		
-		private var gm:PlanetlabAggregateManager;
 		
 		private static var PARSE : int = 0;
 		private static var DONE : int = 1;
@@ -32,17 +45,17 @@ package protogeni.resources
 		private var hasslot:Boolean = false;
 		
 		public function processResourceRspec(afterCompletion : Function):void {
-			gm.clearComponents();
+			manager.clearComponents();
 			
-			Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC", false);
+			Main.Application().setStatus("Parsing " + manager.Hrn + " RSPEC", false);
 			
-			if (gm.Rspec.@type != "SFA")
+			if (manager.Rspec.@type != "SFA")
 			{
-				throw new Error("Unsupported ad rspec type: " + gm.Rspec.@type);
+				throw new Error("Unsupported ad rspec type: " + manager.Rspec.@type);
 			}
 			
-			var networkXml:XMLList = gm.Rspec.children();
-			gm.networkName = networkXml[0].@name;
+			var networkXml:XMLList = manager.Rspec.children();
+			manager.networkName = networkXml[0].@name;
 			sites = networkXml[0].children();
 			var d:int = sites.length();
 			
@@ -67,27 +80,26 @@ package protogeni.resources
 			{
 				parseNextNode();
 				if(Main.debugMode)
-					LogHandler.appendMessage(new LogMessage(gm.Url, "ParseN " + String((new Date()).time - startTime.time)));
+					LogHandler.appendMessage(new LogMessage(manager.Url, "ParseN " + String((new Date()).time - startTime.time)));
 			}
 			else if (myState == DONE)
 			{
 				GeniManager.processing--;
-				Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
-				gm.totalNodes = gm.AllNodes.length;
-				gm.availableNodes = gm.totalNodes;
-				gm.unavailableNodes = 0;
-				gm.percentageAvailable = 100;
-				gm.Status = GeniManager.STATUS_VALID;
-				Main.geniDispatcher.dispatchGeniManagerChanged(gm); // not 'populated' until sites are resolved
+				Main.Application().setStatus("Parsing " + manager.Hrn + " RSPEC Done",false);
+				manager.Status = GeniManager.STATUS_VALID;
+				Main.geniDispatcher.dispatchGeniManagerChanged(manager); // not 'populated' until sites are resolved
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
-
-				var r:RequestSitesLocation = new RequestSitesLocation(gm);
-				r.forceNext = true;
-				//var r:RequestResolvePl = new RequestResolvePl(gm);
-				//r.forceNext = true;
-				Main.geniHandler.requestHandler.pushRequest(r);
 				
-				myAfter();
+				if(callGetSites) {
+					var r:RequestSitesLocation = new RequestSitesLocation(manager);
+					r.forceNext = true;
+					//var r:RequestResolvePl = new RequestResolvePl(manager);
+					//r.forceNext = true;
+					Main.geniHandler.requestHandler.pushRequest(r);
+				}
+				
+				if(this.myAfter != null)
+					myAfter(this.manager);
 			}
 			else
 			{
@@ -107,26 +119,15 @@ package protogeni.resources
 				var site:Site = new Site();
 				site.id = s.@id;
 				site.name = s.child("name")[0].toString();
-				site.hrn = gm.networkName + "." + site.id;
-				gm.sites.addItem(site);
+				site.hrn = manager.networkName + "." + site.id;
+				manager.sites.push(site);
 				for each(var p:XML in s.child("node")) {
-					var node:PhysicalNode = new PhysicalNode(null, gm);
+					var node:PhysicalNode = new PhysicalNode(null, manager);
 					node.name = p.@id;
 					for each(var tx:XML in p.children()) {
 						switch(tx.localName()) {
-							case "bw_limit":
-								node.bw_limitKbps = int(tx.toString());
-								switch(tx.@units) {
-									case "kbps":
-									default:
-										break;
-								}
-								break;
-							case "hostname":
-								node.hostname = tx.toString();
-								break;
 							case "urn":
-								node.urn = tx.toString();
+								node.id = tx.toString();
 								break;
 							default:
 						}
@@ -136,8 +137,8 @@ package protogeni.resources
 					node.available = true;
 					node.exclusive = false;
 					idx++;
-					gm.AllNodes.push(node);
-					site.nodes.addItem(node);
+					manager.AllNodes.push(node);
+					site.nodes.push(node);
 				}
 				myIndex++;
 				if(((new Date()).time - startTime.time) > 40) {
@@ -155,15 +156,14 @@ package protogeni.resources
 		{
 		}
 		
-		public function generateSliverRspec(s:Sliver):XML
+		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean):XML
 		{
-			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
-				+ "<RSpec type=\"SFA\" />");
-			var networkXml:XML = new XML("<network name=\""+gm.networkName+"\" />");
+			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?><RSpec type=\"SFA\" />");
+			var networkXml:XML = new XML("<network name=\""+manager.networkName+"\" />");
 			
 			var requestSites:ArrayCollection = new ArrayCollection();
 			var requestSitesDic:Dictionary = new Dictionary();
-			for each(var vn:VirtualNode in s.nodes) {
+			for each(var vn:VirtualNode in s.nodes.collection) {
 				var newRequestSite:Object = requestSitesDic[vn.physicalNode.tag.id];
 				if(newRequestSite == null) {
 					newRequestSite = new Object();

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:display="protogeni.display.*"
+					   xmlns:components="protogeni.display.components.*"
+					   title="Paste RSPEC" >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.desktop.Clipboard;
+			import flash.desktop.ClipboardFormats;
+			
+			import mx.controls.Alert;
+			
+			import protogeni.resources.Slice;
+			
+			public var slice:Slice;
+			
+			public function setSlice(s:Slice):void {
+				slice = s;
+			}
+			
+			public function success():void {
+				if(slice.tryImport(sliceRspecText.text))
+					closeWindow();
+			}
+
+			protected function doPaste(event:MouseEvent):void
+			{
+				if(Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT))
+					sliceRspecText.text = Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT).toString();
+				else
+					Alert.show("No text was found in the clipboard");
+			}
+
+		]]>
+	</fx:Script>
+
+	<s:TextArea id="sliceRspecText" width="100%" height="100%" />
+	
+	<components:controlBarContent>
+		<s:Button id="cancelButton" label="Cancel" icon="{ImageUtil.cancelIcon}" click="closeWindow();" height="24" />
+		<s:Button id="okButton" label="Apply" icon="{ImageUtil.availableIcon}" click="success();" height="24" />
+	</components:controlBarContent>
+</components:DefaultWindow>

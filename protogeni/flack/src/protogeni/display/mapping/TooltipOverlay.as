@@ -11,7 +11,6 @@ package protogeni.display.mapping {
 
 	import com.google.maps.LatLng;
 	import com.google.maps.MapEvent;
-	import com.google.maps.PaneId;
 	import com.google.maps.interfaces.IMap;
 	import com.google.maps.interfaces.IPane;
 	import com.google.maps.overlays.OverlayBase;
@@ -27,6 +26,7 @@ package protogeni.display.mapping {
 	
 	// Box with text to show as an overlay on Google Maps API for Flash
 	public class TooltipOverlay extends OverlayBase {
+		
 		private var latLng:LatLng;
 		private var label:String;
 		private var textField:TextField;
@@ -36,7 +36,10 @@ package protogeni.display.mapping {
 		private var borderColor:Object;
 		private var backgroundColor:Object;
 
-		public function TooltipOverlay(latLng:LatLng, label:String, edgeColor:Object, backColor:Object) {
+		public function TooltipOverlay(latLng:LatLng,
+									   label:String,
+									   edgeColor:Object,
+									   backColor:Object) {
 			super();
 			this.borderColor = edgeColor;
 			this.backgroundColor = backColor;

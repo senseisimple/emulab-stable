@@ -1,31 +1,41 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.display.mapping
 {
 	import com.google.maps.LatLng;
 	import com.google.maps.LatLngBounds;
 	
 	import flash.events.Event;
-	import flash.utils.Timer;
 	
-	import mx.collections.ArrayCollection;
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniEvent;
-	import protogeni.Util;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.Slice;
-	import protogeni.resources.VirtualNode;
-
-	public class GeniMapHandler
+	
+	public final class GeniMapHandler
 	{
 		public var map:GeniMap;
 		
-		public var nodeGroupMarkers:Array = [];
+		public var nodeGroupMarkers:Vector.<GeniMapMarker> = new Vector.<GeniMapMarker>();
 		private var linkMarkers:Vector.<GeniMapLink> = new Vector.<GeniMapLink>();
-		private var nodeGroupClusterMarkers:Array = [];
+		private var nodeGroupClusterMarkers:Vector.<GeniMapMarker> = new Vector.<GeniMapMarker>();
 		
 		public var userResourcesOnly:Boolean = false;
 		public var selectedSlice:Slice = null;
@@ -47,19 +57,28 @@ package protogeni.display.mapping
 				FlexGlobals.topLevelApplication.stage.removeEventListener(Event.ENTER_FRAME, drawNext);
 			}
 			map.clearOverlays();
-			nodeGroupMarkers = [];
+			nodeGroupMarkers = new Vector.<GeniMapMarker>();
 			linkMarkers = new Vector.<GeniMapLink>();
-			nodeGroupClusterMarkers = []
+			nodeGroupClusterMarkers = new Vector.<GeniMapMarker>();
+		}
+		
+		public function redrawFromScratch():void
+		{
+			clearAll();
+			for each(var gm:GeniManager in Main.geniHandler.GeniManagers) {
+				this.changingManagers.push(gm);
+			}
+			this.drawMapNow();
 		}
 		
 		// If nothing given, gives bounds for all resources
-		public static function getBounds(a:Array = null):LatLngBounds
+		public static function getBounds(a:Vector.<LatLng> = null):LatLngBounds
 		{
-			var coords:Array;
+			var coords:Vector.<LatLng>;
 			if(a == null) {
-				coords = new Array();
+				coords = new Vector.<LatLng>();
 				for each(var m:GeniMapMarker in Main.geniHandler.mapHandler.nodeGroupMarkers)
-					coords.push(m.getLatLng());
+				coords.push(m.getLatLng());
 			} else
 				coords = a;
 			
@@ -96,7 +115,9 @@ package protogeni.display.mapping
 		public function managerChanged(event:GeniEvent):void {
 			if(event.action != GeniEvent.ACTION_POPULATED)
 				return;
-
+			
+			if(Main.debugMode)
+				trace("MAP...New Manager Added: " + event.changedObject.Hrn);
 			this.changingManagers.push(event.changedObject);
 			this.drawMap();
 		}
@@ -131,6 +152,7 @@ package protogeni.display.mapping
 			}
 			
 			drawing = true;
+			myIndex = 0;
 			if(changingManagers.length > 0 )
 				myState = LINK_ADD;
 			else
@@ -139,7 +161,6 @@ package protogeni.display.mapping
 		}
 		
 		public function drawNext(event:Event):void {
-			
 			var startTime:Date = new Date();
 			
 			if(myState == LINK_ADD) {
@@ -175,13 +196,12 @@ package protogeni.display.mapping
 			var startTime:Date = new Date();
 			
 			while(myIndex < gm.Links.collection.length) {
-				var linkGroup:PhysicalLinkGroup = gm.Links.collection.getItemAt(myIndex) as PhysicalLinkGroup;
+				var linkGroup:PhysicalLinkGroup = gm.Links.collection[myIndex];
 				var add:Boolean = !linkGroup.IsSameSite();
 				if(add) {
 					for each(var v:PhysicalLink in linkGroup.collection)
 					{
-						if(v.rspec.toXMLString().indexOf("ipv4") > -1)
-						{
+						if(v.linkTypes.indexOf("ipv4") > -1) {
 							add = false;
 							break;
 						}
@@ -197,14 +217,12 @@ package protogeni.display.mapping
 				}
 				
 				idx++
-				myIndex++;
+					myIndex++;
 				if(((new Date()).time - startTime.time) > 60) {
 					if(Main.debugMode)
 						trace("Links added:" + idx);
 					return;
 				}
-				//if(idx == MAX_WORK)
-				//	return;
 			}
 			
 			myState = NODE_ADD;
@@ -220,7 +238,7 @@ package protogeni.display.mapping
 			var gm:GeniManager = changingManagers[0];
 			
 			while(myIndex < gm.Nodes.collection.length) {
-				var nodeGroup:PhysicalNodeGroup = gm.Nodes.collection.getItemAt(myIndex) as PhysicalNodeGroup;
+				var nodeGroup:PhysicalNodeGroup = gm.Nodes.collection[myIndex];
 				if(nodeGroup.collection.length > 0) {
 					var gmm:GeniMapMarker = new GeniMapMarker(nodeGroup);
 					map.addOverlay(gmm);
@@ -228,14 +246,12 @@ package protogeni.display.mapping
 					gmm.added = true;
 				}
 				idx++
-				myIndex++;
+					myIndex++;
 				if(((new Date()).time - startTime.time) > 60) {
 					if(Main.debugMode)
 						trace("Nodes added:" + idx);
 					return;
 				}
-				//if(idx == MAX_WORK)
-				//	return;
 			}
 			
 			changingManagers = changingManagers.slice(1);
@@ -249,21 +265,23 @@ package protogeni.display.mapping
 			myIndex = 0;
 		}
 		
-		private var clustersToAdd:ArrayCollection;
+		private var clustersToAdd:Vector.<Vector.<GeniMapMarker>>;
 		public function doCluster():void {
 			
 			// Limit to user resources if selected
 			// TODO: Add/Remove virtual links!
+			var marker:GeniMapMarker;
+			var slice:Slice = null;
+			var link:GeniMapLink;
 			if(this.userResourcesOnly) {
-				var marker:GeniMapMarker;
-				var slice:Slice = null;
-				var link:GeniMapLink;
-				if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.length>0)
+				if(this.selectedSlice != null
+						&& this.selectedSlice.urn != null
+						&& this.selectedSlice.urn.full.length>0)
 					slice = selectedSlice;
 				for each(marker in this.nodeGroupMarkers)
-					marker.setUser(slice);
+				marker.setUser(slice);
 				for each(marker in this.nodeGroupClusterMarkers)
-					marker.setUser(slice);
+				marker.setUser(slice);
 				for each(link in this.linkMarkers) {
 					if(link.polyline.visible) {
 						link.polyline.hide();
@@ -284,31 +302,36 @@ package protogeni.display.mapping
 				*/
 			} else {
 				for each(marker in this.nodeGroupMarkers)
-					marker.setDefault();
+				marker.setDefault();
 				for each(marker in this.nodeGroupClusterMarkers)
-					marker.setDefault();
+				marker.setDefault();
 				for each(link in this.linkMarkers) {
-					if(!link.polyline.visible) {
+					if(!link.polyline.visible && link.group.GetManager().Show) {
 						link.polyline.show()
 						link.label.visible = true;
+					} else if(link.polyline.visible && !link.group.GetManager().Show) {
+						link.polyline.hide()
+						link.label.visible = false;
 					}
 				}
 			}
 			
 			// Cluster node groups close to each other
 			var clusterer:Clusterer = new Clusterer(nodeGroupMarkers, map.getZoom(), 40);
-			var clusteredMarkers:Array = clusterer.clusters;
-			clustersToAdd = new ArrayCollection();
+			var clusteredMarkers:Vector.<Vector.<GeniMapMarker>> = clusterer.clusters;
+			clustersToAdd = new Vector.<Vector.<GeniMapMarker>>();
 			
 			// Show group markers that should be shown now, hide those that shouldn't
-			for each(var newArray:Array in clusteredMarkers) {
+			for each(var newArray:Vector.<GeniMapMarker> in clusteredMarkers) {
 				var shouldShow:Boolean = newArray.length == 1;
 				if(!shouldShow)
-					clustersToAdd.addItem(newArray);
+					clustersToAdd.push(newArray);
 				for each(var newMarker:GeniMapMarker in newArray) {
 					if(!newMarker.visible && shouldShow && newMarker.showGroups.collection.length > 0)
 						newMarker.show();
-					else if(newMarker.visible && (newMarker.showGroups.collection.length == 0 || !shouldShow))
+					else if(newMarker.visible &&
+							(newMarker.showGroups.collection.length == 0
+								|| !shouldShow))
 						newMarker.hide();
 				}
 			}
@@ -317,18 +340,26 @@ package protogeni.display.mapping
 			var j:int;
 			var oldMarker:GeniMapMarker;
 			var found:Boolean;
-			var newMarkerArray:Array;
+			var newMarkerArray:Vector.<GeniMapMarker>;
 			
 			// Hide markers no longer used
 			for(i = 0; i < nodeGroupClusterMarkers.length; i++) {
 				oldMarker = this.nodeGroupClusterMarkers[i] as GeniMapMarker;
 				found = false;
 				for(j = 0; j < clustersToAdd.length; j++) {
-					newMarkerArray = clustersToAdd.getItemAt(j) as Array;
-					if(Util.haveSame(newMarkerArray, oldMarker.cluster)) {
+					newMarkerArray = clustersToAdd[j];
+					if(newMarkerArray.length == oldMarker.cluster.length) {
 						found = true;
-						clustersToAdd.removeItemAt(j);	// remove markers which will stay from the create array
-						break;
+						for each(var findMarker:GeniMapMarker in newMarkerArray) {
+							if(oldMarker.cluster.indexOf(findMarker) == -1) {
+								found = false;
+								break;
+							}
+						}
+						if(found) {
+							clustersToAdd.splice(j, 1);	// remove markers which will stay from the create array
+							break;
+						}
 					}
 				}
 				if(!found) {
@@ -355,13 +386,15 @@ package protogeni.display.mapping
 			var idx:int = 0;
 			
 			var startTime:Date = new Date();
-
+			
 			while(myIndex < clustersToAdd.length) {
-				var cluster:Array = clustersToAdd.getItemAt(myIndex) as Array;
+				var cluster:Vector.<GeniMapMarker> = clustersToAdd[myIndex];
 				var marker:GeniMapMarker = new GeniMapMarker(cluster);
 				if(this.userResourcesOnly) {
 					var slice:Slice = null;
-					if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.length>0)
+					if(this.selectedSlice != null
+							&& this.selectedSlice.urn != null
+							&& this.selectedSlice.urn.full.length>0)
 						slice = selectedSlice;
 					marker.setUser(slice);
 				}
@@ -376,11 +409,9 @@ package protogeni.display.mapping
 						trace("Clusters added:" + idx);
 					return;
 				}
-				//if(idx == MAX_WORK)
-				//	return;
 			}
 			clustersToAdd = null;
-
+			
 			myState = DONE;
 		}
 	}

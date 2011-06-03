@@ -1,56 +1,106 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2009 University of Utah and the Flux Group.
- * All rights reserved.
- *
- * Permission to use, copy, modify and distribute this software is hereby
- * granted provided that (1) source code retains these copyright, permission,
- * and disclaimer notices, and (2) redistributions including binaries
- * reproduce the notices in supporting documentation.
- *
- * THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
- * CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
- * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- */
- 
- package protogeni.resources
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
+package protogeni.resources
 {	
-	import mx.collections.ArrayCollection;
+	import com.google.maps.LatLng;
+	import com.google.maps.services.ClientGeocoder;
+	import com.google.maps.services.GeocodingEvent;
+	import com.google.maps.services.Placemark;
 	
 	// Group of physical nodes located in one area
 	public class PhysicalNodeGroup
 	{
+		public var owner:PhysicalNodeGroupCollection = null;
+		
 		public var latitude:Number;
 		public var longitude:Number;
 		public var country:String;
+		
 		[Bindable]
 		public var city:String = "";
 		
-		public var owner:PhysicalNodeGroupCollection = null;
-		public var collection:ArrayCollection = new ArrayCollection;
+		public var collection:Vector.<PhysicalNode>;
 		public var links:PhysicalLinkGroup = null;
 		
-		public function PhysicalNodeGroup(lat:Number = -1, lng:Number = -1, cnt:String = "", own:PhysicalNodeGroupCollection = null)
+		[Bindable]
+		public var original:PhysicalNodeGroup = null;
+		
+		public function PhysicalNodeGroup(lat:Number = -1,
+										  lng:Number = -1,
+										  cnt:String = "",
+										  own:PhysicalNodeGroupCollection = null,
+										  orig:PhysicalNodeGroup = null)
 		{
-			latitude = lat;
-			longitude = lng;
-			country = cnt;
-			owner = own;
+			this.collection = new Vector.<PhysicalNode>();
+			this.latitude = lat;
+			this.longitude = lng;
+			this.country = cnt;
+			this.owner = own;
+			this.original = orig;
+			if(this.original == null && !Main.offlineMode) {
+				this.Geocode();
+			}
+		}
+		
+		public function Geocode():void {
+			try {
+				var geocoder:ClientGeocoder = new ClientGeocoder();
+				geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
+					function(event:GeocodingEvent):void {
+						var placemarks:Array = event.response.placemarks;
+						if (placemarks.length > 0) {
+							try {
+								var p:Placemark = event.response.placemarks[0] as Placemark;
+								var fullAddress : String = p.address;
+								var splitAddress : Array = fullAddress.split(',');
+								if(splitAddress.length == 3)
+									city = splitAddress[0];
+								else 
+									if(splitAddress.length == 4)
+										city = splitAddress[1];
+									else
+										city = fullAddress;
+								//nodeGroup.city = groupInfo.city;
+							} catch (err:Error) { }
+						}
+					});
+				
+				geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
+					function(event:GeocodingEvent):void {
+						//Main.log.appendMessage(
+						//	new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
+					});
+				
+				geocoder.reverseGeocode(new LatLng(latitude, longitude));
+			} catch(e:Error) {}
 		}
 		
 		public function Add(n:PhysicalNode):void {
-			collection.addItem(n);
+			this.collection.push(n);
 		}
-
+		
 		public function GetByUrn(urn:String):PhysicalNode {
-			for each ( var n:PhysicalNode in collection ) {
-				if(n.urn == urn)
+			for each ( var n:PhysicalNode in this.collection ) {
+				if(n.id == urn)
 					return n;
 			}
 			return null;
 		}
 		
 		public function GetByName(name:String):PhysicalNode {
-			for each ( var n:PhysicalNode in collection ) {
+			for each ( var n:PhysicalNode in this.collection ) {
 				if(n.name == name)
 					return n;
 			}
@@ -59,9 +109,9 @@
 		
 		public function GetByType(type:String):PhysicalNodeGroup {
 			var group:PhysicalNodeGroup = new PhysicalNodeGroup();
-			for each ( var n:PhysicalNode in collection ) {
-				for each ( var nt:NodeType in n.types ) {
-					if(nt.name == type) {
+			for each ( var n:PhysicalNode in this.collection ) {
+				for each ( var nt:String in n.hardwareTypes ) {
+					if(nt == type) {
 						group.Add(n);
 						break;
 					}
@@ -72,7 +122,7 @@
 		
 		public function Available():Number {
 			var cnt:Number = 0;
-			for each ( var n:PhysicalNode in collection ) {
+			for each ( var n:PhysicalNode in this.collection ) {
 				if(n.available)
 					cnt++;
 			}
@@ -81,13 +131,18 @@
 		
 		public function ExternalLinks():Number {
 			var cnt:Number = 0;
-			for each ( var n:PhysicalNode in collection ) {
+			for each ( var n:PhysicalNode in this.collection ) {
 				for each ( var l:PhysicalLink in n.GetLinks() ) {
 					if(l.owner != n.owner.links)
 						cnt++;
 				}
 			}
 			return cnt;
+		}
+		
+		public function GetManager():GeniManager
+		{
+			return this.collection[0].manager;
 		}
 	}
 }

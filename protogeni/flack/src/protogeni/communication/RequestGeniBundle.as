@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,29 +14,37 @@
 
 package protogeni.communication
 {
-  import protogeni.Util;
-  import protogeni.resources.GeniManager;
-  import protogeni.resources.ProtogeniComponentManager;
+  import com.mattism.http.xmlrpc.MethodFault;
+  
+  import flash.events.ErrorEvent;
 
-  public class RequestGeniBundle extends Request
+  public final class RequestGeniBundle extends Request
   {
-	  
-    public function RequestGeniBundle() : void
+    public function RequestGeniBundle():void
     {
-		super("CertBundle", "Getting cert bundle", null, true);
+		super("CertBundle",
+			"Getting cert bundle",
+			null,
+			true);
 		op.setExactUrl(Main.geniHandler.certBundleUrl);
 		op.type = Operation.HTTP;
 		op.timeout = 20;
 	}
 	
-	override public function complete(code : Number, response : Object) : *
+	override public function complete(code:Number, response:Object):*
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			Main.setCertBundle(response as String);
+			FlackCache.geniBundle = response as String;
 		}
 		
 		return null;
+	}
+	
+	override public function fail(event:ErrorEvent, fault:MethodFault):*
+	{
+		if(FlackCache.geniBundle.length == 0)
+			FlackCache.geniBundle = (new FallbackGeniBundle()).toString();
 	}
   }
 }

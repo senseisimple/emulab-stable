@@ -1,54 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						width="500" height="500"
-						title="Node Information">
+						title="Node Information" xmlns:components="protogeni.display.components.*">
+	<fx:Declarations>
+		<s:RadioButtonGroup id="boundGroup" change="setBinding()" />
+	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
+			import mx.collections.ArrayList;
 			import mx.controls.Alert;
-			import mx.events.FlexEvent;
+			import mx.events.CloseEvent;
 			
+			import protogeni.display.components.XmlWindow;
 			import protogeni.resources.DiskImage;
-			import protogeni.resources.Sliver;
+			import protogeni.resources.ExecuteService;
+			import protogeni.resources.GeniManager;
+			import protogeni.resources.InstallService;
+			import protogeni.resources.Pipe;
+			import protogeni.resources.PipeCollection;
+			import protogeni.resources.ProtogeniRspecProcessor;
+			import protogeni.resources.SliverType;
+			import protogeni.resources.VirtualInterface;
 			import protogeni.resources.VirtualLink;
+			import protogeni.resources.VirtualLinkCollection;
 			import protogeni.resources.VirtualNode;
+			import protogeni.resources.VirtualNodeCollection;
 			
+			import spark.components.NumericStepper;
+			import spark.primitives.BitmapImage;
 			import spark.primitives.Rect;
 			
 			[Bindable]
 			public var node:VirtualNode = null;
 			
 			[Bindable]
-			private var images:ArrayCollection;
+			private var sliverTypes:ArrayList;
+			
+			public var sn:SliceNode;
+			
+			[Bindable]
+			private var pipes:ArrayCollection;
 			
 			public function loadNode(n:VirtualNode):void {
 				node = n;
-				if(node.physicalNode != null)
-					physicalButton.visible = true;
-				imgExclusive.source = DisplayUtil.assignIcon(!n.isShared);
-				if(n.isShared) imgExclusive.toolTip = "Not exclusive";
-				else imgExclusive.toolTip = "Exclusive";
-				
-				this.diskImageText.text = n.getDiskImageShort();
-				
-				images = new ArrayCollection();
-				for each(var di:DiskImage in node.physicalNode.diskImages)
-					images.addItem(di);
-				
-				this.starupCommandText.text = n.startupCommand;
-				this.tarfilesText.text = n.tarfiles;
+
+				if(n.manager.type == GeniManager.TYPE_PROTOGENI) {
+					previewRspecButton.includeInLayout = true;
+					previewRspecButton.visible = true;
+				}
 				
 				if(node.rspec != null)
-					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteCodeIcon);
-				
+					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
 				if(node.error != null && node.error.length > 0)
 				{
 					errorButton.includeInLayout = true;
 					errorButton.visible = true;
 				}
-				
 				switch(node.status)
 				{
 					case VirtualNode.STATUS_READY:
@@ -64,20 +92,79 @@
 					default:
 				}
 				
-				loadSlices();
 				loadHierarchy();
+				
+				if(node.isDelayNode) {
+					this.bindingDelayRadiobutton.selected = true;
+					this.bindingPhysicalRadiobutton.enabled = false;
+				}
+				else if(node.physicalNode != null)
+				{
+					this.bindingPhysicalRadiobutton.selected = true;
+					physicalVgroup.addElement(DisplayUtil.getPhysicalNodeButton(node.physicalNode));
+				}
+				else
+				{
+					this.bindingVirtualRadiobutton.selected = true;
+					this.exclusiveCheckbox.selected = node.Exclusive;
+					this.bindingPhysicalRadiobutton.enabled = false;
+				}
+				setBinding();
+				
+				this.installFileTypeList.selectedIndex = 0;
+				if(node.installServices.length > 0) {
+					this.installUrlText.text = node.installServices[0].url;
+					this.installFileTypeList.textInput.text = node.installServices[0].fileType;
+					this.installPathText.text = node.installServices[0].installPath;
+				}
+				
+				if(node.executeServices.length > 0) {
+					this.executeShellText.text = node.executeServices[0].shell;
+					this.executeCommandText.text = node.executeServices[0].command;
+				}
+
+				sliverTypes = new ArrayList();
+				if(node.physicalNode != null) {
+					var toSelect:Object = null;
+					for each(var sliverType:SliverType in node.physicalNode.sliverTypes) {
+						for each(var diskImage:DiskImage in sliverType.diskImages) {
+							var newSliverType:Object = new Object();
+							newSliverType.name = sliverType.name;
+							newSliverType.diskLongName = diskImage.name;
+							if(diskImage.name == n.diskImage)
+								toSelect = newSliverType;
+							newSliverType.diskShortName = DiskImage.getDiskImageShort(diskImage.name, node.manager);
+							newSliverType.diskDescription = diskImage.description;
+							newSliverType.diskOs = diskImage.os;
+							newSliverType.diskVersion = diskImage.version;
+							sliverTypes.addItem(newSliverType);
+						}
+					}
+					if(toSelect != null)
+						this.diskImageSelect.selectedItem = toSelect;
+				}
+				
+				if(node.loginServices.length > 0) {
+					this.loginText.text = node.loginServices[0].authentication + " on ";
+					if(node.loginServices[0].username.length > 0)
+						this.loginText.text += node.loginServices[0].username + "@";
+					this.loginText.text += node.loginServices[0].hostname + ":" + node.loginServices[0].port;
+				} else
+					this.loginText.text = "None established";
+
+				loadSlices();
 			}
 			
 			public function loadSlices():void {
 				linksVbox.removeAllElements();
-				var connectedNodes:ArrayCollection = node.GetAllNodes();
+				var connectedNodes:VirtualNodeCollection = node.GetAllNodes();
 				
-				for each(var connectedNode:VirtualNode in connectedNodes)
+				for each(var connectedNode:VirtualNode in connectedNodes.collection)
 				{
 					linksVbox.addElement(DisplayUtil.getVirtualNodeButton(connectedNode));
 					
-					var connectedLinks:ArrayCollection = node.GetLinks(connectedNode);
-					for each(var connectedLink:VirtualLink in connectedLinks)
+					var connectedLinks:VirtualLinkCollection = node.GetLinks(connectedNode);
+					for each(var connectedLink:VirtualLink in connectedLinks.collection)
 					{
 						var pointLinkHbox:HGroup = new HGroup();
 						var space:Rect = new Rect();
@@ -92,53 +179,94 @@
 			public function loadHierarchy():void
 			{
 				hierarchyVbox.removeAllElements();
-				
+
 				// Manager
 				var managerHbox:HGroup = new HGroup();
-				var managerLabel:Label = new Label();
-				managerLabel.text = "Hosted on";
-				managerHbox.addElement(managerLabel);
+				managerHbox.verticalAlign = "middle";
+				managerHbox.gap = 4;
+				managerHbox.addElement(DisplayUtil.getLabel("Hosted on"));
 				managerHbox.addElement(DisplayUtil.getGeniManagerButton(node.manager));
 				hierarchyVbox.addElement(managerHbox);
 				
 				// Parent node info
-				var parentNodeHbox:HGroup = new HGroup();
-				var parentNodeLabel:Label = new Label();
-				parentNodeHbox.addElement(parentNodeLabel);
-				hierarchyVbox.addElement(parentNodeHbox);
 				if(node.superNode != null)
 				{
-					parentNodeLabel.text = "Subnode of";
+					var parentNodeHbox:HGroup = new HGroup();
+					parentNodeHbox.verticalAlign = "middle";
+					parentNodeHbox.gap = 4;
+					parentNodeHbox.addElement(DisplayUtil.getLabel("Subnode of"));
 					parentNodeHbox.addElement(DisplayUtil.getVirtualNodeButton(node.superNode));
-				}
-				else
-				{
-					parentNodeLabel.text = "No parent node";
+					hierarchyVbox.addElement(parentNodeHbox);
 				}
 				
 				// Child node info
-				var subNodesLabel:Label = new Label();
-				hierarchyVbox.addElement(subNodesLabel);
 				if(node.subNodes.length > 0)
 				{
-					subNodesLabel.text = "Subnodes:";
-					for each(var subNode:VirtualNode in node.subNodes)
+					hierarchyVbox.addElement(DisplayUtil.getLabel("Subnodes:"));
+					for each(var subNode:VirtualNode in node.subNodes.collection)
 					{
 						hierarchyVbox.addElement(DisplayUtil.getVirtualNodeButton(subNode));
 					}
 				}
-				else
-				{
-					subNodesLabel.text = "No subnodes";
+			}
+
+			public function loadDelayPipes():void {
+				pipes = new ArrayCollection();
+				for(var i:int = 0; i < this.node.interfaces.length; i++) {
+					var first:VirtualInterface = this.node.interfaces.collection[i];
+					if(first.id == "control")
+						continue;
+					for(var j:int = i+1; j < this.node.interfaces.length; j++) {
+						var second:VirtualInterface = this.node.interfaces.collection[j];
+						if(second.id == "control")
+							continue;
+
+						var firstPipe:Pipe = node.pipes.getFor(first, second);
+						if(firstPipe == null)
+							firstPipe = new Pipe(first, second, Math.min(first.capacity, second.capacity));
+						pipes.addItem(firstPipe);
+						
+						var secondPipe:Pipe = node.pipes.getFor(second, first);
+						if(secondPipe == null)
+							secondPipe = new Pipe(second, first, Math.min(first.capacity, second.capacity));
+						pipes.addItem(secondPipe);
+					}
 				}
 			}
 			
 			public function success():void
 			{
-				this.node.setDiskImage(diskImageText.text);
-				this.node.tarfiles = this.tarfilesText.text;
-				this.node.startupCommand = this.starupCommandText.text;
+				save();
 				closeWindow();
+			}
+			
+			public function save():void
+			{
+				this.node.clientId = this.idLabel.Text;
+				if(this.bindingPhysicalRadiobutton.selected) {
+					// currently can't select a physical node here
+				} else if(this.bindingVirtualRadiobutton.selected) {
+					node.Exclusive = this.exclusiveCheckbox.selected;
+					node.physicalNode = null;
+				} else if(this.bindingDelayRadiobutton.selected) {
+					node.Exclusive = true;
+					node.physicalNode = null;
+					node.isDelayNode = true;
+					node.pipes = new PipeCollection();
+					for each(var pipe:Pipe in pipes)
+						node.pipes.add(pipe);
+				}
+				
+				node.installServices = new Vector.<InstallService>();
+				if(this.installUrlText.text.length > 0) {
+					node.installServices.push(new InstallService(this.installUrlText.text, this.installPathText.text, this.installFileTypeList.textInput.text));
+				}
+				node.executeServices = new Vector.<ExecuteService>();
+				if(this.executeCommandText.text.length > 0) {
+					node.executeServices.push(new ExecuteService(this.executeCommandText.text, this.executeShellText.text));
+				}
+				this.node.setDiskImage(diskImageText.text);
+				Main.geniDispatcher.dispatchSliceChanged(node.sliver.slice);
 			}
 			
 			public function viewRspec():void
@@ -147,153 +275,181 @@
 				{
 					var rspecWindow:XmlWindow = new XmlWindow;
 					rspecWindow.showWindow();
-					rspecWindow.title = "Last Successful RSPEC from " + node.urn;
+					rspecWindow.title = "Last Successful RSPEC from " + node.sliverId;
 					rspecWindow.loadXml(node.rspec);
 				} else {
 					Alert.show("No previous RSPEC is available");
 				}
-				
+			}
+
+			public function previewRspec():void
+			{
+				Alert.show("This preview will not show any changes made if changes have been made without applying.  Would you like to apply any changes before previewing?",
+					"Apply?",
+					Alert.YES|Alert.NO|Alert.CANCEL,
+					this,
+					function closeEvent(event:CloseEvent):void {
+						switch(event.detail) {
+							case Alert.CANCEL:
+								return;
+							case Alert.YES:
+								save();
+							default:
+								var previewRspec:XmlWindow = new XmlWindow();
+								previewRspec.title = "Preview Request RSPEC for: " + node.clientId;
+								previewRspec.loadXml((node.manager.rspecProcessor as ProtogeniRspecProcessor).generateNodeRspec(node, true));
+								previewRspec.showWindow();
+						}
+					});
+			}
+
+			protected function setBinding():void
+			{
+				this.physicalVgroup.enabled = this.bindingPhysicalRadiobutton.selected;
+				this.virtualVgroup.enabled = this.bindingVirtualRadiobutton.selected;
+				if(this.bindingDelayRadiobutton.selected) {
+					detailsViewstack.selectedChild = this.delayView;
+					this.validateNow();
+					loadDelayPipes();
+				} else
+					detailsViewstack.selectedChild = this.detailsView;
 			}
 
 		]]>
 	</fx:Script>
 	
-	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
-		<mx:GridRow width="100%">
-			<mx:GridItem width="30">
+	<s:HGroup width="100%">
+		<display:KeyboardTextInput id="idLabel" Text="{node.clientId}" toolTip="{node.sliverId}" width="100%" />
+		<components:ImageButton id="rspecButton"
+							 icon="{ImageUtil.pageWhiteIcon}"
+							 click="viewRspec()"
+							 toolTip="View the most recent valid RSPEC" />
+		<components:ImageButton id="previewRspecButton"
+							 visible="false" includeInLayout="false"
+							 icon="{ImageUtil.pageCodeIcon}"
+							 click="previewRspec()"
+							 toolTip="Preview the Request RSPEC" />
+	</s:HGroup>
+	
+	<s:HGroup>
+		<s:Label text="Status" fontWeight="bold" />
+		<s:Label id="statusLabel" text="{node.status}" />
+		<components:ImageButton id="errorButton" includeInLayout="false" visible="false" click="Alert.show(node.error,'Error Message')" />
+		<s:Label text="State" fontWeight="bold" />
+		<s:Label id="stateLabel" text="{node.state}" />
+		<s:Label text="Slice" fontWeight="bold"/>
+		<s:Label text="{node.sliver.slice.hrn}" />
+	</s:HGroup>
+
+	<s:VGroup width="100%" id="hierarchyVbox" />
+	
+	<s:Label text="Binding" fontWeight="bold" />
+	<s:HGroup width="100%">
+		<s:VGroup width="33%">
+			<s:RadioButton id="bindingPhysicalRadiobutton" label="Physical" group="{boundGroup}" />
+			<s:VGroup id="physicalVgroup" />
+		</s:VGroup>
+		<s:VGroup width="33%">
+			<s:RadioButton id="bindingVirtualRadiobutton" label="Virtual" group="{boundGroup}" />
+			<s:VGroup id="virtualVgroup">
+				<s:CheckBox id="exclusiveCheckbox" label="Exclusive?" />
+			</s:VGroup>
+		</s:VGroup>
+		<s:VGroup width="33%">
+			<s:RadioButton id="bindingDelayRadiobutton" label="Delay" group="{boundGroup}" />
+		</s:VGroup>
+	</s:HGroup>
+	
+	<mx:ViewStack id="detailsViewstack" width="100%">
+		<s:NavigatorContent id="detailsView" width="100%">
+			<s:VGroup id="nodeOptionsVgroup" width="100%">
+				<s:Label text="Disk Image" fontWeight="bold" />
+				<s:DropDownList id="diskImageSelect" width="100%" prompt="Select image to override default"
+								dataProvider="{sliverTypes}" labelField="diskDescription"
+								change="diskImageText.text = diskImageSelect.selectedItem.diskLongName" />
+				<s:TextInput id="diskImageText" width="100%"
+							 text="{node.diskImage}"
+							 prompt="Select image above or manually type OSID" />
 				
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:HGroup>
-					<s:Label id="idLabel" text="{node.id}" fontSize="17" fontWeight="bold" width="100%" />
-					<display:ImageButton id="physicalButton"
-										 icon="{DisplayUtil.physicalNodeIcon}"
-										 click="DisplayUtil.viewPhysicalNode(node.physicalNode)"
-										 toolTip="View physical node" visible="false" />
-					<display:ImageButton id="rspecButton"
-										 icon="{DisplayUtil.pageWhiteIcon}"
-										 click="viewRspec()"
-										 toolTip="View the most recent valid RSPEC" />
+				<s:Label text="Install" fontWeight="bold" />
+				<s:HGroup width="100%" verticalAlign="middle">
+					<s:TextInput id="installUrlText" width="55%"
+								 prompt="Archive URL" />
+					<s:ComboBox id="installFileTypeList" width="15%" prompt="File type">
+						<s:dataProvider>
+							<s:ArrayList>
+								<fx:String>tar.gz</fx:String>
+							</s:ArrayList>
+						</s:dataProvider>
+					</s:ComboBox>
+					<s:Label text="in" />
+					<s:TextInput id="installPathText" width="30%" text="/"
+								 prompt="Install path" />
 				</s:HGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
 				
-			</mx:GridItem>
-			<mx:GridItem width="100%" id="quickInfoHbox">
-				<s:HGroup>
-					<s:Label text="Exclusive" fontWeight="bold"/>
-					<mx:Image id="imgExclusive"/>
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="Status" fontWeight="bold" />
-					<s:Label id="statusLabel" text="{node.status}" />
-					<display:ImageButton id="errorButton" includeInLayout="false" visible="false" click="Alert.show(node.error,'Error Message')" />
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="State" fontWeight="bold" />
-					<s:Label id="stateLabel" text="{node.state}" />
+				<s:Label text="Execute" fontWeight="bold" />
+				<s:HGroup width="100%" verticalAlign="middle">
+					<s:TextInput id="executeCommandText" width="90%"
+								 prompt="Command" />
+					<s:Label text="using" />
+					<s:TextInput id="executeShellText" width="10%" text="sh"
+								 prompt="Shell? (sh, bash, etc.)" />
 				</s:HGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="URN" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.urn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Sliver" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{(node.slivers.getItemAt(0) as Sliver).urn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Slice" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%" id="sliceButtonContainer">
-				<s:Label text="{(node.slivers.getItemAt(0) as Sliver).slice.hrn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Virt Type" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.virtualizationType}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Virt Subtype" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.virtualizationSubtype}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Manager" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%" height="100%" id="hierarchyVbox" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Hostname" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.hostname}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Disk Image" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup>
-					<display:PromptingTextInput id="diskImageText" width="100%"
-												prompt="Replace default with Image ID or full URN" />
-					<s:DropDownList id="diskImageSelect" width="100%"
-									dataProvider="{images}" labelField="description"
-									change="diskImageText.text = diskImageSelect.selectedItem.name" />
-				</s:VGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Tar files" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<display:PromptingTextInput id="tarfilesText" width="100%"
-											prompt="file(s) to install after disk image is loaded" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Startup cmd" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<display:PromptingTextInput id="starupCommandText" width="100%"
-											prompt="Command(s) to run after startup" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem>
-				<s:Label text="Links to" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%" height="100%" id="linksVbox" />
-			</mx:GridItem>
-		</mx:GridRow>
-	</mx:Grid>
-	<display:controlBarContent>
-		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.cancelIcon}" click="closeWindow();" height="24" />
-		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" height="24" />
-	</display:controlBarContent>
-</display:DefaultWindow>
+			</s:VGroup>
+		</s:NavigatorContent>
+		<s:NavigatorContent id="delayView" width="100%">
+			<s:DataGrid id="delayGrid" width="100%" height="100%" 
+						dataProvider="{pipes}"
+						rowHeight="24"
+						editable="true">
+				<s:columns>
+					<s:ArrayList>
+						<s:GridColumn headerText="Pipe" editable="false">
+							<s:itemRenderer>
+								<fx:Component>
+									<s:GridItemRenderer>
+										<s:HGroup height="100%" verticalAlign="middle" paddingLeft="2">
+											<s:Label text="{data.sourceName}" />
+											<s:BitmapImage source="{ImageUtil.rightIcon}" />
+											<s:Label text="{data.destName}" />
+										</s:HGroup>
+									</s:GridItemRenderer>
+								</fx:Component>
+							</s:itemRenderer>
+						</s:GridColumn>
+						<s:GridColumn dataField="capacity"
+									  headerText="Capacity"
+									  itemRenderer="protogeni.display.components.NumericGridRenderer"
+									  itemEditor="protogeni.display.components.NumericEditor">
+						</s:GridColumn>
+						<s:GridColumn dataField="latency" 
+									  headerText="Latency"
+									  itemRenderer="protogeni.display.components.NumericGridRenderer"
+									  itemEditor="protogeni.display.components.NumericEditor">
+						</s:GridColumn>
+						<s:GridColumn dataField="packetLoss" 
+									  headerText="Packet Loss"
+									  itemRenderer="protogeni.display.components.NumericGridRenderer"
+									  itemEditor="protogeni.display.components.NumericEditor">
+						</s:GridColumn>
+					</s:ArrayList> 
+				</s:columns>
+			</s:DataGrid> 
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup width="100%">
+		<s:Label text="Login" fontWeight="bold" />
+		<s:Label id="loginText" />
+	</s:HGroup>
+	
+	<s:Label text="Links to" fontWeight="bold"/>
+	<s:Scroller width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" id="linksVbox" />
+	</s:Scroller>
+
+	<components:controlBarContent>
+		<s:Button id="cancelButton" label="Cancel" icon="{ImageUtil.cancelIcon}" click="closeWindow();" height="24" />
+		<s:Button id="okButton" label="Apply" icon="{ImageUtil.availableIcon}" click="success();" height="24" />
+	</components:controlBarContent>
+</components:DefaultWindow>

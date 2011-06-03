@@ -1,19 +1,56 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	
-	public class VirtualNodeCollection extends ArrayCollection
+	public final class VirtualNodeCollection
 	{
-		public function VirtualNodeCollection(source:Array=null)
+		public var collection:Vector.<VirtualNode>;
+		public function VirtualNodeCollection()
 		{
-			super(source);
+			this.collection = new Vector.<VirtualNode>();
+			/*if(source != null) {
+			for each(var node:VirtualNode in source)
+			collection.push(node);
+			}*/
+		}
+		
+		public function add(n:VirtualNode):void {
+			this.collection.push(n);
+		}
+		
+		public function remove(n:VirtualNode):void
+		{
+			var idx:int = this.collection.indexOf(n);
+			if(idx > -1)
+				this.collection.splice(idx, 1);
+		}
+		
+		public function contains(n:VirtualNode):Boolean
+		{
+			return this.collection.indexOf(n) > -1;
+		}
+		
+		public function get length():int{
+			return this.collection.length;
 		}
 		
 		public function getById(id:String):VirtualNode
 		{
-			for each(var node:VirtualNode in this)
+			for each(var node:VirtualNode in this.collection)
 			{
-				if(node.id == id)
+				if(node.clientId == id)
 					return node;
 			}
 			return null;
@@ -21,7 +58,7 @@ package protogeni.resources
 		
 		public function getByInterfaceId(id:String):VirtualInterface
 		{
-			for each(var node:VirtualNode in this)
+			for each(var node:VirtualNode in this.collection)
 			{
 				var vi:VirtualInterface = node.interfaces.GetByID(id);
 				if(vi != null)
@@ -32,18 +69,12 @@ package protogeni.resources
 		
 		public function getByUrn(urn:String):VirtualNode
 		{
-			for each(var node:VirtualNode in this)
+			for each(var node:VirtualNode in this.collection)
 			{
-				if(node.urn == urn)
+				if(node.sliverId == urn)
 					return node;
 			}
 			return null;
-		}
-		
-		public function remove(n:VirtualNode):void
-		{
-			if(this.getItemIndex(n) > -1)
-				this.removeItemAt(this.getItemIndex(n));
 		}
 	}
 }

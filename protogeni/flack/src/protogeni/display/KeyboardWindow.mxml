@@ -1,20 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:ResizableTitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:ResizableTitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 							  xmlns:s="library://ns.adobe.com/flex/spark" 
 							  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 							  height="240" width="450"
 							  title="Onscreen Keyboard"
-							  contentCreationComplete="onCreationComplete()" close="onClose(event)">
-	<display:layout>
+							  contentCreationComplete="onCreationComplete()" close="onClose(event)" xmlns:components="protogeni.display.components.*">
+	<components:layout>
 		<s:VerticalLayout gap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
-	</display:layout>
+	</components:layout>
 	<fx:Script>
 		<![CDATA[
-			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
-			import mx.events.FlexEvent;
-			import mx.events.ResizeEvent;
-			import mx.managers.PopUpManager;
 			
 			import spark.components.TextInput;
 			
@@ -157,7 +171,7 @@
 		<display:KeyboardKey id="bslash" smallLetter="\" capitalLetter="|" click="key_click(event)" />
 	</s:HGroup>
 	<s:HGroup width="100%" height="20%" horizontalAlign="center" gap="2">
-		<mx:Spacer width="5%"/>
+		<s:Rect width="5%"/>
 		<display:KeyboardKey id="a" smallLetter="a" capitalLetter="A" click="key_click(event)" />
 		<display:KeyboardKey id="s" smallLetter="s" capitalLetter="S" click="key_click(event)" />
 		<display:KeyboardKey id="d" smallLetter="d" capitalLetter="D" click="key_click(event)" />
@@ -169,10 +183,10 @@
 		<display:KeyboardKey id="l" smallLetter="l" capitalLetter="L" click="key_click(event)" />
 		<display:KeyboardKey id="semi" smallLetter=";" capitalLetter=":" click="key_click(event)" />
 		<display:KeyboardKey id="quote" smallLetter="'" capitalLetter="&quot;" click="key_click(event)" />
-		<mx:Spacer width="5%"/>
+		<s:Rect width="5%"/>
 	</s:HGroup>
 	<s:HGroup width="100%" height="20%" horizontalAlign="center" gap="2">
-		<mx:Spacer width="10%"/>
+		<s:Rect width="10%"/>
 		<display:KeyboardKey id="zKey" smallLetter="z" capitalLetter="Z" click="key_click(event)" />
 		<display:KeyboardKey id="xKey" smallLetter="x" capitalLetter="X" click="key_click(event)" />
 		<display:KeyboardKey id="c" smallLetter="c" capitalLetter="C" click="key_click(event)" />
@@ -183,16 +197,16 @@
 		<display:KeyboardKey id="comma" smallLetter="," capitalLetter="&lt;" click="key_click(event)" />
 		<display:KeyboardKey id="period" smallLetter="." capitalLetter="&gt;" click="key_click(event)" />
 		<display:KeyboardKey id="fslash" smallLetter="/" capitalLetter="?" click="key_click(event)" />
-		<mx:Spacer width="10%"/>
+		<s:Rect width="10%"/>
 	</s:HGroup>
 	<s:HGroup width="100%" height="18%" horizontalAlign="center" gap="2">
-		<mx:Spacer width="5%"/>
-		<mx:Button width="15%" label="Shift" id="shift" click="toggleShift();" toggle="true" selected="{shiftEnabled}" height="100%" fontSize="12" />
-		<mx:Spacer width="5%"/>
+		<s:Rect width="5%"/>
+		<s:ToggleButton width="15%" label="Shift" id="shift" click="toggleShift();" selected="{shiftEnabled}" height="100%" fontSize="12" />
+		<s:Rect width="5%"/>
 		<display:KeyboardKey label="Space" width="50%" id="space" smallLetter=" " capitalLetter=" " click="key_click(event)"/>
-		<mx:Spacer width="5%"/>
-		<mx:Button width="15%" label="←" id="del" click="doDelete()" height="100%" fontSize="12" />
-		<mx:Spacer width="5%"/>
+		<s:Rect width="5%"/>
+		<s:Button width="15%" label="←" id="del" click="doDelete()" height="100%" fontSize="12" />
+		<s:Rect width="5%"/>
 	</s:HGroup>
 	
-</display:ResizableTitleWindow>
+</components:ResizableTitleWindow>
