@@ -272,11 +272,11 @@ if ($mailconfigfile) {
 #
 my @reflines;
 if ($testmode) {
-    my $fullref = `git rev-parse --symbolic-full-name $testbranch`;
+    my $fullref = `$GIT rev-parse --symbolic-full-name $testbranch`;
     if (!$fullref) {
 	    exit(1);
     }
-    my $newrev = `git rev-parse $fullref $STDERRNULL`;
+    my $newrev = `$GIT rev-parse $fullref $STDERRNULL`;
     chomp $newrev;
 
     #
@@ -444,7 +444,7 @@ sub change_type($$$) {
 #
 sub rev_type($) {
     my ($rev) = @_;
-    my $rev_type = `git cat-file -t '$rev' $STDERRNULL`;
+    my $rev_type = `$GIT cat-file -t '$rev' $STDERRNULL`;
     chomp $rev_type;
     return $rev_type;
 }
@@ -689,7 +689,7 @@ sub commit_mail($\@$@) {
     my $actionstring = ucfirst($ref_type) . ' ' . short_refname($refname) .
                        " has been $what_happened";
 
-    $short_rev = `git rev-parse --short $refname $STDERRNULL`;
+    $short_rev = `$GIT rev-parse --short $refname $STDERRNULL`;
     chomp $short_rev;
     $subject .= " ($short_rev)" if ($short_rev);
 
@@ -929,7 +929,7 @@ sub send_mail($$@) {
 #
 sub short_refname($) {
     my ($ref) = @_;
-    my $refname = `git rev-parse --abbrev-ref $ref $STDERRNULL`;
+    my $refname = `$GIT rev-parse --abbrev-ref $ref $STDERRNULL`;
     chomp $refname;
 
     # Fall back to full name if rev-parse fails for some reason
@@ -996,6 +996,8 @@ sub get_config($$) {
         $getcommand = "--get-all";
     }
 
+    # Note: We have to use 'git', not '$GIT' here, since the latter is fetched
+    # using this function
     my @value = `git config $getcommand $CONFIGBASE.$var`;
     chomp @value;
 
@@ -1028,7 +1030,7 @@ sub get_config($$) {
 sub get_merge_base($$)
 {
 	my ($rev_a, $rev_b) = @_;
-	my $mb = `git merge-base '$rev_a' '$rev_b'`;
+	my $mb = `$GIT merge-base '$rev_a' '$rev_b'`;
 	chomp $mb;
 
 	return $mb
