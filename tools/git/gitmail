@@ -219,7 +219,7 @@ sub uniq(@);
 sub flatten_arrayref($);
 sub commit_mail($\@$@);
 sub get_commits($$$);
-sub send_mail($$@);
+sub send_mail($$$@);
 sub short_refname($);
 sub debug(@);
 sub object_exists($$);
@@ -752,7 +752,8 @@ sub commit_mail($\@$@) {
 
         if ($separate_mail) {
             # Send this message by itself
-            send_mail($subject,$actionstring . join("",@body),@mailaddrs);
+            send_mail($subject,$actionstring . join("",@body),
+                short_refname($refname), @mailaddrs);
         } else {
             push @fullbody,\@body;
         }
@@ -765,6 +766,7 @@ sub commit_mail($\@$@) {
         send_mail($subject,
             $actionstring . join("\n" . "-"x72 . "\n\n",
                                  map { join "",@$_} @fullbody),
+            short_refname($refname),
             @mailaddrs);
     }
 }
@@ -858,8 +860,8 @@ sub get_commits($$$) {
 # If any parameters are references to lists, then we send a seperate peice
 # of mail to each of those lists
 #
-sub send_mail($$@) {
-    my ($subject, $body, @to) = @_;
+sub send_mail($$$@) {
+    my ($subject, $body, $refname, @to) = @_;
 
     #
     # Generate our own messageid - this will be helpful if we are sending
@@ -904,11 +906,11 @@ sub send_mail($$@) {
 
         #
         # Add an X-Git-Repo header to help people procmail
-        # TODO: Add branch too!
         #
         if (defined($reponame)) {
             print MAIL "X-Git-Repo: $reponame\n";
         }
+        print MAIL "X-Git-Ref: $refname\n";
 
         #
         # Marks end of headers
