@@ -4296,7 +4296,7 @@ sub CreateSliceFromCertificate($$)
     }
     my $expires = $credential->expires();
     # This is already a localtime.
-    my $when = localtime(strptime($expires));
+    my $when = timelocal(strptime($expires));
     # Reverts to default in Create if this fails
     if (defined($when)) {
 	my $diff = $when - time();
