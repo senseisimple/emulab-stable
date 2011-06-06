@@ -27,6 +27,7 @@ use Compress::Zlib;
 use MIME::Base64;
 use XML::LibXML;
 use Data::Dumper;
+use Frontier::RPC2;
 
 # Disable UUID checks in GeniCredential.
 $GeniCredential::CHECK_UUID = 0;
@@ -81,47 +82,49 @@ sub GetVersion()
     my $url = $me->url();
     $url =~ s/cm$/am/;
 
+    my $coder = Frontier::RPC2->new('use_objects' => 1);
+
     my $default_ad = {
 	"type" => "ProtoGENI",
-	"version" => "0.1" };
+	"version" => $coder->string("0.1") };
     my $request_0_1 = {
 	"type" => "ProtoGENI",
-	"version" => "0.1",
+	"version" => $coder->string("0.1"),
 	"schema" => "http://www.protogeni.net/resources/rspec/0.1/request.xsd",
 	"namespace" => "http://www.protogeni.net/resources/rspec/0.1",
 	"extensions" => []
     };
     my $request_0_2 = {
 	"type" => "ProtoGENI",
-	"version" => "0.2",
+	"version" => $coder->string("0.2"),
 	"schema" => "http://www.protogeni.net/resources/rspec/0.2/request.xsd",
 	"namespace" => "http://www.protogeni.net/resources/rspec/0.2",
 	"extensions" => []
     };
     my $request_2 = {
 	"type" => "ProtoGENI",
-	"version" => "2",
+	"version" => $coder->string("2"),
 	"schema" => "http://www.protogeni.net/resources/rspec/2/request.xsd",
 	"namespace" => "http://www.protogeni.net/resources/rspec/2",
 	"extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
     };
     my $ad_0_1 = {
         "type" => "ProtoGENI",
-        "version" => "0.1",
+        "version" => $coder->string("0.1"),
         "schema" => "http://www.protogeni.net/resources/rspec/0.1/ad.xsd",
         "namespace" => "http://www.protogeni.net/resources/rspec/0.1",
         "extensions" => []
     };
     my $ad_0_2 = {
         "type" => "ProtoGENI",
-        "version" => "0.2",
+        "version" => $coder->string("0.2"),
         "schema" => "http://www.protogeni.net/resources/rspec/0.2/ad.xsd",
         "namespace" => "http://www.protogeni.net/resources/rspec/0.2",
         "extensions" => []
     };
     my $ad_2 = {
         "type" => "ProtoGENI",
-        "version" => "2",
+        "version" => $coder->string("2"),
         "schema" => "http://www.protogeni.net/resources/rspec/2/ad.xsd",
         "namespace" => "http://www.protogeni.net/resources/rspec/2",
         "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
