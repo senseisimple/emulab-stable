@@ -1440,8 +1440,10 @@ sub Create($$$$$$)
     my $clearinghouse;
 
     my $linkname = GeniXML::GetVirtualId($linkrspec);
-    return undef
-	if (!defined($linkname));
+    if (!defined($linkname)) {
+	print STDERR "Could not create tunnel aggregate: Undefined linkname";
+	return undef;
+    }
     my @interfaces = GeniXML::FindNodes("n:interface_ref",
 					$linkrspec)->get_nodelist();
     
@@ -1458,8 +1460,10 @@ sub Create($$$$$$)
 
     my $aggregate = GeniAggregate->Create($slice, $owner, "Tunnel",
 					  $hrn, $linkname);
-    goto bad
-	if (!defined($aggregate));
+    if (!defined($aggregate)) {
+	print STDERR "Could not create tunnel aggregate: Undefined aggregate";
+	goto bad;
+    }
 
     #
     # Create a tunnel entry in the lans table.
@@ -1505,8 +1509,10 @@ sub Create($$$$$$)
 	    $manager1 = $manager_id;
 	}
 	my $interface = Interface->LookupControl($node1);
-	goto bad
-	    if (!defined($interface));
+	if (!defined($interface)) {
+	    print STDERR "Tunnel: Could not lookup control interface for $node1\n";
+	    goto bad;
+	}
 	$ctrlip1 = $interface->IP();
 	$iface1  = $tunnel->AddMember($node1);
 	if (!defined($iface1)) {
@@ -1562,8 +1568,10 @@ sub Create($$$$$$)
 	    $manager2 = $manager_id;
 	}
 	my $interface = Interface->LookupControl($node2);
-	goto bad
-	    if (!defined($interface));
+	if (!defined($interface)) {
+	    print STDERR "Tunnel: Could not lookup control interface for $node2\n";
+	    goto bad;
+	}
 	$ctrlip2 = $interface->IP();
 	$iface2  = $tunnel->AddMember($node2);
 	if (!defined($iface2)) {
