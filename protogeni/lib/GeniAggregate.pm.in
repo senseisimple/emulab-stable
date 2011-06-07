@@ -1429,6 +1429,7 @@ use GeniCertificate;
 use GeniRegistry;
 use GeniAggregate;
 use GeniUtil;
+use GeniXML;
 use Experiment;
 use Interface;
 use Data::Dumper;
@@ -1442,6 +1443,7 @@ sub Create($$$$$$)
     my $linkname = GeniXML::GetVirtualId($linkrspec);
     if (!defined($linkname)) {
 	print STDERR "Could not create tunnel aggregate: Undefined linkname";
+	print STDERR GeniXML::Serialize($linkrspec, 1);
 	return undef;
     }
     my @interfaces = GeniXML::FindNodes("n:interface_ref",
@@ -1462,7 +1464,7 @@ sub Create($$$$$$)
 					  $hrn, $linkname);
     if (!defined($aggregate)) {
 	print STDERR "Could not create tunnel aggregate: Undefined aggregate";
-	goto bad;
+	return undef;
     }
 
     #
@@ -1508,9 +1510,10 @@ sub Create($$$$$$)
 	    }
 	    $manager1 = $manager_id;
 	}
-	my $interface = Interface->LookupControl($node1);
+	my $interface = Interface->LookupControl($node1->isvirtnode() ?
+						 $node1->phys_nodeid() : $node1);
 	if (!defined($interface)) {
-	    print STDERR "Tunnel: Could not lookup control interface for $node1\n";
+	    print STDERR "No control interface for $node1\n";
 	    goto bad;
 	}
 	$ctrlip1 = $interface->IP();
@@ -1567,9 +1570,10 @@ sub Create($$$$$$)
 	    }
 	    $manager2 = $manager_id;
 	}
-	my $interface = Interface->LookupControl($node2);
+	my $interface = Interface->LookupControl($node2->isvirtnode() ?
+						 $node2->phys_nodeid() : $node2);
 	if (!defined($interface)) {
-	    print STDERR "Tunnel: Could not lookup control interface for $node2\n";
+	    print STDERR "No control interface for $node2\n";
 	    goto bad;
 	}
 	$ctrlip2 = $interface->IP();
