@@ -347,7 +347,9 @@ sub GetIp($$)
 {
     my ($ifaceref, $node) = @_;
     my $result = undef;
-    if (! IsVersion0($ifaceref)) {
+    if (IsVersion0($ifaceref)) {
+	$result = GetText("tunnel_ip", $ifaceref);
+    } else {
 	my $id = GetInterfaceId($ifaceref);
 	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
 	foreach my $iface (@ifaces) {
