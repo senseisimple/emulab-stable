@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -788,7 +788,9 @@ sub GenDefsFile($)
     # NS file is re-parsed to pick up additional info.
     #
     my $maxnodes = 0;
-    if (defined($experiment) && $experiment->elabinelab()) {
+    if (defined($experiment) && $experiment->elabinelab() &&
+	defined($experiment->maximum_nodes())) {
+	# The DB default is null.
 	$maxnodes = $experiment->maximum_nodes();
     }
     print TCL "set elabinelab_maxpcs $maxnodes\n\n";
