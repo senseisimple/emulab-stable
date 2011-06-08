@@ -114,6 +114,47 @@ else {
     $LTOUT = *LTMAP;
 }
 
+#
+# Thanks Jon. I took this from ipassign_wrapper.
+#
+my %bridges = ();
+my %bridged_links = ();
+# Link parent in an equivalence class.
+# ! exists implies that this is the root
+our %linkparents = ();
+
+sub getRoot($) {
+    my ($link) = @_;
+    while (exists($linkparents{$link})) {
+	$link = $linkparents{$link};
+    }
+    return $link;
+}
+
+sub mergeLink($$)
+{
+    my ($leftlink, $rightlink) = @_;
+    my $left = getRoot($leftlink);
+    my $right = getRoot($rightlink);
+    $linkparents{$left} = $right;
+}
+
+$query_result =
+    DBQueryFatal("select vname, vlink, vport from virt_bridges ".
+		 " where pid='$pid' and eid='$eid'");
+while (my ($bridgeid, $linkid, $vport) = $query_result->fetchrow_array) {
+    if (! exists($bridges{$bridgeid})) {
+	$bridges{$bridgeid} = [];
+    }
+    foreach $oldlink (@{ $bridges{$bridgeid} }) {
+	mergeLink($linkid, $oldlink);
+    }
+    push(@{ $bridges{$bridgeid} }, $linkid);
+}
+
+#print STDERR Dumper(\%bridges);
+#print STDERR Dumper(\%linkparents);
+
 my %nodes = ();
 my %ips   = ();
 my %lans  = ();
@@ -136,6 +177,10 @@ my $query_result =
 while (my ($vname) = $query_result->fetchrow_array()) {
     $nodes{$vname} = {};
     
+    # If this is a bridge node, skip.
+    next
+	if (exists($bridges{$vname}));
+
     print $LTOUT "h $vname\n";
 }
 $query_result =
@@ -145,46 +190,6 @@ $query_result =
 while (my ($vnode,$vport,$ip) = $query_result->fetchrow_array()) {
     $ips{"$vnode:$vport"} = $ip;
 }
-
-#
-# Thanks Jon. I took this from ipassign_wrapper.
-#
-my %bridges = ();
-# Link parent in an equivalence class.
-# ! exists implies that this is the root
-our %linkparents = ();
-
-sub getRoot($) {
-    my ($link) = @_;
-    while (exists($linkparents{$link})) {
-	$link = $linkparents{$link};
-    }
-    return $link;
-}
-
-sub mergeLink($$)
-{
-    my ($leftlink, $rightlink) = @_;
-    my $left = getRoot($leftlink);
-    my $right = getRoot($rightlink);
-    $linkparents{$left} = $right;
-}
-
-$query_result =
-    DBQueryFatal("select vname, vlink from virt_bridges ".
-		 " where pid='$pid' and eid='$eid'");
-while (my ($bridgeid, $linkid) = $query_result->fetchrow_array) {
-    if (! exists($bridges{$bridgeid})) {
-	$bridges{$bridgeid} = [];
-    }
-    foreach $oldlink (@{ $bridges{$bridgeid} }) {
-	mergeLink($linkid, $oldlink);
-    }
-    push(@{ $bridges{$bridgeid} }, $linkid);
-}
-
-#print STDERR Dumper(\%bridges);
-#print STDERR Dumper(\%linkparents);
 
 #
 # Generate the linktest config for links, which looks like:
@@ -198,7 +203,7 @@ while (my ($bridgeid, $linkid) = $query_result->fetchrow_array) {
 # lname is the user-given name of the link,
 # dropstyle is "droptail" or "gred".
 #
-my %virt_lans = ();
+my %raw_lans = ();
 
 $query_result =
     DBQueryFatal("select * from virt_lans ".
@@ -213,20 +218,21 @@ while (my $rowref = $query_result->fetchrow_hashref()) {
     #
     # Create a row for this lan, if we have not seen it already.
     #
-    if (!exists($virt_lans{$vname})) {
+    if (!exists($raw_lans{$vname})) {
 	my $rec = {};
 	$rec->{"MEMBERLIST"} = [];
 	$rec->{"MEMBERS"}    = {};
-	$virt_lans{$vname}   = $rec;
+	$raw_lans{$vname}    = $rec;
     }
-    $virt_lans{$vname}->{"MEMBERS"}->{$member} = $rowref;
-    push(@{$virt_lans{$vname}->{"MEMBERLIST"}}, $member);
+    $raw_lans{$vname}->{"MEMBERS"}->{$member} = $rowref;
+    push(@{$raw_lans{$vname}->{"MEMBERLIST"}}, $member);
 }
+my %virt_lans = %raw_lans;
 
 #
 # Post process for bridge nodes. 
 #
-if (0 && keys(%bridges)) {
+if (keys(%bridges)) {
     my %tmp_lans = ();
     
     foreach my $lan (keys(%virt_lans)) {
@@ -234,15 +240,19 @@ if (0 && keys(%bridges)) {
 	my @members = @{$virt_lans{$lan}->{"MEMBERLIST"}};
 	my $rec;
 
-	print "$lan:$vname @members\n";
+	#print STDERR "$lan:$vname @members\n";
 
 	if (!exists($tmp_lans{$vname})) {
 	    $rec = {};
 	    $rec->{"MEMBERLIST"} = [];
 	    $rec->{"MEMBERS"}    = {};
-	    $tmp_lans{$vname}   = $rec;
+	    $rec->{"BRIDGED"}    = 0;
+	    $tmp_lans{$vname}    = $rec;
 	}
 	$rec = $tmp_lans{$vname};
+	# Mark as being a bridged lan.
+	$rec->{"BRIDGED"}++
+	    if ($vname ne $lan);
 
 	foreach my $memb (@members) {
 	    my $member = $virt_lans{$lan}->{"MEMBERS"}->{$memb};
@@ -254,18 +264,15 @@ if (0 && keys(%bridges)) {
 	    push(@{$rec->{"MEMBERLIST"}}, $mem);
 	}
     }
-    foreach my $lan (keys(%tmp_lans)) {
-	my @members = @{$tmp_lans{$lan}->{"MEMBERLIST"}};
-
-	print "B $lan: @members\n";
-
-    }
+    %virt_lans = %tmp_lans;
 }
+
+#print STDERR Dumper(\%raw_lans);
 
 foreach my $lan (keys(%virt_lans)) {
     my @members = @{$virt_lans{$lan}->{"MEMBERLIST"}};
 
-#    print "$lan: @members\n";
+    #print "$lan: @members\n";
 
     if (@members == 2) {
 	my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$members[0]};
@@ -315,6 +322,170 @@ foreach my $lan (keys(%virt_lans)) {
 	    "l $node0 $node1 $ebw %.4f %.6f $lan $qtype0\n", $delay, $loss;
 	printf $LTOUT
 	    "l $node1 $node0 $rebw %.4f %.6f $lan $qtype1\n", $rdelay, $rloss;
+    }
+    elsif ($virt_lans{$lan}->{"BRIDGED"}) {
+	if (@members == 4) {
+	    #
+	    # A bridged link. Handled specially since the shaping parameters
+	    # are located in different places in the virt_lans entries.
+	    #
+	    # First find the bridge members
+	    #
+	    my @members = values(%{ $virt_lans{$lan}->{"MEMBERS"} });
+	    my @bridges = grep {defined($_->{'bridge_vname'})} @members;
+	    my $member0 = $bridges[0];
+	    my $member1 = $bridges[1];
+
+	    #
+	    # We get the bridge side of the links above, but we need the other
+	    # side of each link for the names to use in the output.
+	    #
+	    my ($node0, $node1);
+	    foreach my $member (@members) {
+		if ($member->{'vname'} eq $member0->{'vname'}) {
+		    $node0 = $member->{'vnode'}
+		      if ($member->{'vnode'} ne $member0->{'vnode'});
+		}
+		else {
+		    $node1 = $member->{'vnode'}
+		      if ($member->{'vnode'} ne $member1->{'vnode'});
+		}
+	    }
+
+	    my $delay0     = $member0->{"delay"} / 1000.0;
+	    my $loss0      = $member0->{"lossrate"};
+	    my $bw0        = $member0->{"bandwidth"} || 100000;
+	    my $qtype0     = "droptail";
+	    if ($member0->{"q_red"}) {
+		$qtype0 = ($member0->{"q_gentle"} ? "gred" : "red");
+	    }
+
+	    my $delay1     = $member1->{"delay"} / 1000.0;
+	    my $loss1      = $member1->{"lossrate"};
+	    my $bw1        = $member1->{"bandwidth"} || 100000;
+	    my $qtype1     = "droptail";
+	    if ($member1->{"q_red"}) {
+		$qtype1 = ($member1->{"q_gentle"} ? "gred" : "red");
+	    }
+	    my $bw = min($bw0, $bw1) * 1000;
+
+	    printf $LTOUT
+		"l $node0 $node1 $bw %.4f %.6f $lan $qtype0\n", $delay0, $loss0;
+	    printf $LTOUT
+		"l $node1 $node0 $bw %.4f %.6f $lan $qtype1\n", $delay1, $loss1;
+	}
+	else {
+	    #
+	    # A lan with attached bridge nodes.
+	    #
+	    foreach my $memb0 (@members) {
+		my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$memb0};
+		my $node0   = $member0->{"vnode"};
+
+		# Bridges are not part of the topology.
+		next
+		    if (exists($bridges{$node0}));
+
+		#print STDERR "S: $memb0\n";
+
+		#
+		# If this node is attached to a bridge, find it. It has the
+		# delay info for packets heading into the lan. This is
+		# complicated by the fact that not all of the nodes in the
+		# lan must be attached to a bridge (and thus delayed). 
+		#
+		my $origlan0  = $member0->{'vname'};
+		my @omembers = values(%{$raw_lans{$origlan0}->{"MEMBERS"}});
+		if (@omembers == 2) {
+		    #
+		    # Yep, a link. If its a lan, then this member is attached
+		    # directly to the lan with no delay. Get the member on the
+		    # other side of the link (the bridge side), it has the
+		    # delay params.
+		    #
+		    $member0 = ($omembers[0]->{'vnode'} eq $node0 ?
+				$omembers[1] : $omembers[0]);
+		}
+
+		my $delay0     = $member0->{"delay"};
+		my $loss0      = $member0->{"lossrate"};
+		my $bw0        = $member0->{"bandwidth"} || 100000;
+		my $qtype0     = "droptail";
+		if ($member0->{"q_red"}) {
+		    $qtype0 = ($member0->{"q_gentle"} ? "gred" : "red");
+		}
+
+		foreach my $memb1 (@members) {
+		    next
+			if ($memb0 eq $memb1);
+
+		    #print STDERR "D: $memb1\n";
+
+		    my $member1    = $virt_lans{$lan}->{"MEMBERS"}->{$memb1};
+		    my $node1      = $member1->{"vnode"};
+
+		    # Bridges are not part of the topology.
+		    next
+			if (exists($bridges{$node1}));
+
+		    my $origlan1 = $member1->{'vname'};
+		    my @omembers = values(%{$raw_lans{$origlan1}->{"MEMBERS"}});
+		    if (@omembers == 2) {
+			my $wanted;
+			
+			#
+			# Yep, a link. If its a lan, then this member is
+			# attached directly to the lan with no delay. We
+			# need to get the member on the other side of the
+			# link (the bridge side).
+			#
+			my $memberL = ($omembers[0]->{'vnode'} eq $node1 ?
+				       $omembers[1] : $omembers[0]);
+
+			#
+			# We get the bridgeid from that member.
+			#
+			my $bridgeid = $memberL->{'vnode'};
+
+			#
+			# Now we want the member on the other side of
+			# bridge, since that has the delay parameters for
+			# packets heading to the node. Search through the
+			# member list again looking for another (different)
+			# one attached to the bridge,
+			#
+			foreach my $membM (@members) {
+			    my $memberM = $virt_lans{$lan}->{"MEMBERS"}->{$membM};
+
+			    if ($memberM->{'vnode'} eq $bridgeid &&
+				$memberM->{'vport'} != $memberL->{'vport'}) {
+				$wanted = $memberM;
+				last;
+			    }
+			}
+			if (!defined($wanted)) {
+			    print STDERR "No bridge member for $member1\n";
+			}
+			else {
+			    $member1 = $wanted;
+			}
+		    }
+		    #print STDERR Dumper($member1);
+		    
+		    my $delay1    = $member1->{"delay"};
+		    my $loss1     = $member1->{"lossrate"};
+		    my $bw1       = $member1->{"bandwidth"} || 100000;
+
+		    my $delay = ($delay0+$delay1) / 1000.0;
+		    my $loss  = 1-(1-$loss0)*(1-$loss1);
+		    my $bw    = &min($bw0,$bw1) * 1000;
+
+		    printf $LTOUT
+			"l $node0 $node1 $bw %.4f %.6f $lan $qtype0\n",
+			$delay, $loss;
+		}
+	    }
+	}
     }
     else {
 	foreach my $memb0 (@members) {
@@ -427,6 +598,10 @@ while (my ($vname,$member,$mask,$cost,$bridgelink) =
 print $OUT "# nodes: vname,links\n";
 
 foreach my $node (sort keys(%nodes)) {
+    # If this is a bridge node, skip.
+    next
+	if (exists($bridges{$node}));
+    
     print $OUT "$node,";
     print $OUT join(" ", values(%{ $nodes{$node} }));
     print $OUT "\n";
@@ -573,6 +748,7 @@ if ($query_result->numrows) {
     if ($query_result->numrows) {
 	while (my ($memb,$vlan,$imac,$vmac,$vtype,$iface,$noshape) =
 	       $query_result->fetchrow_array) {
+	    $vlan = getRoot($vlan);
 	    if (exists($virt_lans{$vlan}->{"MEMBERS"}->{$memb})) {
 		my $member = $virt_lans{$vlan}->{"MEMBERS"}->{$memb};
 		if (defined($vmac)) {
@@ -620,6 +796,10 @@ if ($havepmap) {
 	foreach my $memb0 (@members) {
 	    my $member0 = $virt_lans{$vlan}->{"MEMBERS"}->{$memb0};
 	    my $node0 = $member0->{"vnode"};
+	    
+	    # If this is a bridge node, skip.
+	    next
+		if (exists($bridges{$node0}));
 
 	    my $mac0 = $member0->{"mac"};
 	    if (!defined($mac0)) {
@@ -632,8 +812,13 @@ if ($havepmap) {
 	    foreach my $memb1 (@members) {
 		next
 		    if ($memb0 eq $memb1);
+		
 		my $member1 = $virt_lans{$vlan}->{"MEMBERS"}->{$memb1};
 		my $node1 = $member1->{"vnode"};
+
+		# If this is a bridge node, skip.
+		next
+		    if (exists($bridges{$node1}));
 
 		print $LTPOUT
 		    "L $node0 $node1 $vlan $mac0 $encap0 $dstyle0\n";

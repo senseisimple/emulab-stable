@@ -82,6 +82,7 @@ Node instproc init {s} {
 
     # If this is a bridge, list of the link members that connect to it.
     $self set bridgelist {}
+    $self set isbridgenode 0
 
     # These are just various strings that we pass through to the DB.
     $self set cmdline ""
@@ -123,8 +124,10 @@ Node instproc init {s} {
 Bridge instproc init {s} {
     $self next $s
     $self instvar role
+    $self instvar isbridgenode
 
     set role "bridge"
+    set isbridgenode 1
 }
 
 # The following procs support renaming (see README)

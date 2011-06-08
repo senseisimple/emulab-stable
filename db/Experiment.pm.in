@@ -4208,7 +4208,7 @@ sub LinkTestCapable($$)
 		    "     r.eid=v.eid and r.vname=v.vname ".
 		    "left join nodes as n on n.node_id=r.node_id ".
 		    "left join os_info as o on o.osid=n.def_boot_osid ".
-		    "where v.exptidx='$idx'");
+		    "where v.exptidx='$idx' and v.role!='bridge'");
     return -1
 	if (!defined($query_result));
 

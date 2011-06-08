@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1030,7 +1030,7 @@ proc tb-set-node-lan-params {node lan delay bw loss} {
 }
 
 proc tb-set-node-failure-action {node type} {
-    if {[$node info class] != "Node"} {
+    if {[$node info class] != "Node" && [$node info class] != "Bridge"} {
 	perror "\[tb-set-node-failure-action] $node is not a node."
 	return
     }

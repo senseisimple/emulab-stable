@@ -6314,6 +6314,7 @@ sub InitializePhysNode($$$)
 		$osid = ($self->option("delay_osid") || $pnode->delay_osid());
 		$cmdline = $self->osidbootcmd($osid, "delay", "");
 		$role = TBDB_RSRVROLE_DELAYNODE();
+		$routertype = TBDB_ROUTERTYPE_NONE;
 	    }
 	    elsif (defined($inner_elab_role) &&
 		   ($inner_elab_role eq "boss" ||

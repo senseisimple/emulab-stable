@@ -597,7 +597,8 @@ Simulator instproc run {} {
     foreach node [lsort [array names node_list]] {
 	$node updatedb "sql"
 
-	if { $default_sync_server == {} && ![$node set issubnode] } {
+	if { $default_sync_server == {} &&
+	     ![$node set issubnode] && ![$node set isbridgenode]} {
 	    set default_sync_server $node
 	}
     }
