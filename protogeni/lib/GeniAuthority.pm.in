@@ -518,6 +518,23 @@ sub Resolve($$)
 	print STDERR "Need an RPC context to generate a self credential\n";
 	return undef;
     }
+
+    #
+    # Gack, if this is an SFA, hand off to the registry module, since it 
+    # knows how to get to the registry.
+    #
+    if ($self->IsSFA()) {
+	my $registry = GeniRegistry::PLC->CreateFromAuthority($self);
+	if (!defined($registry)) {
+	    print "Could not create an SFA registry from $self\n";
+	    return undef;
+	}
+	return $registry->Resolve($urn);
+    }
+
+    #
+    # Otherwise we assume a PG authority, and all PG servers do Resolve.
+    #
     my $context = Genixmlrpc->GetContext();
     my $me      = GeniAuthority->Lookup($context->certificate()->uuid());
     if (!defined($me)) {

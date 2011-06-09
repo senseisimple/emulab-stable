@@ -492,7 +492,8 @@ sub GetTicketAuxAux($$$$$$$$$)
     # ticket is redeemed, it will expire according to the rspec request.
     # If nothing specified in the rspec, then it will expire when the
     # slice record expires, which was given by the expiration time of the
-    # slice credential.
+    # slice credential, or the local policy max_sliver_lifetime. See
+    # CreateSliceFromCertificate() in this file.
     #
     my $expires = GeniXML::GetExpires($rspec);
     if (defined($expires)) {
@@ -655,7 +656,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
     # Turn off fixnode; we will control this on the commandline.
     $virtexperiment->allowfixnode(0);
-    $virtexperiment->multiplex_factor(3);
+    $virtexperiment->multiplex_factor(1);
 
     #
     # An rspec is a structure that requests specific nodes. If those
@@ -2692,6 +2693,14 @@ sub SliverWorkAux($$$$$$$)
 		$message = "$linkname: Missing nodes for tunnels";
 		goto bad;
 	    }
+	    
+	    print STDERR Dumper([$node1sliver,
+				 $node2sliver,
+				 Serialize($linkref, 1),
+				 Serialize($node1rspec, 1),
+				 Serialize($node2rspec, 1)])
+		if (0);
+	    
 	    my $tunnel = GeniAggregate::Tunnel->Create($slice,
 						       $owner,
 						       $node1sliver,
@@ -4328,6 +4337,7 @@ sub CreateUserFromCertificate($)
 		 "a new encrypted SSL certificate.\n",
 		 $TBOPS, "BCC: protogeni-errors\@flux.utah.edu");
     }
+    my $urn = $certificate->urn();
 
     # Local users always exist.
     my $user = GeniUser->Lookup($certificate->urn(), 1);
@@ -4354,7 +4364,7 @@ sub CreateUserFromCertificate($)
     #
     # Check urn. Must be a "user" urn. The uid is checked in Create().
     #
-    my (undef,$type,$uid) = GeniHRN::Parse($certificate->urn());
+    my (undef,$type,$uid) = GeniHRN::Parse($urn);
     if (!defined($uid) || $type ne "user") {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Malformed user URN");
@@ -4373,39 +4383,40 @@ sub CreateUserFromCertificate($)
     my $email  = $certificate->email();
     my $username;
     if (!defined($email) || $email eq "" || $email eq "unknown") {
-	if (! $authority->IsSFA()) {
+	if (! defined($authority->url()) || !$authority->IsSFA()) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Your certificate does not include ".
 					"an email address");
 	}
-	#
-	# XXX: The SFA stores all records in the central registry, not at
-	# the SA like we do. 
-	#
-	my $registry = GeniRegistry->Create($certificate->urn());
+	print STDERR "No email address in certificate for $urn\n";
+	print STDERR "Trying to get email from $authority\n";
+
+	my $registry = GeniRegistry::PLC->CreateFromAuthority($authority);
 	if (!defined($registry)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not connect to PLC registry ".
+					"Could not get registry at $authority ".
 					"to get your email address");
 	}
-	my $blob;
-	    
-	if ($registry->Resolve($certificate->urn(), "User", \$blob) != 0) {
+
+	my $blob = $registry->Resolve($urn);
+	if (!defined($blob)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not resolve you at the PLC ".
-					"registry to get your email address");
+					"Could not resolve you at $registry ".
+					"to get your email address");
 	}
-	# Why does PLC resolve return an array of length one?
-	$email = $blob->[0]->{'email'};
+	# Why does PLC return an array?
+	$blob  = $blob->[0];
+	$email = $blob->{'email'};
 	if (!defined($email) || $email eq "") {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Your PLC registry record did ".
+					"Your authority record did ".
 					"not include your email address");
 	}
-	$username = $blob->[0]->{'first_name'}
-	    if (exists($blob->[0]->{'first_name'}));
-	$username = ($username ? "$username " : "") . $blob->[0]->{'last_name'}
-	    if (exists($blob->[0]->{'last_name'}));
+	# This is very PLC specific.
+	$username = $blob->{'first_name'}
+	    if (exists($blob->{'first_name'}));
+	$username = ($username ? "$username " : "") . $blob->{'last_name'}
+	    if (exists($blob->{'last_name'}));
 	$modify = 1;
     }
     $user = GeniUser->Create($certificate, $authority);
@@ -4431,18 +4442,15 @@ sub CreateAuthorityFromRegistry($)
     my ($certificate) = @_;
     my $authority;
 
-    if (defined($certificate->urn()) &&
-	GeniHRN::IsValid($certificate->urn())) {
-	my ($auth,$type,$id) = GeniHRN::Parse($certificate->urn());
-	my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
-	$authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
+    if (! (defined($certificate->urn()) &&
+	   GeniHRN::IsValid($certificate->urn()))) {
+	print STDERR "Cannot create authority: No URN in $certificate\n";
+	return undef;
     }
-    else {
-	# This prefix stuff will go away when fully converted to urns.
-	my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
+    my ($auth,$type,$id) = GeniHRN::Parse($certificate->urn());
+    my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
+    $authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
 
-	$authority = GeniAuthority->CreateFromRegistry("SA", "P${prefix}");
-    }
     if (!defined($authority)) {
 	print STDERR "Could not create authority from registry\n";
 	return undef;

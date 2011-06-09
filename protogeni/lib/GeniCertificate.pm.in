@@ -675,6 +675,11 @@ sub URL($)
 	print STDERR "Could not find url in $self\n";
 	return undef;
     }
+    # Make sure its really a URL!
+    if (! ($url =~ /^http/)) {
+	print STDERR "Not a valid url in $self: $url\n";
+	return undef;
+    }
     $self->{'CERT'}->{'uri'} = $url;
     $self->{'URL'} = $url;
     return $url;

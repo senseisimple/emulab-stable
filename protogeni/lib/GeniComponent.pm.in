@@ -442,11 +442,19 @@ sub Resolve($)
 	if (!defined($manager_version));
 
     #
+    # Need a credential to make this call. Seems kinda silly. 
+    #
+    if (!defined(Genixmlrpc->GetContext())) {
+	print STDERR "Need an RPC context to generate a self credential\n";
+	return undef;
+    }
+
+    #
     # XXX: The SFA stores all records in the central registry, not at
     # the CM like we do. 
     #
     if ($authority->IsSFA()) {
-	my $registry = GeniRegistry->Create($self->urn());
+	my $registry = GeniRegistry::PLC->CreateFromAuthority($authority);
 	return undef
 	    if (!defined($registry));
 
@@ -458,13 +466,6 @@ sub Resolve($)
 	return $blob->[0];
     }
 
-    #
-    # Need a credential to make this call. Seems kinda silly. 
-    #
-    if (!defined(Genixmlrpc->GetContext())) {
-	print STDERR "Need an RPC context to generate a self credential\n";
-	return undef;
-    }
     my $context = Genixmlrpc->GetContext();
     my $me      = GeniAuthority->Lookup($context->certificate()->uuid());
     if (!defined($me)) {

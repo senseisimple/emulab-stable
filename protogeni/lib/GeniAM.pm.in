@@ -26,6 +26,7 @@ use emutil;
 use Compress::Zlib;
 use MIME::Base64;
 use XML::LibXML;
+use URI;
 use Data::Dumper;
 use Frontier::RPC2;
 
@@ -249,12 +250,11 @@ sub auto_add_sa($)
     }
     my $url = $certificate->URL();
     if (!defined($url)) {
-        print STDERR "auto_add_sa: certificate does not have a URI extension";
-        return;
+        print STDERR "auto_add_sa: certificate does not have a URL extension\n";
     }
     my $urn = $certificate->urn();
     if (!defined($urn)) {
-        print STDERR "auto_add_sa: certificate does not have a URN extension";
+        print STDERR "auto_add_sa: certificate does not have a URN extension\n";
         return;
     }
     # Look to see if already registered.
@@ -267,20 +267,62 @@ sub auto_add_sa($)
 	    if ($certificate->SameCert($authority->GetCertificate()));
 
 	#
-	# Do nothing; needs more thought. The problem is that the caller
-	# could be from a conforming PG authority, and so setting the url
-	# to undef in the code below is wrong. We should probably probe the
-	# SA here, to see if it is conforming. Or maybe set the URL and not
-	# worry of the sliver registration throws an error. 
+	# Not sure what is the right thing yet ...
 	#
 	return;
     }
+    #
+    # We want the URL! 
+    #
+    # First get the list of registries from PLC.
+    my $registry = GeniRegistry::PLC->Create();
+    if (!defined($registry)) {
+	print STDERR "Cannot create a PLC registry object\n";
+	return;
+    }
+    my $blob;
+    if ($registry->GetRegistries(\$blob)) {
+	print STDERR "Cannot get PLC registry listing\n";
+	return;
+    }
+    print STDERR Dumper($blob);
 
-    # if we're auto adding an authority, set the url to null
-    # so the PG/Emulab machinery does not try to contact the
-    # dynamic sa. It probably won't respond to the PG/Emulab
-    # protocols.
-    $url = undef;
+    #
+    # Now look at the last signer certificate; this is the actual authority.
+    #
+    my $authcertstr = @$signers[scalar(@$signers) - 1];
+    my $authcert = GeniCertificate->LoadFromString($authcertstr);
+    if (!defined($authcert)) {
+        print STDERR "auto_add_sa: could not get certificate from $authcertstr\n";
+        return;
+    }
+    my $authurn = $authcert->urn();
+    if (!defined($authurn)) {
+        print STDERR "auto_add_sa: $authcert does not have a URN extension\n";
+        return;
+    }
+
+    #
+    # Now search ...
+    #
+    foreach my $ref (@$blob) {
+	if ($ref->{'urn'} eq $authurn) {
+	    $url = $ref->{'url'};
+	    last;
+	}
+    }
+    if (!defined($url)) {
+        print STDERR "auto_add_sa: could not get a URL for $authcert\n";
+	return;
+    }
+    #
+    # Gack. Replace the URL with a modified URL which says https.
+    # Why does PLC set the scheme to http?
+    #
+    my $uri = URI->new($url);
+    $uri->scheme("https");
+    $url = "$uri";
+    
     if (!GeniAuthority->Create($certificate, $url, "sa")) {
         print STDERR "auto_add_sa: unable to add authority\n";
         return;
