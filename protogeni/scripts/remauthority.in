@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -14,11 +14,12 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: remauthority [-c] <uuid>\n";
+    print "Usage: remauthority [-c | -m] <uuid>\n";
     exit(1);
 }
-my $optlist    = "c";
+my $optlist    = "cm";
 my $asch       = 0;
+my $ascm       = 0;
 
 sub fatal($);
 
@@ -32,6 +33,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"c"})) {
     $asch = 1;
 }
+if (defined($options{"m"})) {
+    $ascm = 1;
+}
 usage()
     if (@ARGV != 1);
 
@@ -40,6 +44,9 @@ my $uuid     = $ARGV[0];
 use vars qw($GENI_DBNAME);
 if ($asch) {
     $GENI_DBNAME = "geni-ch";
+}
+elsif ($ascm) {
+    $GENI_DBNAME = "geni-cm";
 }
 
 # Now we can load the libraries after setting the proper DB.
