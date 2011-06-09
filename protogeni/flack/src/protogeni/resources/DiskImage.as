@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Disk image used for a resource
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class DiskImage
 	{
 		public function DiskImage(newName:String = "",

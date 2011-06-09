@@ -16,6 +16,12 @@ package protogeni
 {
 	import mx.collections.ArrayCollection;
 	
+	/**
+	 * Various common values/functions used throughout the library
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class Util
 	{
 		public static const defaultRspecVersion:Number = 2;

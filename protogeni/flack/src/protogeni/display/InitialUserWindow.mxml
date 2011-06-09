@@ -24,17 +24,25 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
 						contentCreationComplete="onCreationComplete()" xmlns:components="protogeni.display.components.*">
+	
 	<fx:Script>
 		<![CDATA[
+			import com.hurlant.crypto.cert.X509Certificate;
+			import com.hurlant.crypto.rsa.RSAKey;
+			
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
 			
 			import protogeni.NetUtil;
+			import protogeni.Util;
 			import protogeni.resources.SliceAuthority;
 
 			private var certLoader:URLLoader;
 			private var closeAfter:Boolean = false;
+			
+			private var fr:FileReference;
 			
 			private static var certLocation:String = "/protogeni/getsslcert.php3";
 			private static var loginLocation:String = "/login.php3";
@@ -56,6 +64,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					this.height = 130;
 					this.width = 250;
 				}
+				
+				fr = new FileReference();
+				fr.addEventListener(Event.SELECT, onFileSelect);
+				fr.addEventListener(Event.COMPLETE, onFileComplete);
+				fr.addEventListener(IOErrorEvent.IO_ERROR, onFileIoError);
+				fr.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onFileSecurityError);
 			}
 			
 			public function trySubmit():void
@@ -200,17 +214,56 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						+ event.status, true, LogMessage.TYPE_END));
 					askToLogin();
 				}
-					
 			}
-
+			
+			protected function onFileBrowse(event:MouseEvent):void
+			{
+				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec)", "*.txt;*.xml;*.rspec")])
+			}
+			
+			public function onFileSelect(event:Event):void {
+				fr.load();
+			}
+			
+			public function onFileComplete(event:Event):void {
+				try{
+					Main.geniHandler.CurrentUser.sliceCredential = fr.data.readUTFBytes(fr.data.length);
+					
+					var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
+					var expires:Date = Util.parseProtogeniDate(cred.credential.expires);
+					if(expires < new Date()) {
+						Main.geniHandler.CurrentUser.sliceCredential = "";
+						Alert.show("The slice credential has expired on " + expires.toLocaleString() + ", try or create a newer slice");
+						return;
+					}
+					
+					sliceCredentialIcon.visible = true;
+				}catch(e:Error) { }
+			}
+			
+			private function onFileIoError(event:IOErrorEvent):void {
+				Alert.show(event.toString(), "IO Error");
+			}
+			
+			private function onFileSecurityError(event:SecurityErrorEvent):void {
+				Alert.show(event.toString(), "Security Error");
+			}
+			
 		]]>
 	</fx:Script>
 
-	<s:HGroup verticalAlign="middle" width="100%">
+	<s:HGroup width="100%" verticalAlign="middle">
 		<s:Image source="{ImageUtil.authorityIcon}" toolTip="Which authority are you registered with?" />
-		<s:DropDownList id="authorities" labelField="Name"  width="100%" height="24" requireSelection="true" 
+		<s:DropDownList id="authorities" labelField="Name"
+						width="100%" height="24"
+						requireSelection="true" 
 						dataProvider="{Main.geniHandler.GeniAuthorities}"
 						selectedItem="@{selectedAuthority}" />
+		
+		<s:Button label="Import slice credential" height="24"
+				  toolTip="Optionally use a slice credential which was saved to file"
+				  click="onFileBrowse(event)" />
+		<s:BitmapImage id="sliceCredentialIcon" source="{ImageUtil.availableIcon}" visible="false" />
 	</s:HGroup>
 	
 	<s:VGroup width="100%" height="100%" visible="{Main.useJavascript}" includeInLayout="{Main.useJavascript}">
@@ -218,7 +271,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			<s:CheckBox id="retrieveCertCheckbox" enabled="{selectedAuthority.workingCertGet}"
 						label="Automatically retrieve SSL Certificate? If not signed in, please sign in to"
 						selected="true" />
-			<s:Button label="{selectedAuthority.Authority}"  height="24" click="visitLogin();" />
+			<s:Button label="{selectedAuthority.Urn.authority}"  height="24" click="visitLogin();" />
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle">
 			<s:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
@@ -240,6 +293,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			<display:KeyboardTextInput id="passwordField" width="100%" creationComplete="passwordField.textInput.displayAsPassword = true; passwordField.setEnter(trySubmit);" prompt="Enter your passphrase" />
 			<s:CheckBox id="cacheCheckbox" label="Cache?" />
 		</s:HGroup>
+		
 	</s:VGroup>
 	<components:controlBarLayout>
 		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />

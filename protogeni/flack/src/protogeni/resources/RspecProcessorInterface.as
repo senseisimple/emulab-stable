@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Interface for processing any type of RSPEC
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public interface RspecProcessorInterface
 	{
 		// Process

@@ -15,8 +15,13 @@
 package protogeni.resources
 {
 	import com.mattism.http.xmlrpc.JSLoader;
-	
-	// ProtoGENI user information
+
+	/**
+	 * GENI user
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class GeniUser
 	{
 		[Bindable]
@@ -30,7 +35,7 @@ package protogeni.resources
 		public var name:String;
 		[Bindable]
 		public var authority:SliceAuthority;
-		public var credential:String;
+		public var userCredential:String = "";
 		public var keys:Array;
 		[Bindable]
 		public var urn:IdnUrn;
@@ -38,6 +43,16 @@ package protogeni.resources
 		public var slices:SliceCollection;
 		
 		public var hasSetupJavascript:Boolean = false;
+		
+		public var sliceCredential:String = "";
+		
+		public function get Credential():String {
+			if(userCredential != null && userCredential.length > 0)
+				return userCredential;
+			if(sliceCredential != null && sliceCredential.length > 0)
+				return sliceCredential;
+			return "";
+		}
 		
 		public function GeniUser()
 		{

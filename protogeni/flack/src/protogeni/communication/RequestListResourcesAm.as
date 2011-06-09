@@ -25,25 +25,32 @@ package protogeni.communication
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	
+	/**
+	 * Gets the manager's advertisement using the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestListResourcesAm extends Request
 	{
 		private var aggregateManager:AggregateManager;
 		
-		public function RequestListResourcesAm(newAm:AggregateManager):void
+		public function RequestListResourcesAm(newManager:AggregateManager):void
 		{
-			super("ListResourcesAm (" + StringUtil.shortenString(newAm.Url, 15) + ")",
-				"Listing resources for " + newAm.Url,
+			super("ListResourcesAm (" + StringUtil.shortenString(newManager.Url, 15) + ")",
+				"Listing resources for " + newManager.Url,
 				CommunicationUtil.listResourcesAm,
 				true,
 				true,
 				false);
 			ignoreReturnCode = true;
 			op.timeout = 60;
-			aggregateManager = newAm;
-			op.pushField([Main.geniHandler.CurrentUser.credential]);
+			aggregateManager = newManager;
+			
+			// Build up the args
+			op.pushField([Main.geniHandler.CurrentUser.Credential]);
 			op.pushField({geni_available:false, geni_compressed:true});	// geni_available:false = show all, true = show only available
-			op.setExactUrl(newAm.Url);
-			aggregateManager.lastRequest = this;
+			op.setExactUrl(newManager.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*

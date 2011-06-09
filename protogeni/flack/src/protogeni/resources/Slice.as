@@ -24,8 +24,13 @@ package protogeni.resources
 	import protogeni.communication.CommunicationUtil;
 	import protogeni.display.ChooseManagerWindow;
 	import protogeni.display.ImageUtil;
-	
-	// Slice that a user created in ProtoGENI
+
+	/**
+	 * Container for slivers
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class Slice
 	{
 		[Bindable]

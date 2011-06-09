@@ -57,7 +57,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function refresh(junk:* = null):void
 			{
-				this.credentialImage.visible = user.credential != null && user.credential.length > 0;
+				this.credentialImage.visible = user.Credential.length > 0;
 				this.keysImage.visible = user.keys != null && user.keys.length > 0;
 				slices.removeAllElements();
 				for each(var s:Slice in user.slices)

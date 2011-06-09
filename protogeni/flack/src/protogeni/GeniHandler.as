@@ -32,6 +32,12 @@ package protogeni
 	import protogeni.resources.VirtualNode;
 	
 	// Holds and handles all information regarding ProtoGENI
+	/**
+	 * Holds all of the current GENI data, possibly the most referenced variable. Only one is needed.
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class GeniHandler
 	{
 		[Bindable]
@@ -129,6 +135,7 @@ package protogeni
 		public function clearComponents() : void
 		{
 			Main.geniDispatcher.dispatchGeniManagersChanged(GeniEvent.ACTION_REMOVING);
+			Main.geniDispatcher.dispatchSlicesChanged(GeniEvent.ACTION_REMOVING);
 			this.GeniManagers = new GeniManagerCollection();
 			if(this.CurrentUser != null)
 				this.CurrentUser.slices = new SliceCollection();

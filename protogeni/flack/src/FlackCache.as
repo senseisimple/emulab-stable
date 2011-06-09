@@ -77,6 +77,7 @@ package
 			Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, updateManager);
 			Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, updateUser);
 			Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, updateSlice);
+			Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, updateSlices);
 		}
 		
 		public function updateManager(event:GeniEvent):void {
@@ -152,12 +153,30 @@ package
 			if(_offlineSharedObject == null)
 				return;
 			
-			_offlineSharedObject.data.credential = Main.geniHandler.CurrentUser.credential;
+			// only have one set
+			if(Main.geniHandler.CurrentUser.userCredential != null && Main.geniHandler.CurrentUser.userCredential.length > 0) {
+				_offlineSharedObject.data.userCredential = Main.geniHandler.CurrentUser.userCredential;
+				_offlineSharedObject.data.sliceCredential = "";
+			} else if (Main.geniHandler.CurrentUser.sliceCredential != null && Main.geniHandler.CurrentUser.sliceCredential.length > 0) {
+				_offlineSharedObject.data.sliceCredential = Main.geniHandler.CurrentUser.sliceCredential;
+				_offlineSharedObject.data.userCredential = "";
+			}
 			_offlineSharedObject.data.hrn = Main.geniHandler.CurrentUser.hrn;
 			_offlineSharedObject.data.keys = Main.geniHandler.CurrentUser.keys;
 			_offlineSharedObject.data.name = Main.geniHandler.CurrentUser.name;
 			_offlineSharedObject.data.uid = Main.geniHandler.CurrentUser.uid;
 			_offlineSharedObject.data.urn = Main.geniHandler.CurrentUser.urn.full;
+		}
+		
+		public static function updateSlices(event:GeniEvent):void {
+			if(event.action == GeniEvent.ACTION_REMOVING) {
+				if(_offlineSharedObject == null)
+					loadOfflineSharedObject();
+				if(_offlineSharedObject == null)
+					return;
+				
+				_offlineSharedObject.data.slices = [];
+			}
 		}
 		
 		public static function updateSlice(event:GeniEvent):void {
@@ -182,6 +201,7 @@ package
 			
 			var newSliceObject:Object = new Object();
 			newSliceObject.credential = slice.credential;
+			newSliceObject.expires = slice.expires;
 			newSliceObject.hrn = slice.hrn;
 			newSliceObject.urn = slice.urn.full;
 			
@@ -191,6 +211,7 @@ package
 					var newSliverObject:Object = new Object();
 					newSliverObject.managerUrn = sliver.manager.Urn.full;
 					newSliverObject.credential = sliver.credential;
+					newSliverObject.expires = sliver.expires;
 					newSliverObject.state = sliver.state;
 					newSliverObject.status = sliver.status;
 					newSliverObject.urn = sliver.urn.full;
@@ -250,7 +271,7 @@ package
 				{
 					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
 						if(sa.Url == tempSharedObject.data.authority) {
-							userAuthorityUrn = sa.Urn;
+							userAuthorityUrn = sa.Urn.full;
 							break;
 						}
 					}
@@ -285,7 +306,7 @@ package
 			if (_basicSharedObject != null && _basicSharedObject.size > 0)
 			{
 				for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-					if(sa.Urn == userAuthorityUrn) {
+					if(sa.Urn.full == userAuthorityUrn) {
 						Main.geniHandler.CurrentUser.authority = sa;
 						break;
 					}
@@ -420,7 +441,18 @@ package
 			if(offlineAvailable) {
 				try {
 					// get user info
-					Main.geniHandler.CurrentUser.credential = _offlineSharedObject.data.credential;
+					if(_offlineSharedObject.data.credential != null) {
+						Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.credential;
+						Main.geniHandler.CurrentUser.sliceCredential = "";
+						_offlineSharedObject.data.credential = null;
+					}
+					else {
+						if(_offlineSharedObject.data.userCredential != null && _offlineSharedObject.data.userCredential.length > 0)
+							Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.userCredential;
+						else if(_offlineSharedObject.data.sliceCredential != null)
+							Main.geniHandler.CurrentUser.sliceCredential = _offlineSharedObject.data.sliceCredential;
+					}
+					
 					Main.geniHandler.CurrentUser.hrn = _offlineSharedObject.data.hrn;
 					Main.geniHandler.CurrentUser.keys = _offlineSharedObject.data.keys;
 					Main.geniHandler.CurrentUser.name = _offlineSharedObject.data.name;
@@ -510,6 +542,7 @@ package
 				var newSlice:Slice = new Slice();
 				newSlice.creator = Main.geniHandler.CurrentUser;
 				newSlice.credential = sliceObject.credential;
+				newSlice.expires = sliceObject.expires;
 				newSlice.hrn = sliceObject.hrn;
 				newSlice.urn = new IdnUrn(sliceObject.urn);
 				
@@ -517,6 +550,7 @@ package
 					var newSliver:Sliver = newSlice.getOrCreateSliverFor(Main.geniHandler.GeniManagers.getByUrn(sliverObject.managerUrn));
 					newSliver.credential = sliverObject.credential;
 					newSliver.urn = new IdnUrn(sliverObject.urn);
+					newSliver.expires = sliverObject.expires;
 					newSliver.created = true;
 					newSliver.state = sliverObject.state;
 					newSliver.status = sliverObject.status;

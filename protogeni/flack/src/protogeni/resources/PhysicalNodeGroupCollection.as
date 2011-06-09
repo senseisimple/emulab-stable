@@ -15,8 +15,7 @@
 package protogeni.resources
 {
 	import flash.utils.Dictionary;
-	
-	// Collection of all physical node groups
+
 	public final class PhysicalNodeGroupCollection
 	{
 		public var owner:GeniManager;

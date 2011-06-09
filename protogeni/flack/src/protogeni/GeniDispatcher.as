@@ -21,6 +21,12 @@ package protogeni
 	import protogeni.resources.GeniUser;
 	import protogeni.resources.Slice;
 	
+	/**
+	 * Dispatches events to any listener for GENI-related events
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class GeniDispatcher extends EventDispatcher
 	{
 		public function GeniDispatcher(target:IEventDispatcher = null)
@@ -60,8 +66,10 @@ package protogeni
 										action));
 		}
 		
-		public function dispatchSlicesChanged():void {
-			dispatchEvent(new GeniEvent(GeniEvent.SLICES_CHANGED));
+		public function dispatchSlicesChanged(action:int = 0):void {
+			dispatchEvent(new GeniEvent(GeniEvent.SLICES_CHANGED,
+				Main.geniHandler.CurrentUser.slices,
+				action));
 		}
 		
 		public function dispatchLogsChanged(m:LogMessage = null):void {

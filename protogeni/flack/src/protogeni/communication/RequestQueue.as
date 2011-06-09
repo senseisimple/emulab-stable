@@ -14,6 +14,12 @@
 
 package protogeni.communication
 {
+	/**
+	 * Queue of requests
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class RequestQueue
 	{
 		public var head:RequestQueueNode;

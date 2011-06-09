@@ -21,6 +21,11 @@ package protogeni.communication
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Gets information for the slice like what managers have slivers.  Uses the ProtoGENI API
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliceResolve extends Request
 	{
 		private var slice:Slice;
@@ -38,7 +43,9 @@ package protogeni.communication
 				CommunicationUtil.resolve);
 			slice = s;
 			isCreating = willBeCreating;
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			
+			// Build up teh args
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("urn", slice.urn.full);
 			op.addField("type", "Slice");
 			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);

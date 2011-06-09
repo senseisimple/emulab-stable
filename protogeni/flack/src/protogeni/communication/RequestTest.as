@@ -14,6 +14,12 @@
 
 package protogeni.communication
 {
+	/**
+	 * Used for testing random things...
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestTest extends Request
 	{
 		public function RequestTest():void

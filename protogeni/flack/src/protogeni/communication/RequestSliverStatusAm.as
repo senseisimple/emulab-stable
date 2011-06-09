@@ -18,18 +18,26 @@ package protogeni.communication
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	
+	/**
+	 * Gets the sliver status using the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverStatusAm extends Request
 	{
 		private var sliver:Sliver;
 		
-		public function RequestSliverStatusAm(s:Sliver):void
+		public function RequestSliverStatusAm(newSliver:Sliver):void
 		{
 			super("SliverStatus",
-				"Getting the sliver status on " + s.manager.Hrn + " on slice named " + s.slice.hrn,
+				"Getting the sliver status on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
 				CommunicationUtil.sliverStatusAm,
 				true);
 			ignoreReturnCode = true;
-			sliver = s;
+			sliver = newSliver;
+			
+			// Build up the args
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
 			op.setExactUrl(sliver.manager.Url);

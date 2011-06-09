@@ -16,6 +16,12 @@ package protogeni.communication
 {
 	import protogeni.resources.Slice;
 	
+	/**
+	 * Used to see if a slice exists before trying to create a new one.  Uses the ProtoGENI API.
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliceRemove extends Request
 	{
 		private var slice:Slice;
@@ -26,7 +32,9 @@ package protogeni.communication
 				"Remove slice named " + s.hrn,
 				CommunicationUtil.remove);
 			slice = s;
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			
+			// Build up the args
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("hrn", slice.urn.full);
 			op.addField("type", "Slice");
 			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);

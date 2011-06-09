@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Physical link between nodes
+	/**
+	 * Link between two resources as described by a manager advertisement
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class PhysicalLink
 	{
 		public var owner:PhysicalLinkGroup;

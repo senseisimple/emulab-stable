@@ -15,12 +15,21 @@
 package protogeni.communication
 {
 	import protogeni.StringUtil;
+	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
+	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 	
+	/**
+	 * Gets the list of component managers from the clearinghouse using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestListComponents extends Request
 	{
 		private var startDiscoverResources:Boolean;
@@ -36,9 +45,14 @@ package protogeni.communication
 			startSlices = shouldStartSlices;
 		}
 		
+		/**
+		 * Called immediately before the operation is run to add variables it may not have had when added to the queue
+		 * @return Operation to be run
+		 * 
+		 */
 		override public function start():Operation
 		{
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			return op;
 		}
 		
@@ -97,8 +111,30 @@ package protogeni.communication
 					}
 				}
 				
-				if(startSlices)
-					newCalls.push(new RequestUserResolve());
+				if(startSlices) {
+					if(Main.geniHandler.CurrentUser.userCredential.length > 0)
+						newCalls.push(new RequestUserResolve());
+					else if(Main.geniHandler.CurrentUser.sliceCredential.length > 0) {
+						var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
+						Main.geniHandler.CurrentUser.urn = new IdnUrn(cred.credential.owner_urn);
+						
+						var userSlice:Slice = new Slice();
+						userSlice.urn = new IdnUrn(cred.credential.target_urn);
+						userSlice.credential = Main.geniHandler.CurrentUser.sliceCredential;
+						userSlice.expires = Util.parseProtogeniDate(cred.credential.expires);
+						userSlice.creator = Main.geniHandler.CurrentUser;
+						Main.geniHandler.CurrentUser.slices.add(userSlice);
+						/*
+						for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
+							var newSliver:Sliver = new Sliver(userSlice, manager);
+							newCalls.push(new RequestSliverListResourcesAm(newSliver));
+						}
+						Main.geniDispatcher.dispatchSlicesChanged();
+						*/
+						Main.geniDispatcher.dispatchUserChanged();
+						
+					}
+				}
 			}
 			else
 			{

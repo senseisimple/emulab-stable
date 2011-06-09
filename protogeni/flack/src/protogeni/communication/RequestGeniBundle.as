@@ -18,6 +18,12 @@ package protogeni.communication
   
   import flash.events.ErrorEvent;
 
+  /**
+   * Gets the current cert bundle from ProtoGENI
+   * 
+   * @author mstrum
+   * 
+   */
   public final class RequestGeniBundle extends Request
   {
     public function RequestGeniBundle():void

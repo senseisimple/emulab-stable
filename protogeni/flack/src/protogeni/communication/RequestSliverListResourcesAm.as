@@ -21,6 +21,12 @@ package protogeni.communication
 	import protogeni.StringUtil;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Gets the manifest for the sliver using the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverListResourcesAm extends Request
 	{
 		private var sliver:Sliver;
@@ -34,6 +40,8 @@ package protogeni.communication
 			ignoreReturnCode = true;
 			op.timeout = 60;
 			sliver = s;
+			
+			// Build up the args
 			op.pushField([sliver.slice.credential]);
 			op.pushField({geni_available:false, geni_compressed:true, geni_slice_urn:sliver.slice.urn.full});	// geni_available:false = show all, true = show only available
 			op.setExactUrl(sliver.manager.Url);
@@ -52,6 +60,9 @@ package protogeni.communication
 				
 				sliver.created = true;
 				sliver.parseRspec();
+				if(sliver.nodes.collection.length > 0 && !sliver.slice.slivers.contains(sliver))
+					sliver.slice.slivers.add(sliver);
+				
 				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 				return new RequestSliverStatusAm(sliver);
 				

@@ -14,9 +14,16 @@
 
 package protogeni.communication
 {
+	import protogeni.Util;
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Gets some info for the sliver like the sliver credential using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverGet extends Request
 	{
 		private var sliver:Sliver;
@@ -27,8 +34,10 @@ package protogeni.communication
 				CommunicationUtil.getSliver,
 				true);
 			sliver = s;
+			
+			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		
@@ -40,6 +49,7 @@ package protogeni.communication
 				sliver.credential = String(response.value);
 				var cred:XML = new XML(response.value);
 				sliver.urn = new IdnUrn(cred.credential.target_urn);
+				sliver.expires = Util.parseProtogeniDate(cred.credential.expires);
 				newCall = new RequestSliverResolve(sliver);
 			}
 			else if(code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)

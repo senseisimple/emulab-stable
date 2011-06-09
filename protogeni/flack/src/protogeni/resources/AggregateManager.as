@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Manager which impliments the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class AggregateManager extends GeniManager
 	{
 		public function AggregateManager()

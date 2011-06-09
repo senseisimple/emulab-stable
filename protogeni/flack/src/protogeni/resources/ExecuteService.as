@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Script to run on a resource post-create
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class ExecuteService
 	{
 		public var shell:String;

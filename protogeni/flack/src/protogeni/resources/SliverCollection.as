@@ -102,5 +102,15 @@ package protogeni.resources
 			}
 			return newSliver;
 		}
+		
+		public function expires():Date {
+			var d:Date = null;
+			for each(var sliver:Sliver in this.collection)
+			{
+				if(d == null || sliver.expires < d)
+					d = sliver.expires;
+			}
+			return d;
+		}
 	}
 }

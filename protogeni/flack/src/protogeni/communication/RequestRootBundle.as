@@ -19,6 +19,12 @@ package protogeni.communication
 	
 	import flash.events.ErrorEvent;
 	
+	/**
+	 * Gets the current ProtoGENI root bundle
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestRootBundle extends Request
 	{
 		public function RequestRootBundle():void

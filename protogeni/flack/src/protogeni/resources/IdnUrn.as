@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Unique resource identifier in the form: urn:publicid:IDN+authority+type+name
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class IdnUrn
 	{
 		[Bindable]

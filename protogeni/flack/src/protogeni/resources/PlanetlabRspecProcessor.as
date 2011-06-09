@@ -20,9 +20,15 @@ package protogeni.resources
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
 	
-	import protogeni.communication.RequestResolvePl;
+	import protogeni.communication.RequestResolvePlSites;
 	import protogeni.communication.RequestSitesLocation;
 	
+	/**
+	 * Processes SFA RSPECs for PlanetLab managers
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class PlanetlabRspecProcessor implements RspecProcessorInterface
 	{
 		public var callGetSites:Boolean = true;
@@ -154,6 +160,17 @@ package protogeni.resources
 		
 		public function processSliverRspec(s:Sliver):void
 		{
+			/*var networkXml:XMLList = s.rspec.children();
+			for each(var siteXml:XML in networkXml[0].children()) {
+				for each(var nodeXml:XML in siteXml.child("node")) {
+					if(nodeXml.child("sliver").length() > 0) {
+						var virtualNode:VirtualNode = new VirtualNode(s);
+						virtualNode.rspec = nodeXml;
+						virtualNode.setToPhysicalNode(manager.Nodes.GetByName(nodeXml.@id));
+						s.nodes.add(virtualNode);
+					}
+				}
+			}*/
 		}
 		
 		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean):XML

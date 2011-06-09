@@ -17,6 +17,12 @@ package protogeni.communication
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Slice;
 	
+	/**
+	 * Gets the user information and list of slices from the user's slice authority using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestUserResolve extends Request
 	{
 		public function RequestUserResolve():void
@@ -24,13 +30,20 @@ package protogeni.communication
 			super("UserResolve",
 				"Resolve user",
 				CommunicationUtil.resolve);
+			
+			// Build up the args
 			op.addField("type", "User");
 			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
+		/**
+		 * Called immediately before the operation is run to add variables it may not have had when added to the queue
+		 * @return Operation to be run
+		 * 
+		 */
 		override public function start():Operation
 		{
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("hrn", Main.geniHandler.CurrentUser.urn.full);
 			return op;
 		}

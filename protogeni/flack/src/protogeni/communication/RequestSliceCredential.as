@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
@@ -23,14 +24,22 @@ package protogeni.communication
 	{
 		private var slice:Slice;
 		
-		public function RequestSliceCredential(s:Slice):void
+		/**
+		 * Gets the slice credential from the user's slice authority using the ProtoGENI API
+		 * 
+		 * @param s slice which we need the credential for
+		 * 
+		 */
+		public function RequestSliceCredential(newSlice:Slice):void
 		{
 			super("SliceCredential",
-				"Getting the slice credential for " + s.hrn,
+				"Getting the slice credential for " + newSlice.hrn,
 				CommunicationUtil.getCredential,
 				true);
-			slice = s;
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			slice = newSlice;
+			
+			// Build up the args
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("urn", slice.urn.full);
 			op.addField("type", "Slice");
 			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
@@ -42,6 +51,10 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				slice.credential = String(response.value);
+				
+				var cred:XML = new XML(slice.credential);
+				slice.expires = Util.parseProtogeniDate(cred.credential.expires);
+				
 				Main.geniDispatcher.dispatchSliceChanged(slice);
 				for each(var s:Sliver in slice.slivers.collection) {
 					if(s.manager is AggregateManager)
@@ -49,6 +62,14 @@ package protogeni.communication
 					else if(s.manager is ProtogeniComponentManager)
 						newCalls.push(new RequestSliverGet(s));
 				}
+				
+				/*for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
+					if(manager is PlanetlabAggregateManager) {
+						if(manager.type == GeniManager.TYPE_PLANETLAB) {
+							newCalls.push(new RequestResolvePlSlice(manager as PlanetlabAggregateManager, slice));
+						}
+					}
+				}*/
 			}
 			else
 			{

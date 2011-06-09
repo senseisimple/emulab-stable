@@ -19,9 +19,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 <components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						xmlns:mx="library://ns.adobe.com/flex/mx"
+						xmlns:display="protogeni.display.*"
+						xmlns:components="protogeni.display.components.*"
 						title="PlanetLab Manager Information"
-						height="300" width="400" xmlns:components="protogeni.display.components.*">
+						height="400">
 	<fx:Script>
 		<![CDATA[
 			import protogeni.resources.PlanetlabAggregateManager;

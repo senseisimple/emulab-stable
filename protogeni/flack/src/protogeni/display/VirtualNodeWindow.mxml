@@ -124,21 +124,36 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 
 				sliverTypes = new ArrayList();
+				var toSelect:Object = null;
 				if(node.physicalNode != null) {
-					var toSelect:Object = null;
 					for each(var sliverType:SliverType in node.physicalNode.sliverTypes) {
-						for each(var diskImage:DiskImage in sliverType.diskImages) {
+						for each(var sliverDiskImage:DiskImage in sliverType.diskImages) {
 							var newSliverType:Object = new Object();
 							newSliverType.name = sliverType.name;
-							newSliverType.diskLongName = diskImage.name;
+							newSliverType.diskLongName = sliverDiskImage.name;
 							if(diskImage.name == n.diskImage)
 								toSelect = newSliverType;
-							newSliverType.diskShortName = DiskImage.getDiskImageShort(diskImage.name, node.manager);
-							newSliverType.diskDescription = diskImage.description;
-							newSliverType.diskOs = diskImage.os;
-							newSliverType.diskVersion = diskImage.version;
+							newSliverType.diskShortName = DiskImage.getDiskImageShort(sliverDiskImage.name, node.manager);
+							newSliverType.diskDescription = sliverDiskImage.description;
+							newSliverType.diskOs = sliverDiskImage.os;
+							newSliverType.diskVersion = sliverDiskImage.version;
 							sliverTypes.addItem(newSliverType);
 						}
+					}
+					if(toSelect != null)
+						this.diskImageSelect.selectedItem = toSelect;
+				} else if(node.manager.DiskImages.length > 0) {
+					for each(var diskImage:DiskImage in node.manager.DiskImages) {
+						var newDiskType:Object = new Object();
+						newDiskType.name = "N/A";
+						newDiskType.diskLongName = diskImage.name;
+						if(diskImage.name == n.diskImage)
+							toSelect = newDiskType;
+						newDiskType.diskShortName = DiskImage.getDiskImageShort(diskImage.name, node.manager);
+						newDiskType.diskDescription = diskImage.description;
+						newDiskType.diskOs = diskImage.os;
+						newDiskType.diskVersion = diskImage.version;
+						sliverTypes.addItem(newDiskType);
 					}
 					if(toSelect != null)
 						this.diskImageSelect.selectedItem = toSelect;

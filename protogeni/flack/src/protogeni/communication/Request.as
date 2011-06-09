@@ -18,6 +18,12 @@ package protogeni.communication
 	
 	import flash.events.ErrorEvent;
 	
+	/**
+	 * Skeleton structure and behavior of a request
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class Request
 	{
 		public var op:Operation;
@@ -52,41 +58,84 @@ package protogeni.communication
 			removeImmediately = shouldRemoveImmediately;
 		}
 		
+		/**
+		 * Called after everything has been done to do any leftover cleanup
+		 * 
+		 */
 		public function cleanup():void
 		{
 			op.cleanup();
 		}
 		
+		/**
+		 * Cancels the request
+		 * 
+		 */
 		public function cancel():void
 		{
 			cleanup();
 		}
 		
+		/**
+		 * 
+		 * @return Value sent
+		 * 
+		 */
 		public function getSent():String
 		{
 			return op.getSent();
 		}
 		
+		/**
+		 * 
+		 * @return Last response
+		 * 
+		 */
 		public function getResponse():String
 		{
 			return op.getResponse();
 		}
 		
+		/**
+		 * 
+		 * @return URL for the request
+		 * 
+		 */
 		public function getUrl():String
 		{
 			return op.getUrl();
 		}
 		
+		/**
+		 * Called immediately before the operation is run to add variables it may not have had when added to the queue
+		 * @return Operation to be run
+		 * 
+		 */
 		public function start():Operation
 		{
 			return op;
 		}
 		
+		/**
+		 * Called when the request returns
+		 * 
+		 * @param code ProtoGENI response code
+		 * @param response Value returned from the request
+		 * @return Optionally another request or a queue of multiple requests
+		 * 
+		 */
 		public function complete(code:Number, response:Object):*
 		{
 			return null;
 		}
 		
+		/**
+		 * Called if the request fails
+		 * @param event
+		 * @param fault
+		 * @return Optionally another request or a queue of multiple requests
+		 * 
+		 */
 		public function fail(event:ErrorEvent, fault:MethodFault):*
 		{
 			return null;

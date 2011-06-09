@@ -25,25 +25,32 @@ package protogeni.communication
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	
+	/**
+	 * Gets the manager's advertisement using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestDiscoverResources extends Request
 	{
 		private var componentManager:ProtogeniComponentManager;
 		
-		public function RequestDiscoverResources(newCm:ProtogeniComponentManager):void
+		public function RequestDiscoverResources(newManager:ProtogeniComponentManager):void
 		{
-			super("DiscoverResources (" + StringUtil.shortenString(newCm.Hrn, 15) + ")",
-				"Discovering resources for " + newCm.Hrn,
+			super("DiscoverResources (" + StringUtil.shortenString(newManager.Hrn, 15) + ")",
+				"Discovering resources for " + newManager.Hrn,
 				CommunicationUtil.discoverResources,
 				true,
 				true,
 				false);
 			op.timeout = 60;
-			componentManager = newCm;
-			op.addField("credentials", new Array(Main.geniHandler.CurrentUser.credential));
+			componentManager = newManager;
+			
+			// Build up the args
+			op.addField("credentials", [Main.geniHandler.CurrentUser.Credential]);
 			op.addField("compress", true);
 			op.addField("rspec_version", componentManager.outputRspecVersion);
-			op.setUrl(newCm.Url);
-			componentManager.lastRequest = this;
+			op.setUrl(newManager.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*

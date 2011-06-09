@@ -23,24 +23,29 @@ package protogeni.communication
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	
+	/**
+	 * Gets version and other information for a manager using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestGetVersion extends Request
 	{
 		private var componentManager:ProtogeniComponentManager;
 		
-		public function RequestGetVersion(newCm:ProtogeniComponentManager):void
+		public function RequestGetVersion(newManager:ProtogeniComponentManager):void
 		{
-			super("GetVersion (" + StringUtil.shortenString(newCm.Url, 15) + ")",
-				"Getting the version of the component manager for " + newCm.Hrn,
+			super("GetVersion (" + StringUtil.shortenString(newManager.Url, 15) + ")",
+				"Getting the version of the component manager for " + newManager.Hrn,
 				CommunicationUtil.getVersion,
 				true,
 				true,
 				true);
-			componentManager = newCm;
+			componentManager = newManager;
+			
 			op.setUrl(componentManager.Url);
-			componentManager.lastRequest = this;
 		}
 		
-		// Should return Request or RequestQueueNode
 		override public function complete(code:Number, response:Object):*
 		{
 			var r:Request = null;

@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Node allocated into a sliver/slice which has a physical node underneath
+	/**
+	 * Resource within a slice
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class VirtualNode
 	{
 		public static const STATUS_CHANGING:String = "changing";

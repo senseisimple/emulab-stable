@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Interface on a virtual node
+	/**
+	 * Interface on a resource used to connect to other resources through links
+	 *  
+	 * @author mstrum
+	 * 
+	 */	
 	public class VirtualInterface
 	{
 		public static var tunnelNext:int = 1;

@@ -37,6 +37,12 @@ package protogeni.display
 	import spark.components.Button;
 	import spark.components.Label;
 	
+	/**
+	 * Common functions for GUI stuff
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class DisplayUtil
 	{
 		public static const windowHeight:int = 400;

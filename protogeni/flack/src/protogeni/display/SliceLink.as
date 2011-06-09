@@ -29,7 +29,13 @@ package protogeni.display
 	import spark.components.HGroup;
 	import spark.primitives.Rect;
 	
-	public class SliceLink extends UIComponent
+	/**
+	 * VirtualLink for use on the slice canvas
+	 * 
+	 * @author mstrum
+	 * 
+	 */
+	public final class SliceLink extends UIComponent
 	{
 		public static const NORMAL_COLOR:uint = 0x000000;
 		public static const TUNNEL_COLOR:uint = 0x00ffff;

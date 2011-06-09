@@ -16,17 +16,25 @@ package protogeni.communication
 {
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Stops a sliver using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverStop extends Request
 	{
 		public var sliver:Sliver;
 		
-		public function RequestSliverStop(s:Sliver):void
+		public function RequestSliverStop(newSliver:Sliver):void
 		{
-			super("SliverStop", "Stopping sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
+			super("SliverStop", "Stopping sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
 				CommunicationUtil.stopSliver);
-			sliver = s;
+			sliver = newSliver;
+			
+			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		

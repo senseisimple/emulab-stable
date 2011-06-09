@@ -108,7 +108,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function tryUpdateUser(e:GeniEvent):void
 			{
 				var u:GeniUser = e.changedObject as GeniUser;
-				if(u != null && u.credential != null && u.credential.length > 0) {
+				if(u != null && u.Credential.length > 0) {
 					managerGroup.percentHeight = 70;
 					userGroup.includeInLayout = true;
 					userGroup.visible = true;
@@ -121,7 +121,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function createSlice(junk:* = null):void
 			{
-				if(Main.geniHandler.CurrentUser.credential == null || Main.geniHandler.CurrentUser.credential.length == 0)
+				if(Main.geniHandler.CurrentUser.userCredential == null || Main.geniHandler.CurrentUser.userCredential.length == 0)
 				{
 					Alert.show("User credential needed before trying to create slice.");
 					return;

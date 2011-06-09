@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Site within PlanetLab's SFA architecture
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class Site
 	{
 		public var id:String;

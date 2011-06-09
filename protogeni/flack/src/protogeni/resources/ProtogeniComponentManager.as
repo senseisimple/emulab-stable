@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Federated ProtoGENI manager
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class ProtogeniComponentManager extends GeniManager
 	{
 		public static const LEVEL_MINIMAL:int = 0;

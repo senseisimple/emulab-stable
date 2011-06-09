@@ -22,23 +22,28 @@ package protogeni.communication
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	
+	/**
+	 * Gets the GENI AM API version used by the manager using the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestGetVersionAm extends Request
 	{
 		private var aggregateManager:AggregateManager;
 		
-		public function RequestGetVersionAm(newAm:AggregateManager):void
+		public function RequestGetVersionAm(newManager:AggregateManager):void
 		{
-			super("GetVersion (" + StringUtil.shortenString(newAm.Url, 15) + ")",
-				"Getting the version of the aggregate manager for " + newAm.Hrn,
+			super("GetVersion (" + StringUtil.shortenString(newManager.Url, 15) + ")",
+				"Getting the version of the aggregate manager for " + newManager.Hrn,
 				CommunicationUtil.getVersionAm,
 				true,
 				true,
 				true);
 			ignoreReturnCode = true;
-			aggregateManager = newAm;
-			//op.setUrl(am.Url);
+			aggregateManager = newManager;
+			
 			op.setExactUrl(aggregateManager.Url);
-			aggregateManager.lastRequest = this;
 		}
 		
 		// Should return Request or RequestQueueNode

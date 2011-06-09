@@ -22,6 +22,12 @@ package protogeni.communication
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Allocates resources to a sliver using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverCreate extends Request
 	{
 		public var sliver:Sliver;
@@ -33,10 +39,12 @@ package protogeni.communication
 				CommunicationUtil.createSliver);
 			sliver = s;
 			s.created = false;
+			
+			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
 			op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
 			op.addField("keys", sliver.slice.creator.keys);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 			op.timeout = 360;
 		}

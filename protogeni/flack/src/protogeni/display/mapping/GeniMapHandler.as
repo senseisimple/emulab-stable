@@ -29,6 +29,12 @@ package protogeni.display.mapping
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.Slice;
 	
+	/**
+	 * Handles everything for drawing GENI resources onto Google Maps
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class GeniMapHandler
 	{
 		public var map:GeniMap;

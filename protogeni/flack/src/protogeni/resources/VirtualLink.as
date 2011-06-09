@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Link as part of a sliver/slice connecting virtual nodes
+	/**
+	 * Link between resources within a slice
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class VirtualLink
 	{
 		public static const TYPE_NORMAL:int = 0;

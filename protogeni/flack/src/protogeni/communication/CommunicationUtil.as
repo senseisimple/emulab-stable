@@ -18,9 +18,14 @@ package protogeni.communication
 	
 	import flash.events.ErrorEvent;
 	
+	/**
+	 * Common values/functions for communication in the GENI world
+	 * @author mstrum
+	 * 
+	 */
 	public final class CommunicationUtil
 	{
-		// Error codes
+		// ProtoGENI response codes
 		public static const GENIRESPONSE_SUCCESS:int = 0;
 		public static const GENIRESPONSE_BADARGS:int  = 1;
 		public static const GENIRESPONSE_ERROR:int = 2;

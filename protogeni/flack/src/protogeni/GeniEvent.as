@@ -16,6 +16,12 @@ package protogeni
 {
 	import flash.events.Event;
 	
+	/**
+	 * Event within the GENI world
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class GeniEvent extends Event
 	{
 		public static const ACTION_CHANGED:int = 0;

@@ -25,6 +25,12 @@ package protogeni.resources
 	import protogeni.Util;
 	import protogeni.XmlUtil;
 	
+	/**
+	 * Processes ProtoGENI RSPECS.  Supports 0.1, 0.2, 2.
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class ProtogeniRspecProcessor implements RspecProcessorInterface
 	{
 		private var manager:ProtogeniComponentManager;
@@ -49,6 +55,7 @@ package protogeni.resources
 		private var subnodeList:ArrayCollection;
 		private var linkDictionary:Dictionary;
 		private var hasslot:Boolean = false;
+		private var diskNameToImage:Dictionary;
 		
 		private var defaultNamespace:Namespace;
 		
@@ -98,6 +105,7 @@ package protogeni.resources
 			this.myState = NODE_PARSE;
 			this.interfaceDictionary = new Dictionary();
 			this.nodeNameDictionary = new Dictionary();
+			this.diskNameToImage = new Dictionary();
 			this.subnodeList = new ArrayCollection();
 			this.myAfter = afterCompletion;
 			FlexGlobals.topLevelApplication.stage.addEventListener(Event.ENTER_FRAME, parseNext);
@@ -203,12 +211,19 @@ package protogeni.resources
 							} else if(nodeChildXml.localName() == "sliver_type") {
 								var newSliverType:SliverType = new SliverType(nodeChildXml.@name);
 								for each(var sliverTypeChildXml:XML in nodeChildXml.children()) {
-									if(sliverTypeChildXml.localName() == "disk_image")
-										newSliverType.diskImages.push(new DiskImage(sliverTypeChildXml.@name,
-											sliverTypeChildXml.@os,
-											sliverTypeChildXml.@version,
-											sliverTypeChildXml.@description,
-											sliverTypeChildXml.@default == "true"));
+									if(sliverTypeChildXml.localName() == "disk_image") {
+										var newSliverDiskImage:DiskImage = this.diskNameToImage[String(sliverTypeChildXml.@name)];
+										if(newSliverDiskImage == null) {
+											newSliverDiskImage = new DiskImage(sliverTypeChildXml.@name,
+												sliverTypeChildXml.@os,
+												sliverTypeChildXml.@version,
+												sliverTypeChildXml.@description,
+												sliverTypeChildXml.@default == "true");
+											this.diskNameToImage[String(sliverTypeChildXml.@name)] = newSliverDiskImage;
+											manager.DiskImages.addItem(newSliverDiskImage);
+										}
+										newSliverType.diskImages.push(newSliverDiskImage);
+									}
 								}
 								node.sliverTypes.push(newSliverType);
 							} else if(nodeChildXml.localName() == "available") {
@@ -232,11 +247,17 @@ package protogeni.resources
 							} else if(nodeChildXml.localName() == "disk_image") {
 								if(node.sliverTypes.length == 0)
 									node.sliverTypes.push(new SliverType("N/A"));
-								node.sliverTypes[0].diskImages.push(new DiskImage(nodeChildXml.@name,
-									nodeChildXml.@os,
-									nodeChildXml.@version,
-									nodeChildXml.@description,
-									nodeChildXml.@default == "true"));
+								var newDiskImage:DiskImage = this.diskNameToImage[String(nodeChildXml.@name)];
+								if(newDiskImage == null) {
+									newDiskImage = new DiskImage(nodeChildXml.@name,
+										nodeChildXml.@os,
+										nodeChildXml.@version,
+										nodeChildXml.@description,
+										nodeChildXml.@default == "true");
+									this.diskNameToImage[String(nodeChildXml.@name)] = newDiskImage;
+									manager.DiskImages.addItem(newDiskImage);
+								}
+								node.sliverTypes[0].diskImages.push();
 							}
 								// Depreciated
 							else if(nodeChildXml.localName() == "exclusive") {

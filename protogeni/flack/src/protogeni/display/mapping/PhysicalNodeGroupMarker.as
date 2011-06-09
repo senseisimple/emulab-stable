@@ -1,8 +1,4 @@
-/**
- * Code taken from the official tutorials for Google Maps API for Flash
- */
- 
- package protogeni.display.mapping
+package protogeni.display.mapping
  {
 	import flash.display.Sprite;
 	import flash.events.MouseEvent;
@@ -17,6 +13,12 @@
 	import protogeni.display.ColorUtil;
 	import protogeni.resources.GeniManager;
 	
+	/**
+	 * Visual part of the marker on the map
+	 * 
+	 * Code taken from the official tutorials for Google Maps API for Flash
+	 * 
+	 */
 	public class PhysicalNodeGroupMarker extends UIComponent
 	{
 		public var marker:GeniMapMarker;
