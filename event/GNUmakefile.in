@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 
 SYSTEM	       := $(shell uname -s)
 
-SUBDIRS		= lib tbgen program-agent proxy example linktest link-agent
+SUBDIRS		= tbgen proxy example linktest link-agent
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif
@@ -46,7 +46,6 @@ etc-subdir:
 	@$(MAKE) -C etc all
 
 install: 
-	@$(MAKE) -C lib install
 	@$(MAKE) -C sched install
 ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched install
@@ -54,21 +53,18 @@ endif
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
-	@$(MAKE) -C program-agent install
 	@$(MAKE) -C proxy install
 
 client:		trafgen-fetch client-subdirs
 client-install: client client-install-subdirs
 
 control-install: 
-	@$(MAKE) -C lib control-install
 	@$(MAKE) -C tbgen control-install
 	@$(MAKE) -C sched control-install
 ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched control-install
 endif
 	@$(MAKE) -C linktest control-install
-	@$(MAKE) -C program-agent control-install
 	@$(MAKE) -C proxy control-install
 
 post-install: 

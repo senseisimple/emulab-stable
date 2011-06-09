@@ -3,28 +3,30 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ..
-SUBDIR		= lib
+OBJDIR		= @top_builddir@
+SUBDIR		= clientside/event
+SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= libtb event
+SUBDIRS		= program-agent
 
 all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-client: client-subdirs
+client:		client-subdirs
+client-install: client client-install-subdirs
 
-install: install-subdirs
+control-install: 
+	@$(MAKE) -C event control-install
 
-control-install: control-install-subdirs
+post-install: 
+	@$(MAKE) -C event post-install
 
 clean:		clean-subdirs
-
 distclean:	distclean-subdirs
 
 # How to recursively descend into subdirectories to make general

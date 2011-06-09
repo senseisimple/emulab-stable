@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,8 +41,8 @@ ifeq ($(EVENTSYS),1)
 BI_DBSRC += event-support.c
 BI_DBOBJ += event-support.o
 
-CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib -I/usr/local/include
-LFLAGS  += $(OBJDIR)/event/lib/libevent.a -L/usr/local/lib -lpubsub -lcrypto
+CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/lib/event -I/usr/local/include
+LFLAGS  += $(OBJDIR)/lib/event/libevent.a -L/usr/local/lib -lpubsub -lcrypto
 endif
 
 bootinfo: main.o bootinfo.o bootinfo.h bootinfo_version.o \

@@ -1,13 +1,12 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ../..
-SUBDIR		= event/program-agent
+OBJDIR		= @top_builddir@
+SUBDIR		= clientside/event/program-agent
 
 SYSTEM	       := $(shell uname -s)
 PROGRAMS	= program-agent
@@ -20,15 +19,14 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
-CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I. -I${OBJDIR}
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS	 += -I/usr/local/include
-#CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c` -DHAVE_ELVIN
 CFLAGS	 += -DHAVE_PUBSUB
 CFLAGS   += -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 
-LDFLAGS  += -g -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -g -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
-#LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
 LIBS	 += -L/usr/local/lib -lpubsub
 LDFLAGS  += $(LDSTATIC)
 
@@ -55,7 +53,7 @@ version.c: program-agent.c
 program-agent-debug: program-agent.o version.o
 	$(CC) $(LDFLAGS) -o $@ program-agent.o version.o $(LIBS)
 
-$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+$(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 
 install:	$(INSTALL_DIR)/opsdir/sbin/program-agent
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -37,7 +37,7 @@ buildnse:
 	ln -sf $(SRCDIR)/ip_fw.h .
 	ln -sf $(SRCDIR)/../../lib/libtb/log.h .
 	ln -sf $(SRCDIR)/../../lib/libtb/tbdefs.h .
-	ln -sf $(SRCDIR)/../lib/event.h .
+	ln -sf $(SRCDIR)/../../lib/event/event.h .
 	$(SRCDIR)/nse-install $(SRCDIR)/nse.patch
 
 makepatch:

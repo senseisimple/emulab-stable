@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -101,8 +101,8 @@ endif
 endif
 
 ifeq ($(EVENTSYS),1)
-	TMCDCFLAGS  = -I$(TESTBED_SRCDIR)/event/lib -DEVENTSYS
-	TMCDLIBS    = ${OBJDIR}/event/lib/libevent.a
+	TMCDCFLAGS  = -I$(TESTBED_SRCDIR)/lib/event -DEVENTSYS
+	TMCDLIBS    = ${OBJDIR}/lib/event/libevent.a
 	ELVINFLAGS  = -lm -L/usr/local/lib -lpubsub 
 endif
 
@@ -207,8 +207,8 @@ $(INSTALL_BINDIR)/tmcd/%: %
 # Here so that the event system libraries, and libraries they depend upon,
 # can get made.
 #
-${OBJDIR}/event/lib/%:
-	cd ${OBJDIR}/event/lib && gmake $<
+${OBJDIR}/lib/event/%:
+	cd ${OBJDIR}/lib/event && gmake $<
 ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
 

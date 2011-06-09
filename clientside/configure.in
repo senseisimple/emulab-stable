@@ -1,0 +1,55 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+AC_INIT(Makefile.in)
+AC_PROG_CPP
+AC_PROG_CXX
+AC_PROG_LN_S
+AC_PROG_RANLIB
+AC_PROG_MKDIR_P
+AC_PROG_INSTALL
+AC_PATH_PROG(AR, ar)
+if test -z "$AR" ; then
+    AC_MSG_ERROR([no acceptable ar found in \$PATH])
+fi
+AC_PATH_PROG(RM, rm)
+if test -z "$RM" ; then
+    AC_MSG_ERROR([no acceptable rm found in \$PATH])
+fi
+AC_PATH_PROG(CP, cp)
+if test -z "$CP" ; then
+    AC_MSG_ERROR([no acceptable cp found in \$PATH])
+fi
+AC_PATH_PROG(YACC, byacc)
+if test -z "$YACC" ; then
+    AC_MSG_ERROR([no byacc found in \$PATH])
+fi
+AC_PATH_PROG(TAR, tar)
+if test -z "$TAR" ; then
+    AC_MSG_ERROR([no tar found in \$PATH])
+fi
+AC_PATH_PROG(LIBTOOL, libtool)
+if test -z "$LIBTOOL" ; then
+    AC_MSG_ERROR([no libtool found in \$PATH])
+fi
+AC_PATH_PROG(RPM, rpm, rpm)
+if test -z "$RPM" ; then
+    AC_MSG_ERROR([no rpm found in \$PATH])
+fi
+
+#
+# The only option is if we build in elvin compat support.
+#
+AC_SUBST(ELVIN_COMPAT)
+ELVIN_COMPAT=0
+
+AC_ARG_ENABLE(elvin_compat,
+[  --enable-elvin_compat[[=yes/no]]  Include Elvin Hash compat [[default=no]]])
+
+if test "$enable_elvin_compat" = "yes"; then
+    ELVIN_COMPAT=1
+fi
+
+AC_OUTPUT(Makefile 2.pubsubd.sh linux-pubsubd.sh)

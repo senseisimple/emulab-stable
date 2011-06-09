@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -8,8 +8,8 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/linktest
-LIBTBDIR    = $(OBJDIR)/lib/libtb
-LIBEVENTDIR = ../lib
+LIBTBDIR        = $(OBJDIR)/lib/libtb
+LIBEVENTDIR     = ${OBJDIR}/lib/event
 NSTOIRDIR	= $(TESTBED_SRCDIR)/tbsetup/ns2ir
 DAEMON	        = linktest
 LTEVENT		= ltevent
@@ -38,10 +38,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 CFLAGS	 += -O -g -Wall
-CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I. -I${OBJDIR}
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
 LIBS     += -levent -lcrypto -lssl
 LIBS     += -L/usr/local/lib -lpubsub -lm
 LDFLAGS  += $(LDSTATIC)
@@ -89,9 +90,9 @@ $(LTEVENT)-debug: $(LTEVENT_OBJS) $(LIBTB_OBJS)
 version.c: linktest.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-$(DAEMON_OBJS): ../lib/libevent.a ../lib/event.h
+$(DAEMON_OBJS): ${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 
-$(LTEVENT_OBJS): ../lib/libevent.a ../lib/event.h
+$(LTEVENT_OBJS): ${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 
 # We install just enough to fire off the test from boss and wait. 
 install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -39,11 +39,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g #-Wall
 CFLAGS   += -I. -I$(TGSRCDIR) -I${OBJDIR}
-CFLAGS   += -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += -I/usr/local/include
 CFLAGS	 += -DUSEEVENTS
 
-LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 # Expand the elvin-config list now so it can be filtered below.
 LIBS     += -L/usr/local/lib -lpubsub -lm
@@ -108,7 +108,7 @@ tg.o: tg.y lex.yy.c
 trafgen-debug:	$(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+$(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ../../lib/event/event.h
 
 install:
 

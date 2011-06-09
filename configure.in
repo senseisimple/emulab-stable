@@ -3,7 +3,7 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-AC_PREREQ(2.13)
+AC_PREREQ(2.62)
 
 AC_INIT(Makeconf.in)
 AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
@@ -696,7 +696,7 @@ if test "$enable_events" = "no"; then
 	eventfiles="";
         EVENTSYS=0;
 else
-	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
+	eventfiles="event/GNUmakefile lib/event/GNUmakefile \
 		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
 		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
 		    event/sched/GNUmakefile \
@@ -712,7 +712,7 @@ else
 		    event/nsetrafgen/nseinput.tcl \
 		    event/nsetrafgen/nse-makepatch \
                     event/delay-agent/GNUmakefile \
-		    event/program-agent/GNUmakefile \
+		    clientside/event/program-agent/GNUmakefile \
 		    event/link-agent/GNUmakefile \
 		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated \

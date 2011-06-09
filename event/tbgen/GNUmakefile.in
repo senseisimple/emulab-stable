@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,7 +19,7 @@ all:	$(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 LIBTBDIR    = $(OBJDIR)/lib/libtb
-LIBEVENTDIR = ../lib
+LIBEVENTDIR = $(OBJDIR)/lib/event
 
 # Rules to make sure that some libraries we need from other directories get
 # built first
@@ -31,10 +31,11 @@ $(LIBEVENTDIR)/%.a:
 
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
-CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I. -I${OBJDIR}
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
+LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L$(OBJDIR)/lib/event
 LIBS     += -levent -lcrypto
 LIBS     += -lm -L/usr/local/lib -lpubsub 
 LDFLAGS  += $(LDSTATIC)
@@ -61,7 +62,8 @@ endif
 
 # Link against some of the object files from libtb, instead of the
 # whole library, since the latter cannot be built on clients (without mysql)
-tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o ../lib/libevent.a ../lib/event.h
+tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o \
+			$(LIBEVENTDIR)/libevent.a ../../lib/event/event.h
 	$(CC) $(LDFLAGS) -o $@ tevc.o $(LIBTBDIR)/log.o \
 		$(LIBTBDIR)/tbdefs.o $(LIBS)
 

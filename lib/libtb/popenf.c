@@ -1,11 +1,8 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004, 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2004-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
-
-#include "config.h"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>

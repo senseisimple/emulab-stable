@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,18 +19,19 @@ CFLAGS   += -g -pthread -DBINDIR='"$(INSTALL_BINDIR)"'
 CFLAGS   += -DSBINDIR='"$(INSTALL_SBINDIR)"'
 #CFLAGS  += -DDEBUG
 CFLAGS	 += -O -Wall
-CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I. -I${OBJDIR}
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -pthread
-LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
 LDFLAGS  += $(LDSTATIC)
 DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
 LIBS     += -levent_r -ltb -lz
 
 ULXRINC   = -I/usr/local/include -I/usr/local/include/ulxmlrpcpp
 CXXFLAGS += -pthread -O $(ULXRINC) -I$(OBJDIR) -I$(TESTBED_SRCDIR)/lib/libtb
-CXXFLAGS += -I$(SRCDIR)/../lib
+CXXFLAGS += -I$(TESTBED_SRCDIR)/lib/event
 ULXRLIBS  = -L/usr/local/lib  -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
 
 #
@@ -60,13 +61,13 @@ OBJS = \
 	timeline-agent.o \
 	version.o
 
-event-sched_rrpc: $(OBJS) event-sched.h ../lib/libevent.a
+event-sched_rrpc: $(OBJS) event-sched.h ../../lib/event/libevent.a
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
 
 DEPS = \
 	console-agent.h error-record.h event-sched.h group-agent.h listNode.h \
 	local-agent.h node-agent.h rpc.h simulator-agent.h timeline-agent.h \
-	../lib/event.h
+	../../lib/event/event.h
 
 queue.o:		queue.c $(DEPS)
 listNode.o:		listNode.c $(DEPS)
