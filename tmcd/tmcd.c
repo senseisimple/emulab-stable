@@ -5185,12 +5185,13 @@ COMMAND_PROTOTYPE(dosecurestate)
         }
         for (i = 0; i < TPM_NONCE_BYTES; i++) {
             if (sscanf(row[0] + (i*2),"%2x", &temp) != 1) {
-		nonce[i] = (unsigned char)temp;
                 error("SECURESTATE: %s: Error parsing nonce\n", reqp->nodeid);
                 mysql_free_result(res);
                 // XXX: return error to client
                 return 1;
             }
+
+	    nonce[i] = (unsigned char)temp;
         }
 
         mysql_free_result(res);
