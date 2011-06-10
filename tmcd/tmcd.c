@@ -5233,13 +5233,13 @@ COMMAND_PROTOTYPE(dosecurestate)
             wantpcrs |= (1 << pcr);
             for (j = 0; j < TPM_PCR_BYTES; j++) {
                 if (sscanf(row[1] + (j*2),"%2x", &temp) != 1) {
-		    pcrs[i][j] = (unsigned char)temp;
                     error("SECURESTATE: %s: Error parsing PCR\n", reqp->nodeid);
                     free(pcrs);
                     mysql_free_result(res);
                     // XXX: return error to client
                     return 1;
                 }
+		pcrs[i][j] = (unsigned char)temp;
             }
 
         }
