@@ -796,7 +796,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	#
 	# Check for disk_image request. Specified as a URN. 
 	#
-	my $diskref = GeniXML::FindFirst("n:disk_image", $ref);
+	my $diskref = GeniXML::GetDiskImage($ref);
 	if (defined($diskref)) {
 	    my $dname = GeniXML::GetText("name", $diskref);
 

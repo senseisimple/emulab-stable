@@ -18,7 +18,8 @@ GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
 GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
-CreateDocument AddElement RemoveChild PolicyExists GetMask);
+CreateDocument AddElement RemoveChild PolicyExists GetMask
+GetDiskImage);
 
 use English;
 use XML::LibXML;
@@ -540,6 +541,21 @@ sub GetVirtualizationSubtype($)
 	my $type = FindFirst("n:sliver_type", $node);
 	if (defined($type)) {
 	    $result = GetText("name", $type);
+	}
+    }
+    return $result;
+}
+
+sub GetDiskImage($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = FindFirst("n:disk_image", $node);
+    } else {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (defined($type)) {
+	    $result = FindFirst("n:disk_image", $type);
 	}
     }
     return $result;
