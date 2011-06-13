@@ -255,9 +255,6 @@ sub Resolve($)
 	return GeniResponse->MalformedArgsResponse();
     }
     $type = lc($type);
-    if (! defined($cred)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
     my $lookup_token = ($urn || $uuid || $hrn);
 
     my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
@@ -265,14 +262,25 @@ sub Resolve($)
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    my $credential = CheckCredential($cred, $authority);
-    return $credential
-	if (GeniResponse::IsResponse($credential));
+
+    #
+    # We allow any valid user without a credential, to resolve
+    # authorities. Helpful for Flack. 
+    #
+    if (! defined($cred) &&
+	! ($type eq "cm" || $type eq "am" || $type eq "sa")) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    else {
+	my $credential = CheckCredential($cred, $authority);
+	return $credential
+	    if (GeniResponse::IsResponse($credential));
    
-    $credential->HasPrivilege( "authority" ) or
-	$credential->HasPrivilege( "resolve" ) or
-	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
-				     "Insufficient privilege" );
+	$credential->HasPrivilege( "authority" ) or
+	    $credential->HasPrivilege( "resolve" ) or
+	    return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+					 "Insufficient privilege" );
+    }
 
     if ($type eq "user") {
 	my $user = GeniUser->Lookup($lookup_token);

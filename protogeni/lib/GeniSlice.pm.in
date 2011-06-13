@@ -268,6 +268,7 @@ sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub creator_urn($)	{ return field($_[0], "creator_urn"); }
 sub created($)		{ return field($_[0], "created"); }
 sub shutdown($)		{ return field($_[0], "shutdown"); }
+sub isshutdown($)	{ return field($_[0], "isshutdown"); }
 sub expires($)		{ return field($_[0], "expires"); }
 sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub exptidx($)		{ return field($_[0], "exptidx"); }
@@ -828,15 +829,19 @@ sub SetShutdown($$)
     else {
 	$when = "NULL";
     }
+    #
+    # Always clear isshutdown so that expire_daemon knows of change.
+    #
     my $query_result =
-	DBQueryWarn("update geni_slices set shutdown=$when " .
+	DBQueryWarn("update geni_slices set shutdown=$when, isshutdown=0 " .
 		    "where uuid='$uuid'");
     
     return -1
 	if (!$query_result);
 
     # XXX Wrong format, but harmless.
-    $self->{'SLICE'}->{'shutdown'} = ($shutdown ? time() : undef);
+    $self->{'SLICE'}->{'shutdown'}   = ($shutdown ? time() : undef);
+    $self->{'SLICE'}->{'isshutdown'} = 0;
     return 0;
 }
 
@@ -903,6 +908,27 @@ sub SetRegisteredFlag($$)
 	if (!$query_result);
 
     $self->{'SLICE'}->{'registered'} = $registered;
+    return 0;
+}
+
+#
+# Set the isshutdown field.
+#
+sub SetShutdownFlag($$)
+{
+    my ($self, $isshutdown) = @_;
+    my $uuid  = $self->uuid();
+
+    $isshutdown = ($isshutdown ? 1 : 0);
+
+    my $query_result =
+	DBQueryWarn("update geni_slices set isshutdown='$isshutdown' " .
+		    "where uuid='$uuid'");
+    
+    return -1
+	if (!$query_result);
+
+    $self->{'SLICE'}->{'isshutdown'} = $isshutdown;
     return 0;
 }
 

@@ -4708,6 +4708,7 @@ sub CleanupDeadSlice($;$)
 	if (system("$NAMEDSETUP")) {
 	    print STDERR "$NAMEDSETUP failed\n";
 	}
+	$experiment->SetState(EXPTSTATE_SWAPPED());
     }
 
     return 0
