@@ -42,6 +42,7 @@ use Experiment;
 use English;
 use Data::Dumper;
 use XML::Simple;
+use XML::LibXML;
 use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
@@ -2117,6 +2118,21 @@ sub SliverWorkAux($$$$$$$)
 
     # The Manifest starts out as a copy of the rspec. 
     my $manifest = $rspec->cloneNode(1);
+    if (! GeniXML::IsVersion0($manifest)) {
+	GeniXML::SetText("type", $manifest, "manifest");
+	my $schemaLocation = GeniXML::FindNodesNS('@n:schemaLocation',
+						  $manifest,
+						  $GeniXML::XSI_NS)->pop();
+	if (defined($schemaLocation) &&
+	    $schemaLocation->nodeType() == XML_ATTRIBUTE_NODE) {
+	    my $requestUrl = $GeniXML::REQUEST_URL;
+	    my $manifestUrl = $GeniXML::MANIFEST_URL;
+	    my $value = $schemaLocation->getValue();
+	    $value =~ s/$requestUrl/$manifestUrl/;
+	    $schemaLocation->setValue($value);
+	}
+    }
+
 
     #
     # Find current slivers and save.
