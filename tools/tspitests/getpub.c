@@ -58,6 +58,7 @@ main(void)
 	TSS_UUID srkUUID = TSS_UUID_SRK;
 	TSS_UUID myuuid = {1,1,1,1,1,{1,1,1,1,1,1}};
 	TSS_HPOLICY srkpol;
+	BYTE wellknown[20] = TSS_WELL_KNOWN_SECRET;
 
 	int ret,i;
 	int plen = 0;
@@ -78,7 +79,7 @@ main(void)
 
 	ret = Tspi_GetPolicyObject(hSRK, TSS_POLICY_USAGE, &srkpol);
 	check("get policy object", ret);
-	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN, 4, "1234");
+	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_SHA1, 20, wellknown);
 	check("policy set secret", ret);
 
 	ret = Tspi_Context_LoadKeyByUUID(hContext, TSS_PS_TYPE_SYSTEM, myuuid,
