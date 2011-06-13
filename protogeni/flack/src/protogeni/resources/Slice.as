@@ -20,6 +20,7 @@ package protogeni.resources
 	import mx.controls.Alert;
 	import mx.events.CloseEvent;
 	
+	import protogeni.Util;
 	import protogeni.XmlUtil;
 	import protogeni.communication.CommunicationUtil;
 	import protogeni.display.ChooseManagerWindow;
@@ -42,6 +43,9 @@ package protogeni.resources
 		public var slivers:SliverCollection = new SliverCollection();
 		
 		public var expires:Date;
+		
+		[Bindable]
+		public var useInputRspecVersion:Number = Util.defaultRspecVersion;
 		
 		public function get name():String {
 			if(urn != null)

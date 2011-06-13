@@ -108,7 +108,7 @@ package protogeni.resources
 		
 		public function getRequestRspec(removeNonexplicitBinding:Boolean):XML
 		{
-			return this.manager.rspecProcessor.generateSliverRspec(this, removeNonexplicitBinding);
+			return this.manager.rspecProcessor.generateSliverRspec(this, removeNonexplicitBinding, slice.useInputRspecVersion);
 		}
 		
 		public function parseRspec():void

@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Key;
+
 	/**
 	 * Gets the user's keys which can be used to put keys onto allocated resources later. Uses the ProtoGENI API.
 	 * 
@@ -46,7 +48,11 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				Main.geniHandler.CurrentUser.keys = response.value;
+				Main.geniHandler.CurrentUser.keys = new Vector.<Key>();
+				for each(var keyObject:Object in response.value) {
+					Main.geniHandler.CurrentUser.keys.push(new Key(keyObject.key, keyObject.type));
+				}
+				
 				Main.geniDispatcher.dispatchUserChanged();
 			}
 			else

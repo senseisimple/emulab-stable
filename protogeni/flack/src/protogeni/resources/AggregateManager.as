@@ -25,6 +25,8 @@ package protogeni.resources
 		public function AggregateManager()
 		{
 			super();
+			this.isAm = true;
+			
 			// MUST define an AdParser!
 			// MUST define a RequestGenerator
 		}

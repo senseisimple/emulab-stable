@@ -31,13 +31,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<fx:Script>
 		<![CDATA[
 			import mx.controls.Alert;
+			import mx.events.FlexEvent;
 			
 			import protogeni.GeniEvent;
 			import protogeni.resources.GeniUser;
+			import protogeni.resources.Key;
 			import protogeni.resources.Slice;
 			
 			[Bindable]
 			private var user:GeniUser;
+			
+			private var fr:FileReference;
+			private var loading:Boolean;
 			
 			public function onCreationComplete():void
 			{
@@ -46,6 +51,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, refresh);
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, refresh);
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, refresh);
+				
+				fr = new FileReference();
+				fr.addEventListener(Event.SELECT, onFileSelect);
+				fr.addEventListener(Event.COMPLETE, onFileComplete);
+				fr.addEventListener(IOErrorEvent.IO_ERROR, onFileIoError);
+				fr.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onFileSecurityError);
 			}
 			
 			public override function closeWindow(event:Event=null):void {
@@ -59,17 +70,107 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				this.credentialImage.visible = user.Credential.length > 0;
 				this.keysImage.visible = user.keys != null && user.keys.length > 0;
-				slices.removeAllElements();
-				for each(var s:Slice in user.slices)
+				
+				if(keysVgroup != null) {
+					this.keysVgroup.removeAllElements();
+					for each(var k:Key in user.keys) {
+						addKey(k.value);
+					}
+				}
+				
+				if(slices != null) {
+					slices.removeAllElements();
+					for each(var s:Slice in user.slices)
 					slices.addElement(DisplayUtil.getSliceButton(s));
-				if(sslPem != null)
-					this.sslPem.text = FlackCache.userSslPem;
+					if(sslPem != null)
+						this.sslPem.text = FlackCache.userSslPem;
+				}
 			}
 			
 			public function save():void
 			{
-				FlackCache.userSslPem = this.sslPem.text;
-				FlackCache.saveBasic();
+				if(this.keysVgroup != null) {
+					user.keys = new Vector.<Key>();
+					for(var i:int = 0; i < this.keysVgroup.numElements; i++) {
+						var newKey:String = ((this.keysVgroup.getElementAt(0) as HGroup).getElementAt(0) as TextArea).text;
+						if(user.keys.indexOf(newKey) == -1)
+							user.keys.push(new Key(newKey));
+					}
+				}
+				if(this.sslPem != null) {
+					FlackCache.userSslPem = this.sslPem.text;
+					FlackCache.saveBasic();
+				}
+			}
+			
+			public function addKey(newText:String = ""):void
+			{
+				var newKeyHgroup:HGroup = new HGroup();
+				newKeyHgroup.percentWidth = 100;
+				var newKeyTextarea:TextArea = new TextArea();
+				newKeyTextarea.percentWidth = 100;
+				newKeyTextarea.setStyle("verticalScrollPolicy", "off");
+				newKeyTextarea.text = newText;
+				newKeyTextarea.addEventListener(FlexEvent.UPDATE_COMPLETE,
+					function beforeShow(event:FlexEvent):void {
+						newKeyTextarea.height = newKeyTextarea.scroller.viewport.contentHeight + 2
+					});
+				var buttonVgroup:VGroup = new VGroup();
+				var newDeleteButton:Button = DisplayUtil.getButton(ImageUtil.deleteIcon, true);
+				newDeleteButton.addEventListener(MouseEvent.CLICK,
+					function removeMe(event:MouseEvent):void {
+						event.currentTarget.parent.parent.parent.removeElement(event.currentTarget.parent.parent as DisplayObject);
+					});
+				var newSaveButton:Button = DisplayUtil.getButton(ImageUtil.saveIcon, true);
+				newSaveButton.addEventListener(MouseEvent.CLICK,
+					function saveKey(event:MouseEvent):void {
+						saveKey(((event.currentTarget.parent.parent as HGroup).getChildAt(0) as TextArea).text);
+					});
+				buttonVgroup.addElement(newSaveButton);
+				buttonVgroup.addElement(newDeleteButton);
+				newKeyHgroup.addElement(newKeyTextarea);
+				newKeyHgroup.addElement(buttonVgroup);
+				this.keysVgroup.addElement(newKeyHgroup);
+			}
+			
+			/**
+			 * Ask the user to load a RSPEC from file
+			 */
+			public function addKeyFromFile():void {
+				loading = true;
+				fr.browse([new FileFilter("Keys (*.txt, *.pub, *.*)", "*.txt;*.pub;*.*")])
+			}
+			
+			/**
+			 * Ask the user to save the preview RSPEC to file
+			 */
+			public function saveKey(keyToSave:String):void {
+				loading = false;
+				fr.save(keyToSave, "id_rsa.pub");
+			}
+			
+			/**
+			 * The file was selected
+			 */
+			public function onFileSelect(event:Event):void {
+				if(loading)
+					fr.load();
+			}
+			
+			/**
+			 * The file is ready to read
+			 */
+			public function onFileComplete(event:Event):void {
+				if(loading)
+					addKey(fr.data.readUTFBytes(fr.data.length));
+			}
+			
+			private function onFileIoError(event:IOErrorEvent):void {
+				Alert.show(event.toString(), "IO Error");
+			}
+			
+			private function onFileSecurityError(event:SecurityErrorEvent):void {
+				Alert.show(event.toString(), "Security Error");
 			}
 		]]>
 	</fx:Script>
@@ -78,7 +179,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<s:Image id="credentialImage" source="{ImageUtil.credentialIcon}" toolTip="Has credential" />
 		<s:Image id="keysImage" source="{ImageUtil.sslIcon}" toolTip="Has SSL keys" />
 	</s:HGroup>
-	<mx:TabNavigator width="100%" height="100%" paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5">
+	<mx:TabNavigator width="100%" height="100%" id="tabs"
+					 paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5"
+					 change="refresh()">
 		<s:NavigatorContent label="Basic" width="100%" height="100%">
 			<s:VGroup width="100%" height="100%">
 				<s:HGroup verticalAlign="middle">
@@ -87,7 +190,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				</s:HGroup>
 				<s:HGroup verticalAlign="middle">
 					<s:Image source="{ImageUtil.passwordIcon}" toolTip="Password" />
-					<s:Button label="Force delete password" click="FlackCache.userPassword = ''; FlackCache.saveBasic(); Alert.show('Password removed');" />
+					<s:Button label="Forget" click="FlackCache.userPassword = ''; FlackCache.saveBasic(); Alert.show('Password removed');" enabled="{FlackCache.userPassword.length>0}" />
 				</s:HGroup>
 				<s:Label text="Slices" fontWeight="bold"/>
 				<s:Scroller width="100%" height="100%">
@@ -97,6 +200,19 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		</s:NavigatorContent>
 		<s:NavigatorContent height="100%" width="100%" label="SSL Certificate">
 			<s:TextArea id="sslPem" text="{FlackCache.userSslPem}" width="100%" height="100%" />
+		</s:NavigatorContent>
+		<s:NavigatorContent label="Keys" width="100%" height="100%" id="keysTab">
+			<s:VGroup width="100%" height="100%">
+				<s:HGroup>
+					<components:ImageButton icon="{ImageUtil.addIcon}"
+											toolTip="Add a blank public key" click="addKey();" />
+					<components:ImageButton icon="{ImageUtil.openIcon}"
+											toolTip="Add a public key from file" click="addKeyFromFile();" />
+				</s:HGroup>
+				<s:Scroller width="100%" height="100%">
+					<s:VGroup width="100%" id="keysVgroup" />
+				</s:Scroller>
+			</s:VGroup>
 		</s:NavigatorContent>
 	</mx:TabNavigator>
 	<components:controlBarContent>

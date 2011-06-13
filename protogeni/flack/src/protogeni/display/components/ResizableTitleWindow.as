@@ -40,10 +40,10 @@ package protogeni.display.components
 			this.addEventListener("close", closeWindow);
 		}
 		
-		public function showWindow():void
+		public function showWindow(modal:Boolean = false):void
 		{
 			if(!this.isPopUp)
-				PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, false);
+				PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, modal);
 			else
 				PopUpManager.bringToFront(this);				
 			PopUpManager.centerPopUp(this);

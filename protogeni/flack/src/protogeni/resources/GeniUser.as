@@ -36,7 +36,7 @@ package protogeni.resources
 		[Bindable]
 		public var authority:SliceAuthority;
 		public var userCredential:String = "";
-		public var keys:Array;
+		public var keys:Vector.<Key> = new Vector.<Key>();
 		[Bindable]
 		public var urn:IdnUrn;
 		

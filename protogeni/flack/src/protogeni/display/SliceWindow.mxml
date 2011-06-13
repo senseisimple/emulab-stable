@@ -35,6 +35,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import mx.managers.DragManager;
 			
 			import protogeni.GeniEvent;
+			import protogeni.Util;
 			import protogeni.display.components.AdvancedTextArea;
 			import protogeni.display.components.DataButton;
 			import protogeni.display.components.DefaultWindow;
@@ -154,7 +155,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 				
 				if(this.sliceCanvas.slice.expires != null) {
-					this.expireImage.toolTip = "Slice expires on: "
+					this.expireButton.toolTip = "Slice expires on: "
 						+ this.sliceCanvas.slice.expires.toLocaleString();
 					
 					var differenceInMilliseconds:Number = this.sliceCanvas.slice.expires.time - (new Date()).time;
@@ -162,7 +163,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					var hours:Number = Math.floor(differenceInMilliseconds/(1000*60*60) - days*24);
 					var minutes:Number = Math.floor(differenceInMilliseconds/(1000*60) - days*24*60 - hours*60);
 					
-					this.expireImage.toolTip += "\nTime left: " + days + " Days, "
+					this.expireButton.toolTip += "\nTime left: " + days + " Days, "
 						+ hours + " Hours, "
 						+ minutes + " Minutes";
 				}
@@ -170,7 +171,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				if(this.sliceCanvas.slice.slivers != null) {
 					var sliversExpire:Date = this.sliceCanvas.slice.slivers.expires();
 					if(sliversExpire != null)
-						this.expireImage.toolTip += "\nSoonest sliver expiration: " + sliversExpire.toLocaleString();
+						this.expireButton.toolTip += "\nSoonest sliver expiration: " + sliversExpire.toLocaleString();
 				}
 				this.sliceCanvas.refreshStatus();
 			}
@@ -346,7 +347,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			/**
 			 * Ask the user to save the preview RSPEC to file
 			 */
-			public function saveRspec():void {
+			public function saveRequestRspec():void {
 				loading = false;
 				fr.save(sliceCanvas.slice.slivers.getCombined().getRequestRspec(true).toXMLString(), this.sliceCanvas.slice.name+"_previewRspec.xml");
 			}
@@ -534,16 +535,32 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					setSidePane(VIEW_COLLECTION, dragGroup.collection);
 				}
 			}
+			
+			public function tryCreateSlice():void {
+				if(Main.geniHandler.CurrentUser.keys.length == 0) {
+					Alert.show("You don't have any public keys to use when logging in to your nodes.  Would you like to add any public keys?", "No public keys", Alert.YES|Alert.NO|Alert.CANCEL, Main.Application(),
+						function choiceHandler(event:CloseEvent):void {
+							if(event.detail == Alert.YES) {
+								DisplayUtil.viewUserWindow(true);
+							} else if(event.detail == Alert.NO) {
+								Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);
+							}
+						});
+					return;
+				}
+				
+				sliceCanvas.slice.useInputRspecVersion = outputRspecDropdownlist.selectedItem;
+				Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);
+			}
+			
+			public function viewExpires():void {
+				Alert.show(this.expireButton.toolTip);
+			}
 
 		]]>
 	</fx:Script>
 	
 	<s:HGroup width="100%" verticalAlign="middle">
-		<s:Image id="expireImage" source="{ImageUtil.timeIcon}" />
-		<components:ImageButton id="saveSliceCredentialButton"
-								toolTip="Save the slice credential to file"
-								click="saveCredential()"
-								icon="{ImageUtil.credentialIcon}" />
 		<s:Label id="hrnLabel" text="{sliceCanvas.slice.urn.name}" toolTip="{sliceCanvas.slice.urn.full}" width="100%" fontSize="17" fontWeight="bold" />
 		<components:ImageButton id="clearCanvasButton"
 							 toolTip="Clear the canvas"
@@ -556,28 +573,35 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<components:ImageButton icon="{ImageUtil.openIcon}"
 							 toolTip="Load RSPEC from file"
 							 click="onFileBrowse(event)" />
-		<components:ImageButton icon="{ImageUtil.saveIcon}"
-							 toolTip="Save preview RSPEC to file"
-							 click="saveRspec()" />
 		<components:DefaultLine height="14" visible="false" />
-		<components:ImageButton id="rspecButton"
-							 icon="{ImageUtil.pageWhiteIcon}"
-							 click="viewRspecs()"
-							 toolTip="View the most recent valid RSPEC" />
+		<s:Label text="Use RSPECv" />
+		<s:DropDownList id="outputRspecDropdownlist"
+						requireSelection="true"
+						width="58"
+						height="24"
+						dataProvider="{Util.usableRspecVersions}"
+						selectedItem="{sliceCanvas.slice.useInputRspecVersion}"
+						change="sliceCanvas.slice.useInputRspecVersion = outputRspecDropdownlist.selectedItem;">
+		</s:DropDownList>
 		<components:ImageButton id="previewRspecButton"
-							  icon="{ImageUtil.pageCodeIcon}"
-							 click="previewRspecs()"
-							 toolTip="Preview the Request RSPEC" />
+								icon="{ImageUtil.pageCodeIcon}"
+								click="previewRspecs()"
+								toolTip="Preview the Request RSPEC" />
+		<components:ImageButton icon="{ImageUtil.saveIcon}"
+								toolTip="Save preview RSPEC to file"
+								click="saveRequestRspec()" />
 		<components:DefaultLine height="14" visible="false" />
-		<s:Label text="Use" />
-		<s:CheckBox id="ionCheckbox" color="{SliceLink.ION_COLOR}"
-					selected="{Main.useIon}"
-					label="ION"
-					valueCommit="Main.useIon = ionCheckbox.selected" />
-		<s:CheckBox id="pgeniCheckbox" color="{SliceLink.GPENI_COLOR}"
-					selected="{Main.useGpeni}"
-					label="GPENI"
-					valueCommit="Main.useGpeni = pgeniCheckbox.selected" />
+		<components:ImageButton id="expireButton"
+								icon="{ImageUtil.timeIcon}"
+								click="viewExpires()" />
+		<components:ImageButton id="saveSliceCredentialButton"
+								toolTip="Save the slice credential to file"
+								click="saveCredential()"
+								icon="{ImageUtil.credentialIcon}" />
+		<components:ImageButton id="rspecButton"
+								icon="{ImageUtil.pageWhiteIcon}"
+								click="viewRspecs()"
+								toolTip="View the most recent valid RSPEC" />
 	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
 		<s:Scroller height="100%" minWidth="150">
@@ -589,16 +613,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />
 	</mx:HDividedBox>
 	<components:controlBarLayout>
-		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="12" paddingTop="2" />
+		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="12" paddingTop="2" />
 	</components:controlBarLayout>
 	<components:controlBarContent>
-		<s:HGroup enabled="{!Main.offlineMode}">
+		<s:HGroup enabled="{!Main.offlineMode}" verticalAlign="middle" height="100%" width="100%">
 			<s:Button id="createButton"
 					  toolTip="Create slivers"
 					  label="Create"
 					  height="24"
 					  icon="{ImageUtil.actionIcon}"
-					  click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
+					  click="tryCreateSlice()"/>
 			<components:ImageButton id="refreshButton"
 								 toolTip="Refresh slivers"
 								 click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"

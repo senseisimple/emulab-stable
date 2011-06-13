@@ -30,9 +30,9 @@ package protogeni.communication
 	 */
 	public final class RequestGetVersionAm extends Request
 	{
-		private var aggregateManager:AggregateManager;
+		private var aggregateManager:GeniManager;
 		
-		public function RequestGetVersionAm(newManager:AggregateManager):void
+		public function RequestGetVersionAm(newManager:GeniManager):void
 		{
 			super("GetVersion (" + StringUtil.shortenString(newManager.Url, 15) + ")",
 				"Getting the version of the aggregate manager for " + newManager.Hrn,

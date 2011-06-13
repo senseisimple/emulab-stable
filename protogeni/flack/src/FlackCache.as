@@ -29,6 +29,7 @@ package
 	import protogeni.NetUtil;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
+	import protogeni.resources.Key;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PlanetlabAggregateManager;
@@ -68,6 +69,7 @@ package
 		public static var userAuthorityUrn:String = "";
 		[Bindable]
 		public static var userSslPem:String = "";
+		[Bindable]
 		public static var userPassword:String = "";
 		public static var maxParallelRequests:int = 3;
 		public static var geniBundle:String = "";
@@ -162,7 +164,9 @@ package
 				_offlineSharedObject.data.userCredential = "";
 			}
 			_offlineSharedObject.data.hrn = Main.geniHandler.CurrentUser.hrn;
-			_offlineSharedObject.data.keys = Main.geniHandler.CurrentUser.keys;
+			_offlineSharedObject.data.keys = [];
+			for each(var key:Key in Main.geniHandler.CurrentUser.keys)
+				_offlineSharedObject.data.keys.push(key.value);
 			_offlineSharedObject.data.name = Main.geniHandler.CurrentUser.name;
 			_offlineSharedObject.data.uid = Main.geniHandler.CurrentUser.uid;
 			_offlineSharedObject.data.urn = Main.geniHandler.CurrentUser.urn.full;
@@ -256,35 +260,6 @@ package
 							NetUtil.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
 					});
 			}
-			
-			/*
-			if(geniBundle.length == 0)
-			geniBundle = (new FallbackGeniBundle()).toString();
-			if(rootBundle.length == 0)
-			rootBundle =  (new FallbackRootBundle()).toString();
-			*/
-			
-			// keep data from the old caching method
-			try {
-				var tempSharedObject:SharedObject = SharedObject.getLocal("geniLocalSharedObject");
-				if (tempSharedObject != null && tempSharedObject.size > 0)
-				{
-					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-						if(sa.Url == tempSharedObject.data.authority) {
-							userAuthorityUrn = sa.Urn.full;
-							break;
-						}
-					}
-					
-					userSslPem = tempSharedObject.data.sslPem;
-					
-					if(tempSharedObject.data.password != null && tempSharedObject.data.password.length > 0)
-						userPassword = tempSharedObject.data.password;
-					
-					tempSharedObject.clear();
-				}
-				
-			} catch(e:Error) {}
 		}
 		
 		/**
@@ -454,7 +429,9 @@ package
 					}
 					
 					Main.geniHandler.CurrentUser.hrn = _offlineSharedObject.data.hrn;
-					Main.geniHandler.CurrentUser.keys = _offlineSharedObject.data.keys;
+					Main.geniHandler.CurrentUser.keys = new Vector.<Key>();
+					for each(var key:String in _offlineSharedObject.data.keys)
+						Main.geniHandler.CurrentUser.keys.push(new Key(key));
 					Main.geniHandler.CurrentUser.name = _offlineSharedObject.data.name;
 					Main.geniHandler.CurrentUser.uid = _offlineSharedObject.data.uid;
 					Main.geniHandler.CurrentUser.urn = new IdnUrn(_offlineSharedObject.data.urn);

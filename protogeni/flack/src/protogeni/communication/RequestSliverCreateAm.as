@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Key;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
@@ -42,8 +43,8 @@ package protogeni.communication
 			op.pushField([sliver.slice.credential]);
 			op.pushField(sliver.getRequestRspec(true).toXMLString());
 			var userKeys:Array = [];
-			for each(var keyObject:Object in sliver.slice.creator.keys) {
-				userKeys.push(keyObject.key);
+			for each(var key:Key in sliver.slice.creator.keys) {
+				userKeys.push(key.value);
 			}
 			op.pushField([{urn:Main.geniHandler.CurrentUser.urn.full, keys:userKeys}]);
 			op.setExactUrl(sliver.manager.Url);

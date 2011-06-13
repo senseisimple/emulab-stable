@@ -147,13 +147,15 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function tryUpdateSlices(junk:* = null):void
 			{
 				userItems.removeAllElements();
-				for each(var s:Slice in Main.geniHandler.CurrentUser.slices)
-				{
-					var newSliceItem:GeniMapLegendSliceItem = new GeniMapLegendSliceItem();
-					newSliceItem.radioGroup = this.sliceRadiogroup;
-					newSliceItem.slice = s;
-					newSliceItem.showCheckbox = this.mineOnlyCheckbox;
-					userItems.addElement(newSliceItem);
+				if(Main.geniHandler.CurrentUser.slices != null) {
+					for each(var s:Slice in Main.geniHandler.CurrentUser.slices)
+					{
+						var newSliceItem:GeniMapLegendSliceItem = new GeniMapLegendSliceItem();
+						newSliceItem.radioGroup = this.sliceRadiogroup;
+						newSliceItem.slice = s;
+						newSliceItem.showCheckbox = this.mineOnlyCheckbox;
+						userItems.addElement(newSliceItem);
+					}
 				}
 			}
 			

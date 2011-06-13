@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Key;
 	import protogeni.resources.Sliver;
 	
 	public final class RequestTicketRedeem extends Request
@@ -35,8 +36,11 @@ package protogeni.communication
 			
 			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("ticket", sliver.ticket.toXMLString());
-			op.addField("keys", sliver.slice.creator.keys);
+			op.addField("ticket", sliver.ticket.toXMLString());var keys:Array = [];
+			for each(var key:Key in sliver.slice.creator.keys) {
+				keys.push({type:key.type, key:key.value});
+			}
+			op.addField("keys", keys);
 			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}

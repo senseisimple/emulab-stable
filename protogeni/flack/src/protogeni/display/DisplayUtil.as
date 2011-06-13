@@ -346,9 +346,11 @@ package protogeni.display
 			PopUpManager.centerPopUp(aboutWindow);
 		}
 		
-		public static function viewUserWindow():void {
+		public static function viewUserWindow(viewKeys:Boolean = false):void {
 			var userWindow:UserWindow = new UserWindow();
 			userWindow.showWindow();
+			if(viewKeys)
+				userWindow.tabs.selectedChild = userWindow.keysTab;
 		}
 		
 		public static function viewXml(xml:XML, title:String):void {
@@ -372,7 +374,7 @@ package protogeni.display
 		public static function viewInitialUserWindow():void {
 			if(initialUserWindow == null)
 				initialUserWindow = new InitialUserWindow();
-			initialUserWindow.showWindow();
+			initialUserWindow.showWindow(true);
 		}
 	}
 }

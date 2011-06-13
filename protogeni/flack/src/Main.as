@@ -49,12 +49,6 @@
 	public static var protogeniOnly:Boolean = false;
 	
 	[Bindable]
-	public static var useIon:Boolean = false;
-	
-	[Bindable]
-	public static var useGpeni:Boolean = false;
-	
-	[Bindable]
 	public static var offlineMode:Boolean = false;
   }
 }

@@ -767,13 +767,18 @@ package protogeni.resources
 			return;
 		}
 		
-		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean):XML
+		public function generateSliverRspec(s:Sliver,
+											removeNonexplicitBinding:Boolean,
+											overrideRspecVersion:Number):XML
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?><rspec type=\"request\" />");
 			
 			// Add namespaces
 			var defaultNamespace:Namespace;
-			switch(manager.inputRspecVersion) {
+			var useInputRspecVersion:Number = manager.inputRspecVersion;
+			if(overrideRspecVersion)
+				useInputRspecVersion = overrideRspecVersion;
+			switch(useInputRspecVersion) {
 				case 0.1:
 					defaultNamespace = new Namespace(null, XmlUtil.rspec01Namespace);
 					break;
@@ -785,14 +790,14 @@ package protogeni.resources
 					break;
 			}
 			requestRspec.setNamespace(defaultNamespace);
-			if(manager.inputRspecVersion >= 2)
+			if(useInputRspecVersion >= 2)
 				requestRspec.addNamespace(XmlUtil.flackNamespace);
 			var xsiNamespace:Namespace = XmlUtil.xsiNamespace;
 			requestRspec.addNamespace(xsiNamespace);
 			
 			// Add schema locations
 			var schemaLocations:String;
-			switch(manager.inputRspecVersion) {
+			switch(useInputRspecVersion) {
 				case 0.1:
 					schemaLocations = XmlUtil.rspec01SchemaLocation;
 					break;
@@ -815,20 +820,27 @@ package protogeni.resources
 			// TOHERE
 			
 			for each(var vn:VirtualNode in s.nodes.collection) {
-				requestRspec.appendChild(generateNodeRspec(vn, removeNonexplicitBinding));
+				requestRspec.appendChild(generateNodeRspec(vn, removeNonexplicitBinding, useInputRspecVersion));
 			}
 			
 			for each(var vl:VirtualLink in s.links.collection) {
-				requestRspec.appendChild(generateLinkRspec(vl));
+				requestRspec.appendChild(generateLinkRspec(vl, useInputRspecVersion));
 			}
 			
 			return requestRspec;
 		}
 		
-		public function generateNodeRspec(vn:VirtualNode, removeNonexplicitBinding:Boolean):XML
+		public function generateNodeRspec(vn:VirtualNode,
+										  removeNonexplicitBinding:Boolean,
+										  overrideRspecVersion:Number = NaN):XML
 		{
+			
+			var useInputRspecVersion:Number = manager.inputRspecVersion;
+			if(overrideRspecVersion)
+				useInputRspecVersion = overrideRspecVersion;
+			
 			var nodeXml:XML = <node />;
-			if(manager.inputRspecVersion < 1) {
+			if(useInputRspecVersion < 1) {
 				nodeXml.@virtual_id = vn.clientId;
 				nodeXml.@component_manager_uuid = vn.manager.Urn.full;
 				nodeXml.@virtualization_type = vn.virtualizationType;
@@ -839,7 +851,7 @@ package protogeni.resources
 			
 			if (vn.IsBound() &&
 					!(removeNonexplicitBinding && vn.flackUnbound)) {
-				if(manager.inputRspecVersion < 1) {
+				if(useInputRspecVersion < 1) {
 					nodeXml.@component_uuid = vn.physicalNode.id;
 				} else {
 					nodeXml.@component_id = vn.physicalNode.id;
@@ -848,7 +860,7 @@ package protogeni.resources
 			
 			if (!vn.Exclusive)
 			{
-				if(manager.inputRspecVersion < 1) {
+				if(useInputRspecVersion < 1) {
 					nodeXml.@virtualization_subtype = vn.virtualizationSubtype;
 					nodeXml.@exclusive = 0;
 				} else {
@@ -856,14 +868,13 @@ package protogeni.resources
 				}
 			}
 			else {
-				if(manager.inputRspecVersion < 1)
+				if(useInputRspecVersion < 1)
 					nodeXml.@exclusive = 1;
 				else
 					nodeXml.@exclusive = "true";
 			}
 			
-			// Currently only pcs
-			if(manager.inputRspecVersion < 2) {
+			if(useInputRspecVersion < 2) {
 				var nodeType:String = "pc";
 				if (!vn.Exclusive)
 					nodeType = "pcvm";
@@ -872,7 +883,7 @@ package protogeni.resources
 				nodeTypeXml.@type_slots = 1;
 				nodeXml.appendChild(nodeTypeXml);
 				
-				if(vn.diskImage.length > 0) {
+				if(vn.diskImage.length > 0 && useInputRspecVersion > 0.1) {
 					var diskImageXml:XML = <disk_image />;
 					diskImageXml.@name = vn.diskImage;
 					nodeXml.appendChild(diskImageXml);
@@ -908,7 +919,7 @@ package protogeni.resources
 			}
 			
 			// Services
-			if(manager.inputRspecVersion < 1) {
+			if(useInputRspecVersion < 1) {
 				if(vn.executeServices.length > 0) {
 					nodeXml.@startup_command = vn.executeServices[0].command;
 				}
@@ -934,15 +945,15 @@ package protogeni.resources
 					nodeXml.appendChild(serviceXml);
 			}
 			
-			if (manager.inputRspecVersion < 1 && vn.superNode != null)
+			if (useInputRspecVersion < 1 && vn.superNode != null)
 				nodeXml.appendChild(XML("<subnode_of>" + vn.superNode.sliverId + "</subnode_of>"));
 			
 			for each (var current:VirtualInterface in vn.interfaces.collection)
 			{
-				if(manager.inputRspecVersion >= 2 && current.id == "control")
+				if(useInputRspecVersion >= 2 && current.id == "control")
 					continue;
 				var interfaceXml:XML = <interface />;
-				if(manager.inputRspecVersion < 1)
+				if(useInputRspecVersion < 1)
 					interfaceXml.@virtual_id = current.id;
 				else {
 					interfaceXml.@client_id = current.id;
@@ -959,7 +970,7 @@ package protogeni.resources
 				nodeXml.appendChild(interfaceXml);
 			}
 			
-			if(manager.inputRspecVersion >= 2) {
+			if(useInputRspecVersion >= 2) {
 				var flackXml:XML = <info />;
 				flackXml.setNamespace(XmlUtil.flackNamespace);
 				flackXml.@x = vn.flackX;
@@ -971,17 +982,22 @@ package protogeni.resources
 			return nodeXml;
 		}
 		
-		public function generateLinkRspec(vl:VirtualLink):XML
+		public function generateLinkRspec(vl:VirtualLink,
+										  overrideRspecVersion:Number = NaN):XML
 		{
+			var useInputRspecVersion:Number = manager.inputRspecVersion;
+			if(overrideRspecVersion)
+				useInputRspecVersion = overrideRspecVersion;
+			
 			var linkXml:XML =  <link />;
 			
-			if(manager.inputRspecVersion < 1)
+			if(useInputRspecVersion < 1)
 				linkXml.@virtual_id = vl.clientId;
 			else
 				linkXml.@client_id = vl.clientId;
 			
 			var s:Sliver;
-			if(manager.inputRspecVersion >= 2) {
+			if(useInputRspecVersion >= 2) {
 				for each(s in vl.slivers.collection) {
 					var cmXml:XML = <component_manager />;
 					cmXml.@name = s.manager.Urn.full;
@@ -990,7 +1006,7 @@ package protogeni.resources
 			}
 			
 			if (vl.linkType != VirtualLink.TYPE_TUNNEL && vl.capacity != -1) {
-				if(manager.inputRspecVersion < 1)
+				if(useInputRspecVersion < 1)
 					linkXml.appendChild(XML("<bandwidth>" + vl.capacity + "</bandwidth>"));
 				else {
 					for(var i:int = 0; i < vl.interfaces.length; i++) {
@@ -1012,7 +1028,7 @@ package protogeni.resources
 			
 			if (vl.linkType == VirtualLink.TYPE_TUNNEL)
 			{
-				if(manager.inputRspecVersion < 1)
+				if(useInputRspecVersion < 1)
 					linkXml.@link_type = "tunnel";
 				else {
 					var link_type:XML = <link_type />;
@@ -1023,10 +1039,10 @@ package protogeni.resources
 			
 			for each (var currentVi:VirtualInterface in vl.interfaces.collection)
 			{
-				if(manager.inputRspecVersion >= 2 && currentVi.id == "control")
+				if(useInputRspecVersion >= 2 && currentVi.id == "control")
 					continue;
 				var interfaceRefXml:XML = <interface_ref />;
-				if(manager.inputRspecVersion < 1) {
+				if(useInputRspecVersion < 1) {
 					interfaceRefXml.@virtual_node_id = currentVi.owner.clientId;
 					if (vl.linkType == VirtualLink.TYPE_TUNNEL)
 					{

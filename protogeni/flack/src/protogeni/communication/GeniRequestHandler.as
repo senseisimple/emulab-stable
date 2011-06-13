@@ -23,7 +23,6 @@ package protogeni.communication
 	
 	import protogeni.NetUtil;
 	import protogeni.display.DisplayUtil;
-	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.ProtogeniComponentManager;
@@ -106,10 +105,20 @@ package protogeni.communication
 		 */
 		public function loadListAndComponentManagersAndSlices():void
 		{
+			/*var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
+			newCm.isAm = true;
+			newCm.Hrn = "beelab.cm";
+			newCm.Url = "https://myboss.geelab.geni.emulab.net/protogeni/xmlrpc/am";
+			newCm.Urn = new IdnUrn("urn:publicid:IDN+geelab.geni.emulab.net+authority+cm");
+			Main.geniHandler.GeniManagers.add(newCm);
+			newCm.Status = GeniManager.STATUS_INPROGRESS;
+			this.pushRequest(new RequestGetVersionAm(newCm));*/
+			
 			if(Main.geniHandler.unauthenticatedMode)
 				pushRequest(new RequestListComponentsPublic());
 			else
 				pushRequest(new RequestListComponents(true, true));
+			
 		}
 		
 		/**
@@ -178,7 +187,7 @@ package protogeni.communication
 				var addDelay:Boolean = false;
 				for each(var sliver:Sliver in newSlivers.collection) {
 					var request:Request;
-					if(sliver.manager is AggregateManager)
+					if(sliver.manager.isAm)
 						request = new RequestSliverCreateAm(sliver);
 					else if(sliver.manager is ProtogeniComponentManager)
 						request = new RequestSliverCreate(sliver);
@@ -199,7 +208,7 @@ package protogeni.communication
 				
 				// Delete
 				for each(sliver in deleteSlivers.collection) {
-					if(sliver.manager is AggregateManager)
+					if(sliver.manager.isAm)
 						pushRequest(new RequestSliverDeleteAm(sliver));
 					else if(sliver.manager is ProtogeniComponentManager)
 						pushRequest(new RequestSliverDelete(sliver));
@@ -211,7 +220,7 @@ package protogeni.communication
 					sliver.created = false;
 				}
 				for each(sliver in slice.slivers.collection) {
-					if(sliver.manager is AggregateManager)
+					if(sliver.manager.isAm)
 						pushRequest(new RequestSliverCreateAm(sliver));
 					else if(sliver.manager is ProtogeniComponentManager)
 						pushRequest(new RequestSliverCreate(sliver));
@@ -232,7 +241,7 @@ package protogeni.communication
 			for each(var sliver:Sliver in slice.slivers.collection) {
 				if(skipDone && sliver.status == Sliver.STATUS_READY)
 					continue;
-				if(sliver.manager is AggregateManager)
+				if(sliver.manager.isAm)
 					pushRequest(new RequestSliverStatusAm(sliver));
 				else if(sliver.manager is ProtogeniComponentManager)
 					pushRequest(new RequestSliverStatus(sliver));
@@ -250,7 +259,7 @@ package protogeni.communication
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers.collection)
 			{
-				if(sliver.manager is AggregateManager)
+				if(sliver.manager.isAm)
 					pushRequest(new RequestSliverDeleteAm(sliver));
 				else if(sliver.manager is ProtogeniComponentManager)
 					pushRequest(new RequestSliverDelete(sliver));

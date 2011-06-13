@@ -77,11 +77,11 @@ package protogeni.resources
 				this.linkType = TYPE_NORMAL;
 			else
 			{
-				if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
+				/*if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
 					this.linkType = TYPE_ION;
 				else if (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)
 					this.linkType = TYPE_GPENI;
-				else
+				else*/
 					this.setUpTunnels();
 				
 				// Make sure nodes are in both

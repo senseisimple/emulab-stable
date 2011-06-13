@@ -33,9 +33,9 @@ package protogeni.communication
 	 */
 	public final class RequestListResourcesAm extends Request
 	{
-		private var aggregateManager:AggregateManager;
+		private var aggregateManager:GeniManager;
 		
-		public function RequestListResourcesAm(newManager:AggregateManager):void
+		public function RequestListResourcesAm(newManager:GeniManager):void
 		{
 			super("ListResourcesAm (" + StringUtil.shortenString(newManager.Url, 15) + ")",
 				"Listing resources for " + newManager.Url,

@@ -111,7 +111,7 @@ package protogeni
 									"https://www.pgeni3.gpolab.bbn.com/protogeni/xmlrpc"),
 				new SliceAuthority("cron.cct.lsu.edu.sa",
 									"urn:publicid:IDN+cron.cct.lsu.edu+authority+sa",
-									"https://www.cron.cct.lsu.edu/protogeni/xmlrpc"),
+									"https://www.cron.cct.lsu.edu/protogeni/xmlrpc"), //cron.loni.org
 				new SliceAuthority("chihuas.sa",
 									"urn:publicid:IDN+chi.itesm.mx+authority+sa",
 									"https://boss.chi.itesm.mx/protogeni/xmlrpc/"),

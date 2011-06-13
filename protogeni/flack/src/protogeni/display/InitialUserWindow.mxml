@@ -37,6 +37,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			import protogeni.NetUtil;
 			import protogeni.Util;
+			import protogeni.resources.IdnUrn;
+			import protogeni.resources.Slice;
 			import protogeni.resources.SliceAuthority;
 
 			private var certLoader:URLLoader;
@@ -75,16 +77,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function trySubmit():void
 			{
 				if(Main.useJavascript) {
-					if(passwordField.textInput.text.length == 0) {
+					/*if(passwordField.textInput.text.length == 0) {
 						Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as flack);
 						return;
-					}
+					}*/
 					if(retrieveCertCheckbox.selected && selectedAuthority.workingCertGet) {
 						closeAfter = true;
 						tryLoadCert(certLocation);
 						return;
 					} else if(sslPem.text.length == 0) {
-						Alert.show("You must suply an SSL Cert");
+						Alert.show("You must suply a private key/certificate bundle");
 						return;
 					}
 				}
@@ -95,6 +97,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
 				if(Main.useJavascript) {
+					// prepare pem
 					FlackCache.userSslPem = sslPem.text;
 					FlackCache.saveBasic();
 					if(!Main.geniHandler.CurrentUser.setPassword(passwordField.textInput.text, cacheCheckbox.selected)) {
@@ -216,9 +219,17 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 			}
 			
+			private var loadingPem:Boolean;
 			protected function onFileBrowse(event:MouseEvent):void
 			{
+				loadingPem = false;
 				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec)", "*.txt;*.xml;*.rspec")])
+			}
+			
+			protected function openPem(event:MouseEvent):void
+			{
+				loadingPem = true;
+				fr.browse([new FileFilter("PEMs (*.pem)", "*.pem")])
 			}
 			
 			public function onFileSelect(event:Event):void {
@@ -226,19 +237,34 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			public function onFileComplete(event:Event):void {
-				try{
-					Main.geniHandler.CurrentUser.sliceCredential = fr.data.readUTFBytes(fr.data.length);
-					
-					var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
-					var expires:Date = Util.parseProtogeniDate(cred.credential.expires);
-					if(expires < new Date()) {
-						Main.geniHandler.CurrentUser.sliceCredential = "";
-						Alert.show("The slice credential has expired on " + expires.toLocaleString() + ", try or create a newer slice");
-						return;
-					}
-					
-					sliceCredentialIcon.visible = true;
-				}catch(e:Error) { }
+				if(loadingPem) {
+					sslPem.text = fr.data.readUTFBytes(fr.data.length);
+					this.passwordField.textInput.setFocus();
+				} else {
+					try{
+						Main.geniHandler.CurrentUser.sliceCredential = fr.data.readUTFBytes(fr.data.length);
+						
+						var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
+						Main.geniHandler.CurrentUser.urn = new IdnUrn(cred.credential.owner_urn);
+						var expires:Date = Util.parseProtogeniDate(cred.credential.expires);
+						if(expires < new Date()) {
+							Main.geniHandler.CurrentUser.sliceCredential = "";
+							Alert.show("The slice credential has expired on " + expires.toLocaleString() + ", try or create a newer slice");
+							return;
+						}
+						
+						var userSlice:Slice = new Slice();
+						userSlice.credential = Main.geniHandler.CurrentUser.sliceCredential;
+						userSlice.creator = Main.geniHandler.CurrentUser;
+						userSlice.expires = expires;
+						userSlice.urn = new IdnUrn(cred.credential.target_urn);
+						Main.geniHandler.CurrentUser.slices.add(userSlice);
+						
+						Main.geniDispatcher.dispatchUserChanged();
+						
+						sliceCredentialIcon.visible = true;
+					}catch(e:Error) { }
+				}
 			}
 			
 			private function onFileIoError(event:IOErrorEvent):void {
@@ -259,8 +285,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						requireSelection="true" 
 						dataProvider="{Main.geniHandler.GeniAuthorities}"
 						selectedItem="@{selectedAuthority}" />
-		
-		<s:Button label="Import slice credential" height="24"
+		<s:Label text="or" />
+		<s:Button label="Use slice credential" height="24"
 				  toolTip="Optionally use a slice credential which was saved to file"
 				  click="onFileBrowse(event)" />
 		<s:BitmapImage id="sliceCredentialIcon" source="{ImageUtil.availableIcon}" visible="false" />
@@ -286,12 +312,23 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			<s:Label id="getLabel" text="" />
 		</s:HGroup>
 		<s:Label text="If the automatic SSL Certificate retrieval doesn't work, copy and paste it here" />
+		<s:HGroup>
+			<components:ImageButton icon="{ImageUtil.saveIcon}"
+									toolTip="Save to file"
+									click="fr.save(sslPem.text, 'encrypted.pem')" />
+			<components:ImageButton icon="{ImageUtil.openIcon}"
+									toolTip="Open from file"
+									click="openPem(event)" />
+			<components:ImageButton icon="{ImageUtil.copyIcon}"
+									toolTip="Copy to clipboard"
+									click="System.setClipboard(sslPem.text)" />
+		</s:HGroup>
 		<s:TextArea id="sslPem" prompt="Copy your SSL Certificate here if automatically getting certificate doesn't work"
 					width="100%" height="100%" />
 		<s:HGroup width="100%" verticalAlign="middle">
 			<s:Image source="{ImageUtil.passwordIcon}" toolTip="SSL Certificate Password" />
 			<display:KeyboardTextInput id="passwordField" width="100%" creationComplete="passwordField.textInput.displayAsPassword = true; passwordField.setEnter(trySubmit);" prompt="Enter your passphrase" />
-			<s:CheckBox id="cacheCheckbox" label="Cache?" />
+			<s:CheckBox id="cacheCheckbox" label="Remember" />
 		</s:HGroup>
 		
 	</s:VGroup>

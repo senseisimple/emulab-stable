@@ -19,6 +19,7 @@ package protogeni.communication
 	import flash.events.ErrorEvent;
 	
 	import protogeni.resources.IdnUrn;
+	import protogeni.resources.Key;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
@@ -43,7 +44,11 @@ package protogeni.communication
 			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
 			op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
-			op.addField("keys", sliver.slice.creator.keys);
+			var keys:Array = [];
+			for each(var key:Key in sliver.slice.creator.keys) {
+				keys.push({type:key.type, key:key.value});
+			}
+			op.addField("keys", keys);
 			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 			op.timeout = 360;

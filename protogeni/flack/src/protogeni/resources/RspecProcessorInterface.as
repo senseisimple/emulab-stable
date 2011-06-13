@@ -28,6 +28,7 @@ package protogeni.resources
 		
 		// Generate
 		function generateSliverRspec(s:Sliver,
-									 removeNonexplicitBinding:Boolean):XML;
+									 removeNonexplicitBinding:Boolean,
+									 overrideRspecVersion:Number):XML;
 	}
 }

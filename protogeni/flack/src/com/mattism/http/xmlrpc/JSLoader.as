@@ -27,7 +27,7 @@ package com.mattism.http.xmlrpc
     public static function setClientInfo(password : String,
                                          pem : String) : void
     {
-      var lines : Array = pem.split(/[\n\r]/);
+	  var lines : Array = pem.split(/[\r\n]+/);
       var key : String = "";
       var cert : String = "";
       var inKey : Boolean = false;

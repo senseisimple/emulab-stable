@@ -78,6 +78,8 @@ package protogeni.resources
 		
 		public var data:*;
 		
+		public var isAm:Boolean = false;
+		
 		public function AllNodesAsArray():Array {
 			var allNodesArray:Array = new Array();
 			for each (var elem:PhysicalNode in AllNodes) {

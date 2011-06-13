@@ -173,7 +173,7 @@ package protogeni.resources
 			}*/
 		}
 		
-		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean):XML
+		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean, overrideRspecVersion:Number):XML
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?><RSpec type=\"SFA\" />");
 			var networkXml:XML = new XML("<network name=\""+manager.networkName+"\" />");
