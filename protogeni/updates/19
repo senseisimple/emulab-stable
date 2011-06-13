@@ -12,7 +12,7 @@ sub DoUpdate($$$)
 
     if (!DBSlotExists("geni_slices", "stitch_locked")) {
 	DBQueryFatal("alter table geni_slices ".
-		     "  add `stitch_locked` datetime default NULL");
+		     "  add `stitch_locked` datetime default NULL after locked");
     }
     return 0;
 }
