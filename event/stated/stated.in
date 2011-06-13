@@ -63,7 +63,7 @@ my $last_reload = time;
 # For startup and reload: maximum time in the past for which we will schedule
 # a timeout. Anything older is assumed to be ancient history and is ignored.
 # Note it is a negative value.
-my $maxpasttimeout = -(2 * 24 * 60 * 60);	# 2 days
+my $maxpasttimeout = -(7 * 24 * 60 * 60);	# 1 week
 
 # Handling of SECVIOLATIONS, eventually controlled by a sitevar
 my $soft_secviolation = 1;
@@ -296,7 +296,7 @@ sub process_event_queue() {
 	} else {
 	    #debug("Using blocking event poll - $wait seconds\n");
 	    # timeout param is in milliseconds, so multiply
-	    PollEvents(1, $wait*1000);
+	    PollEvents(1, $wait);
 	    $now = time();
 	    # subtract seconds elapsed from my wait time
 	    $wait = $finish - $now;
@@ -430,13 +430,7 @@ sub readStates(;@) {
 	    $nodes{$node_id}{noretry}        = 0;
 	    # Is there a timeout? If so, set it up!
 	    if (defined($timestamp) && $dbtag eq $nodes{$node_id}{"tag"}) {
-		my $TO = $timestamp - $now;
-		if ($TO > $maxpasttimeout) {
-		    setTimeout($mode,$state,$node_id,$timestamp);
-		} else {
-		    debug("Ignoring ancient timeout $TO for ",
-			  "($node_id,$mode,$state)\n");
-		}
+		setTimeout($mode,$state,$node_id,$timestamp);
 	    }
 	}
     }
@@ -1340,24 +1334,39 @@ sub checkDBRedirect($) {
     }
 }
 
-# Check if this state has a timeout, and if so, put it in the queue
+#
+# Check if this state has a timeout, and if so, put it in the queue.
+#
+# We also check if the timeout expired at some distant time in the
+# past. If that is the case, we just ignore that timeout.
+#
 sub setTimeout( $$$$ ) {
-    my ($mode,$state,$node,$now) = @_;
-    if (0) { print "Original: ($mode,$state,$node,$now)\n"; qshow(); }
+    my ($mode,$state,$node,$stime) = @_;
+
+    # Remove any old timeout first
+    if (0) { print "Original: ($mode,$state,$node,$stime)\n"; qshow(); }
     if (defined(qfind($node))) { qdelete($node); delete($timeout_tag{$node}); }
     if (0) { print "Deleted:\n"; qshow(); }
+
     if (defined($mode) && defined($state) &&
-	defined($timeouts{$mode}) &&
-	defined($timeouts{$mode}{$state})) {
+	defined($timeouts{$mode}) && defined($timeouts{$mode}{$state})) {
 	my $deadline = ${$timeouts{$mode}{$state}}[0];
-        if (defined($deadline) &&
-	    $deadline != $TBNOTIMEOUT) {
-	    my $TO = $deadline + $now;
-	    debug("Setting timeout for ($node,$mode,$state) at ".
-		  "$deadline + $now ($TO)\n");
-	    qinsert($TO,$node);
-	    $timeout_tag{$node} = "$mode:$state";
-	    if (0) { qshow(); }
+        if (defined($deadline) && $deadline != $TBNOTIMEOUT) {
+	    my $TO = $deadline + $stime;
+	    my $fromnow = $TO - time();
+
+	    # see if deadline was too far in the past
+	    if ($fromnow > $maxpasttimeout) {
+		debug("Setting timeout for ($node,$mode,$state) at ".
+		      "$deadline + $stime ($TO: $fromnow seconds from now)\n");
+		qinsert($TO, $node);
+		$timeout_tag{$node} = "$mode:$state";
+		if (0) { qshow(); }
+	    } else {
+		$fromnow = -$fromnow;
+		debug("Ignoring ancient timeout ($fromnow seconds ago) for ",
+		      "($node,$mode,$state)\n");
+	    }
 	}
     }
     if (0) { print "Done:\n"; qshow(); }
@@ -1875,9 +1884,11 @@ sub PollEvents($$)
 	fatal("Event reader exited prematurely: $foo $status!\n");
     }
     if ($blocking) {
-	$timeout = undef
-	    if (!$timeout);
-	
+	if ($timeout == 0) {
+	    $timeout = undef;
+	} elsif ($timeout*1000 < 0) {
+	    fatal("Event reader timeout too large ($timeout sec)!\n");
+	}
 	$pollval = $eventpoll->poll($timeout);
     }
     else {
