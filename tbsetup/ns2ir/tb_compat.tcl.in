@@ -1319,9 +1319,6 @@ proc tb-set-link-encap {lanlink style} {
     }
 
     switch -- $style {
-	"alias" {
-	    set style "alias"
-	}
 	"gre" {
 	    set style "gre"
 	}
@@ -1331,9 +1328,6 @@ proc tb-set-link-encap {lanlink style} {
 	"vtun" {
 	    set style "vtun"
 	}
-	"veth" {
-	    set style "veth"
-	}
 	"veth-ne" {
 	    set style "veth-ne"
 	}
@@ -1341,7 +1335,7 @@ proc tb-set-link-encap {lanlink style} {
 	    set style "vlan"
 	}
 	default {
-	    perror "\[tb-set-link-encap] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
+	    perror "\[tb-set-link-encap] one of: 'veth-ne', 'vlan'"
 	    return
 	}
     }
@@ -1502,9 +1496,6 @@ proc tb-set-vlink-emulation {style} {
     var_import ::GLOBALS::vlink_encapsulate
 
     switch -- $style {
-	"alias" {
-	    set style "alias"
-	}
 	"gre" {
 	    set style "gre"
 	}
@@ -1514,9 +1505,6 @@ proc tb-set-vlink-emulation {style} {
 	"vtun" {
 	    set style "vtun"
 	}
-	"veth" {
-	    set style "veth"
-	}
 	"veth-ne" {
 	    set style "veth-ne"
 	}
@@ -1524,7 +1512,7 @@ proc tb-set-vlink-emulation {style} {
 	    set style "vlan"
 	}
 	default {
-	    perror "\[tb-set-encapsulate] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
+	    perror "\[tb-set-encapsulate] one of: 'veth-ne', 'vlan'"
 	    return
 	}
     }
