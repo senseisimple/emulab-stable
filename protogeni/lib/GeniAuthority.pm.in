@@ -501,6 +501,25 @@ sub Disable($)
 }
 
 #
+# Update the certificate, as when an authority regenerates.
+#
+sub UpdateCertificate($$)
+{
+    my ($self, $certificate) = @_;
+    my $oldcert = $self->GetCertificate();
+
+    if ($oldcert->Delete()) {
+	print STDERR "Could not delete $self\n";
+	return -1;
+    }
+    if ($certificate->Store()) {
+	print STDERR "Could not store $certificate\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
 # Resolve something at an authority
 #
 sub Resolve($$)
