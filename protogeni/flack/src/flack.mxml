@@ -96,12 +96,15 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<fx:Script>
 		<![CDATA[
 			import com.hurlant.crypto.cert.X509Certificate;
+			import com.hurlant.util.der.DER;
 			
 			import mx.controls.Alert;
+			import mx.utils.Base64Decoder;
 			
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.communication.RequestGeniBundle;
+			import protogeni.communication.RequestListAuthoritiesPublic;
 			import protogeni.communication.RequestRootBundle;
 			import protogeni.display.DisplayUtil;
 			import protogeni.display.ImageUtil;
@@ -126,7 +129,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Security.allowDomain("*");
 				Security.allowInsecureDomain("*");
 				Security.allowDomain("localhost");	
-				
+
 				ParamHandler.preload();
 			}
 			
@@ -156,6 +159,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
 					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
 				}
+				Main.geniHandler.requestHandler.pushRequest(new RequestListAuthoritiesPublic());
 				
 				// Always show the start options
 				var startOptions:StartOptionsWindow = new StartOptionsWindow();

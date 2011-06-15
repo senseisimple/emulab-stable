@@ -26,17 +26,17 @@ package protogeni.resources
 		public var Name:String;
 		[Bindable]
 		public var Urn:IdnUrn;
+		[Bindable]
 		public var Url:String;
 		[Bindable]
 		public var workingCertGet:Boolean = false;
 		
-		public function SliceAuthority(newName:String = "",
-									   newUrn:String = "",
-									   newUrl:String = "",
+		public function SliceAuthority(newUrn:String,
+									   newUrl:String,
 									   newWorkingCertGet:Boolean = false)
 		{
-			this.Name = newName;
 			this.Urn = new IdnUrn(newUrn);
+			this.Name = this.Urn.authority;
 			this.Url = newUrl;
 			this.workingCertGet = newWorkingCertGet;
 		}

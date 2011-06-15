@@ -121,6 +121,7 @@ package protogeni.communication
 		public static var map:Array = new Array(ses, "Map");
 		
 		public static var listComponents:Array = new Array(ch, "ListComponents");
+		public static var whoAmI:Array = new Array(ch, "WhoAmI");
 		
 		public static function getResponse(name:String,
 										   url:String,

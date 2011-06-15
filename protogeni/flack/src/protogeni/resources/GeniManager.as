@@ -53,6 +53,20 @@ package protogeni.resources
 		public var Version:int;
 		
 		[Bindable]
+		public var outputRspecVersion:Number;
+		[Bindable]
+		public var inputRspecVersion:Number;
+		
+		[Bindable]
+		public var outputRspecDefaultVersion:Number;
+		
+		public var inputRspecVersions:Vector.<Number>;
+		public var outputRspecVersions:Vector.<Number>;
+		
+		public var generated:Date;
+		public var expires:Date;
+		
+		[Bindable]
 		public var errorMessage:String = "";
 		public var errorDescription:String = "";
 		

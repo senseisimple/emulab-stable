@@ -24,6 +24,8 @@ package protogeni.communication
 	import protogeni.StringUtil;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
+	import protogeni.resources.PlanetlabRspecProcessor;
 	
 	/**
 	 * Gets the manager's advertisement using the GENI AM API
@@ -46,10 +48,14 @@ package protogeni.communication
 			ignoreReturnCode = true;
 			op.timeout = 60;
 			aggregateManager = newManager;
-			
+
 			// Build up the args
+			var options:Object = {geni_available:false, geni_compressed:true};
+			if(aggregateManager.outputRspecDefaultVersion)
+				options.rspec_version = "ProtoGENI " + aggregateManager.outputRspecVersion
+					
 			op.pushField([Main.geniHandler.CurrentUser.Credential]);
-			op.pushField({geni_available:false, geni_compressed:true});	// geni_available:false = show all, true = show only available
+			op.pushField(options);	
 			op.setExactUrl(newManager.Url);
 		}
 		

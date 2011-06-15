@@ -88,6 +88,7 @@ package protogeni.communication
 							
 						} else if(!Main.protogeniOnly)
 						{
+							continue;
 							var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 							planetLabAm.Hrn = obj.hrn;
 							planetLabAm.Url = StringUtil.makeSureEndsWith(obj.url, "/"); // needs this for forge...

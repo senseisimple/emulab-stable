@@ -30,10 +30,6 @@ package protogeni.communication
 			super("UserResolve",
 				"Resolve user",
 				CommunicationUtil.resolve);
-			
-			// Build up the args
-			op.addField("type", "User");
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		/**
@@ -43,6 +39,9 @@ package protogeni.communication
 		 */
 		override public function start():Operation
 		{
+			// Build up the args
+			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.addField("type", "User");
 			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("hrn", Main.geniHandler.CurrentUser.urn.full);
 			return op;

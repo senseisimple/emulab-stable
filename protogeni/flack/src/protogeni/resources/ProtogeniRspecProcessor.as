@@ -33,8 +33,8 @@ package protogeni.resources
 	 */
 	public class ProtogeniRspecProcessor implements RspecProcessorInterface
 	{
-		private var manager:ProtogeniComponentManager;
-		public function ProtogeniRspecProcessor(newGm:ProtogeniComponentManager)
+		private var manager:GeniManager;
+		public function ProtogeniRspecProcessor(newGm:GeniManager)
 		{
 			this.manager = newGm;
 		}

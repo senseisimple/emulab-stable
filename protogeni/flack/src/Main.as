@@ -50,5 +50,7 @@
 	
 	[Bindable]
 	public static var offlineMode:Boolean = false;
+	
+	public static var allowCaching:Boolean = true;
   }
 }

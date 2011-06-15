@@ -65,8 +65,7 @@ package
 			return _offlineSharedObject != null
 				&& _offlineSharedObject.size > 0;
 		}
-		
-		public static var userAuthorityUrn:String = "";
+
 		[Bindable]
 		public static var userSslPem:String = "";
 		[Bindable]
@@ -114,9 +113,8 @@ package
 			}
 			
 			var newManagerObject:Object = new Object();
-			if(manager.type == GeniManager.TYPE_PROTOGENI)
-				newManagerObject.inputRspecVersion = (manager as ProtogeniComponentManager).inputRspecVersion;
-			else if(manager.type == GeniManager.TYPE_PLANETLAB) {
+			newManagerObject.inputRspecVersion = manager.inputRspecVersion;
+			if(manager.rspecProcessor is PlanetlabRspecProcessor) {
 				newManagerObject.sites = [];
 				for each(var site:Site in (manager as PlanetlabAggregateManager).sites) {
 					var siteObject:Object = new Object();
@@ -238,8 +236,6 @@ package
 			try {
 				_basicSharedObject = SharedObject.getLocal("flackCacheSharedObject");
 				if(_basicSharedObject.size > 0) {
-					if(_basicSharedObject.data.userAuthorityUrn != null)
-						userAuthorityUrn = _basicSharedObject.data.userAuthorityUrn;
 					if(_basicSharedObject.data.userSslPem != null)
 						userSslPem = _basicSharedObject.data.userSslPem;
 					if(_basicSharedObject.data.userPassword != null)
@@ -280,13 +276,6 @@ package
 		public static function applyBasic():void {
 			if (_basicSharedObject != null && _basicSharedObject.size > 0)
 			{
-				for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-					if(sa.Urn.full == userAuthorityUrn) {
-						Main.geniHandler.CurrentUser.authority = sa;
-						break;
-					}
-				}
-				
 				if(userPassword.length > 0)
 					Main.geniHandler.CurrentUser.setPassword(userPassword, true);
 				
@@ -299,12 +288,13 @@ package
 		 * 
 		 */		
 		public static function saveBasic():void {
+			if(!Main.allowCaching)
+				return;
 			if(_basicSharedObject == null)
 				return;
 
 			var flushStatus:String = null;
 			try {
-				_basicSharedObject.data.userAuthorityUrn = userAuthorityUrn;
 				_basicSharedObject.data.userSslPem = userSslPem;
 				_basicSharedObject.data.userPassword = userPassword;
 				_basicSharedObject.data.maxParallelRequests = maxParallelRequests;
@@ -338,13 +328,17 @@ package
 		private static function onFlushStatus(event:NetStatusEvent):void {
 			if(event.info.code == "SharedObject.Flush.Success") {
 				// saved
-			}
+			} else
+				Main.allowCaching = false;
+			
 			_basicSharedObject.removeEventListener(NetStatusEvent.NET_STATUS, onFlushStatus);
 		}	
 		private static function onOfflineFlushStatus(event:NetStatusEvent):void {
 			if(event.info.code == "SharedObject.Flush.Success") {
 				// saved
-			}
+			} else
+				Main.allowCaching = false;
+			
 			_offlineSharedObject.removeEventListener(NetStatusEvent.NET_STATUS, onFlushStatus);
 		}
 		
@@ -370,6 +364,8 @@ package
 		}
 		
 		public static function saveOffline():void {
+			if(!Main.allowCaching)
+				return;
 			if(_offlineSharedObject == null)
 				loadOfflineSharedObject();
 			if(_offlineSharedObject == null)
@@ -474,7 +470,7 @@ package
 					for each(var managerObject:Object in _offlineSharedObject.data.managers) {
 						var newManager:GeniManager = Main.geniHandler.GeniManagers.getByUrn(managerObject.urn);
 						
-						if(newManager.type == GeniManager.TYPE_PLANETLAB) {
+						if(newManager.rspecProcessor is PlanetlabRspecProcessor) {
 							(newManager.rspecProcessor as PlanetlabRspecProcessor).callGetSites = false;
 							newManager.data = managerObject.sites;
 							newManager.rspecProcessor.processResourceRspec(

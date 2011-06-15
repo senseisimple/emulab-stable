@@ -19,8 +19,10 @@ package protogeni.communication
 	import flash.events.ErrorEvent;
 	
 	import protogeni.StringUtil;
+	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.ProtogeniRspecProcessor;
 	
 	/**
 	 * Gets the GENI AM API version used by the manager using the GENI AM API
@@ -52,7 +54,55 @@ package protogeni.communication
 			var r:Request = null;
 			try
 			{
-				aggregateManager.Version = response.geni_api;
+				if(response.geni_api != null)
+					aggregateManager.Version = response.geni_api;
+				aggregateManager.inputRspecVersions = new Vector.<Number>();
+				aggregateManager.outputRspecVersions = new Vector.<Number>();
+				var maxInputRspecVersion:Number = -1;
+				var usesProtogeniRspec:Boolean = false;
+				if(response.request_rspec_versions != null) {
+					for each(var requestRspecVersion:Object in response.request_rspec_versions) {
+						if(String(requestRspecVersion.type).toLowerCase() == "protogeni") {
+							usesProtogeniRspec = true;
+							var requestVersion:Number = Number(requestRspecVersion.version);
+							aggregateManager.inputRspecVersions.push(requestVersion);
+							if(requestVersion > maxInputRspecVersion)
+								maxInputRspecVersion = requestVersion;
+						}
+					}
+				}
+				var maxOutputRspecVersion:Number = -1;
+				if(response.ad_rspec_versions != null) {
+					for each(var adRspecVersion:Object in response.ad_rspec_versions) {
+						if(String(adRspecVersion.type).toLowerCase() == "protogeni") {
+							usesProtogeniRspec = true;
+							var adVersion:Number = Number(adRspecVersion.version);
+							aggregateManager.outputRspecVersions.push(adVersion);
+							if(adVersion > maxOutputRspecVersion)
+								maxOutputRspecVersion = adVersion;
+						}
+					}
+				}
+				if(response.default_ad_rspec != null) {
+					if(String(response.default_ad_rspec.type).toLowerCase() == "protogeni") {
+						usesProtogeniRspec = true;
+						aggregateManager.outputRspecDefaultVersion = Number(response.default_ad_rspec.version);
+					}
+				}
+				
+				// Make sure aggregate uses protogeni if it supports it
+				if(usesProtogeniRspec) {
+
+					// Set output version
+					aggregateManager.outputRspecVersion = Math.min(Util.defaultRspecVersion, maxOutputRspecVersion);
+					
+					// Set input version
+					aggregateManager.inputRspecVersion = Math.min(Util.defaultRspecVersion, maxInputRspecVersion);
+					
+					aggregateManager.rspecProcessor = new ProtogeniRspecProcessor(aggregateManager);
+				}
+				
+				// if supported, switch to pg_rspec
 				r = new RequestListResourcesAm(aggregateManager);
 				r.forceNext = true;
 			}

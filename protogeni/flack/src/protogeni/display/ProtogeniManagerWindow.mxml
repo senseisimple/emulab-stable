@@ -42,12 +42,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						levelText.text = "Minimal";
 						break;
 				}
-				for each(var outputVersion:Number in gm.outputRspecVersions) {
-					outputVersionsHgroup.addElement(DisplayUtil.getLabel(outputVersion.toString(), outputVersion == gm.outputRspecVersion));
-				}
-				for each(var inputVersion:Number in gm.inputRspecVersions) {
-					inputVersionsHgroup.addElement(DisplayUtil.getLabel(inputVersion.toString(), inputVersion == gm.inputRspecVersion));
-				}
 			}
 		]]>
 	</fx:Script>
@@ -57,14 +51,5 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<s:HGroup>
 		<s:Label text="Level" fontWeight="bold"/>
 		<s:Label id="levelText" />
-	</s:HGroup>
-	<s:Label text="RSPEC support" fontWeight="bold" />
-	<s:HGroup>
-		<s:Label text="Output:" fontWeight="bold" />
-		<s:HGroup id="outputVersionsHgroup" />
-	</s:HGroup>
-	<s:HGroup>
-		<s:Label text="Input:" fontWeight="bold" />
-		<s:HGroup id="inputVersionsHgroup" />
 	</s:HGroup>
 </components:DefaultWindow>

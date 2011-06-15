@@ -27,20 +27,6 @@ package protogeni.resources
 		
 		public var Level:int;
 		
-		[Bindable]
-		public var outputRspecVersion:Number;
-		[Bindable]
-		public var inputRspecVersion:Number;
-		
-		[Bindable]
-		public var outputRspecDefaultVersion:Number;
-		
-		public var inputRspecVersions:Vector.<Number>;
-		public var outputRspecVersions:Vector.<Number>;
-		
-		public var generated:Date;
-		public var expires:Date;
-		
 		public function ProtogeniComponentManager()
 		{
 			super();

@@ -29,8 +29,6 @@ package protogeni.communication
 			super("GetKeys",
 				"Getting the ssh credential",
 				CommunicationUtil.getKeys);
-			
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		/**
@@ -40,6 +38,7 @@ package protogeni.communication
 		 */
 		override public function start():Operation
 		{
+			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 			op.addField("credential",Main.geniHandler.CurrentUser.Credential);
 			return op;
 		}

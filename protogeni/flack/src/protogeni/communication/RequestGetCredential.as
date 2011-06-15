@@ -29,8 +29,11 @@ package protogeni.communication
 			super("GetCredential",
 				"Getting the basic user credential",
 				CommunicationUtil.getCredential);
-			
+		}
+		
+		override public function start():Operation {
 			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			return op;
 		}
 		
 		override public function complete(code:Number, response:Object):*
