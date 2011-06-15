@@ -38,7 +38,7 @@ my $CMCERT	  = "$TB/etc/genicm.pem";
 my $geniuserid    = "geniuser";
 my $geniprojid    = "GeniSlices";
 my $SUDO	  = "/usr/local/bin/sudo";
-my $MYSQLSHOW	  = "/usr/X11R6/bin/mysqlshow";
+my $MYSQLSHOW	  = "/usr/local/bin/mysqlshow";
 my $BATCHEXP      = "$TB/bin/batchexp";
 
 # un-taint path
