@@ -190,7 +190,7 @@ encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen)
 	}
 	fgets(akeybuf, sizeof(akeybuf), fp);
 	fclose(fp);
-	if ((cp = rindex(akeybuf, '\n')))
+	if ((cp = strrchr(akeybuf, '\n')))
 		*cp = '\0';
 	if (!hexstr_to_mem(keybuf, akeybuf, buflen)) {
 		fprintf(stderr, "%s: cannot parse encryption key\n",
