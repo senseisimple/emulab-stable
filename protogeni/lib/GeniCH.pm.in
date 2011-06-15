@@ -44,6 +44,38 @@ my $SLICESHUTDOWN  = "$TB/sbin/protogeni/shutdownslice";
 my $API_VERSION = 1;
 
 #
+# This is for Flack. 
+#
+sub WhoAmI($)
+{
+    my $caller_urn = $ENV{'GENIURN'};
+    my $caller_gid = $ENV{'SSL_CLIENT_CERT'};
+    my $sa_urn;
+    my $sa_url;
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				"Malformed URN ")
+	if (!GeniHRN::IsValid($caller_urn));
+    
+    # Convert the caller URN to an SA urn.
+    my ($auth, $type, $id) = GeniHRN::Parse($caller_urn);
+    $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
+
+    my $authority = GeniAuthority->Lookup($sa_urn);
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"No such slice authority $sa_urn")
+	if (!defined($authority));
+    $sa_url = $authority->url();
+
+    my $blob = {
+	"urn"    => $caller_urn,
+	"sa_urn" => $sa_urn,
+	"sa_url" => $sa_url,
+    };
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);    
+}
+
+#
 # Tell the client what API revision we support.  The correspondence
 # between revision numbers and API features is to be specified elsewhere.
 # No credentials are required.
