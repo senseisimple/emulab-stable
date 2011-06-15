@@ -267,8 +267,19 @@ sub auto_add_sa($)
 	    if ($certificate->SameCert($authority->GetCertificate()));
 
 	#
-	# Not sure what is the right thing yet ...
+	# Want to reuse the old uuid since we use it as a table cross
+	# reference index. Eventually need to use the URN. Anyway, change
+	# the uuid in the new certificate so that it goes into the DB
+	# with the original one. Then update the Authority record with
+	# the new certificate.
 	#
+	print STDERR "Updating $authority with new certificate: $certificate\n";
+	
+	$certificate->setuuid($authority->uuid());
+	if ($authority->UpdateCertificate($certificate)) {
+	    print STDERR "Failed to update $authority with $certificate\n";
+	    return;
+	}
 	return;
     }
     #
