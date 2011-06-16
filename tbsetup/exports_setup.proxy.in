@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -115,6 +115,15 @@ system("cat $exportshead >> $exportsnew") == 0 or
 # 
 system("cat $exportstail >> $exportsnew") == 0 or
     fatal("Failed to concat $exportstail to $exportsnew\n");
+
+#
+# Do nothing if no change.
+#
+system("/usr/bin/diff -q $exports $exportsnew >/dev/null");
+if (! $?) {
+#    print "No changes to $exports; skipping ...\n";
+    exit(0);
+}
 
 #
 # Back up the existing exports, and then mv in the new one.
