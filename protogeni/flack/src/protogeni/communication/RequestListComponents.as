@@ -88,7 +88,6 @@ package protogeni.communication
 							
 						} else if(!Main.protogeniOnly)
 						{
-							continue;
 							var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 							planetLabAm.Hrn = obj.hrn;
 							planetLabAm.Url = StringUtil.makeSureEndsWith(obj.url, "/"); // needs this for forge...
@@ -116,24 +115,12 @@ package protogeni.communication
 					if(Main.geniHandler.CurrentUser.userCredential.length > 0)
 						newCalls.push(new RequestUserResolve());
 					else if(Main.geniHandler.CurrentUser.sliceCredential.length > 0) {
-						var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
-						Main.geniHandler.CurrentUser.urn = new IdnUrn(cred.credential.owner_urn);
-						
-						var userSlice:Slice = new Slice();
-						userSlice.urn = new IdnUrn(cred.credential.target_urn);
-						userSlice.credential = Main.geniHandler.CurrentUser.sliceCredential;
-						userSlice.expires = Util.parseProtogeniDate(cred.credential.expires);
-						userSlice.creator = Main.geniHandler.CurrentUser;
-						Main.geniHandler.CurrentUser.slices.add(userSlice);
-						/*
-						for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
-							var newSliver:Sliver = new Sliver(userSlice, manager);
-							newCalls.push(new RequestSliverListResourcesAm(newSliver));
+						for each(var slice:Slice in Main.geniHandler.CurrentUser.slices) {
+							if(slice.credential == Main.geniHandler.CurrentUser.sliceCredential) {
+								Main.geniHandler.requestHandler.discoverSliceAllocatedResources(slice);
+								break;
+							}
 						}
-						Main.geniDispatcher.dispatchSlicesChanged();
-						*/
-						Main.geniDispatcher.dispatchUserChanged();
-						
 					}
 				}
 			}

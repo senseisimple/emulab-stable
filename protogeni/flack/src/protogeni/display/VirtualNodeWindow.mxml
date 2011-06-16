@@ -131,7 +131,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 							var newSliverType:Object = new Object();
 							newSliverType.name = sliverType.name;
 							newSliverType.diskLongName = sliverDiskImage.name;
-							if(diskImage.name == n.diskImage)
+							if(sliverDiskImage.name == n.diskImage)
 								toSelect = newSliverType;
 							newSliverType.diskShortName = DiskImage.getDiskImageShort(sliverDiskImage.name, node.manager);
 							newSliverType.diskDescription = sliverDiskImage.description;

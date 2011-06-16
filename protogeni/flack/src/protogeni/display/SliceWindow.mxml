@@ -46,6 +46,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.resources.Site;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
+			import protogeni.resources.SliverCollection;
 			import protogeni.resources.VirtualNode;
 			
 			import spark.components.NavigatorContent;
@@ -556,6 +557,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function viewExpires():void {
 				Alert.show(this.expireButton.toolTip);
 			}
+			
+			public function discoverAllocatedResources():void {
+				sliceCanvas.clear();
+				sliceCanvas.slice.slivers = new SliverCollection();
+				Main.geniHandler.requestHandler.discoverSliceAllocatedResources(sliceCanvas.slice);
+			}
 
 		]]>
 	</fx:Script>
@@ -631,26 +638,33 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						label="Autorefresh"
 						toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
 			<components:ImageButton id="deleteButton"
-								 toolTip="Delete slivers"
-								 click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
-								 icon="{ImageUtil.deleteIcon}"/>
+									toolTip="Delete slivers"
+									click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.deleteIcon}"/>
 			<components:DefaultLine percentHeight="90" />
 			<s:Button id="embedButton" label="Embed"
 					  toolTip="Embed slivers"
+					  height="24"
 					  click="Main.geniHandler.requestHandler.embedSlice(sliceCanvas.slice)" />
 			<components:DefaultLine percentHeight="90" />
 			<components:ImageButton id="startButton"
-								 toolTip="Start slivers"
-								  click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
-								  icon="{ImageUtil.playControlIcon}"/>
+									height="24"
+									toolTip="Start slivers"
+									click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.playControlIcon}"/>
 			<components:ImageButton id="stopButton"
-								 toolTip="Stop slivers"
-								  click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
-								  icon="{ImageUtil.stopControlIcon}"/>
+									toolTip="Stop slivers"
+									click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.stopControlIcon}"/>
 			<components:ImageButton id="restartButton"
-								 toolTip="Restart slivers"
-								  click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
-								  icon="{ImageUtil.repeatControlIcon}"/>
+									toolTip="Restart slivers"
+									click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.repeatControlIcon}"/>
+			<components:DefaultLine percentHeight="90" />
+			<s:Button label="Discover allocated resources"
+					  toolTip="Ask each known manager if it has resources allocated to this slice"
+					  height="24"
+					  click="discoverAllocatedResources()" />
 		</s:HGroup>
 	</components:controlBarContent>
 </components:DefaultWindow>

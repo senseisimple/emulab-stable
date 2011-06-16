@@ -57,9 +57,9 @@ package protogeni.communication
 				
 				Main.geniDispatcher.dispatchSliceChanged(slice);
 				for each(var s:Sliver in slice.slivers.collection) {
-					if(s.manager is AggregateManager)
+					if(s.manager.isAm)
 						newCalls.push(new RequestSliverListResourcesAm(s));
-					else if(s.manager is ProtogeniComponentManager)
+					else
 						newCalls.push(new RequestSliverGet(s));
 				}
 				

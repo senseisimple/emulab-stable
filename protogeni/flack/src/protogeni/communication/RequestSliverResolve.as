@@ -48,6 +48,9 @@ package protogeni.communication
 				sliver.rspec = new XML(response.value.manifest);
 				sliver.created = true;
 				sliver.parseRspec();
+				if(!sliver.slice.slivers.contains(sliver))
+					sliver.slice.slivers.add(sliver);
+				
 				if(sliver.slice.isCreated())
 					Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATED);
 				else

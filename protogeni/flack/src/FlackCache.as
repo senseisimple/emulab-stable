@@ -167,7 +167,8 @@ package
 				_offlineSharedObject.data.keys.push(key.value);
 			_offlineSharedObject.data.name = Main.geniHandler.CurrentUser.name;
 			_offlineSharedObject.data.uid = Main.geniHandler.CurrentUser.uid;
-			_offlineSharedObject.data.urn = Main.geniHandler.CurrentUser.urn.full;
+			if(Main.geniHandler.CurrentUser.urn != null)
+				_offlineSharedObject.data.urn = Main.geniHandler.CurrentUser.urn.full;
 		}
 		
 		public static function updateSlices(event:GeniEvent):void {

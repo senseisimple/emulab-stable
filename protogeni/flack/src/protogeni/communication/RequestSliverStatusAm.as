@@ -30,7 +30,7 @@ package protogeni.communication
 		
 		public function RequestSliverStatusAm(newSliver:Sliver):void
 		{
-			super("SliverStatus",
+			super("SliverStatusAM",
 				"Getting the sliver status on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
 				CommunicationUtil.sliverStatusAm,
 				true);

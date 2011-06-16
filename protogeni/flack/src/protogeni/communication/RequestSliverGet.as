@@ -15,6 +15,7 @@
 package protogeni.communication
 {
 	import protogeni.Util;
+	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Sliver;
 	
@@ -41,9 +42,16 @@ package protogeni.communication
 			op.setUrl(sliver.manager.Url);
 		}
 		
+		override public function start():Operation {
+			if(sliver.manager.Status == GeniManager.STATUS_VALID)
+				return op;
+			else
+				return null;
+		}
+		
 		override public function complete(code:Number, response:Object):*
 		{
-			var newCall:Request = new Request();
+			var newCall:Request = null;
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				sliver.credential = String(response.value);

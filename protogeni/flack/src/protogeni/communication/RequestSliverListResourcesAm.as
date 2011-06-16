@@ -19,6 +19,8 @@ package protogeni.communication
 	import mx.utils.Base64Decoder;
 	
 	import protogeni.StringUtil;
+	import protogeni.resources.GeniManager;
+	import protogeni.resources.ProtogeniRspecProcessor;
 	import protogeni.resources.Sliver;
 	
 	/**
@@ -33,7 +35,7 @@ package protogeni.communication
 		
 		public function RequestSliverListResourcesAm(s:Sliver):void
 		{
-			super("ListResources (" + StringUtil.shortenString(s.manager.Url, 15) + ")",
+			super("ListSliverResources (" + StringUtil.shortenString(s.manager.Url, 15) + ")",
 				"Listing resources for sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn,
 				CommunicationUtil.listResourcesAm,
 				true);
@@ -42,9 +44,20 @@ package protogeni.communication
 			sliver = s;
 			
 			// Build up the args
+			var options:Object = {geni_available:false, geni_compressed:true, geni_slice_urn:sliver.slice.urn.full};
+			if(sliver.manager.rspecProcessor is ProtogeniRspecProcessor)
+				options.rspec_version = "ProtoGENI " + sliver.manager.outputRspecVersion
+					
 			op.pushField([sliver.slice.credential]);
-			op.pushField({geni_available:false, geni_compressed:true, geni_slice_urn:sliver.slice.urn.full});	// geni_available:false = show all, true = show only available
+			op.pushField(options);
 			op.setExactUrl(sliver.manager.Url);
+		}
+		
+		override public function start():Operation {
+			if(sliver.manager.Status == GeniManager.STATUS_VALID)
+				return op;
+			else
+				return null;
 		}
 		
 		override public function complete(code:Number, response:Object):*
@@ -60,12 +73,12 @@ package protogeni.communication
 				
 				sliver.created = true;
 				sliver.parseRspec();
-				if(sliver.nodes.collection.length > 0 && !sliver.slice.slivers.contains(sliver))
+				
+				if(sliver.nodes.length > 0 && !sliver.slice.slivers.contains(sliver)) {
 					sliver.slice.slivers.add(sliver);
-				
-				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-				return new RequestSliverStatusAm(sliver);
-				
+					Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+					return new RequestSliverStatusAm(sliver);
+				}
 			} catch(e:Error)
 			{
 			}

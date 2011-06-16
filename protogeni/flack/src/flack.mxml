@@ -139,6 +139,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
 				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				Main.geniDispatcher.addEventListener(GeniEvent.QUEUE_CHANGED, queueChanged);
 				
 				// Default behavior (public)
 				allowAuthenticate = true;
@@ -212,16 +213,20 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			public function userChanged(pe:GeniEvent):void {
-				if(Main.geniHandler.CurrentUser == null
-					|| Main.geniHandler.CurrentUser.Credential.length == 0)
+				if(Main.geniHandler.unauthenticatedMode &&
+					(Main.geniHandler.CurrentUser == null
+					|| Main.geniHandler.CurrentUser.Credential.length == 0))
 				{
 					this.userButton.setStyle("icon", ImageUtil.noUserIcon);
-					this.userButton.toolTip = "Authenticate";
-					this.userButton.label = "Authenticate";
+					this.userButton.toolTip = "Log in";
+					this.userButton.label = "Log in";
 				} else {
 					this.userButton.setStyle("icon", ImageUtil.userIcon);
 					this.userButton.toolTip = "View user information"
-					this.userButton.label = Main.geniHandler.CurrentUser.uid;
+					if(Main.geniHandler.CurrentUser != null)
+						this.userButton.label = Main.geniHandler.CurrentUser.uid;
+					else
+						this.userButton.label = "";
 				}
 			}
 			
@@ -269,20 +274,31 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				//Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
-			public function setStatus(s:String, isError:Boolean):void
-			{
+			public function queueChanged(event:GeniEvent):void {
 				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
+				var workingCount:int = Main.geniHandler.requestHandler.queue.workingCount();
+				var waitingCount:int = Main.geniHandler.requestHandler.queue.waitingCount();
 				spinner.visible = isWorking;
 				if(isWorking)
 					spinner.startSpin();
 				else
 					spinner.stopSpin();
-				progressLabel.text = s;
-				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
-					waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
+				if(isWorking && workingCount > 1)
+					waitingCountLabel.text = workingCount + " active";
 				else
 					waitingCountLabel.text = "";
-				if(isWorking)
+				if(waitingCount > 0) {
+					if(waitingCountLabel.text.length > 0)
+						waitingCountLabel.text += ", ";
+					waitingCountLabel.text += waitingCount + " waiting";
+				}
+			}
+			
+			public function setStatus(s:String, isError:Boolean):void
+			{
+				progressLabel.text = s;
+				
+				if(Main.geniHandler.requestHandler.queue.working())
 					progressLabel.styleName = "inprogressStyle";
 				else if(isError)
 					progressLabel.styleName = "failedStyle";
@@ -302,8 +318,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 								toolTip="Console"/>
 		<s:Button icon="{ImageUtil.noUserIcon}"
 				  click="loadUser()"
-				  visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
-				  toolTip="Log in to get user-only features" label="Log in" styleName="unauthenticatedStyle"
+				  visible="{allowAuthenticate}"
+				  includeInLayout="{allowAuthenticate}"
+				  toolTip="Log in to get user-only features"
+				  label="Log in"
+				  styleName="unauthenticatedStyle"
 				  id="userButton" height="24" />
 		<s:Rect percentWidth="100" />
 		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>

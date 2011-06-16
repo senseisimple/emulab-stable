@@ -85,6 +85,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					Alert.show("You must suply a private key/certificate bundle");
 					return;
 				}
+				if(this.sliceCredentialRadiobutton.selected && Main.geniHandler.CurrentUser.sliceCredential.length == 0) {
+					Alert.show("You haven't selected a slice credential.  Would you like to select one now to continue?", "No slice credential selected", Alert.YES|Alert.NO, Main.Application(),
+						function afterSelection(event:CloseEvent):void {
+							if(event.detail == Alert.YES)
+								onFileBrowse(null);
+						});
+					return;
+				}
 				saveAndClose();
 			}
 			
@@ -101,7 +109,21 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 				Main.geniHandler.mapHandler.clearAll();
 				Main.geniHandler.unauthenticatedMode = false;
-				Main.geniHandler.requestHandler.pushRequest(new RequestWhoAmI());
+				if(this.userCredentialRadiobutton.selected)
+					Main.geniHandler.requestHandler.pushRequest(new RequestWhoAmI());
+				else {
+					var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
+					
+					var userSlice:Slice = new Slice();
+					userSlice.urn = new IdnUrn(cred.credential.target_urn);
+					userSlice.credential = Main.geniHandler.CurrentUser.sliceCredential;
+					userSlice.expires = Util.parseProtogeniDate(cred.credential.expires);
+					userSlice.creator = Main.geniHandler.CurrentUser;
+					Main.geniHandler.CurrentUser.slices.add(userSlice);
+					
+					Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence(this.discoverResourcesCheckbox.selected);
+				}
+				Main.geniDispatcher.dispatchUserChanged();
 				closeWindow();
 			}
 			
@@ -235,13 +257,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 							return;
 						}
 						
-						var userSlice:Slice = new Slice();
-						userSlice.credential = Main.geniHandler.CurrentUser.sliceCredential;
-						userSlice.creator = Main.geniHandler.CurrentUser;
-						userSlice.expires = expires;
-						userSlice.urn = new IdnUrn(cred.credential.target_urn);
-						Main.geniHandler.CurrentUser.slices.add(userSlice);
-						
 						Main.geniDispatcher.dispatchUserChanged();
 						
 						sliceCredentialIcon.visible = true;
@@ -308,7 +323,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<s:CheckBox id="cacheCheckbox" label="Remember" />
 	</s:HGroup>
 	
-	<s:HGroup>
+	<s:HGroup verticalAlign="middle">
 		<s:RadioButton id="userCredentialRadiobutton"
 					   groupName="credentialGroup"
 					   label="Get user credential"
@@ -316,10 +331,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<s:RadioButton id="sliceCredentialRadiobutton"
 					   groupName="credentialGroup"
 					   label="Use slice credential" />
-		<components:ImageButton icon="{ImageUtil.openIcon}"
+		<components:ImageButton icon="{ImageUtil.openIcon}" id="openSliceCredentialButton"
 								toolTip="Optionally use a slice credential which was saved to file"
 								click="onFileBrowse(event)" />
 		<s:BitmapImage id="sliceCredentialIcon" source="{ImageUtil.availableIcon}" visible="false" />
+		<s:CheckBox label="Discover allocated resources"
+					id="discoverResourcesCheckbox"
+					enabled="{sliceCredentialRadiobutton.selected}" />
 	</s:HGroup>
 	<components:controlBarLayout>
 		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />

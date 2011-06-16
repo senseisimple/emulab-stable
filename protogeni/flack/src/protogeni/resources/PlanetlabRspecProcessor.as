@@ -121,30 +121,36 @@ package protogeni.resources
 			var startTime:Date = new Date();
 			
 			while(myIndex < sites.length()) {
-				var s:XML = sites[myIndex];
-				var site:Site = new Site();
-				site.id = s.@id;
-				site.name = s.child("name")[0].toString();
-				site.hrn = manager.networkName + "." + site.id;
-				manager.sites.push(site);
-				for each(var p:XML in s.child("node")) {
-					var node:PhysicalNode = new PhysicalNode(null, manager);
-					node.name = p.@id;
-					for each(var tx:XML in p.children()) {
-						switch(tx.localName()) {
-							case "urn":
-								node.id = tx.toString();
-								break;
-							default:
+				try {
+					var s:XML = sites[myIndex];
+					var site:Site = new Site();
+					site.id = s.@id;
+					site.name = s.child("name")[0].toString();
+					site.hrn = manager.networkName + "." + site.id;
+					manager.sites.push(site);
+					for each(var p:XML in s.child("node")) {
+						var node:PhysicalNode = new PhysicalNode(null, manager);
+						node.name = p.@id;
+						for each(var tx:XML in p.children()) {
+							switch(tx.localName()) {
+								case "urn":
+									node.id = tx.toString();
+									break;
+								default:
+							}
 						}
+						node.rspec = p.copy();
+						node.tag = site;
+						node.available = true;
+						node.exclusive = false;
+						idx++;
+						manager.AllNodes.push(node);
+						site.nodes.push(node);
 					}
-					node.rspec = p.copy();
-					node.tag = site;
-					node.available = true;
-					node.exclusive = false;
-					idx++;
-					manager.AllNodes.push(node);
-					site.nodes.push(node);
+				} catch(e:Error) {
+					// skip if some problem
+					if(Main.debugMode)
+						trace("Skipped node which threw error in manager named " + manager.Hrn);
 				}
 				myIndex++;
 				if(((new Date()).time - startTime.time) > 40) {

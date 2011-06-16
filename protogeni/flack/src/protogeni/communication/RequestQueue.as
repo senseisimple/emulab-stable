@@ -133,6 +133,21 @@ package protogeni.communication
 			return count;
 		}
 		
+		public function waitingCount():int
+		{
+			var count:int = 0;
+			var n:RequestQueueNode = head;
+			
+			while(n != null)
+			{
+				if(!(n.item as Request).running)
+					count++;
+				n = n.next;
+			}
+			
+			return count;
+		}
+		
 		public function readyToStart():Boolean
 		{
 			return head != null &&

@@ -59,7 +59,6 @@ package protogeni.communication
 				}
 				
 				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-				Main.geniDispatcher.dispatchSlicesChanged();
 			}
 			else
 			{

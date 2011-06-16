@@ -72,7 +72,7 @@ package protogeni.communication
 		 * Starts authenticated GENI calls
 		 * 
 		 */
-		public function startAuthenticatedInitiationSequence():void
+		public function startAuthenticatedInitiationSequence(getSlices:Boolean = true):void
 		{
 			if(Main.geniHandler.unauthenticatedMode) {
 				DisplayUtil.viewInitialUserWindow();
@@ -82,7 +82,7 @@ package protogeni.communication
 				pushRequest(new RequestGetCredential());
 				pushRequest(new RequestGetKeys());
 			}
-			loadListAndComponentManagersAndSlices();
+			loadListAndComponentManagers(getSlices);
 			Main.Application().hideAuthenticate();
 		}
 		
@@ -90,20 +90,7 @@ package protogeni.communication
 		 * Adds calls to get the list of component managers
 		 * 
 		 */
-		public function loadListAndComponentManagers():void
-		{
-			if(Main.geniHandler.unauthenticatedMode)
-				pushRequest(new RequestListComponentsPublic());
-			else
-				pushRequest(new RequestListComponents(true, false));
-			
-		}
-		
-		/**
-		 * Adds calls to get the list of component managers and the user's slices
-		 * 
-		 */
-		public function loadListAndComponentManagersAndSlices():void
+		public function loadListAndComponentManagers(getSlices:Boolean = false):void
 		{
 			/*var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 			newCm.isAm = true;
@@ -117,7 +104,7 @@ package protogeni.communication
 			if(Main.geniHandler.unauthenticatedMode)
 				pushRequest(new RequestListComponentsPublic());
 			else
-				pushRequest(new RequestListComponents(true, true));
+				pushRequest(new RequestListComponents(true, getSlices));
 			
 		}
 		
@@ -136,6 +123,16 @@ package protogeni.communication
 				}
 				else
 					pushRequest(new RequestGetVersion(cm));
+			}
+		}
+		
+		public function discoverSliceAllocatedResources(slice:Slice):void {
+			for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
+				var newSliver:Sliver = new Sliver(slice, manager);
+				if(manager.isAm)
+					this.pushRequest(new RequestSliverListResourcesAm(newSliver));
+				else
+					this.pushRequest(new RequestSliverGet(newSliver));
 			}
 		}
 		
@@ -360,16 +357,21 @@ package protogeni.communication
 				var start:Request = queue.nextAndProgress();
 				start.running = true;
 				var op:Operation = start.start();
-				start.numTries++;
-				op.call(complete, failure);
-				Main.Application().setStatus(start.name, false);
-				LogHandler.appendMessage(new LogMessage(op.getUrl(),
-														start.name,
-														op.getSent(),
-														false,
-														LogMessage.TYPE_START));
-				
-				Main.geniDispatcher.dispatchQueueChanged();
+				if(op == null) {
+					start.running = false;
+					this.remove(start);
+				} else {
+					start.numTries++;
+					op.call(complete, failure);
+					Main.Application().setStatus(start.name, false);
+					LogHandler.appendMessage(new LogMessage(op.getUrl(),
+						start.name,
+						op.getSent(),
+						false,
+						LogMessage.TYPE_START));
+					
+					Main.geniDispatcher.dispatchQueueChanged();
+				}
 				
 				if(continuous)
 					this.start();
@@ -462,7 +464,7 @@ package protogeni.communication
 				msg = event.toString();
 				failMessage += "\nFAILURE event: " + request.name + ": " + msg;
 				if(msg.search("#2048") > -1)
-					failMessage += "\nStream error, possibly due to server error";
+					failMessage += "\nStream error, possibly due to server error\n\n****Very possible that this server has not added a Flash socket security policy server****";
 				else if(msg.search("#2032") > -1) {
 					if(Main.geniHandler.unauthenticatedMode)
 						failMessage += "\nIO Error, possibly due to server problems";
