@@ -393,7 +393,7 @@ sub GetTicketAux($$$$$$$)
     #
     # Create user from the certificate.
     #
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
     
@@ -408,11 +408,8 @@ sub GetTicketAux($$$$$$$)
 					"No slice found for UpdateTicket");
 	}
 	$slice = CreateSliceFromCertificate($credential, $user);
-	if (!defined($slice)) {
-	    print STDERR "Could not create $slice_urn\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not create slice");
-	}
+	return $slice
+	    if (GeniResponse::IsResponse($slice));
     }
     
     return GetTicketAuxAux($slice, $user, $rspecstr,
@@ -2082,7 +2079,7 @@ sub SliverWorkAux($$$$$$$)
     #
     # Create the user.
     #
-    my $owner = CreateUserFromCertificate($owner_cert);
+    my $owner = CreateUserFromCertificate($credential);
     return $owner
 	if (GeniResponse::IsResponse($owner));
 
@@ -3635,7 +3632,7 @@ sub GetSliverAux($)
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -3713,7 +3710,7 @@ sub BindToSlice($)
     #
     # Find or create the user.
     #
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -4051,7 +4048,7 @@ sub SliverTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -4241,7 +4238,7 @@ sub ListTickets($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -4280,34 +4277,36 @@ sub ListTickets($)
 sub CreateSliceFromCertificate($$)
 {
     my ($credential, $user) = @_;
-
     my $certificate = $credential->target_cert();
 
-    my $authority = CreateAuthorityFromRegistry($certificate);
-    return undef    
-	if (!defined($authority));
+    # Should no longer happen, but lets make sure.
+    if (!defined($certificate->urn()) &&
+	GeniHRN::IsValid($certificate->urn())) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN");
+    }
+    my $authority = CreateAuthorityFromCertificate($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
 
     #
-    # The problem with HRNs is that people will tend to reuse them.
-    # So check to see if we have a slice with the hrn.
+    # The problem with URNs is that people will tend to reuse them.
+    # So check to see if we have a slice with the same urn.
     #
-    my $slice = GeniSlice->Lookup($certificate->hrn());
+    my $slice = GeniSlice->Lookup($certificate->urn());
     if (defined($slice)) {
+	# Same certificate means it really is the same slice.
 	return $slice
-	    if ($slice->uuid() eq $certificate->uuid());
+	    if ($certificate->SameCert($slice));
 
-	if ($slice->Lock() != 0) {
-	    print STDERR "Could not lock $slice\n";
-	    return undef;
-	}
-	if (CleanupDeadSlice($slice) != 0) {
-	    print STDERR "Could not cleanup dead slice $slice\n";
-	    $slice->UnLock();
-	    return undef;
-	}
+	# In the past we would destroy the old slice, but no longer
+	# think this is the correct thing to do.
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Duplicate slice URN already exists here");
     }
     $slice = GeniSlice->Create($certificate, $user, $authority);
-    return undef
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Cannot create slice object")
 	if (!defined($slice));
 
     #
@@ -4340,39 +4339,45 @@ sub CreateSliceFromCertificate($$)
 #
 sub CreateUserFromCertificate($)
 {
-    my ($certificate) = @_;
+    my ($credential) = @_;
+    my $certificate  = $credential->owner_cert();
 
     #
     # We now force people to have URNs in their certs.
     #
     if (!defined($certificate->urn()) &&
 	GeniHRN::IsValid($certificate->urn())) {
-	SENDMAIL($certificate->email(), "ProtoGENI Certificate Error",
-		 "Your user certificate is out of date! \n".
-		 "Please login to your Emulab and generate\n".
-		 "a new encrypted SSL certificate.\n",
-		 $TBOPS, "BCC: protogeni-errors\@flux.utah.edu");
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN");
     }
     my $urn = $certificate->urn();
 
-    # Local users always exist.
+    # Local users always exist, so pass flag.
     my $user = GeniUser->Lookup($certificate->urn(), 1);
-    return $user
-	if (defined($user));
-
-    # Try using the uuid, in case we have a stale (pre-urn) certificate.
-    $user = GeniUser->Lookup($certificate->uuid());
     if (defined($user)) {
 	#
-	# Replace stale certificate with new onw.
+	# See if the certificate changed. If it did, we have to update the
+	# user record, but we want to use the old uuid since that is our
+	# table cross reference index. Eventually uuid will no longer be
+	# visible, but for now just keep on doing it.
 	#
-	print STDERR "Reloading certificate for $user from $certificate\n";
+	return $user
+	    if ($certificate->SameCert($user));
+
+	#
+	# Replace the user certificate. I think this is okay, since we
+	# do not sign anything with the user key anyway. As long as we
+	# keep the uuid from changing, all should be okay.
+	#
+	print STDERR "Updating certificate for $user to $certificate\n";
 	$user->Flush();
+	$certificate->Flush();
+	$certificate->setuuid($user->uuid());
 	$certificate->Store();
 	$user = GeniUser->Lookup($certificate->urn());
 	if (!defined($user)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			    "Problem loading your certificate");
+					"Problem reloading your certificate");
 	}
 	return $user;
     }
@@ -4385,10 +4390,9 @@ sub CreateUserFromCertificate($)
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Malformed user URN");
     }
-    my $authority = CreateAuthorityFromRegistry($certificate);
-    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Could not create authority object")
-	if (!defined($authority));
+    my $authority = CreateAuthorityFromCertificate($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
 
     #
     # We want an email address to send expiration notifications to,
@@ -4451,25 +4455,107 @@ sub CreateUserFromCertificate($)
 }
 
 #
+# When we have a credential, we can create the authority object using
+# the signer certificate.
+#
+sub CreateAuthorityFromCertificate($)
+{
+    my ($credential) = @_;
+    my $signers = $credential->signer_certs();
+    my $certstr = @$signers[0];
+
+    my $certificate = GeniCertificate->LoadFromString($certstr);
+    if (!defined($certificate)) {
+        print STDERR "Could not get certificate from $certstr\n";
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Could not load signer certificate");
+    }
+    if (! (defined($certificate->urn()) &&
+	   GeniHRN::IsValid($certificate->urn()))) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN in $certstr");
+    }
+    my $authority = GeniAuthority->Lookup($certificate->urn());
+    if (defined($authority)) {
+	# Same certificate means it really is the same authority
+	return $authority
+	    if ($certificate->SameCert($authority));
+
+	#
+	# Want to reuse the old uuid since we use it as a table cross
+	# reference index. Eventually need to use the URN. Anyway, change
+	# the uuid in the new certificate so that it goes into the DB
+	# with the original one. Then update the Authority record with
+	# the new certificate.
+	#
+	# XXX What about a URL change? 
+	#
+	print STDERR "Updating $authority with new certificate: $certificate\n";
+	
+	$certificate->setuuid($authority->uuid());
+	if ($authority->UpdateCertificate($certificate)) {
+	    print STDERR "Failed to update $authority with $certificate\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not update $authority certificate");
+	}
+	return $authority;
+    }
+    #
+    # Check that this really is an SA.
+    #
+    my ($auth,$type,$id) = GeniHRN::Parse($certificate->urn());
+    if (! ($type eq "authority" && $id eq "sa")) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+			    "Signer certificate is not from a Slice Authority");
+    }
+    #
+    # Protogeni signer certificates will have a URL in them. Otherwise it
+    # is PLC or other framework and they must go through the AM interface.
+    #
+    my $url = $certificate->URL();
+    if (!defined($url)) {
+        print STDERR "$certificate does not have a URL extension\n";
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Signer certificate does not have a URL");
+    }
+    $authority = GeniAuthority->Create($certificate, $url, "sa");
+    if (!defined($authority)) {
+        print STDERR "unable to add authority from $certificate\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+		    "Could not create authority from $certificate");
+    }
+    return $authority;
+}
+
+#
 # Create authority from the ClearingHouse, by looking up the info.
+# We need this when we do not have a credential, wich at the moment
+# is just one place.
 #
 sub CreateAuthorityFromRegistry($)
 {
     my ($certificate) = @_;
-    my $authority;
 
     if (! (defined($certificate->urn()) &&
 	   GeniHRN::IsValid($certificate->urn()))) {
-	print STDERR "Cannot create authority: No URN in $certificate\n";
-	return undef;
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN in certificate");
     }
+    #
+    # Transform whatever the urn is, to the corresponding SA urn.
+    # Note that we will never find out if the slice authority has
+    # changed its certificate. But we do not want to put in a call
+    # to the authority from here, since it might block if it is
+    # unreachable, and we do not want to block on this path. 
+    #
     my ($auth,$type,$id) = GeniHRN::Parse($certificate->urn());
     my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
-    $authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
 
     if (!defined($authority)) {
-	print STDERR "Could not create authority from registry\n";
-	return undef;
+	print STDERR "Could not create authority for $sa_urn\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Could not create authority object for $sa_urn");
     }
     return $authority;
 }
