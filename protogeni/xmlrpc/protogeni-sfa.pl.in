@@ -110,6 +110,7 @@ elsif (1) {
     my $f   = "urn:publicid:IDN+plc:utah+authority+sa";
     my $g   = "urn:publicid:IDN+plc:bbn+authority+sa";
     my $h   = "urn:publicid:IDN+ple+authority+sa";
+    my $i   = "urn:publicid:IDN+plc:utah+slice+lbs";
     $response =
 	Genixmlrpc::CallMethod($server, $context, "Resolve",
 			       $h, $selfcred->asString());
