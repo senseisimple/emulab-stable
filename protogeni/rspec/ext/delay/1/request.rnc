@@ -58,7 +58,7 @@ PipeContents =
   attribute linterm { xsd:int }? &
 
   # Lambda in EWMA for determining average queue size [Default: 0.002]
-  attribute q_weight { xsd:float }? &
+  attribute q_weight { xsd:float }?
 
 # Both of the above are start elements.
 start = SliverType
