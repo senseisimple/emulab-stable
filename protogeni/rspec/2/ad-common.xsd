@@ -153,18 +153,25 @@
   </xs:complexType>
   <xs:complexType name="LinkContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:group ref="rspec:AnyExtension"/>
-      <xs:element ref="rspec:property"/>
-      <xs:element ref="rspec:link_type"/>
-      <xs:element ref="rspec:interface_ref"/>
+      <xs:choice>
+        <xs:group ref="rspec:AnyExtension"/>
+        <xs:element ref="rspec:property"/>
+        <xs:element ref="rspec:link_type"/>
+        <xs:element ref="rspec:interface_ref"/>
+      </xs:choice>
+      <xs:element ref="rspec:component_manager"/>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="component_id" use="required"/>
-    <xs:attribute name="component_manager_id" use="required"/>
     <xs:attribute name="component_name"/>
   </xs:complexType>
   <xs:element name="property" type="rspec:LinkPropertyContents"/>
   <xs:element name="interface_ref" type="rspec:InterfaceRefContents"/>
+  <xs:element name="component_manager">
+    <xs:complexType>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
   <xs:complexType name="InterfaceRefContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
