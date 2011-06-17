@@ -296,7 +296,10 @@ sub Flush($)
 {
     my ($self) = @_;
 
-    $self->GetCertificate()->Flush();
+    # Just in case we get something else.
+    $self->GetCertificate()->Flush()
+	if (ref($self) ne "GeniCertificate");
+
     delete($certificates{$self->uuid()});
 }
 
