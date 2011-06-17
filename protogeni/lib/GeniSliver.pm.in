@@ -1223,6 +1223,13 @@ sub UnProvision($)
     }
 
     #
+    # Skip this for Tunnel aggregates; nothing to to, and the code below
+    # only applies for vlan links.
+    #
+    return 0
+	if ($aggregate->type() eq "Tunnel");
+
+    #
     # This is terrible; we need an interface to remove ports form vlans,
     # so that we do not have to tear down the entire vlan and recreate.
     #
