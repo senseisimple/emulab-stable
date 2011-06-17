@@ -46,6 +46,18 @@ package protogeni.resources
 			return this.collection.length;
 		}
 		
+		public function isIdUnique(node:*, id:String):Boolean {
+			var found:Boolean = false;
+			for each(var testNode:VirtualNode in this.collection)
+			{
+				if(node == testNode)
+					continue;
+				if(testNode.clientId == id)
+					return false;
+			}
+			return true;
+		}
+		
 		public function getById(id:String):VirtualNode
 		{
 			for each(var node:VirtualNode in this.collection)

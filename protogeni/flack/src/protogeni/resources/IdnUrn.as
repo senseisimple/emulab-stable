@@ -72,5 +72,18 @@ package protogeni.resources
 		{
 			return new IdnUrn("urn:publicid:IDN+" + newAuthority + "+" + newType + "+" + newName);
 		}
+		
+		public static function isIdnUrn(testString:String):Boolean {
+			try {
+				var array:Array = testString.split("+");
+				if(array[0] != "urn:publicid:IDN")
+					return false;
+				if(array.length != 4)
+					return false;
+			} catch(e:Error) {
+				return false;
+			}
+			return true;
+		}
 	}
 }

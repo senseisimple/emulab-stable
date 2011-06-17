@@ -76,5 +76,9 @@ package protogeni
 			dispatchEvent(new GeniEvent(GeniEvent.LOGS_CHANGED,
 										m));
 		}
+		
+		public function dispatchGeniAuthoritiesChanged():void {
+			dispatchEvent(new GeniEvent(GeniEvent.GENIAUTHORITIES_CHANGED));
+		}
 	}
 }

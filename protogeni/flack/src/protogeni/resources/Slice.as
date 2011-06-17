@@ -393,6 +393,14 @@ package protogeni.resources
 			}
 		}
 		
+		public function isIdUnique(o:*, id:String):Boolean {
+			if(!this.GetAllLinks().isIdUnique(o, id))
+				return false;
+			if(!this.GetAllNodes().isIdUnique(o, id))
+				return false;
+			return true;
+		}
+		
 		public function getUniqueVirtualLinkId(l:VirtualLink = null):String
 		{
 			var highest:int = 0;

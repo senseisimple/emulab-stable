@@ -58,6 +58,8 @@ package protogeni.communication
 					var sliceAuthorityLineParts:Array = sliceAuthorityLine.split(" ");
 					Main.geniHandler.GeniAuthorities.addItem(new SliceAuthority(sliceAuthorityLineParts[0], sliceAuthorityLineParts[1], true));
 				}
+				
+				Main.geniDispatcher.dispatchGeniAuthoritiesChanged();
 			}
 			else
 			{

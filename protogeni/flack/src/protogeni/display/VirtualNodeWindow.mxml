@@ -40,6 +40,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.resources.Pipe;
 			import protogeni.resources.PipeCollection;
 			import protogeni.resources.ProtogeniRspecProcessor;
+			import protogeni.resources.Sliver;
 			import protogeni.resources.SliverType;
 			import protogeni.resources.VirtualInterface;
 			import protogeni.resources.VirtualLink;
@@ -251,12 +252,19 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function success():void
 			{
-				save();
+				if(save())
+					return;
 				closeWindow();
 			}
 			
-			public function save():void
+			public function save():Boolean
 			{
+				// Make sure the client_id is not taken
+				if(!this.node.sliver.slice.isIdUnique(this.node, this.idLabel.Text)) {
+					Alert.show(this.idLabel.Text + " is already in use, please choose a different client id");
+					return true;
+				}
+				
 				this.node.clientId = this.idLabel.Text;
 				if(this.bindingPhysicalRadiobutton.selected) {
 					// currently can't select a physical node here
@@ -282,6 +290,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 				this.node.setDiskImage(diskImageText.text);
 				Main.geniDispatcher.dispatchSliceChanged(node.sliver.slice);
+				
+				return false;
 			}
 			
 			public function viewRspec():void
@@ -308,7 +318,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 							case Alert.CANCEL:
 								return;
 							case Alert.YES:
-								save();
+								if(save())
+									return;
 							default:
 								var previewRspec:XmlWindow = new XmlWindow();
 								previewRspec.title = "Preview Request RSPEC for: " + node.clientId;

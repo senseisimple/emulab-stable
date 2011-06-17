@@ -34,15 +34,21 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<![CDATA[
 			import com.hurlant.crypto.cert.X509Certificate;
 			import com.hurlant.crypto.rsa.RSAKey;
+			import com.hurlant.util.der.PEM;
+			import com.mstrum.Asn1Field;
+			import com.mstrum.DER;
+			import com.mstrum.Oids;
 			
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
 			
+			import protogeni.GeniEvent;
 			import protogeni.NetUtil;
 			import protogeni.Util;
 			import protogeni.communication.RequestWhoAmI;
+			import protogeni.resources.GeniUser;
 			import protogeni.resources.IdnUrn;
 			import protogeni.resources.Slice;
 			import protogeni.resources.SliceAuthority;
@@ -77,6 +83,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				fr.addEventListener(Event.COMPLETE, onFileComplete);
 				fr.addEventListener(IOErrorEvent.IO_ERROR, onFileIoError);
 				fr.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onFileSecurityError);
+				
+				Main.geniDispatcher.addEventListener(GeniEvent.GENIAUTHORITIES_CHANGED, authoritiesChanged);
 			}
 			
 			public function trySubmit():void
@@ -98,7 +106,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function saveAndClose():void
 			{
-				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
+				
 				
 				FlackCache.userSslPem = sslPem.text;
 				FlackCache.saveBasic();
@@ -109,9 +117,15 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 				Main.geniHandler.mapHandler.clearAll();
 				Main.geniHandler.unauthenticatedMode = false;
-				if(this.userCredentialRadiobutton.selected)
-					Main.geniHandler.requestHandler.pushRequest(new RequestWhoAmI());
-				else {
+				if(this.userCredentialRadiobutton.selected) {
+					
+					if(Main.geniHandler.CurrentUser.authority == null) {
+						Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
+						Main.geniHandler.requestHandler.pushRequest(new RequestWhoAmI());
+					} else
+						Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
+					
+				} else {
 					var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
 					
 					var userSlice:Slice = new Slice();
@@ -233,7 +247,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			protected function openPem(event:MouseEvent):void
 			{
 				loadingPem = true;
-				fr.browse([new FileFilter("PEMs (*.pem)", "*.pem")])
+				fr.browse([new FileFilter("PEMs (*.pem, *.txt, *.der)", "*.pem;*.txt;*.der")])
 			}
 			
 			public function onFileSelect(event:Event):void {
@@ -242,8 +256,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function onFileComplete(event:Event):void {
 				if(loadingPem) {
-					sslPem.text = fr.data.readUTFBytes(fr.data.length);
-					this.passwordField.textInput.setFocus();
+					var d:Asn1Field = DER.Parse(fr.data);
+					var val:Asn1Field = d.getHolderFor(Oids.ACA_GROUP);
+					val = val;
+					/*sslPem.text = fr.data.readUTFBytes(fr.data.length);
+					this.passwordField.textInput.setFocus();*/
 				} else {
 					try{
 						Main.geniHandler.CurrentUser.sliceCredential = fr.data.readUTFBytes(fr.data.length);
@@ -280,6 +297,42 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					this.tryLoadCert(NetUtil.tryGetBaseUrl(selectedAuthority.Url) + certLocation);
 			}
 			
+			private function test():void {
+				try {
+					var certArray:ByteArray = PEM.readCertIntoArray(this.sslPem.text);
+					var cert:Asn1Field = DER.Parse(certArray);
+					var subjAlt:Asn1Field = cert.getHolderFor(Oids.SUBJECT_ALT_NAME);
+					var urnString:String = subjAlt.getValue();
+					if(IdnUrn.isIdnUrn(urnString))
+						setUserUrn(urnString);
+				} catch(e:Error) { this.detectedUrnLabel.text = ""; }
+			}
+			
+			private function setUserUrn(urnString:String):void {
+				Main.geniHandler.CurrentUser.urn = new IdnUrn(urnString);
+				this.detectedUrnLabel.text = "Hello, " + Main.geniHandler.CurrentUser.urn.name + " from " + Main.geniHandler.CurrentUser.urn.authority;
+				setUserAuthority();
+			}
+			
+			private function setUserAuthority():void {
+				for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
+					if(sa.Urn.authority == Main.geniHandler.CurrentUser.urn.authority) {
+						Main.geniHandler.CurrentUser.authority = sa;
+						this.authorities.selectedItem = sa;
+						return;
+					}
+				}
+			}
+			
+			private function authoritiesChanged(event:GeniEvent):void {
+				if(Main.geniHandler.CurrentUser.urn != null) {
+					setUserAuthority();
+				}
+				if(Main.geniHandler.CurrentUser.authority != null) {
+					this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
+				}
+			}
+			
 		]]>
 	</fx:Script>
 
@@ -314,7 +367,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	</s:HGroup>
 			
 	<s:TextArea id="sslPem" prompt="Copy your private key and certificate here if you can't automatically load it"
-				width="100%" height="100%" />
+				width="100%" height="100%" valueCommit="test()" />
+	<s:Label id="detectedUrnLabel" width="100%" />
 	<s:HGroup width="100%" verticalAlign="middle">
 		<s:Image source="{ImageUtil.passwordIcon}" />
 		<display:KeyboardTextInput id="passwordField"

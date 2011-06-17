@@ -109,11 +109,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function success():void
 			{
-				save();
+				if(save())
+					return;
 				closeWindow();
 			}
 			
-			public function save():void {
+			public function save():Boolean {
+				// Make sure the client_id is not taken
+				if(!this.link.slivers[0].slice.isIdUnique(this.link, this.idLabel.Text)) {
+					Alert.show(this.idLabel.Text + " is already in use, please choose a different client id");
+					return true;
+				}
+				
 				this.link.clientId = this.idLabel.Text;
 				if(link.linkType != this.typeList.selectedItem.type) {
 					if(this.typeList.selectedItem.type == VirtualLink.TYPE_TUNNEL)
@@ -126,6 +133,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				else
 					link.capacity = -1;
 				Main.geniDispatcher.dispatchSliceChanged(link.slivers.collection[0].slice);
+				
+				return false;
 			}
 		]]>
 	</fx:Script>
