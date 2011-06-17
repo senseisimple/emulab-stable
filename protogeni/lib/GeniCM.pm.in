@@ -2737,6 +2737,19 @@ sub SliverWorkAux($$$$$$$)
 		GeniXML::SetText("sliver_id", $linkref, $tunnel->urn());
 	    }
 
+	    if (!GeniXML::IsVersion0($linkref)) {
+		my @tunnel_slivers = ();
+		if ($tunnel->SliverList(\@tunnel_slivers) != 0) {
+		    $message = "Could not get slivers for $tunnel\n";
+		    goto bad;
+		}
+		foreach my $tunnel_sliver (@tunnel_slivers) {
+		    my $id = GeniXML::GetInterfaceId($tunnel_sliver->rspec());
+		    GeniXML::SetText("sliver_id", $ifacexml{$id},
+				     $tunnel_sliver->sliver_urn());
+		}
+	    }
+
 	    # Add to the aggregate.
 	    if ($tunnel->SetAggregate($aggregate) != 0) {
 		$message = "Could not set aggregate for $tunnel to $aggregate";
