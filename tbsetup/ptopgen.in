@@ -2498,8 +2498,6 @@ sub print_named_link_xml
 	my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "component_manager_uuid=\"$cmurn\" ";
-	} elsif ($genimode eq $V_2) {
-	    print "component_manager_id=\"$cmurn\" ";
 	}
 	print "component_name=\"$name\" ";
 	my $urn = GeniHRN::Generate($OURDOMAIN, "link", $name);
@@ -2509,6 +2507,9 @@ sub print_named_link_xml
 	    print "component_id=\"$urn\" ";
 	}
 	print ">\n";
+	if ($genimode eq $V_2) {
+	    print "<component_manager name=\"$cmurn\" />\n";
+	}
 	print_interface($source, $source_if);
 	print_interface($dest, $dest_if);
     } else {
