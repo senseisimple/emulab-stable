@@ -3,11 +3,13 @@
        virtualization_type="emulab-vnode">
    <disk_image
       name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA8-OVZ-STD" />
+   <interface virtual_id="virt0"/> 
  </node>
  <node virtual_id="geni2" 
        virtualization_type="emulab-vnode">
    <disk_image
       name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA8-OVZ-STD" />
+   <interface virtual_id="virt0"/> 
  </node>
  <link virtual_id="link0" link_type="tunnel">
   <interface_ref virtual_node_id="geni1"
