@@ -2062,7 +2062,7 @@ sub print_footer {
 	if ($genimode eq $V_2) {
 	    print_type_limits();
 	    if (defined($MAINSITE) && $MAINSITE) {
-		print $stitching;
+		print $stitchxml;
 	    }
 	}
 	print "</rspec>\n";
