@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rspec xmlns="http://www.protogeni.net/resources/rspec/2"
+       xmlns:delay="http://www.protogeni.net/resources/rspec/ext/delay/1"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd
+			   http://www.protogeni.net/resources/rspec/ext/delay/1 http://www.protogeni.net/resources/rspec/ext/delay/1/request-delay.xsd"
+       type="request" >
+  <node client_id="left"
+        exclusive="true">
+    <sliver_type name="raw-pc" />
+    <interface client_id="left:if0" />
+  </node>
+  <node client_id="right"
+        exclusive="true">
+    <sliver_type name="raw-pc" />
+    <interface client_id="right:if0" />
+  </node>
+  <node client_id="bridge"
+	exclusive="true">
+    <sliver_type name="delay">
+      <delay:sliver_type_shaping xmlns="http://www.protogeni.net/resources/rspec/ext/delay/1">
+	<pipe source="delay:left" dest="delay:right"
+	      capacity="1000" latency="50"/>
+	<pipe source="delay:right" dest=delay"left"
+	      capacity="10000" latency="25" packet_loss="0.01" />
+      </delay:sliver_type_shaping>
+    </sliver_type>
+    <interface client_id="delay:left" />
+    <interface client_id="delay:right" />
+  </node>
+  <link client_id="bridge-left">
+    <interface_ref client_id="left:if0" />
+    <interface_ref client_id="delay:left" />
+  </link>
+  <link client_id="bridge-right">
+    <interface_ref client_id="right:if0" />
+    <interface_ref client_id="delay:right" />
+  </link>
+</rspec>
