@@ -88,7 +88,7 @@ elsif (0) {
 			       $selfcred->asString(),
 			       {'geni_slice_urn' => $c});
 }
-elsif (1) {
+elsif (0) {
     $response =
 	Genixmlrpc::CallMethod($server, $context, "GetVersion");
 }
@@ -113,7 +113,7 @@ elsif (1) {
     my $i   = "urn:publicid:IDN+plc:utah+slice+lbs";
     $response =
 	Genixmlrpc::CallMethod($server, $context, "Resolve",
-			       $h, $selfcred->asString());
+			       $i, $selfcred->asString());
 }
 print Dumper($response);
 exit(1);
