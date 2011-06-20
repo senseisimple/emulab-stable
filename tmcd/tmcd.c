@@ -4664,14 +4664,18 @@ COMMAND_PROTOTYPE(doloadinfo)
 		useacpi = "unknown";
 		useasf = "unknown";
 
-		res2 = mydb_query("select attrkey,attrvalue from nodes as n "
+		res2 = mydb_query("select a.attrkey,a.attrvalue,na.attrvalue "
+				  "from nodes as n "
 				  "left join node_type_attributes as a on "
 				  "     n.type=a.type "
+				  "left join node_attributes as na on "
+				  "     a.attrkey=na.attrkey and "
+				  "     na.node_id=n.node_id "
 				  "where (a.attrkey='bootdisk_unit' or "
 				  "       a.attrkey='disktype' or "
 				  "       a.attrkey='use_acpi' or "
 				  "       a.attrkey='use_asf') and "
-				  "      n.node_id='%s'", 2, reqp->nodeid);
+				  "      n.node_id='%s'", 3, reqp->nodeid);
 
 		if (!res2) {
 			error("doloadinfo: %s: DB Error getting disktype!\n",
@@ -4683,20 +4687,30 @@ COMMAND_PROTOTYPE(doloadinfo)
 			int nrows2 = (int)mysql_num_rows(res2);
 
 			while (nrows2) {
+				char *attrstr;
+
 				row2 = mysql_fetch_row(res2);
 
-				if (row2[1] && row2[1][0]) {
+				/* node_attribute overrides node_type_attribute */
+				if (row2[2] && row2[2][0])
+					attrstr = row2[2];
+				else if (row2[1] && row2[1][0])
+					attrstr = row2[1];
+				else
+					attrstr = NULL;
+
+				if (attrstr) {
 					if (strcmp(row2[0], "bootdisk_unit") == 0) {
-						disknum = atoi(row2[1]);
+						disknum = atoi(attrstr);
 					}
 					else if (strcmp(row2[0], "disktype") == 0) {
-						disktype = row2[1];
+						disktype = attrstr;
 					}
 					else if (strcmp(row2[0], "use_acpi") == 0) {
-						useacpi = row2[1];
+						useacpi = attrstr;
 					}
 					else if (strcmp(row2[0], "use_asf") == 0) {
-						useasf = row2[1];
+						useasf = attrstr;
 					}
 				}
 				nrows2--;
