@@ -1475,6 +1475,8 @@ sub Create($$$$$$)
 	print STDERR "Could not create tunnel entry in lans table\n";
 	return undef;
     }
+    # Mark it as a tunnel for a protogeni sliver.
+    $tunnel->SetAttribute("protogeni_tunnel", "Yep");
 
     my $iface1ref = $interfaces[0];
     my $iface2ref = $interfaces[1];

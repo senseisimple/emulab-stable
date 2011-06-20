@@ -3177,14 +3177,17 @@ sub ClearBackupState($)
 
     return 0;
 }
-sub RemovePhysicalState($)
+sub RemovePhysicalState($;$)
 {
-    my ($self) = @_;
+    my ($self, $purge) = @_;
     require Lan;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
+
+    $purge = 0
+	if (!defined($purge));
 
     my $pid = $self->pid();
     my $eid = $self->eid();
@@ -3211,7 +3214,7 @@ sub RemovePhysicalState($)
 	}
     }
     return -1
-	if (Lan->DestroyExperimentLans($self) != 0);
+	if (Lan->DestroyExperimentLans($self, $purge) != 0);
     
     if (@pnodenames || @vnodenames) {
 	my $clause1 = join(" or ", map("node_id='$_'",  @pnodenames))
