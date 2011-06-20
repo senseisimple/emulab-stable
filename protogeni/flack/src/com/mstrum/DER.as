@@ -6,9 +6,12 @@ package com.mstrum
 	
 	import mx.core.UIComponent;
 
+	// '-----BEGIN [^-]+-----([A-Za-z0-9+\/=\\s]+)-----END [^-]+-----');
 	public class DER
 	{
 		public static function Parse(bytes:ByteArray, parent:Asn1Field = null):Asn1Field {
+			if(bytes.bytesAvailable < 2)
+				throw new Error("Not enough bytes to parse DER structure");
 			var newField:Asn1Field = new Asn1Field(parent);
 			// type
 			var currentOctet:uint = bytes.readUnsignedByte();
@@ -39,6 +42,8 @@ package com.mstrum
 					count--;
 				}
 			}
+			if(bytes.bytesAvailable < newField.length)
+				throw new Error("Not enough bytes to parse DER value");
 			
 			if(newField.length == 0)
 				return newField;
@@ -48,16 +53,18 @@ package com.mstrum
 			
 			// XXX These need to be context specific, I only see these a limited number of times now so it's good until something breaks...
 			if(newField.identifierClass == Asn1Classes.CONTEXT_SPECIFIC) {
+				// 0xAX
 				if(newField.identifierConstructed)
 					newField.contents = DER.Parse(newField.rawContents, newField);
 				else {
+					// 0x8X
 					switch(newField.identifierTag) {
 						case Asn1Tags.RFC822NAME:
 						case Asn1Tags.UNIFORM_RESOURCE_IDENTIFIER:
 							newField.contents = newField.rawContents.readMultiByte(newField.length, "x-IA5");
 							break;
 						default:
-							throw new Error("Unknown context specific, primitive value");
+							newField.contents = newField.rawContents;
 					}
 				}
 			} else {
@@ -97,7 +104,7 @@ package com.mstrum
 						}
 						newField.contents = Oids.getNameFor(oidString);
 						break;
-					case Asn1Tags.INTEGER:
+					case Asn1Tags.INTEGER: // XXX won't work for huge values
 						currentOctet = newField.rawContents.readUnsignedByte();
 						left--;
 						var integerValue:int = 0;
@@ -144,6 +151,13 @@ package com.mstrum
 						newField.contents = newField.rawContents.readMultiByte(newField.length, "utf-8");
 						break;
 					case Asn1Tags.PRINTABLESTRING:
+					case Asn1Tags.BMP_STRING:
+					case Asn1Tags.UNIVERSAL_STRING:
+					case Asn1Tags.GENERAL_STRING:
+					case Asn1Tags.VISIBLE_STRING:
+					case Asn1Tags.GRAPHIC_STRING:
+					case Asn1Tags.NUMERIC_STRING:
+					case Asn1Tags.VIDEOTEX_STRING:
 						newField.contents = newField.rawContents.readMultiByte(newField.length, "US-ASCII");
 						break;
 					case Asn1Tags.T61STRING:
@@ -175,26 +189,15 @@ package com.mstrum
 						var minute:uint = parseInt(UtcTimeString.substr(8,2));
 						newField.contents = new Date(year, month-1, day, hour, minute);
 						break;
+					// TODO, but not really used very often apparently
 					case Asn1Tags.OD:
-						// TODO
-						break;
 					case Asn1Tags.EXTERNAL_INSTANCEOF:
-						// TODO
-						break;
 					case Asn1Tags.REAL:
-						// TODO
-						break;
 					case Asn1Tags.ENUMERATED:
-						// TODO
-						break;
 					case Asn1Tags.EMBEDDED_PDV:
-						// TODO
-						break;
 					case Asn1Tags.RELATIVE_OID:
-						// TODO
-						break;
 					default:
-						throw new Error("Unkown type");
+						newField.contents = newField.rawContents;
 				}
 			}
 			

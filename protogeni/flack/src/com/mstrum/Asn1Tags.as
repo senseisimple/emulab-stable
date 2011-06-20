@@ -21,12 +21,19 @@ package com.mstrum
 		public static const SET_SETOF:uint = 0x11;
 		
 		// EXTENDED
+		public static const NUMERIC_STRING:uint = 0x12;
 		public static const PRINTABLESTRING:uint = 0x13;
 		public static const T61STRING:uint = 0x14;
+		public static const VIDEOTEX_STRING:uint = 0x15;
 		public static const XIA5STRING:uint = 0x16;
 		public static const UTCTIME:uint = 0x17;
 		public static const GENERALIZEDTIME:uint = 0x18;
-		
+		public static const GRAPHIC_STRING:uint = 0x19;
+		public static const VISIBLE_STRING:uint = 0x1A;
+		public static const GENERAL_STRING:uint = 0x1B;
+		public static const UNIVERSAL_STRING:uint = 0x1C;
+		public static const BMP_STRING:uint = 0x1E;
+
 		// CONTEXT SPECIFIC, primitive (0xAX)
 		public static const EXPLICITLYTYPED:uint = 0x00;
 		public static const EXTENSIONS:uint = 0x03;

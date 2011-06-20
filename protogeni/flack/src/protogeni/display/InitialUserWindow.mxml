@@ -43,6 +43,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
+			import mx.utils.Base64Encoder;
 			
 			import protogeni.GeniEvent;
 			import protogeni.NetUtil;
@@ -247,7 +248,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			protected function openPem(event:MouseEvent):void
 			{
 				loadingPem = true;
-				fr.browse([new FileFilter("PEMs (*.pem, *.txt, *.der)", "*.pem;*.txt;*.der")])
+				fr.browse([new FileFilter("PEMs (*.pem, *.txt, *.der, *.crt, *.key, *.*)", "*.pem;*.txt;*.der;*.crt;*.key;*.*")])
 			}
 			
 			public function onFileSelect(event:Event):void {
@@ -256,11 +257,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function onFileComplete(event:Event):void {
 				if(loadingPem) {
+					/* var e:Base64Encoder = new Base64Encoder();
+					e.encodeBytes(fr.data, 0, fr.data.length);
+					var encoded:String = e.toString();
 					var d:Asn1Field = DER.Parse(fr.data);
 					var val:Asn1Field = d.getHolderFor(Oids.ACA_GROUP);
-					val = val;
-					/*sslPem.text = fr.data.readUTFBytes(fr.data.length);
-					this.passwordField.textInput.setFocus();*/
+					val = val; */
+					sslPem.text = fr.data.readUTFBytes(fr.data.length);
+					this.passwordField.textInput.setFocus();
 				} else {
 					try{
 						Main.geniHandler.CurrentUser.sliceCredential = fr.data.readUTFBytes(fr.data.length);
