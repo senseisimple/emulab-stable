@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<RSpec type="SFA">
+  <network name="plc">
+    <site id="kentucky">
+      <name>Kentucky</name>
+      <node id="n73">
+        <hostname>planetlab1.netlab.uky.edu</hostname>
+        <urn>urn:publicid:IDN+plc:kentucky+node+planetlab1.netlab.uky.edu</urn>
+      </node>
+      <node id="n74">
+        <hostname>planetlab2.netlab.uky.edu</hostname>
+        <urn>urn:publicid:IDN+plc:kentucky+node+planetlab2.netlab.uky.edu</urn>
+      </node>
+    </site>
+  </network>
+</RSpec>
+
