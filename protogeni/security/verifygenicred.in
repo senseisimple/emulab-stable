@@ -239,9 +239,12 @@ foreach my $credential ( keys( %credentials ) ) {
 				     lookup( $parent, 
 					     "privileges" )->childNodes );
 	    my %allowed = ();
-	    $allowed{ lookup( $_, "name" )->textContent } = 1
-		foreach grep( lookup( $_, "can_delegate" )->textContent == 1,
-			      @parent_privs );
+	    {
+		my $flag = lookup( $_, "can_delegate" )->textContent;
+
+		$allowed{ lookup( $_, "name" )->textContent } = 1
+		    if( $flag == 1 or $flag =~ /true/i );
+	    } foreach @parent_privs;
 
 	    foreach my $priv ( @privs ) {
 		my $name = lookup( $priv, "name" )->textContent;
