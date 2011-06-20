@@ -42,7 +42,10 @@ my %GENI_MODULES = ( "cm"        => "@prefix@/lib/protogeni-cm.pm",
 		     $AM_MODULE  => "@prefix@/lib/geni-am.pm",
 		     "sa"        => "@prefix@/lib/protogeni-sa.pm",
 		     "ch"        => "@prefix@/lib/protogeni-ch.pm",
-		     "ses"       => "@prefix@/lib/protogeni-ses.pm" );
+		     "ses"       => "@prefix@/lib/protogeni-ses.pm",
+		     # XXX This is temporary! 
+		     "instools"  => "@prefix@/lib/protogeni-instools.pm",
+    );
 
 # These variables are shared with the loaded module.
 use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION
@@ -238,6 +241,10 @@ if (!(defined($GENI_METHODS) && defined($EMULAB_PEMFILE))) {
 	     "No definition for GENI_METHODS or EMULAB_PEMFILE");
     XMLError(XMLRPC_APPLICATION_ERROR(),
 	     "Internal error loading module; missing definitions");
+}
+# Temporary while we are running Instools stuff in Utah.
+if ($MODULE eq "instools" && $MAINSITE) {
+    $debug = 1;
 }
 
 #
