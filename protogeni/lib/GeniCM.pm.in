@@ -1002,8 +1002,10 @@ sub GetTicketAuxAux($$$$$$$$$)
 			"osname"  => $osname,
 			"ips"     => '', # deprecated
 			"cmd_line"=> '', # bogus
+			"routertype" => "static-ddijk",
 			"fixed"   => (defined($subnode_of) ? $subnode_of :
 				      defined($node) ? $node->node_id() : ""),
+			    
 			};
 
 	if ($isbridge) {
