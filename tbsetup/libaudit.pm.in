@@ -326,6 +326,8 @@ sub AuditFork()
 	
 	POSIX::dup2(fileno(LOG), 1);
 	POSIX::dup2(fileno(LOG), 2);
+	STDOUT->fdopen(1, "a");
+	STDERR->fdopen(2, "a");
     }
 
     #
