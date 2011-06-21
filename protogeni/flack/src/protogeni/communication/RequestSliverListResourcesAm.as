@@ -35,7 +35,7 @@ package protogeni.communication
 		
 		public function RequestSliverListResourcesAm(s:Sliver):void
 		{
-			super("ListSliverResources (" + StringUtil.shortenString(s.manager.Url, 15) + ")",
+			super("ListResources(Sliver)AM (" + StringUtil.shortenString(s.manager.Url, 15) + ")",
 				"Listing resources for sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn,
 				CommunicationUtil.listResourcesAm,
 				true);

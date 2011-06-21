@@ -50,13 +50,23 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				Main.geniHandler.GeniAuthorities = new ArrayList();
-				
 				var sliceAuthorityLines:Array = (response as String).split(/[\n\r]+/);
 				for each(var sliceAuthorityLine:String in sliceAuthorityLines) {
 					if(sliceAuthorityLine.length == 0)
 						continue;
 					var sliceAuthorityLineParts:Array = sliceAuthorityLine.split(" ");
-					Main.geniHandler.GeniAuthorities.addItem(new SliceAuthority(sliceAuthorityLineParts[0], sliceAuthorityLineParts[1], true));
+					var sliceAuthority:SliceAuthority = new SliceAuthority(sliceAuthorityLineParts[0], sliceAuthorityLineParts[1], true);
+					if(sliceAuthority.Name == "emulab.net")
+						Main.geniHandler.GeniAuthorities.addItemAt(sliceAuthority, 0);
+					else {
+						var i:int;
+						for(i = 0; i < Main.geniHandler.GeniAuthorities.length; i++) {
+							var existingManager:SliceAuthority = Main.geniHandler.GeniAuthorities.getItemAt(i) as SliceAuthority;
+							if(sliceAuthority.Name < existingManager.Name && existingManager.Name != "emulab.net")
+								break;
+						}
+						Main.geniHandler.GeniAuthorities.addItemAt(sliceAuthority, i);
+					}
 				}
 				
 				Main.geniDispatcher.dispatchGeniAuthoritiesChanged();

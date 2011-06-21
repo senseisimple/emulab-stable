@@ -253,13 +253,14 @@ package protogeni.communication
 		 */
 		public function deleteSlice(slice:Slice):void
 		{
+			this.isPaused = false;
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers.collection)
 			{
 				if(sliver.manager.isAm)
-					pushRequest(new RequestSliverDeleteAm(sliver));
+					this.pushRequest(new RequestSliverDeleteAm(sliver));
 				else if(sliver.manager is ProtogeniComponentManager)
-					pushRequest(new RequestSliverDelete(sliver));
+					this.pushRequest(new RequestSliverDelete(sliver));
 			}
 		}
 		

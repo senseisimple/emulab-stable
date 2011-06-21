@@ -96,13 +96,13 @@ package protogeni.resources
 				Main.geniDispatcher.dispatchGeniManagerChanged(manager); // not 'populated' until sites are resolved
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				
-				if(callGetSites) {
+				/*if(callGetSites) {
 					var r:RequestSitesLocation = new RequestSitesLocation(manager);
 					r.forceNext = true;
 					//var r:RequestResolvePl = new RequestResolvePl(manager);
 					//r.forceNext = true;
 					Main.geniHandler.requestHandler.pushRequest(r);
-				}
+				}*/
 				
 				if(this.myAfter != null)
 					myAfter(this.manager);

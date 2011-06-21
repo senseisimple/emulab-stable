@@ -239,50 +239,56 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			private var loadingPem:Boolean;
+			private var saving:Boolean;
 			protected function onFileBrowse(event:MouseEvent):void
 			{
+				saving = false;
 				loadingPem = false;
 				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec)", "*.txt;*.xml;*.rspec")])
 			}
 			
 			protected function openPem(event:MouseEvent):void
 			{
+				saving = false;
 				loadingPem = true;
 				fr.browse([new FileFilter("PEMs (*.pem, *.txt, *.der, *.crt, *.key, *.*)", "*.pem;*.txt;*.der;*.crt;*.key;*.*")])
 			}
 			
 			public function onFileSelect(event:Event):void {
-				fr.load();
+				if(!saving)
+					fr.load();
 			}
 			
 			public function onFileComplete(event:Event):void {
-				if(loadingPem) {
-					/* var e:Base64Encoder = new Base64Encoder();
-					e.encodeBytes(fr.data, 0, fr.data.length);
-					var encoded:String = e.toString();
-					var d:Asn1Field = DER.Parse(fr.data);
-					var val:Asn1Field = d.getHolderFor(Oids.ACA_GROUP);
-					val = val; */
-					sslPem.text = fr.data.readUTFBytes(fr.data.length);
-					this.passwordField.textInput.setFocus();
-				} else {
-					try{
-						Main.geniHandler.CurrentUser.sliceCredential = fr.data.readUTFBytes(fr.data.length);
-						
-						var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
-						Main.geniHandler.CurrentUser.urn = new IdnUrn(cred.credential.owner_urn);
-						var expires:Date = Util.parseProtogeniDate(cred.credential.expires);
-						if(expires < new Date()) {
-							Main.geniHandler.CurrentUser.sliceCredential = "";
-							Alert.show("The slice credential has expired on " + expires.toLocaleString() + ", try or create a newer slice");
-							return;
-						}
-						
-						Main.geniDispatcher.dispatchUserChanged();
-						
-						sliceCredentialIcon.visible = true;
-						sliceCredentialRadiobutton.selected = true;
-					}catch(e:Error) { }
+				if(!saving) {
+					if(loadingPem) {
+						/* var e:Base64Encoder = new Base64Encoder();
+						e.encodeBytes(fr.data, 0, fr.data.length);
+						var encoded:String = e.toString();
+						var d:Asn1Field = DER.Parse(fr.data);
+						var val:Asn1Field = d.getHolderFor(Oids.ACA_GROUP);
+						val = val; */
+						sslPem.text = fr.data.readUTFBytes(fr.data.length);
+						this.passwordField.textInput.setFocus();
+					} else {
+						try{
+							Main.geniHandler.CurrentUser.sliceCredential = fr.data.readUTFBytes(fr.data.length);
+							
+							var cred:XML = new XML(Main.geniHandler.CurrentUser.sliceCredential);
+							Main.geniHandler.CurrentUser.urn = new IdnUrn(cred.credential.owner_urn);
+							var expires:Date = Util.parseProtogeniDate(cred.credential.expires);
+							if(expires < new Date()) {
+								Main.geniHandler.CurrentUser.sliceCredential = "";
+								Alert.show("The slice credential has expired on " + expires.toLocaleString() + ", try or create a newer slice");
+								return;
+							}
+							
+							Main.geniDispatcher.dispatchUserChanged();
+							
+							sliceCredentialIcon.visible = true;
+							sliceCredentialRadiobutton.selected = true;
+						}catch(e:Error) { }
+					}
 				}
 			}
 			
@@ -344,7 +350,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<s:Label text="SSL Certificate" />
 		<components:ImageButton icon="{ImageUtil.saveIcon}"
 								toolTip="Save to file"
-								click="fr.save(sslPem.text, 'encrypted.pem')" />
+								click="saving = true; fr.save(sslPem.text, 'encrypted.pem')" />
 		<components:ImageButton icon="{ImageUtil.openIcon}"
 								toolTip="Open from file"
 								click="openPem(event)" />

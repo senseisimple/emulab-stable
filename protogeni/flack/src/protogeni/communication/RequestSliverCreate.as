@@ -40,6 +40,7 @@ package protogeni.communication
 				CommunicationUtil.createSliver);
 			sliver = s;
 			s.created = false;
+			s.staged = false;
 			
 			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
@@ -62,7 +63,6 @@ package protogeni.communication
 				var cred:XML = new XML(sliver.credential);
 				sliver.urn = new IdnUrn(cred.credential.target_urn);
 				sliver.created = true;
-				sliver.staged = false;
 				
 				sliver.rspec = new XML(response.value[1]);
 				sliver.parseRspec();

@@ -91,6 +91,8 @@ package protogeni.resources
 			fakeManager.Hrn = "Combined";
 			var newSliver:Sliver = new Sliver(null, fakeManager);
 			for each(var sliver:Sliver in this.collection) {
+				if(newSliver.slice == null)
+					newSliver.slice = sliver.slice;
 				for each(var node:VirtualNode in sliver.nodes.collection) {
 					if(!newSliver.nodes.contains(node))
 						newSliver.nodes.add(node);

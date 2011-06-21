@@ -86,6 +86,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				redrawAllLinks();
 				
+				// Don't draw a slice while it's being created, wait until the end
 				if(!slice.hasAllAllocatedResources() && !slice.isStaged())
 					return;
 				

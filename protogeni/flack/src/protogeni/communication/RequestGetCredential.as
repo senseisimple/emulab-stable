@@ -32,7 +32,7 @@ package protogeni.communication
 		}
 		
 		override public function start():Operation {
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 			return op;
 		}
 		

@@ -16,6 +16,8 @@ package protogeni.communication
 {
 	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
+	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
@@ -42,7 +44,7 @@ package protogeni.communication
 			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("urn", slice.urn.full);
 			op.addField("type", "Slice");
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*
@@ -64,10 +66,9 @@ package protogeni.communication
 				}
 				
 				/*for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
-					if(manager is PlanetlabAggregateManager) {
-						if(manager.type == GeniManager.TYPE_PLANETLAB) {
-							newCalls.push(new RequestResolvePlSlice(manager as PlanetlabAggregateManager, slice));
-						}
+					if(manager.Urn.authority == "plc") {
+						var newSliver:Sliver = new Sliver(slice, manager);
+						Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
 					}
 				}*/
 			}

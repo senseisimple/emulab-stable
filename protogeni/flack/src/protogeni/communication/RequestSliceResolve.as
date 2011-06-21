@@ -44,11 +44,11 @@ package protogeni.communication
 			slice = s;
 			isCreating = willBeCreating;
 			
-			// Build up teh args
+			// Build up the args
 			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("urn", slice.urn.full);
 			op.addField("type", "Slice");
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*

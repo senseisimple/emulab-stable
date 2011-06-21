@@ -30,12 +30,13 @@ package protogeni.communication
 		
 		public function RequestSliverCreateAm(s:Sliver):void
 		{
-			super("SliverCreate",
+			super("SliverCreateAM",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.createSliverAm);
 			ignoreReturnCode = true;
 			sliver = s;
 			s.created = false;
+			s.staged = false;
 			op.timeout = 360;
 			
 			// Build up the args
@@ -55,7 +56,6 @@ package protogeni.communication
 			try
 			{
 				sliver.created = true;
-				sliver.staged = false;
 				sliver.rspec = new XML(response);
 				sliver.parseRspec();
 				
@@ -68,6 +68,7 @@ package protogeni.communication
 				}
 				
 				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+				Main.geniDispatcher.dispatchSlicesChanged();
 				
 				return new RequestSliverStatusAm(sliver);
 			}

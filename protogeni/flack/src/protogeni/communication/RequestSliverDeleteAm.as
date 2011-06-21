@@ -29,7 +29,7 @@ package protogeni.communication
 		
 		public function RequestSliverDeleteAm(s:Sliver):void
 		{
-			super("SliverDelete",
+			super("SliverDeleteAM",
 				"Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.deleteSliverAm);
 			ignoreReturnCode = true;

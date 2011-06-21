@@ -50,7 +50,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					previewRspecButton.visible = true;
 				}
 				
-				if(link.capacity != -1)
+				if(link.capacity)
 					capacityInput.text = link.capacity.toString();
 				
 				types = new ArrayList();
@@ -131,7 +131,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				if(this.capacityInput.text.length > 0)
 					link.capacity = Number(this.capacityInput.text);
 				else
-					link.capacity = -1;
+					link.capacity = NaN;
 				Main.geniDispatcher.dispatchSliceChanged(link.slivers.collection[0].slice);
 				
 				return false;

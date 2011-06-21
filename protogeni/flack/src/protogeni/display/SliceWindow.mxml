@@ -367,7 +367,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			protected function onFileBrowse(event:MouseEvent):void
 			{
 				loading = true;
-				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec)", "*.txt;*.xml;*.rspec")])
+				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec, *.*)", "*.txt;*.xml;*.rspec;*.*")])
 			}
 			
 			/**
@@ -641,11 +641,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 									toolTip="Delete slivers"
 									click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
 									icon="{ImageUtil.deleteIcon}"/>
-			<components:DefaultLine percentHeight="90" />
-			<s:Button id="embedButton" label="Embed"
-					  toolTip="Embed slivers"
-					  height="24"
-					  click="Main.geniHandler.requestHandler.embedSlice(sliceCanvas.slice)" />
 			<components:DefaultLine percentHeight="90" />
 			<components:ImageButton id="startButton"
 									height="24"

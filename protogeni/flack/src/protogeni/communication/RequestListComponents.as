@@ -96,7 +96,14 @@ package protogeni.communication
 							newGm = planetLabAm;
 						}
 						
-						Main.geniHandler.GeniManagers.add(newGm);
+						var i:int;
+						for(i = 0; i < Main.geniHandler.GeniManagers.length; i++) {
+							var existingManager:GeniManager = Main.geniHandler.GeniManagers.getItemAt(i) as GeniManager;
+							if(newGm.Urn.authority < existingManager.Urn.authority && existingManager.Urn.authority != "emulab.net")
+								break;
+						}
+						Main.geniHandler.GeniManagers.addAt(newGm, i);
+						
 						if(startDiscoverResources)
 						{
 							newGm.Status = GeniManager.STATUS_INPROGRESS;

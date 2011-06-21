@@ -16,6 +16,7 @@ package protogeni.communication
 {
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Slice;
+	import protogeni.resources.SliceCollection;
 	
 	/**
 	 * Gets the user information and list of slices from the user's slice authority using the ProtoGENI API
@@ -40,7 +41,7 @@ package protogeni.communication
 		override public function start():Operation
 		{
 			// Build up the args
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 			op.addField("type", "User");
 			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("hrn", Main.geniHandler.CurrentUser.urn.full);
@@ -52,6 +53,9 @@ package protogeni.communication
 			var newCalls:RequestQueue = new RequestQueue();
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
+				// XXX needs to delete any external links to these...
+				Main.geniHandler.CurrentUser.slices = new SliceCollection();
+				
 				Main.geniHandler.CurrentUser.uid = response.value.uid;
 				Main.geniHandler.CurrentUser.hrn = response.value.hrn;
 				Main.geniHandler.CurrentUser.email = response.value.email;
