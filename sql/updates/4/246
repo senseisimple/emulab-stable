@@ -1,0 +1,28 @@
+#
+# Additional mode transition for SECUREBOOT.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    my @mode_transitions = (
+	["SECUREBOOT","TPMSIGNOFF","PXEKERNEL","BOOTING","SecureBootDone"]
+    );
+
+    foreach my $row (@mode_transitions) {
+	my ($opm1,$s1,$opm2,$s2,$lab) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode1 FROM mode_transitions WHERE ".
+			 "op_mode1='$opm1' AND state1='$s1' AND ".
+			 "op_mode2='$opm2' AND state2='$s2'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO mode_transitions VALUES ".
+			 "('$opm1','$s1','$opm2', '$s2','$lab')");
+	}
+    }
+
+    return 0;
+}
+1;
