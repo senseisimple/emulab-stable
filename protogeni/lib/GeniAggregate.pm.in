@@ -963,6 +963,34 @@ sub Start($$$)
     }
 
     if ($version >= 2) {
+	#
+	# Dump the manifest into the experiment directory.
+	#
+	my $userdir       = $experiment->UserDir();
+	my $manifest_file = "$userdir/tbdata/geni_manifest";
+	my $manifest      = $self->GetManifest(1);
+	if (open(MAN, ">$manifest_file")) {
+	    print MAN $manifest;
+	    close(MAN);
+	}
+
+	#
+	# Now we need a mapping of node_id to sliver_urn.
+	#
+	my $mapping_file = "$userdir/tbdata/geni_mapping";
+	if (open(MAP, ">$mapping_file")) {
+	    foreach my $sliver (@slivers) {
+		next
+		    if (ref($sliver) ne "GeniSliver::Node");
+
+		print MAP $sliver->resource_id();
+		print MAP " ";
+		print MAP $sliver->sliver_urn();
+		print MAP "\n";
+	    }
+	    close(MAP);
+	}
+	
 	if (system("$GENTOPOFILE $pid $eid")) {
 	    print STDERR "$GENTOPOFILE failed\n";
 	    return -1;
@@ -1790,16 +1818,39 @@ sub Start($$)
 		print STDERR "Could not lookup authority $dsturn\n";
 		return -1;
 	    }
-	    my $blob = $authority->Resolve($slice->urn());
-	    if (!defined($blob)) {
-		print STDERR "Could not resolve $slice at $authority\n";
+	    #
+	    # The other side might not have seen the request yet, and so it
+	    # will not know anything about the slice, or might not have a
+	    # manifest yet. Lets loop for a bit, hoping to get it. This is
+	    # a bit fragile since once we start looping, there is no way for
+	    # the client to stop us. Need to add such a capability.
+	    #
+	    my $count    = 500;
+	    my $interval = 30;
+	    my $manifest;
+	    while ($count >= 0) {
+		my $blob = $authority->Resolve($slice->urn());
+		if (defined($blob)) {
+		    if (exists($blob->{'manifest'})) {
+			$manifest = $blob->{'manifest'};
+			last;
+		    }
+		    print STDERR
+			"No manifest returned for $dsturn from $authority\n";
+		}
+		else {
+		    print STDERR "Could not resolve $slice at $authority\n";
+		}
+		print STDERR "Will try again in $interval seconds\n";
+		$count -= $interval;
+		sleep($interval);
+	    }
+	    if (!defined($manifest)) {
+		print STDERR
+		    "Could not get manifest for $dsturn from $authority\n";
 		return -1;
 	    }
-	    if (!exists($blob->{'manifest'})) {
-		print STDERR "No manifest returned for $dsturn from $self\n";
-		return -1;
-	    }
-	    my $manifest = GeniXML::Parse($blob->{'manifest'});
+	    $manifest = GeniXML::Parse($manifest);
 	    #
 	    # Need to find the peer node in the nodes section.
 	    #
