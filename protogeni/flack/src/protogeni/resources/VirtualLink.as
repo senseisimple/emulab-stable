@@ -134,8 +134,8 @@ package protogeni.resources
 				
 				for(var i:int = 1; i < vi.owner.slivers.length; i++)
 				{
-					if(vi.owner.slivers[i].links.getForNode(vi.owner).length == 0)
-						vi.owner.slivers[i].nodes.remove(vi.owner);
+					if(vi.owner.slivers.collection[i].links.getForNode(vi.owner).length == 0)
+						vi.owner.slivers.collection[i].nodes.remove(vi.owner);
 				}
 			}
 			this.interfaces = new VirtualInterfaceCollection();

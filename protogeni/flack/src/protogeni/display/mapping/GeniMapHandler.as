@@ -285,9 +285,9 @@ package protogeni.display.mapping
 						&& this.selectedSlice.urn.full.length>0)
 					slice = selectedSlice;
 				for each(marker in this.nodeGroupMarkers)
-				marker.setUser(slice);
+					marker.setUser(slice);
 				for each(marker in this.nodeGroupClusterMarkers)
-				marker.setUser(slice);
+					marker.setUser(slice);
 				for each(link in this.linkMarkers) {
 					if(link.polyline.visible) {
 						link.polyline.hide();
@@ -308,9 +308,9 @@ package protogeni.display.mapping
 				*/
 			} else {
 				for each(marker in this.nodeGroupMarkers)
-				marker.setDefault();
+					marker.setDefault();
 				for each(marker in this.nodeGroupClusterMarkers)
-				marker.setDefault();
+					marker.setDefault();
 				for each(link in this.linkMarkers) {
 					if(!link.polyline.visible && link.group.GetManager().Show) {
 						link.polyline.show()

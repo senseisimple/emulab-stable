@@ -51,7 +51,9 @@ package protogeni.communication
 				sliver.urn = new IdnUrn(response.geni_urn);
 				for each(var nodeObject:Object in response.geni_resources)
 				{
-					var vn:VirtualNode = sliver.nodes.getByUrn(nodeObject.geni_urn);
+					var vn:VirtualNode = sliver.nodes.getBySliverUrn(nodeObject.geni_urn);
+					if(vn == null)
+						vn = sliver.nodes.getByComponentUrn(nodeObject.geni_urn);
 					if(vn != null)
 					{
 						vn.status = nodeObject.geni_status;
