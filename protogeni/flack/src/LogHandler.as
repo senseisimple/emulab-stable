@@ -16,8 +16,23 @@ package
 {
 	import protogeni.display.ConsoleWindow;
 	
+	/**
+	 * Handles all of the logs application-wide
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class LogHandler
 	{
+		public static var logs:Vector.<LogMessage> = new Vector.<LogMessage>();
+		private static var console:ConsoleWindow = null;
+		
+		/**
+		 * Adds a message into the logs
+		 * 
+		 * @param msg Message to add
+		 * 
+		 */
 		public static function appendMessage(msg:LogMessage):void {
 			logs.push(msg);
 			Main.geniDispatcher.dispatchLogsChanged(msg);
@@ -43,8 +58,5 @@ package
 			logs = new Vector.<LogMessage>();
 			Main.geniDispatcher.dispatchLogsChanged();
 		}
-		
-		public static var logs:Vector.<LogMessage> = new Vector.<LogMessage>();
-		private static var console:ConsoleWindow = null;
 	}
 }

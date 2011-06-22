@@ -19,7 +19,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 <components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						xmlns:mx="library://ns.adobe.com/flex/mx"
+						xmlns:display="protogeni.display.*"
 						xmlns:components="protogeni.display.components.*"
 						title="Slice"
 						initialize="me = this;"
@@ -34,6 +35,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import mx.managers.DragManager;
 			
 			import protogeni.GeniEvent;
+			import protogeni.Util;
 			import protogeni.display.components.AdvancedTextArea;
 			import protogeni.display.components.DataButton;
 			import protogeni.display.components.DefaultWindow;
@@ -44,6 +46,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.resources.Site;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
+			import protogeni.resources.SliverCollection;
 			import protogeni.resources.VirtualNode;
 			
 			import spark.components.NavigatorContent;
@@ -57,6 +60,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			private var me:SliceWindow;
 			
+			/**
+			 * Window has been created, prepare to handle everything
+			 */
 			public function onCreationComplete():void
 			{
 				fr = new FileReference();
@@ -68,6 +74,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
 			}
 			
+			/**
+			 * Close the window if the user wants
+			 */
 			public override function closeWindow(event:Event=null):void {
 				if(sliceCanvas.isEdited()) {
 					Alert.show("The slice appears to have been edited.  Close and clear any changes?", "Confirm", Alert.YES|Alert.NO, Main.Application(),
@@ -79,6 +88,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					doCloseWindow(event);
 			}
 			
+			/**
+			 * Actually close the window
+			 */
 			public function doCloseWindow(event:Event=null):void {
 				sliceStatusRefresher.stop();
 				fr.removeEventListener(Event.SELECT, onFileSelect);
@@ -88,12 +100,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				super.closeWindow(event);
 			}
 			
+			/**
+			 * The slice has been changed somewhere, apply changes
+			 */
 			public function sliceChanged(e:GeniEvent):void
 			{
 				if(e.changedObject.hrn == sliceCanvas.slice.hrn)
 					refreshSlice();
 			}
 			
+			/**
+			 * Apply the slice information/status to just the window, not the slice canvas
+			 */
 			public function refreshInterface():void
 			{
 				var isCreated:Boolean;
@@ -137,15 +155,40 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						this.hrnLabel.styleName = "unknownStyle";
 				}
 				
+				if(this.sliceCanvas.slice.expires != null) {
+					this.expireButton.toolTip = "Slice expires on: "
+						+ this.sliceCanvas.slice.expires.toLocaleString();
+					
+					var differenceInMilliseconds:Number = this.sliceCanvas.slice.expires.time - (new Date()).time;
+					var days:Number = Math.floor(differenceInMilliseconds/(1000*60*60*24));
+					var hours:Number = Math.floor(differenceInMilliseconds/(1000*60*60) - days*24);
+					var minutes:Number = Math.floor(differenceInMilliseconds/(1000*60) - days*24*60 - hours*60);
+					
+					this.expireButton.toolTip += "\nTime left: " + days + " Days, "
+						+ hours + " Hours, "
+						+ minutes + " Minutes";
+				}
+				
+				if(this.sliceCanvas.slice.slivers != null) {
+					var sliversExpire:Date = this.sliceCanvas.slice.slivers.expires();
+					if(sliversExpire != null)
+						this.expireButton.toolTip += "\nSoonest sliver expiration: " + sliversExpire.toLocaleString();
+				}
 				this.sliceCanvas.refreshStatus();
 			}
 			
+			/**
+			 * Refreshes the window and the slice canvas
+			 */
 			public function refreshSlice():void
 			{
 				sliceCanvas.refreshSlice();
 				refreshInterface();
 			}
 			
+			/**
+			 * Loads a slice
+			 */
 			public function loadSlice(s:Slice):void
 			{
 				sliceCanvas.load(s);
@@ -172,6 +215,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				setSidePane();
 			}
 			
+			/**
+			 * Called periodically to see if the slice needs to try to refresh its status
+			 * 
+			 * There's a better way to do this...
+			 */
 			private function autorefresh(e:TimerEvent):void
 			{
 				if(this.autoRefreshCheckbox.selected
@@ -185,6 +233,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice, true);
 			}
 			
+			/**
+			 * Views the latest manifest RSPECs from the slice
+			 */
 			public function viewRspecs():void
 			{
 				if(sliceCanvas.slice.slivers.length == 0)
@@ -230,6 +281,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				viewRspec.showWindow();
 			}
 			
+			/**
+			 * View the RSPECs as they appear for the slice as it's currently drawn
+			 */
 			public function previewRspecs():void
 			{
 				var previewRspec:DefaultWindow = new DefaultWindow();
@@ -267,10 +321,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				previewRspec.showWindow();
 			}
 			
-			private function assignAvailableIcon(item:Object):Class {
-				return ImageUtil.availableIcon;
-			}
-			
+			/**
+			 * Removes all resources from the slice canvas
+			 */
 			public function clearCanvas():void {
 				if(sliceCanvas.slice.isCreated())
 					Alert.show("The slice has resources allocated to it.  Please delete the slice before trying to create a new slice.", "Allocated Resources Exist");
@@ -283,29 +336,51 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			// Import and save
-			
+			/**
+			 * Ask a user to paste a RSPEC
+			 */
 			public function importRspec():void {
 				var importWindow:ImportSliceWindow = new ImportSliceWindow();
 				importWindow.setSlice(this.sliceCanvas.slice);
 				importWindow.showWindow();
 			}
 			
-			public function saveRspec():void {
+			/**
+			 * Ask the user to save the preview RSPEC to file
+			 */
+			public function saveRequestRspec():void {
 				loading = false;
-				fr.save(sliceCanvas.slice.slivers.getCombined().getRequestRspec(true).toXMLString(), "rspec.xml");
+				fr.save(sliceCanvas.slice.slivers.getCombined().getRequestRspec(true).toXMLString(), this.sliceCanvas.slice.name+"_previewRspec.xml");
 			}
 			
+			/**
+			 * Ask the user to save the preview RSPEC to file
+			 */
+			public function saveCredential():void {
+				loading = false;
+				fr.save(sliceCanvas.slice.credential, this.sliceCanvas.slice.name+"_sliceCredential.xml");
+			}
+			
+			/**
+			 * Ask the user to load a RSPEC from file
+			 */
 			protected function onFileBrowse(event:MouseEvent):void
 			{
 				loading = true;
-				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec)", "*.txt;*.xml;*.rspec")])
+				fr.browse([new FileFilter("RSPECs (*.txt, *.xml, *.rspec, *.*)", "*.txt;*.xml;*.rspec;*.*")])
 			}
 			
+			/**
+			 * The file was selected
+			 */
 			public function onFileSelect(event:Event):void {
 				if(loading)
 					fr.load();
 			}
 			
+			/**
+			 * The file is ready to read
+			 */
 			public function onFileComplete(event:Event):void {
 				if(loading)
 					sliceCanvas.slice.tryImport(fr.data.readUTFBytes(fr.data.length));
@@ -319,6 +394,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Alert.show(event.toString(), "Security Error");
 			}
 			
+			// Side pane stuff
 			private const VIEW_MANAGERS:int = 0;
 			private const VIEW_MANAGER:int = 1;
 			private const VIEW_COLLECTION:int = 2;
@@ -397,7 +473,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				addDelayButton.data = delay;
 				addDelayButton.addEventListener(MouseEvent.CLICK,
 					function addDelayClicked(e:MouseEvent):void {
-						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
+						sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
 					});
 				managerHgroup.addElement(addDelayButton);
 
@@ -413,7 +489,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				addExclusiveButton.data = exclusive;
 				addExclusiveButton.addEventListener(MouseEvent.CLICK,
 					function addExclusiveClicked(e:MouseEvent):void {
-						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
+						sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
 					});
 				managerHgroup.addElement(addExclusiveButton);
 				
@@ -427,13 +503,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				addSharedButton.data = shared;
 				addSharedButton.addEventListener(MouseEvent.CLICK,
 					function addSharedClicked(e:MouseEvent):void {
-						sliceCanvas.addBasicVirtualNode(shared);
+						sliceCanvas.addBasicCloneOfVirtualNode(shared);
 					});
 				managerHgroup.addElement(addSharedButton);
 				this.sidePane.addElement(managerHgroup);
 			}
-
-
+			
 			protected function sidePane_dragEnterHandler(event:DragEvent):void
 			{
 				if (event.dragSource.hasFormat("site") ||
@@ -444,8 +519,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					DragManager.acceptDragDrop(VGroup(event.currentTarget));
 				}
 			}
-
-
+			
 			protected function sidePane_dragDropHandler(event:DragEvent):void
 			{
 				if(event.dragSource.hasFormat("marker"))
@@ -461,6 +535,33 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					var dragGroup:PhysicalNodeGroup = event.dragSource.dataForFormat('physicalnodegroup') as PhysicalNodeGroup;
 					setSidePane(VIEW_COLLECTION, dragGroup.collection);
 				}
+			}
+			
+			public function tryCreateSlice():void {
+				if(Main.geniHandler.CurrentUser.keys.length == 0) {
+					Alert.show("You don't have any public keys to use when logging in to your nodes.  Would you like to add any public keys?", "No public keys", Alert.YES|Alert.NO|Alert.CANCEL, Main.Application(),
+						function choiceHandler(event:CloseEvent):void {
+							if(event.detail == Alert.YES) {
+								DisplayUtil.viewUserWindow(true);
+							} else if(event.detail == Alert.NO) {
+								Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);
+							}
+						});
+					return;
+				}
+				
+				sliceCanvas.slice.useInputRspecVersion = outputRspecDropdownlist.selectedItem;
+				Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);
+			}
+			
+			public function viewExpires():void {
+				Alert.show(this.expireButton.toolTip);
+			}
+			
+			public function discoverAllocatedResources():void {
+				sliceCanvas.clear();
+				sliceCanvas.slice.slivers = new SliverCollection();
+				Main.geniHandler.requestHandler.discoverSliceAllocatedResources(sliceCanvas.slice);
 			}
 
 		]]>
@@ -479,28 +580,35 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<components:ImageButton icon="{ImageUtil.openIcon}"
 							 toolTip="Load RSPEC from file"
 							 click="onFileBrowse(event)" />
-		<components:ImageButton icon="{ImageUtil.saveIcon}"
-							 toolTip="Save preview RSPEC to file"
-							 click="saveRspec()" />
 		<components:DefaultLine height="14" visible="false" />
-		<components:ImageButton id="rspecButton"
-							 icon="{ImageUtil.pageWhiteIcon}"
-							 click="viewRspecs()"
-							 toolTip="View the most recent valid RSPEC" />
+		<s:Label text="Use RSPECv" />
+		<s:DropDownList id="outputRspecDropdownlist"
+						requireSelection="true"
+						width="58"
+						height="24"
+						dataProvider="{Util.usableRspecVersions}"
+						selectedItem="{sliceCanvas.slice.useInputRspecVersion}"
+						change="sliceCanvas.slice.useInputRspecVersion = outputRspecDropdownlist.selectedItem;">
+		</s:DropDownList>
 		<components:ImageButton id="previewRspecButton"
-							  icon="{ImageUtil.pageCodeIcon}"
-							 click="previewRspecs()"
-							 toolTip="Preview the Request RSPEC" />
+								icon="{ImageUtil.pageCodeIcon}"
+								click="previewRspecs()"
+								toolTip="Preview the Request RSPEC" />
+		<components:ImageButton icon="{ImageUtil.saveIcon}"
+								toolTip="Save preview RSPEC to file"
+								click="saveRequestRspec()" />
 		<components:DefaultLine height="14" visible="false" />
-		<s:Label text="Use" />
-		<s:CheckBox id="ionCheckbox" color="{SliceLink.ION_COLOR}"
-					selected="{Main.useIon}"
-					label="ION"
-					valueCommit="Main.useIon = ionCheckbox.selected" />
-		<s:CheckBox id="pgeniCheckbox" color="{SliceLink.GPENI_COLOR}"
-					selected="{Main.useGpeni}"
-					label="GPENI"
-					valueCommit="Main.useGpeni = pgeniCheckbox.selected" />
+		<components:ImageButton id="expireButton"
+								icon="{ImageUtil.timeIcon}"
+								click="viewExpires()" />
+		<components:ImageButton id="saveSliceCredentialButton"
+								toolTip="Save the slice credential to file"
+								click="saveCredential()"
+								icon="{ImageUtil.credentialIcon}" />
+		<components:ImageButton id="rspecButton"
+								icon="{ImageUtil.pageWhiteIcon}"
+								click="viewRspecs()"
+								toolTip="View the most recent valid RSPEC" />
 	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
 		<s:Scroller height="100%" minWidth="150">
@@ -512,42 +620,46 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />
 	</mx:HDividedBox>
 	<components:controlBarLayout>
-		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="12" paddingTop="2" />
+		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="12" paddingTop="2" />
 	</components:controlBarLayout>
 	<components:controlBarContent>
-		<s:Button id="createButton"
-				  toolTip="Create slivers"
-				  label="Create"
-				  height="24"
-				  icon="{ImageUtil.actionIcon}"
-				  click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
-		<components:ImageButton id="refreshButton"
-							 toolTip="Refresh slivers"
-							 click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"
-							 icon="{ImageUtil.refreshIcon}"/>
-		<s:CheckBox id="autoRefreshCheckbox"
-					label="Autorefresh"
-					toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
-		<components:ImageButton id="deleteButton"
-							 toolTip="Delete slivers"
-							 click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
-							 icon="{ImageUtil.deleteIcon}"/>
-		<components:DefaultLine percentHeight="90" />
-		<s:Button id="embedButton" label="Embed"
-				  toolTip="Embed slivers"
-				  click="Main.geniHandler.requestHandler.embedSlice(sliceCanvas.slice)" />
-		<components:DefaultLine percentHeight="90" />
-		<components:ImageButton id="startButton"
-							 toolTip="Start slivers"
-							  click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
-							  icon="{ImageUtil.playControlIcon}"/>
-		<components:ImageButton id="stopButton"
-							 toolTip="Stop slivers"
-							  click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
-							  icon="{ImageUtil.stopControlIcon}"/>
-		<components:ImageButton id="restartButton"
-							 toolTip="Restart slivers"
-							  click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
-							  icon="{ImageUtil.repeatControlIcon}"/>
+		<s:HGroup enabled="{!Main.offlineMode}" verticalAlign="middle" height="100%" width="100%">
+			<s:Button id="createButton"
+					  toolTip="Create slivers"
+					  label="Create"
+					  height="24"
+					  icon="{ImageUtil.actionIcon}"
+					  click="tryCreateSlice()"/>
+			<components:ImageButton id="refreshButton"
+								 toolTip="Refresh slivers"
+								 click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"
+								 icon="{ImageUtil.refreshIcon}"/>
+			<s:CheckBox id="autoRefreshCheckbox"
+						label="Autorefresh"
+						toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
+			<components:ImageButton id="deleteButton"
+									toolTip="Delete slivers"
+									click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.deleteIcon}"/>
+			<components:DefaultLine percentHeight="90" />
+			<components:ImageButton id="startButton"
+									height="24"
+									toolTip="Start slivers"
+									click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.playControlIcon}"/>
+			<components:ImageButton id="stopButton"
+									toolTip="Stop slivers"
+									click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.stopControlIcon}"/>
+			<components:ImageButton id="restartButton"
+									toolTip="Restart slivers"
+									click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
+									icon="{ImageUtil.repeatControlIcon}"/>
+			<components:DefaultLine percentHeight="90" />
+			<s:Button label="Discover allocated resources"
+					  toolTip="Ask each known manager if it has resources allocated to this slice"
+					  height="24"
+					  click="discoverAllocatedResources()" />
+		</s:HGroup>
 	</components:controlBarContent>
 </components:DefaultWindow>

@@ -14,10 +14,16 @@
 
 package protogeni
 {
+	/**
+	 * Common functions used for dealing with strings
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class StringUtil
 	{
 		// Makes the first letter uppercase
-		public static function firstToUpper (phrase : String) : String {
+		public static function firstToUpper (phrase:String):String {
 			return phrase.substring(1, 0).toUpperCase() + phrase.substring(1);
 		}
 		
@@ -26,7 +32,7 @@ package protogeni
 		}
 		
 		// Shortens the given string to a length, taking out from the middle
-		public static function shortenString(phrase : String, size : int) : String {
+		public static function shortenString(phrase:String, size:int):String {
 			// Remove any un-needed elements
 			var a:Array = phrase.split("https://");
 			if(a.length == 1)

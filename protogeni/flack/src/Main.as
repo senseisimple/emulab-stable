@@ -19,9 +19,20 @@
 	import protogeni.GeniDispatcher;
 	import protogeni.GeniHandler;
 	
+  /**
+   * Global container for things we use
+   * 
+   * @author mstrum
+   * 
+   */
   public class Main
   {
-	// Returns the main class
+	/**
+	 * Gets the main application currently running
+	 * 
+	 * @return Flack
+	 * 
+	 */	
 	public static function Application():flack {
 		return FlexGlobals.topLevelApplication as flack;
 	}
@@ -33,16 +44,13 @@
 	public static var debugMode:Boolean = false;
 	
 	[Bindable]
-	public static var useJavascript:Boolean = false;
+	public static var useJavascript:Boolean = true;
 	
 	public static var protogeniOnly:Boolean = false;
 	
 	[Bindable]
-	public static var useIon:Boolean = false;
-	
-	[Bindable]
-	public static var useGpeni:Boolean = false;
-	
 	public static var offlineMode:Boolean = false;
+	
+	public static var allowCaching:Boolean = true;
   }
 }

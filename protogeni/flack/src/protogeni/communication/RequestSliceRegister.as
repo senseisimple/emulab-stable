@@ -14,9 +14,16 @@
 
 package protogeni.communication
 {
+	import protogeni.Util;
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.Slice;
 	
+	/**
+	 * Creates a new slice and gets its credential using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliceRegister extends Request
 	{
 		private var slice:Slice;
@@ -27,10 +34,12 @@ package protogeni.communication
 				"Register slice named " + s.hrn,
 				CommunicationUtil.register);
 			slice = s;
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			
+			// Build up the args
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("hrn", slice.urn.full);
 			op.addField("type", "Slice");
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*
@@ -39,6 +48,10 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				slice.credential = String(response.value);
+				
+				var cred:XML = new XML(slice.credential);
+				slice.expires = Util.parseProtogeniDate(cred.credential.expires);
+				
 				Main.geniHandler.CurrentUser.slices.add(slice);
 				Main.geniDispatcher.dispatchSlicesChanged();
 				DisplayUtil.viewSlice(slice);

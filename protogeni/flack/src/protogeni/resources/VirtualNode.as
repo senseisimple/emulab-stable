@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Node allocated into a sliver/slice which has a physical node underneath
+	/**
+	 * Resource within a slice
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class VirtualNode
 	{
 		public static const STATUS_CHANGING:String = "changing";
@@ -61,7 +66,7 @@ package protogeni.resources
 		
 		public var rspec:XML;
 		
-		public var sliverType:String;
+		public var sliverType:String = "";
 		
 		public var installServices:Vector.<InstallService> = new Vector.<InstallService>();
 		public var executeServices:Vector.<ExecuteService> = new Vector.<ExecuteService>();
@@ -107,11 +112,22 @@ package protogeni.resources
 		
 		public function set Exclusive(value:Boolean):void {
 			this._exclusive = value;
-			// TODO: support more
-			if(this._exclusive)
-				sliverType = "raw-pc";
-			else
-				sliverType = "emulab-openvz";
+
+			if(this.physicalNode != null
+					&& this.physicalNode.sliverTypes.length == 1
+					&& this.physicalNode.sliverTypes[0].name != "N/A")
+				this.sliverType = this.physicalNode.sliverTypes[0].name;
+			else {
+				if(this.manager is ProtogeniComponentManager) {
+					if(this._exclusive)
+						sliverType = "raw-pc";
+					else
+						sliverType = "emulab-openvz";
+				} else if(this.manager is PlanetlabAggregateManager) {
+					sliverType = "plab-vnode";
+				}
+			}
+			
 		}
 		
 		public function setToPhysicalNode(node:PhysicalNode):void

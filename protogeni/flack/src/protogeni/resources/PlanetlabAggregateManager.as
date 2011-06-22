@@ -16,6 +16,12 @@ package protogeni.resources
 {
 	import mx.collections.ArrayCollection;
 	
+	/**
+	 * PlanetLab implementation of the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class PlanetlabAggregateManager extends AggregateManager
 	{
 		public var registryUrl:String;

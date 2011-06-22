@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Link as part of a sliver/slice connecting virtual nodes
+	/**
+	 * Link between resources within a slice
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class VirtualLink
 	{
 		public static const TYPE_NORMAL:int = 0;
@@ -72,11 +77,11 @@ package protogeni.resources
 				this.linkType = TYPE_NORMAL;
 			else
 			{
-				if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
+				/*if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
 					this.linkType = TYPE_ION;
 				else if (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)
 					this.linkType = TYPE_GPENI;
-				else
+				else*/
 					this.setUpTunnels();
 				
 				// Make sure nodes are in both
@@ -129,8 +134,8 @@ package protogeni.resources
 				
 				for(var i:int = 1; i < vi.owner.slivers.length; i++)
 				{
-					if(vi.owner.slivers[i].links.getForNode(vi.owner).length == 0)
-						vi.owner.slivers[i].nodes.remove(vi.owner);
+					if(vi.owner.slivers.collection[i].links.getForNode(vi.owner).length == 0)
+						vi.owner.slivers.collection[i].nodes.remove(vi.owner);
 				}
 			}
 			this.interfaces = new VirtualInterfaceCollection();

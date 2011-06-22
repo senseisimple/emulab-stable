@@ -70,6 +70,17 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				graphInfoButton.visible = gm.Rspec != null;
 				graphInfoButton.includeInLayout = gm.Rspec != null;
 				nodesButton.label = gm.availableNodes + "/" + gm.AllNodes.length.toString() + " (" + gm.percentageAvailable.toFixed() + "%) Nodes Available";
+				
+				if(gm.DiskImages.length > 0) {
+					diskImageGroup.visible = true; 
+				}
+				
+				for each(var outputVersion:Number in gm.outputRspecVersions) {
+					outputVersionsHgroup.addElement(DisplayUtil.getLabel(outputVersion.toString(), outputVersion == gm.outputRspecVersion));
+				}
+				for each(var inputVersion:Number in gm.inputRspecVersions) {
+					inputVersionsHgroup.addElement(DisplayUtil.getLabel(inputVersion.toString(), inputVersion == gm.inputRspecVersion));
+				}
 			}
 			
 			public function viewRspec():void {
@@ -180,4 +191,37 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	
 	<s:Button id="nodesButton" height="24"
 			  click="DisplayUtil.viewNodeCollection(new ArrayCollection(gm.AllNodesAsArray()));"/>
+	
+	<s:VGroup id="diskImageGroup" visible="false" includeInLayout="{diskImageGroup.visible}" width="100%">
+		<s:Label text="Disk Images" fontWeight="bold" />
+		<s:DataGrid id="imageGrid" dataProvider="{gm.DiskImages}"
+					width="100%" height="106">
+			<s:columns>
+				<s:ArrayList>
+					<s:GridColumn headerText="OSID" dataField="name" />
+					<s:GridColumn headerText="Description" dataField="description">
+						<s:itemRenderer>
+							<fx:Component>
+								<s:GridItemRenderer>
+									<s:Label text="{data.description}"
+											 toolTip="{data.os} {data.version} ({data.description})"
+											 maxDisplayedLines="1"
+											 left="10" right="5" paddingTop="10" paddingBottom="5"/>
+								</s:GridItemRenderer>
+							</fx:Component>
+						</s:itemRenderer>
+					</s:GridColumn>
+				</s:ArrayList>
+			</s:columns>
+		</s:DataGrid>
+	</s:VGroup>
+	<s:Label text="RSPEC support" fontWeight="bold" />
+	<s:HGroup>
+		<s:Label text="Output:" fontWeight="bold" />
+		<s:HGroup id="outputVersionsHgroup" />
+	</s:HGroup>
+	<s:HGroup>
+		<s:Label text="Input:" fontWeight="bold" />
+		<s:HGroup id="inputVersionsHgroup" />
+	</s:HGroup>
 </s:VGroup>

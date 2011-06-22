@@ -1,4 +1,3 @@
-// Found at http://blog.flexdevelopers.com/2011/03/using-flex-4-skins-states-to-disable.html
 package protogeni.display.components
 {
 	import flash.display.Sprite;
@@ -8,6 +7,12 @@ package protogeni.display.components
 	import mx.core.UIComponent;
 	import mx.utils.ColorUtil;
 	
+	/**
+	 * Visual spinner component
+	 * 
+	 * @see http://blog.flexdevelopers.com/2011/03/using-flex-4-skins-states-to-disable.html
+	 * 
+	 */
 	public class Spinner extends UIComponent
 	{
 		public static const COUNTER_CLOCKWISE:Number = 0;

@@ -14,32 +14,41 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Key;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Allocates resources to a sliver using the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverCreateAm extends Request
 	{
 		public var sliver:Sliver;
 		
 		public function RequestSliverCreateAm(s:Sliver):void
 		{
-			super("SliverCreate",
+			super("SliverCreateAM",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.createSliverAm);
 			ignoreReturnCode = true;
 			sliver = s;
 			s.created = false;
+			s.staged = false;
+			op.timeout = 360;
+			
+			// Build up the args
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
 			op.pushField(sliver.getRequestRspec(true).toXMLString());
-			// Internal API error: <Fault 102: "person_id 1: AddPersonKey: Invalid key_fields['key'] value: expected string, got struct">
 			var userKeys:Array = [];
-			for each(var keyObject:Object in sliver.slice.creator.keys) {
-				userKeys.push(keyObject.key);
+			for each(var key:Key in sliver.slice.creator.keys) {
+				userKeys.push(key.value);
 			}
 			op.pushField([{urn:Main.geniHandler.CurrentUser.urn.full, keys:userKeys}]);
 			op.setExactUrl(sliver.manager.Url);
-			op.timeout = 360;
 		}
 		
 		override public function complete(code:Number, response:Object):*
@@ -47,7 +56,6 @@ package protogeni.communication
 			try
 			{
 				sliver.created = true;
-				sliver.staged = false;
 				sliver.rspec = new XML(response);
 				sliver.parseRspec();
 				
@@ -60,6 +68,7 @@ package protogeni.communication
 				}
 				
 				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+				Main.geniDispatcher.dispatchSlicesChanged();
 				
 				return new RequestSliverStatusAm(sliver);
 			}

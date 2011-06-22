@@ -14,6 +14,12 @@
 
 package protogeni.communication
 {
+	/**
+	 * Queue of requests
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class RequestQueue
 	{
 		public var head:RequestQueueNode;
@@ -120,6 +126,21 @@ package protogeni.communication
 			while(n != null && n != nextRequest)
 			{
 				if((n.item as Request).running)
+					count++;
+				n = n.next;
+			}
+			
+			return count;
+		}
+		
+		public function waitingCount():int
+		{
+			var count:int = 0;
+			var n:RequestQueueNode = head;
+			
+			while(n != null)
+			{
+				if(!(n.item as Request).running)
 					count++;
 				n = n.next;
 			}

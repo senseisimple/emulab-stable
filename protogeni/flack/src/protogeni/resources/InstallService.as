@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Archive to install on a resource
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class InstallService
 	{
 		public var url:String;

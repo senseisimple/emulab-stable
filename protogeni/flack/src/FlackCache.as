@@ -29,6 +29,7 @@ package
 	import protogeni.NetUtil;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
+	import protogeni.resources.Key;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PlanetlabAggregateManager;
@@ -64,10 +65,10 @@ package
 			return _offlineSharedObject != null
 				&& _offlineSharedObject.size > 0;
 		}
-		
-		public static var userAuthorityUrn:String = "";
+
 		[Bindable]
 		public static var userSslPem:String = "";
+		[Bindable]
 		public static var userPassword:String = "";
 		public static var maxParallelRequests:int = 3;
 		public static var geniBundle:String = "";
@@ -77,6 +78,7 @@ package
 			Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, updateManager);
 			Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, updateUser);
 			Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, updateSlice);
+			Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, updateSlices);
 		}
 		
 		public function updateManager(event:GeniEvent):void {
@@ -111,9 +113,8 @@ package
 			}
 			
 			var newManagerObject:Object = new Object();
-			if(manager.type == GeniManager.TYPE_PROTOGENI)
-				newManagerObject.inputRspecVersion = (manager as ProtogeniComponentManager).inputRspecVersion;
-			else if(manager.type == GeniManager.TYPE_PLANETLAB) {
+			newManagerObject.inputRspecVersion = manager.inputRspecVersion;
+			if(manager.rspecProcessor is PlanetlabRspecProcessor) {
 				newManagerObject.sites = [];
 				for each(var site:Site in (manager as PlanetlabAggregateManager).sites) {
 					var siteObject:Object = new Object();
@@ -152,12 +153,33 @@ package
 			if(_offlineSharedObject == null)
 				return;
 			
-			_offlineSharedObject.data.credential = Main.geniHandler.CurrentUser.credential;
+			// only have one set
+			if(Main.geniHandler.CurrentUser.userCredential != null && Main.geniHandler.CurrentUser.userCredential.length > 0) {
+				_offlineSharedObject.data.userCredential = Main.geniHandler.CurrentUser.userCredential;
+				_offlineSharedObject.data.sliceCredential = "";
+			} else if (Main.geniHandler.CurrentUser.sliceCredential != null && Main.geniHandler.CurrentUser.sliceCredential.length > 0) {
+				_offlineSharedObject.data.sliceCredential = Main.geniHandler.CurrentUser.sliceCredential;
+				_offlineSharedObject.data.userCredential = "";
+			}
 			_offlineSharedObject.data.hrn = Main.geniHandler.CurrentUser.hrn;
-			_offlineSharedObject.data.keys = Main.geniHandler.CurrentUser.keys;
+			_offlineSharedObject.data.keys = [];
+			for each(var key:Key in Main.geniHandler.CurrentUser.keys)
+				_offlineSharedObject.data.keys.push(key.value);
 			_offlineSharedObject.data.name = Main.geniHandler.CurrentUser.name;
 			_offlineSharedObject.data.uid = Main.geniHandler.CurrentUser.uid;
-			_offlineSharedObject.data.urn = Main.geniHandler.CurrentUser.urn.full;
+			if(Main.geniHandler.CurrentUser.urn != null)
+				_offlineSharedObject.data.urn = Main.geniHandler.CurrentUser.urn.full;
+		}
+		
+		public static function updateSlices(event:GeniEvent):void {
+			if(event.action == GeniEvent.ACTION_REMOVING) {
+				if(_offlineSharedObject == null)
+					loadOfflineSharedObject();
+				if(_offlineSharedObject == null)
+					return;
+				
+				_offlineSharedObject.data.slices = [];
+			}
 		}
 		
 		public static function updateSlice(event:GeniEvent):void {
@@ -182,6 +204,7 @@ package
 			
 			var newSliceObject:Object = new Object();
 			newSliceObject.credential = slice.credential;
+			newSliceObject.expires = slice.expires;
 			newSliceObject.hrn = slice.hrn;
 			newSliceObject.urn = slice.urn.full;
 			
@@ -191,6 +214,7 @@ package
 					var newSliverObject:Object = new Object();
 					newSliverObject.managerUrn = sliver.manager.Urn.full;
 					newSliverObject.credential = sliver.credential;
+					newSliverObject.expires = sliver.expires;
 					newSliverObject.state = sliver.state;
 					newSliverObject.status = sliver.status;
 					newSliverObject.urn = sliver.urn.full;
@@ -213,8 +237,6 @@ package
 			try {
 				_basicSharedObject = SharedObject.getLocal("flackCacheSharedObject");
 				if(_basicSharedObject.size > 0) {
-					if(_basicSharedObject.data.userAuthorityUrn != null)
-						userAuthorityUrn = _basicSharedObject.data.userAuthorityUrn;
 					if(_basicSharedObject.data.userSslPem != null)
 						userSslPem = _basicSharedObject.data.userSslPem;
 					if(_basicSharedObject.data.userPassword != null)
@@ -235,35 +257,6 @@ package
 							NetUtil.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
 					});
 			}
-			
-			/*
-			if(geniBundle.length == 0)
-			geniBundle = (new FallbackGeniBundle()).toString();
-			if(rootBundle.length == 0)
-			rootBundle =  (new FallbackRootBundle()).toString();
-			*/
-			
-			// keep data from the old caching method
-			try {
-				var tempSharedObject:SharedObject = SharedObject.getLocal("geniLocalSharedObject");
-				if (tempSharedObject != null && tempSharedObject.size > 0)
-				{
-					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-						if(sa.Url == tempSharedObject.data.authority) {
-							userAuthorityUrn = sa.Urn;
-							break;
-						}
-					}
-					
-					userSslPem = tempSharedObject.data.sslPem;
-					
-					if(tempSharedObject.data.password != null && tempSharedObject.data.password.length > 0)
-						userPassword = tempSharedObject.data.password;
-					
-					tempSharedObject.clear();
-				}
-				
-			} catch(e:Error) {}
 		}
 		
 		/**
@@ -284,13 +277,6 @@ package
 		public static function applyBasic():void {
 			if (_basicSharedObject != null && _basicSharedObject.size > 0)
 			{
-				for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-					if(sa.Urn == userAuthorityUrn) {
-						Main.geniHandler.CurrentUser.authority = sa;
-						break;
-					}
-				}
-				
 				if(userPassword.length > 0)
 					Main.geniHandler.CurrentUser.setPassword(userPassword, true);
 				
@@ -303,12 +289,13 @@ package
 		 * 
 		 */		
 		public static function saveBasic():void {
+			if(!Main.allowCaching)
+				return;
 			if(_basicSharedObject == null)
 				return;
 
 			var flushStatus:String = null;
 			try {
-				_basicSharedObject.data.userAuthorityUrn = userAuthorityUrn;
 				_basicSharedObject.data.userSslPem = userSslPem;
 				_basicSharedObject.data.userPassword = userPassword;
 				_basicSharedObject.data.maxParallelRequests = maxParallelRequests;
@@ -342,13 +329,17 @@ package
 		private static function onFlushStatus(event:NetStatusEvent):void {
 			if(event.info.code == "SharedObject.Flush.Success") {
 				// saved
-			}
+			} else
+				Main.allowCaching = false;
+			
 			_basicSharedObject.removeEventListener(NetStatusEvent.NET_STATUS, onFlushStatus);
 		}	
 		private static function onOfflineFlushStatus(event:NetStatusEvent):void {
 			if(event.info.code == "SharedObject.Flush.Success") {
 				// saved
-			}
+			} else
+				Main.allowCaching = false;
+			
 			_offlineSharedObject.removeEventListener(NetStatusEvent.NET_STATUS, onFlushStatus);
 		}
 		
@@ -374,6 +365,8 @@ package
 		}
 		
 		public static function saveOffline():void {
+			if(!Main.allowCaching)
+				return;
 			if(_offlineSharedObject == null)
 				loadOfflineSharedObject();
 			if(_offlineSharedObject == null)
@@ -420,9 +413,22 @@ package
 			if(offlineAvailable) {
 				try {
 					// get user info
-					Main.geniHandler.CurrentUser.credential = _offlineSharedObject.data.credential;
+					if(_offlineSharedObject.data.credential != null) {
+						Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.credential;
+						Main.geniHandler.CurrentUser.sliceCredential = "";
+						_offlineSharedObject.data.credential = null;
+					}
+					else {
+						if(_offlineSharedObject.data.userCredential != null && _offlineSharedObject.data.userCredential.length > 0)
+							Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.userCredential;
+						else if(_offlineSharedObject.data.sliceCredential != null)
+							Main.geniHandler.CurrentUser.sliceCredential = _offlineSharedObject.data.sliceCredential;
+					}
+					
 					Main.geniHandler.CurrentUser.hrn = _offlineSharedObject.data.hrn;
-					Main.geniHandler.CurrentUser.keys = _offlineSharedObject.data.keys;
+					Main.geniHandler.CurrentUser.keys = new Vector.<Key>();
+					for each(var key:String in _offlineSharedObject.data.keys)
+						Main.geniHandler.CurrentUser.keys.push(new Key(key));
 					Main.geniHandler.CurrentUser.name = _offlineSharedObject.data.name;
 					Main.geniHandler.CurrentUser.uid = _offlineSharedObject.data.uid;
 					Main.geniHandler.CurrentUser.urn = new IdnUrn(_offlineSharedObject.data.urn);
@@ -465,7 +471,7 @@ package
 					for each(var managerObject:Object in _offlineSharedObject.data.managers) {
 						var newManager:GeniManager = Main.geniHandler.GeniManagers.getByUrn(managerObject.urn);
 						
-						if(newManager.type == GeniManager.TYPE_PLANETLAB) {
+						if(newManager.rspecProcessor is PlanetlabRspecProcessor) {
 							(newManager.rspecProcessor as PlanetlabRspecProcessor).callGetSites = false;
 							newManager.data = managerObject.sites;
 							newManager.rspecProcessor.processResourceRspec(
@@ -510,6 +516,7 @@ package
 				var newSlice:Slice = new Slice();
 				newSlice.creator = Main.geniHandler.CurrentUser;
 				newSlice.credential = sliceObject.credential;
+				newSlice.expires = sliceObject.expires;
 				newSlice.hrn = sliceObject.hrn;
 				newSlice.urn = new IdnUrn(sliceObject.urn);
 				
@@ -517,6 +524,7 @@ package
 					var newSliver:Sliver = newSlice.getOrCreateSliverFor(Main.geniHandler.GeniManagers.getByUrn(sliverObject.managerUrn));
 					newSliver.credential = sliverObject.credential;
 					newSliver.urn = new IdnUrn(sliverObject.urn);
+					newSliver.expires = sliverObject.expires;
 					newSliver.created = true;
 					newSliver.state = sliverObject.state;
 					newSliver.status = sliverObject.status;

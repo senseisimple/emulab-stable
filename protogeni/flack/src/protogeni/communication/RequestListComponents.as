@@ -15,12 +15,21 @@
 package protogeni.communication
 {
 	import protogeni.StringUtil;
+	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
+	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 	
+	/**
+	 * Gets the list of component managers from the clearinghouse using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestListComponents extends Request
 	{
 		private var startDiscoverResources:Boolean;
@@ -36,9 +45,14 @@ package protogeni.communication
 			startSlices = shouldStartSlices;
 		}
 		
+		/**
+		 * Called immediately before the operation is run to add variables it may not have had when added to the queue
+		 * @return Operation to be run
+		 * 
+		 */
 		override public function start():Operation
 		{
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			return op;
 		}
 		
@@ -82,7 +96,14 @@ package protogeni.communication
 							newGm = planetLabAm;
 						}
 						
-						Main.geniHandler.GeniManagers.add(newGm);
+						var i:int;
+						for(i = 0; i < Main.geniHandler.GeniManagers.length; i++) {
+							var existingManager:GeniManager = Main.geniHandler.GeniManagers.getItemAt(i) as GeniManager;
+							if(newGm.Urn.authority < existingManager.Urn.authority && existingManager.Urn.authority != "emulab.net")
+								break;
+						}
+						Main.geniHandler.GeniManagers.addAt(newGm, i);
+						
 						if(startDiscoverResources)
 						{
 							newGm.Status = GeniManager.STATUS_INPROGRESS;
@@ -97,8 +118,18 @@ package protogeni.communication
 					}
 				}
 				
-				if(startSlices)
-					newCalls.push(new RequestUserResolve());
+				if(startSlices) {
+					if(Main.geniHandler.CurrentUser.userCredential.length > 0)
+						newCalls.push(new RequestUserResolve());
+					else if(Main.geniHandler.CurrentUser.sliceCredential.length > 0) {
+						for each(var slice:Slice in Main.geniHandler.CurrentUser.slices) {
+							if(slice.credential == Main.geniHandler.CurrentUser.sliceCredential) {
+								Main.geniHandler.requestHandler.discoverSliceAllocatedResources(slice);
+								break;
+							}
+						}
+					}
+				}
 			}
 			else
 			{

@@ -14,26 +14,18 @@
 
 package protogeni.resources
 {
+	/**
+	 * Federated ProtoGENI manager
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class ProtogeniComponentManager extends GeniManager
 	{
 		public static const LEVEL_MINIMAL:int = 0;
 		public static const LEVEL_FULL:int = 1;
 		
 		public var Level:int;
-		
-		[Bindable]
-		public var outputRspecVersion:Number;
-		[Bindable]
-		public var inputRspecVersion:Number;
-		
-		[Bindable]
-		public var outputRspecDefaultVersion:Number;
-		
-		public var inputRspecVersions:Vector.<Number>;
-		public var outputRspecVersions:Vector.<Number>;
-		
-		public var generated:Date;
-		public var expires:Date;
 		
 		public function ProtogeniComponentManager()
 		{

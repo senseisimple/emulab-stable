@@ -17,19 +17,27 @@ package protogeni.communication
 	import protogeni.GeniEvent;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Gets the manifest for a sliver using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverResolve extends Request
 	{
 		private var sliver:Sliver;
 		
-		public function RequestSliverResolve(s:Sliver):void
+		public function RequestSliverResolve(newSliver:Sliver):void
 		{
 			super("SliverResolve",
-				"Resolving sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn,
+				"Resolving sliver on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
 				CommunicationUtil.resolveResource,
 				true);
-			sliver = s;
+			sliver = newSliver;
+			
+			// Build up the args
 			op.addField("urn", sliver.urn.full);
-			op.addField("credentials", new Array(sliver.credential));
+			op.addField("credentials", [sliver.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		
@@ -40,6 +48,9 @@ package protogeni.communication
 				sliver.rspec = new XML(response.value.manifest);
 				sliver.created = true;
 				sliver.parseRspec();
+				if(!sliver.slice.slivers.contains(sliver))
+					sliver.slice.slivers.add(sliver);
+				
 				if(sliver.slice.isCreated())
 					Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATED);
 				else

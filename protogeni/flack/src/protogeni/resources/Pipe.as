@@ -1,5 +1,11 @@
 package protogeni.resources
 {
+	/**
+	 * Pipe used within a delay node to edit network properties from one interface to another
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class Pipe
 	{
 		public var source:VirtualInterface;

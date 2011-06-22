@@ -22,6 +22,12 @@ package protogeni.communication
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	
+	/**
+	 * Gets a public advertisement for a ProtoGENI component manager
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestDiscoverResourcesPublic extends Request
 	{
 		private var componentManager:ProtogeniComponentManager;
@@ -35,9 +41,9 @@ package protogeni.communication
 				true,
 				false);
 			componentManager = newCm;
+			
 			op.setExactUrl(newCm.Url);
 			op.type = Operation.HTTP;
-			componentManager.lastRequest = this;
 		}
 		
 		override public function complete(code:Number, response:Object):*

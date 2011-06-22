@@ -14,6 +14,12 @@
 
 package protogeni
 {
+	/**
+	 * Common XML values/function used around the library
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class XmlUtil
 	{
 		// Namespaces

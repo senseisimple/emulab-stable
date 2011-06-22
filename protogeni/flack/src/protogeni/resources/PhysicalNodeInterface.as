@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Interface on a physical node
+	/**
+	 * Interface on a resource which is typically used to connect to links
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class PhysicalNodeInterface
 	{
 		public static const ROLE_CONTROL:int = 0;

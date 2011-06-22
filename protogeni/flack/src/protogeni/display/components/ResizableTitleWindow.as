@@ -6,6 +6,7 @@ package protogeni.display.components
 	import flash.events.Event;
 	import flash.events.MouseEvent;
 	import flash.geom.Point;
+	import flash.geom.Rectangle;
 	
 	import mx.core.FlexGlobals;
 	import mx.core.IFlexDisplayObject;
@@ -15,7 +16,9 @@ package protogeni.display.components
 	
 	import protogeni.display.skins.ResizableTitleWindowSkin;
 	
+	import spark.accessibility.TitleWindowAccImpl;
 	import spark.components.TitleWindow;
+	import spark.events.TitleWindowBoundsEvent;
 	
 	/**
 	 *  ResizableTitleWindow is a TitleWindow with
@@ -38,12 +41,33 @@ package protogeni.display.components
 			super();
 			this.setStyle("skinClass", ResizableTitleWindowSkin);
 			this.addEventListener("close", closeWindow);
+			this.addEventListener(TitleWindowBoundsEvent.WINDOW_MOVING, onWindowMoving);
 		}
 		
-		public function showWindow():void
+		public function onWindowMoving(event:TitleWindowBoundsEvent):void {
+			var endBounds:Rectangle = event.afterBounds;
+			
+			// left edge of the stage
+			if (endBounds.x < (endBounds.width*-1 + 48))
+				endBounds.x = endBounds.width*-1 + 48;
+			
+			// right edge of the stage
+			if (endBounds.x > (FlexGlobals.topLevelApplication.width - 48))
+				endBounds.x = FlexGlobals.topLevelApplication.width - 48;
+			
+			// top edge of the stage
+			if (endBounds.y < 0)
+				endBounds.y = 0;
+			
+			// bottom edge of the stage
+			if (endBounds.y > (FlexGlobals.topLevelApplication.height - 48))
+				endBounds.y = FlexGlobals.topLevelApplication.height - 48;
+		}
+		
+		public function showWindow(modal:Boolean = false):void
 		{
 			if(!this.isPopUp)
-				PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, false);
+				PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, modal);
 			else
 				PopUpManager.bringToFront(this);				
 			PopUpManager.centerPopUp(this);

@@ -25,6 +25,12 @@ package protogeni
 	import flash.system.Security;
 	import flash.utils.Dictionary;
 	
+	/**
+	 * Common functions used for web stuff
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class NetUtil
 	{
 		public static function showSetup():void

@@ -14,22 +14,34 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Key;
 	import protogeni.resources.Sliver;
 	
 	public final class RequestTicketRedeem extends Request
 	{
 		public var sliver:Sliver;
 		
-		public function RequestTicketRedeem(s:Sliver):void
+		/**
+		 * Redeems a ticket previously given to the user using the ProtoGENI API
+		 * 
+		 * @param s
+		 * 
+		 */
+		public function RequestTicketRedeem(newSliver:Sliver):void
 		{
 			super("TicketRedeem",
-				"Updating ticket for sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
+				"Updating ticket for sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
 				CommunicationUtil.redeemTicket);
-			sliver = s;
+			sliver = newSliver;
+			
+			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("ticket", sliver.ticket.toXMLString());
-			op.addField("keys", sliver.slice.creator.keys);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.addField("ticket", sliver.ticket.toXMLString());var keys:Array = [];
+			for each(var key:Key in sliver.slice.creator.keys) {
+				keys.push({type:key.type, key:key.value});
+			}
+			op.addField("keys", keys);
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		

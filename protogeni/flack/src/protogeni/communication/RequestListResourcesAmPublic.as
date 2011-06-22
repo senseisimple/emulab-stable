@@ -22,6 +22,12 @@ package protogeni.communication
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	
+	/**
+	 * Gets a manager's advertisment for an unauthenticated user
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestListResourcesAmPublic extends Request
 	{
 		private var aggregateManager:AggregateManager;
@@ -37,7 +43,6 @@ package protogeni.communication
 			aggregateManager = newAm;
 			op.setExactUrl(aggregateManager.Url);
 			op.type = Operation.HTTP;
-			aggregateManager.lastRequest = this;
 		}
 		
 		override public function complete(code:Number, response:Object):*

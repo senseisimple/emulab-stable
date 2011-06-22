@@ -204,9 +204,11 @@ package com.hurlant.crypto.cert {
 			return _obj.algorithmIdentifier.algorithmId.toString();
 		}
 		public function getNotBefore():Date {
+			load();
 			return _obj.signedCertificate.validity.notBefore.date;
 		}
 		public function getNotAfter():Date {
+			load();
 			return _obj.signedCertificate.validity.notAfter.date;
 		}
 		

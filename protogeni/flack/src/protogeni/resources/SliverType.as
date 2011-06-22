@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Describes the sliver environment which will be given to the user
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class SliverType
 	{
 		public var name:String;

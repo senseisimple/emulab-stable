@@ -14,26 +14,29 @@
 
 package protogeni.resources
 {
+	/**
+	 * Responsible for users and their slices in ProtoGENI
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class SliceAuthority
 	{
 		[Bindable]
 		public var Name:String;
-		public var Urn:String;
-		public var Url:String;
 		[Bindable]
-		public var Authority:String;
+		public var Urn:IdnUrn;
+		[Bindable]
+		public var Url:String;
 		[Bindable]
 		public var workingCertGet:Boolean = false;
 		
-		public function SliceAuthority(newName:String = "",
-									   newUrn:String = "",
-									   newUrl:String = "",
+		public function SliceAuthority(newUrn:String,
+									   newUrl:String,
 									   newWorkingCertGet:Boolean = false)
 		{
-			this.Name = newName;
-			this.Urn = newUrn;
-			if(this.Urn.length > 0)
-				this.Authority = this.Urn.split("+")[1];
+			this.Urn = new IdnUrn(newUrn);
+			this.Name = this.Urn.authority;
 			this.Url = newUrl;
 			this.workingCertGet = newWorkingCertGet;
 		}

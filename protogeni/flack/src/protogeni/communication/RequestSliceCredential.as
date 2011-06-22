@@ -14,7 +14,10 @@
 
 package protogeni.communication
 {
+	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
+	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
@@ -23,17 +26,25 @@ package protogeni.communication
 	{
 		private var slice:Slice;
 		
-		public function RequestSliceCredential(s:Slice):void
+		/**
+		 * Gets the slice credential from the user's slice authority using the ProtoGENI API
+		 * 
+		 * @param s slice which we need the credential for
+		 * 
+		 */
+		public function RequestSliceCredential(newSlice:Slice):void
 		{
 			super("SliceCredential",
-				"Getting the slice credential for " + s.hrn,
+				"Getting the slice credential for " + newSlice.hrn,
 				CommunicationUtil.getCredential,
 				true);
-			slice = s;
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			slice = newSlice;
+			
+			// Build up the args
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("urn", slice.urn.full);
 			op.addField("type", "Slice");
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*
@@ -42,13 +53,24 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				slice.credential = String(response.value);
+				
+				var cred:XML = new XML(slice.credential);
+				slice.expires = Util.parseProtogeniDate(cred.credential.expires);
+				
 				Main.geniDispatcher.dispatchSliceChanged(slice);
 				for each(var s:Sliver in slice.slivers.collection) {
-					if(s.manager is AggregateManager)
+					if(s.manager.isAm)
 						newCalls.push(new RequestSliverListResourcesAm(s));
-					else if(s.manager is ProtogeniComponentManager)
+					else
 						newCalls.push(new RequestSliverGet(s));
 				}
+				
+				/*for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
+					if(manager.Urn.authority == "plc") {
+						var newSliver:Sliver = new Sliver(slice, manager);
+						Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
+					}
+				}*/
 			}
 			else
 			{

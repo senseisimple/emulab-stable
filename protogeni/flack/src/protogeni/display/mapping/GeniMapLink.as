@@ -26,6 +26,12 @@ package protogeni.display.mapping
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.PhysicalLinkGroup;
 	
+	/**
+	 * Visual representation of a link on Google Maps
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class GeniMapLink
 	{
 		public static const linkColor:Object = 0xFFCFD1;

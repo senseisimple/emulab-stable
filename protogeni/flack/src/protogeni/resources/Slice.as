@@ -20,12 +20,18 @@ package protogeni.resources
 	import mx.controls.Alert;
 	import mx.events.CloseEvent;
 	
+	import protogeni.Util;
 	import protogeni.XmlUtil;
 	import protogeni.communication.CommunicationUtil;
 	import protogeni.display.ChooseManagerWindow;
 	import protogeni.display.ImageUtil;
-	
-	// Slice that a user created in ProtoGENI
+
+	/**
+	 * Container for slivers
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class Slice
 	{
 		[Bindable]
@@ -37,6 +43,9 @@ package protogeni.resources
 		public var slivers:SliverCollection = new SliverCollection();
 		
 		public var expires:Date;
+		
+		[Bindable]
+		public var useInputRspecVersion:Number = Util.defaultRspecVersion;
 		
 		public function get name():String {
 			if(urn != null)
@@ -382,6 +391,14 @@ package protogeni.resources
 				case Sliver.STATUS_FAILED : return ImageUtil.flagRedIcon;
 				default : return ImageUtil.flagOrangeIcon;
 			}
+		}
+		
+		public function isIdUnique(o:*, id:String):Boolean {
+			if(!this.GetAllLinks().isIdUnique(o, id))
+				return false;
+			if(!this.GetAllNodes().isIdUnique(o, id))
+				return false;
+			return true;
 		}
 		
 		public function getUniqueVirtualLinkId(l:VirtualLink = null):String

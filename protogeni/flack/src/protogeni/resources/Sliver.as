@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Sliver from a slice containing all resources from the CM
+	/**
+	 * Holds resources for a slice at one manager
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class Sliver
 	{
 		public static const STATE_STARTED:String = "started";
@@ -103,7 +108,7 @@ package protogeni.resources
 		
 		public function getRequestRspec(removeNonexplicitBinding:Boolean):XML
 		{
-			return this.manager.rspecProcessor.generateSliverRspec(this, removeNonexplicitBinding);
+			return this.manager.rspecProcessor.generateSliverRspec(this, removeNonexplicitBinding, slice.useInputRspecVersion);
 		}
 		
 		public function parseRspec():void

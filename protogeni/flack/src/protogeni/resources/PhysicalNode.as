@@ -14,7 +14,12 @@
 
 package protogeni.resources
 {
-	// Physical node
+	/**
+	 * Resource as described by a manager's advertisement
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class PhysicalNode
 	{
 		public var owner:PhysicalNodeGroup;

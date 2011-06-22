@@ -20,15 +20,23 @@ package protogeni.communication
 	{
 		public var sliver:Sliver;
 		
-		public function RequestSliverUpdate(s:Sliver):void
+		/**
+		 * Creates a redeemable ticket for a sliver with a different configuration using the ProtoGENI API
+		 * 
+		 * @param newSliver
+		 * 
+		 */
+		public function RequestSliverUpdate(newSliver:Sliver):void
 		{
 			super("SliverUpdate",
-				"Updating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
+				"Updating sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
 				CommunicationUtil.updateSliver);
-			sliver = s;
+			sliver = newSliver;
+			
+			// Build up the args
 			op.addField("sliver_urn", sliver.urn.full);
 			op.addField("rspec", sliver.getRequestRspec(false).toXMLString());
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		

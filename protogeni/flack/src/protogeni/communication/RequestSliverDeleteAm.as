@@ -17,17 +17,25 @@ package protogeni.communication
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Releases all resources allocated to the sliver using the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverDeleteAm extends Request
 	{
 		public var sliver:Sliver;
 		
 		public function RequestSliverDeleteAm(s:Sliver):void
 		{
-			super("SliverDelete",
+			super("SliverDeleteAM",
 				"Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.deleteSliverAm);
 			ignoreReturnCode = true;
 			sliver = s;
+			
+			// Build up the args
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
 			op.setExactUrl(sliver.manager.Url);

@@ -19,9 +19,16 @@ package protogeni.communication
 	import flash.events.ErrorEvent;
 	
 	import protogeni.resources.IdnUrn;
+	import protogeni.resources.Key;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Allocates resources to a sliver using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverCreate extends Request
 	{
 		public var sliver:Sliver;
@@ -33,10 +40,17 @@ package protogeni.communication
 				CommunicationUtil.createSliver);
 			sliver = s;
 			s.created = false;
+			s.staged = false;
+			
+			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
 			op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
-			op.addField("keys", sliver.slice.creator.keys);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			var keys:Array = [];
+			for each(var key:Key in sliver.slice.creator.keys) {
+				keys.push({type:key.type, key:key.value});
+			}
+			op.addField("keys", keys);
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 			op.timeout = 360;
 		}
@@ -49,7 +63,6 @@ package protogeni.communication
 				var cred:XML = new XML(sliver.credential);
 				sliver.urn = new IdnUrn(cred.credential.target_urn);
 				sliver.created = true;
-				sliver.staged = false;
 				
 				sliver.rspec = new XML(response.value[1]);
 				sliver.parseRspec();

@@ -20,8 +20,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 <s:BorderContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
 				   xmlns:s="library://ns.adobe.com/flex/spark" 
 				   xmlns:mx="library://ns.adobe.com/flex/mx"
-				   width="100%" height="100%" backgroundColor="#F6F6F6" borderStyle="solid" borderColor="#CDC2C2"
-				   dragEnter="dragEnterHandler(event)"  dragDrop="dragDropHandler(event)"
+				   width="100%" height="100%"
+				   backgroundColor="#F6F6F6" borderStyle="solid" borderColor="#CDC2C2"
+				   dragEnter="dragEnterHandler(event)"
+				   dragDrop="dragDropHandler(event)"
 				   mouseMove="mouseMoveHandler(event)"
 				   mouseUp="mouseUpHandler(event)">
 	<fx:Script>
@@ -53,6 +55,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			private var edited:Boolean = false;
 			
+			/**
+			 * Loads a slice into the canvas
+			 */
 			public function load(newSlice:Slice):void
 			{
 				slice = newSlice.clone(false);
@@ -74,10 +79,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				edited = !slice.isCreated();
 			}
 			
+			/**
+			 * Makes sure everything is up to date, adding or removing new things, etc.
+			 */
 			public function refreshSlice():void
 			{
 				redrawAllLinks();
 				
+				// Don't draw a slice while it's being created, wait until the end
 				if(!slice.hasAllAllocatedResources() && !slice.isStaged())
 					return;
 				
@@ -152,6 +161,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				edited = !slice.isCreated();
 			}
 			
+			/**
+			 * Refreshes the canvas based on the slice's status
+			 */
 			public function refreshStatus():void
 			{
 				switch(this.slice.Status())
@@ -177,6 +189,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 			}
 			
+			/**
+			 * Allow the drag-drop if I know what the data being dragged is
+			 */
 			private  function dragEnterHandler(event:DragEvent):void {
 				var selectedNode:PhysicalNode = null;
 				if(event.dragInitiator is List && (event.dragInitiator as List).selectedItem is PhysicalNode)
@@ -196,6 +211,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 			}
 			
+			/**
+			 * Do the drag-drop action
+			 */
 			private function dragDropHandler(event:DragEvent):void {
 				// Handle dragging from lists
 				if(event.dragInitiator is List)
@@ -207,7 +225,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 							SliceCanvas(event.currentTarget).mouseY);
 						
 					} else if(List(event.dragInitiator).selectedItem is VirtualNode) {
-						addBasicVirtualNode(List(event.dragInitiator).selectedItem as VirtualNode,
+						addBasicCloneOfVirtualNode(List(event.dragInitiator).selectedItem as VirtualNode,
 							SliceCanvas(event.currentTarget).mouseX,
 							SliceCanvas(event.currentTarget).mouseY);
 					}
@@ -225,7 +243,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						SliceCanvas(event.currentTarget).mouseX,
 						SliceCanvas(event.currentTarget).mouseY);
 				} else if(event.dragSource.hasFormat("virtualnode")) {
-					addBasicVirtualNode(event.dragSource.dataForFormat('virtualnode') as VirtualNode,
+					addBasicCloneOfVirtualNode(event.dragSource.dataForFormat('virtualnode') as VirtualNode,
 						SliceCanvas(event.currentTarget).mouseX,
 						SliceCanvas(event.currentTarget).mouseY);
 				}
@@ -239,47 +257,56 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 			}
 			
-			public function removeVirtualNode(vn:VirtualNode):void
+			/**
+			 * Removes a virtual node
+			 */
+			public function removeVirtualNode(virtualNode:VirtualNode):void
 			{
 				for each(var sn:SliceNode in this.allNodes)
 				{
-					if(sn.node == vn)
+					if(sn.node == virtualNode)
 						removeSliceNode(sn);
 				}
 			}
 			
-			public function removeSliceNode(sn:SliceNode):void
+			/**
+			 * Removes a slice node
+			 */
+			public function removeSliceNode(sliceNode:SliceNode):void
 			{
 				// Remove subnodes
-				for each(var sub:VirtualNode in sn.node.subNodes.collection)
+				for each(var sub:VirtualNode in sliceNode.node.subNodes.collection)
 					removeVirtualNode(sub);
 				
 				// Remove links
-				while(sn.links.length > 0)
-					sn.links[0].removeLink();
+				while(sliceNode.links.length > 0)
+					sliceNode.links[0].removeLink();
 				
 				// Remove nodes and slivers
-				for each(var s:Sliver in sn.node.slivers.collection)
+				for each(var s:Sliver in sliceNode.node.slivers.collection)
 				{
-					if(s.nodes.contains(sn.node))
-						s.nodes.remove(sn.node);
+					if(s.nodes.contains(sliceNode.node))
+						s.nodes.remove(sliceNode.node);
 					if(s.nodes.length == 0 && slice.slivers.contains(s))
 						slice.slivers.remove(s);
 				}
 				
-				this.removeElement(sn);
-				allNodes.removeItemAt(allNodes.getItemIndex(sn));
+				this.removeElement(sliceNode);
+				allNodes.removeItemAt(allNodes.getItemIndex(sliceNode));
 				//hostWindow.loadNodes();
 				edited = true;
 			}
 			
-			public function addVirtualLinkToCanvas(vl:VirtualLink):SliceLink
+			/**
+			 * Adds a virtual link to the canvas.  Nodes from the link should already be added prior to this call.  This is the method to create links from outside SliceCanvas.
+			 */
+			public function addVirtualLinkToCanvas(virtualLink:VirtualLink):SliceLink
 			{
-				if(this.allLinks.containsVirtualLink(vl))
-					return this.allLinks.getForVirtualLink(vl);
+				if(this.allLinks.containsVirtualLink(virtualLink))
+					return this.allLinks.getForVirtualLink(virtualLink);
 				
 				var sl:SliceLink = new SliceLink(this);
-				sl.establishFromExisting(vl);
+				sl.establishFromExisting(virtualLink);
 				sl.drawEstablished();
 				this.addElement(sl);
 				validateNow();
@@ -288,93 +315,74 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				return sl;
 			}
 			
-			public function addVirtualNodeToCanvas(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode
+			/**
+			 * Creates a slice node for the virtual node and adds it to the canvas and resources.
+			 * 
+			 * If outside of SliceCanvas, use addVirtualNode.
+			 */
+			public function addVirtualNodeToCanvas(virtualNode:VirtualNode, x:int = -1, y:int = -1):SliceNode
 			{
-				if(allNodes.containsVirtualNode(vn))
-					return allNodes.getForVirtualNode(vn);
+				if(allNodes.containsVirtualNode(virtualNode))
+					return allNodes.getForVirtualNode(virtualNode);
 				
 				var sn:SliceNode = new SliceNode();
-				sn.setNode(vn);
+				sn.setNode(virtualNode);
 				addSliceNode(sn, x, y);
 				return sn;
 			}
 			
-			public function addBasicVirtualNode(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode {
-				var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(vn.manager));
-				nvn.Exclusive = vn.Exclusive;
-				nvn.isDelayNode = vn.isDelayNode;
+			/**
+			 * Adds a basic unbound node like the one given
+			 * 
+			 * If outside of SliceCanvas, use addVirtualNode.
+			 */
+			public function addBasicCloneOfVirtualNode(virtualNode:VirtualNode, x:int = -1, y:int = -1):SliceNode {
+				var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(virtualNode.manager));
+				nvn.Exclusive = virtualNode.Exclusive;
+				nvn.isDelayNode = virtualNode.isDelayNode;
 				nvn.clientId = slice.getUniqueVirtualNodeId(nvn);
 				return this.addVirtualNode(nvn, x, y);
 			}
 			
-			public function addVirtualNode(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode
+			/**
+			 * Does absolutely everything to add a virtual node.  This is what should be called outside of SliceCanvas.
+			 */
+			public function addVirtualNode(sliceNode:VirtualNode, x:int = -1, y:int = -1):SliceNode
 			{
 				// Don't duplicate
-				if(allNodes.containsVirtualNode(vn))
-					return allNodes.getForVirtualNode(vn);
+				if(allNodes.containsVirtualNode(sliceNode))
+					return allNodes.getForVirtualNode(sliceNode);
 				
-				var sn:SliceNode = addVirtualNodeToCanvas(vn, x, y);
+				var sn:SliceNode = addVirtualNodeToCanvas(sliceNode, x, y);
 				sn.node.flackUnbound = true;
-				if(!vn.slivers.collection[0].nodes.contains(vn))
-					vn.slivers.collection[0].nodes.add(vn);
+				if(!sliceNode.slivers.collection[0].nodes.contains(sliceNode))
+					sliceNode.slivers.collection[0].nodes.add(sliceNode);
 				
 				// See if we need to connect to a parent node
-				if(vn.superNode != null)
+				if(sliceNode.superNode != null)
 				{
-					if(!allNodes.containsVirtualNode(vn.superNode))
-						sn.node.superNode = addVirtualNode(vn.superNode, x + 40, y + 40).node;
+					if(!allNodes.containsVirtualNode(sliceNode.superNode))
+						sn.node.superNode = addVirtualNode(sliceNode.superNode, x + 40, y + 40).node;
 					else
-						sn.node.superNode = allNodes.getForVirtualNode(vn.superNode).node;
+						sn.node.superNode = allNodes.getForVirtualNode(sliceNode.superNode).node;
 					sn.node.superNode.subNodes.add(sn.node);
-				} else if(vn.physicalNode != null && vn.physicalNode.subNodeOf != null)
+				} else if(sliceNode.physicalNode != null && sliceNode.physicalNode.subNodeOf != null)
 				{
-					if(!allNodes.containsPhysicalNode(vn.physicalNode.subNodeOf))
-						sn.node.superNode = addPhysicalNode(vn.physicalNode.subNodeOf, x + 40, y + 40).node;
+					if(!allNodes.containsPhysicalNode(sliceNode.physicalNode.subNodeOf))
+						sn.node.superNode = addPhysicalNode(sliceNode.physicalNode.subNodeOf, x + 40, y + 40).node;
 					else
-						sn.node.superNode = allNodes.getForPhysicalNode(vn.physicalNode.subNodeOf).node;
+						sn.node.superNode = allNodes.getForPhysicalNode(sliceNode.physicalNode.subNodeOf).node;
 					sn.node.superNode.subNodes.add(sn.node);
 				}
 				
 				return sn;
 			}
 			
-			public function addPhysicalNodeToCanvas(pn:PhysicalNode, x:int = -1, y:int = -1):SliceNode
-			{
-				if(allNodes.containsPhysicalNode(pn))
-					return allNodes.getForPhysicalNode(pn);
-				
-				var sn:SliceNode = new SliceNode();
-				var newVirtualNode:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(pn.manager));
-				newVirtualNode.setToPhysicalNode(pn);
-				sn.setNode(newVirtualNode);
-				addSliceNode(sn, x, y);
-				return sn;
-			}
-			
-			public function addPhysicalNode(pn:PhysicalNode, x:int = -1, y:int = -1):SliceNode
-			{
-				// Don't duplicate
-				if(allNodes.containsPhysicalNode(pn))
-					return allNodes.getForPhysicalNode(pn);
-				
-				var sn:SliceNode = addPhysicalNodeToCanvas(pn, x, y);
-				sn.node.flackUnbound = false;
-				if(!sn.node.slivers.collection[0].nodes.contains(sn.node))
-					sn.node.slivers.collection[0].nodes.add(sn.node);
-				
-				// See if we need to connect to a parent node
-				if(pn.subNodeOf != null)
-				{
-					if(!allNodes.containsPhysicalNode(pn.subNodeOf))
-						sn.node.superNode = addPhysicalNode(pn.subNodeOf, x + 40, y + 40).node;
-					else
-						sn.node.superNode = allNodes.getForPhysicalNode(pn.subNodeOf).node;
-					sn.node.superNode.subNodes.add(sn.node);
-				}
-				edited = true;
-				return sn;
-			}
-			
+			/**
+			 * Adds a slice node to the canvas and resources.
+			 * 
+			 * If outside of SliceCanvas, use addPhysicalNode.
+			 */
 			public function addSliceNode(sn:SliceNode, x:int = -1, y:int = -1):void
 			{
 				if(allNodes.contains(sn))
@@ -393,12 +401,63 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				//	hostWindow.nodes.removeItemAt(hostWindow.nodes.getItemIndex(sn.node.physicalNode));
 			}
 			
+			/**
+			 * Creates a slice node for the physical node and adds it to the canvas and resources.
+			 * 
+			 * If outside of SliceCanvas, use addPhysicalNode.
+			 */
+			public function addPhysicalNodeToCanvas(physicalNode:PhysicalNode, x:int = -1, y:int = -1):SliceNode
+			{
+				if(allNodes.containsPhysicalNode(physicalNode))
+					return allNodes.getForPhysicalNode(physicalNode);
+				
+				var sn:SliceNode = new SliceNode();
+				var newVirtualNode:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(physicalNode.manager));
+				newVirtualNode.setToPhysicalNode(physicalNode);
+				sn.setNode(newVirtualNode);
+				addSliceNode(sn, x, y);
+				return sn;
+			}
+			
+			/**
+			 * Does absolutely everything to add a physical node.  This is what should be called outside of SliceCanvas.
+			 */
+			public function addPhysicalNode(pn:PhysicalNode, x:int = -1, y:int = -1):SliceNode
+			{
+				// Don't duplicate
+				if(allNodes.containsPhysicalNode(pn))
+					return allNodes.getForPhysicalNode(pn);
+				
+				var physicalNode:SliceNode = addPhysicalNodeToCanvas(pn, x, y);
+				physicalNode.node.flackUnbound = false;
+				if(!physicalNode.node.slivers.collection[0].nodes.contains(physicalNode.node))
+					physicalNode.node.slivers.collection[0].nodes.add(physicalNode.node);
+				
+				// See if we need to connect to a parent node
+				if(pn.subNodeOf != null)
+				{
+					if(!allNodes.containsPhysicalNode(pn.subNodeOf))
+						physicalNode.node.superNode = addPhysicalNode(pn.subNodeOf, x + 40, y + 40).node;
+					else
+						physicalNode.node.superNode = allNodes.getForPhysicalNode(pn.subNodeOf).node;
+					physicalNode.node.superNode.subNodes.add(physicalNode.node);
+				}
+				edited = true;
+				return physicalNode;
+			}
+			
+			/**
+			 * Start a temporary link which will become real if the user finishes linking
+			 */
 			public function startLinkingFrom(node:SliceNode):void
 			{
 				startNode = node;
 				tempLink = new SliceLink(this);
 			}
 			
+			/**
+			 * See if we are doing anything while the mouse is down and moving
+			 */
 			protected function mouseMoveHandler(event:MouseEvent):void
 			{
 				if(startNode != null)
@@ -427,6 +486,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					removeElement(tempLink);
 			}
 			
+			/**
+			 * Once the mouse button is unclicked, see if we need to do anything
+			 */
 			protected function mouseUpHandler(event:MouseEvent):void
 			{
 				// Add link if needed
@@ -447,11 +509,17 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				redrawAllLinks();
 			}
 			
+			/**
+			 * Remove all of the resources
+			 */
 			public function clear():void {
 				while(this.allNodes.length > 0)
 					this.removeSliceNode(this.allNodes.getItemAt(0) as SliceNode);
 			}
 			
+			/**
+			 * Has the user changed anything?
+			 */
 			public function isEdited():Boolean {
 				if(edited) {
 					return slice.isCreated() || this.allNodes.length > 0;
@@ -460,6 +528,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			// RAW CHILDREN FUNCTIONS
+			
+			/**
+			 * Draws all links and sends to back so that nodes are on top
+			 */
 			public function redrawAllLinks():void
 			{
 				for each(var sl:SliceLink in allLinks)

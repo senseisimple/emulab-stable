@@ -33,6 +33,12 @@ package protogeni.resources
 			Main.geniDispatcher.dispatchGeniManagersChanged();
 		}
 		
+		public function addAt(gm:GeniManager, index:int):void
+		{
+			this.addItemAt(gm, index);
+			Main.geniDispatcher.dispatchGeniManagersChanged();
+		}
+		
 		public function clear():void
 		{
 			for each(var gm:GeniManager in this)
@@ -42,9 +48,11 @@ package protogeni.resources
 		
 		public function getByUrn(urn:String):GeniManager
 		{
+			var idnUrn:IdnUrn = new IdnUrn(urn);
 			for each(var gm:GeniManager in this)
 			{
-				if(gm.Urn.full == urn)
+				// PlanetLab
+				if(gm.Urn.authority == idnUrn.authority)
 					return gm;
 			}
 			return null;

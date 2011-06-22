@@ -20,9 +20,15 @@ package protogeni.resources
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
 	
-	import protogeni.communication.RequestResolvePl;
+	import protogeni.communication.RequestResolvePlSites;
 	import protogeni.communication.RequestSitesLocation;
 	
+	/**
+	 * Processes SFA RSPECs for PlanetLab managers
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class PlanetlabRspecProcessor implements RspecProcessorInterface
 	{
 		public var callGetSites:Boolean = true;
@@ -90,13 +96,13 @@ package protogeni.resources
 				Main.geniDispatcher.dispatchGeniManagerChanged(manager); // not 'populated' until sites are resolved
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				
-				if(callGetSites) {
+				/*if(callGetSites) {
 					var r:RequestSitesLocation = new RequestSitesLocation(manager);
 					r.forceNext = true;
 					//var r:RequestResolvePl = new RequestResolvePl(manager);
 					//r.forceNext = true;
 					Main.geniHandler.requestHandler.pushRequest(r);
-				}
+				}*/
 				
 				if(this.myAfter != null)
 					myAfter(this.manager);
@@ -115,30 +121,36 @@ package protogeni.resources
 			var startTime:Date = new Date();
 			
 			while(myIndex < sites.length()) {
-				var s:XML = sites[myIndex];
-				var site:Site = new Site();
-				site.id = s.@id;
-				site.name = s.child("name")[0].toString();
-				site.hrn = manager.networkName + "." + site.id;
-				manager.sites.push(site);
-				for each(var p:XML in s.child("node")) {
-					var node:PhysicalNode = new PhysicalNode(null, manager);
-					node.name = p.@id;
-					for each(var tx:XML in p.children()) {
-						switch(tx.localName()) {
-							case "urn":
-								node.id = tx.toString();
-								break;
-							default:
+				try {
+					var s:XML = sites[myIndex];
+					var site:Site = new Site();
+					site.id = s.@id;
+					site.name = s.child("name")[0].toString();
+					site.hrn = manager.networkName + "." + site.id;
+					manager.sites.push(site);
+					for each(var p:XML in s.child("node")) {
+						var node:PhysicalNode = new PhysicalNode(null, manager);
+						node.name = p.@id;
+						for each(var tx:XML in p.children()) {
+							switch(tx.localName()) {
+								case "urn":
+									node.id = tx.toString();
+									break;
+								default:
+							}
 						}
+						node.rspec = p.copy();
+						node.tag = site;
+						node.available = true;
+						node.exclusive = false;
+						idx++;
+						manager.AllNodes.push(node);
+						site.nodes.push(node);
 					}
-					node.rspec = p.copy();
-					node.tag = site;
-					node.available = true;
-					node.exclusive = false;
-					idx++;
-					manager.AllNodes.push(node);
-					site.nodes.push(node);
+				} catch(e:Error) {
+					// skip if some problem
+					if(Main.debugMode)
+						trace("Skipped node which threw error in manager named " + manager.Hrn);
 				}
 				myIndex++;
 				if(((new Date()).time - startTime.time) > 40) {
@@ -154,9 +166,20 @@ package protogeni.resources
 		
 		public function processSliverRspec(s:Sliver):void
 		{
+			/*var networkXml:XMLList = s.rspec.children();
+			for each(var siteXml:XML in networkXml[0].children()) {
+				for each(var nodeXml:XML in siteXml.child("node")) {
+					if(nodeXml.child("sliver").length() > 0) {
+						var virtualNode:VirtualNode = new VirtualNode(s);
+						virtualNode.rspec = nodeXml;
+						virtualNode.setToPhysicalNode(manager.Nodes.GetByName(nodeXml.@id));
+						s.nodes.add(virtualNode);
+					}
+				}
+			}*/
 		}
 		
-		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean):XML
+		public function generateSliverRspec(s:Sliver, removeNonexplicitBinding:Boolean, overrideRspecVersion:Number):XML
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?><RSpec type=\"SFA\" />");
 			var networkXml:XML = new XML("<network name=\""+manager.networkName+"\" />");

@@ -20,6 +20,12 @@ package protogeni.resources
 	import com.google.maps.services.Placemark;
 	
 	// Group of physical nodes located in one area
+	/**
+	 * Group of resources optionally located at the same coordinates.
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class PhysicalNodeGroup
 	{
 		public var owner:PhysicalNodeGroupCollection = null;

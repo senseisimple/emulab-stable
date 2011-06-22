@@ -12,15 +12,16 @@
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
  
- /* Common.as
- 
-    Functions used all around the project
-*/
- 
  package protogeni.display
 {
 	import spark.primitives.BitmapImage;
 
+	/**
+	 * Common images/functions used for icons around the library
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class ImageUtil
 	{
 		public static function getBitmapImageFor(img:Class):BitmapImage {

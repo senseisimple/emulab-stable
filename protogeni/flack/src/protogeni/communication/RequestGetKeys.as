@@ -14,6 +14,14 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Key;
+
+	/**
+	 * Gets the user's keys which can be used to put keys onto allocated resources later. Uses the ProtoGENI API.
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestGetKeys extends Request
 	{
 		public function RequestGetKeys():void
@@ -21,12 +29,17 @@ package protogeni.communication
 			super("GetKeys",
 				"Getting the ssh credential",
 				CommunicationUtil.getKeys);
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
+		/**
+		 * Called immediately before the operation is run to add variables it may not have had when added to the queue
+		 * @return Operation to be run
+		 * 
+		 */
 		override public function start():Operation
 		{
-			op.addField("credential",Main.geniHandler.CurrentUser.credential);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.addField("credential",Main.geniHandler.CurrentUser.Credential);
 			return op;
 		}
 		
@@ -34,7 +47,11 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				Main.geniHandler.CurrentUser.keys = response.value;
+				Main.geniHandler.CurrentUser.keys = new Vector.<Key>();
+				for each(var keyObject:Object in response.value) {
+					Main.geniHandler.CurrentUser.keys.push(new Key(keyObject.key, keyObject.type));
+				}
+				
 				Main.geniDispatcher.dispatchUserChanged();
 			}
 			else

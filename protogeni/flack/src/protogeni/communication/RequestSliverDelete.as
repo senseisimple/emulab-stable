@@ -17,6 +17,12 @@ package protogeni.communication
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Releases all resources in a sliver using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverDelete extends Request
 	{
 		public var sliver:Sliver;
@@ -27,8 +33,10 @@ package protogeni.communication
 				"Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.deleteSlice);
 			sliver = s;
+			
+			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		

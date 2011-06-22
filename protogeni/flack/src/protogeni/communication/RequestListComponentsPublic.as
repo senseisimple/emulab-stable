@@ -19,6 +19,12 @@ package protogeni.communication
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	
+	/**
+	 * Gets the list of managers for an unauthenticated user
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestListComponentsPublic extends Request
 	{
 		public function RequestListComponentsPublic():void

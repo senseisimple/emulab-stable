@@ -23,8 +23,11 @@ package protogeni.display.mapping {
 	import flash.text.TextFormat;
 	
 	import mx.core.FlexGlobals;
-	
-	// Box with text to show as an overlay on Google Maps API for Flash
+
+	/**
+	 * Box with text to show as an overlay on Google Maps API for Flash
+	 * 
+	 */
 	public class TooltipOverlay extends OverlayBase {
 		
 		private var latLng:LatLng;

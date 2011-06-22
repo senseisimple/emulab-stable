@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Interface for processing any type of RSPEC
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public interface RspecProcessorInterface
 	{
 		// Process
@@ -22,6 +28,7 @@ package protogeni.resources
 		
 		// Generate
 		function generateSliverRspec(s:Sliver,
-									 removeNonexplicitBinding:Boolean):XML;
+									 removeNonexplicitBinding:Boolean,
+									 overrideRspecVersion:Number):XML;
 	}
 }

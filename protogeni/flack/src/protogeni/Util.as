@@ -16,9 +16,17 @@ package protogeni
 {
 	import mx.collections.ArrayCollection;
 	
+	/**
+	 * Various common values/functions used throughout the library
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class Util
 	{
 		public static const defaultRspecVersion:Number = 2;
+		[Bindable]
+		public static var usableRspecVersions:ArrayCollection = new ArrayCollection([0.1, 0.2, 2]);
 		
 		// Takes the given bandwidth and creates a human readable string
 		public static function kbsToString(bandwidth:Number):String {

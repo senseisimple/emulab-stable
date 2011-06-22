@@ -16,6 +16,12 @@ package protogeni.communication
 {
 	import protogeni.resources.IdnUrn;
 	
+	/**
+	 * Gets the user's credential from their slice authority using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestGetCredential extends Request
 	{
 		public function RequestGetCredential():void
@@ -23,14 +29,18 @@ package protogeni.communication
 			super("GetCredential",
 				"Getting the basic user credential",
 				CommunicationUtil.getCredential);
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
+		}
+		
+		override public function start():Operation {
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
+			return op;
 		}
 		
 		override public function complete(code:Number, response:Object):*
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				Main.geniHandler.CurrentUser.credential = String(response.value);
+				Main.geniHandler.CurrentUser.userCredential = String(response.value);
 				var cred:XML = new XML(response.value);
 				Main.geniHandler.CurrentUser.urn = new IdnUrn(cred.credential.owner_urn);
 				Main.geniDispatcher.dispatchUserChanged();

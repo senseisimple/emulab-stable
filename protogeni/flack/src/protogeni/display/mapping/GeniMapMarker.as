@@ -35,6 +35,12 @@ package protogeni.display.mapping
 	import protogeni.resources.Slice;
 	import protogeni.resources.VirtualNode;
 	
+	/**
+	 * Marker to be used for GENI resources on Google Maps
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class GeniMapMarker extends Marker
 	{
 		public function GeniMapMarker(o:*)

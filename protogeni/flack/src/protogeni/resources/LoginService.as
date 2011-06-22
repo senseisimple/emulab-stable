@@ -14,6 +14,12 @@
 
 package protogeni.resources
 {
+	/**
+	 * Login available to the user
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class LoginService
 	{
 		public var authentication:String;

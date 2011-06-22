@@ -20,11 +20,17 @@ package protogeni.communication
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.Site;
 	
+	/**
+	 * Gets the cached PLC site location info
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSitesLocation extends Request
 	{
 		private var planetLabManager:PlanetlabAggregateManager;
 		
-		public function RequestSitesLocation(newPlm:PlanetlabAggregateManager):void
+		public function RequestSitesLocation(newPlanetLabManager:PlanetlabAggregateManager):void
 		{
 			super("SitesLocation",
 				"Getting Planetlab location info",
@@ -32,10 +38,9 @@ package protogeni.communication
 				true,
 				true,
 				true);
-			planetLabManager = newPlm;
+			planetLabManager = newPlanetLabManager;
 			op.setExactUrl("https://www.emulab.net/protogeni/planetlab-sites.xml");
 			op.type = Operation.HTTP;
-			planetLabManager.lastRequest = this;
 		}
 		
 		override public function complete(code:Number, response:Object):*

@@ -14,11 +14,19 @@
 
 package protogeni.resources
 {
+	import mx.collections.ArrayCollection;
+	
 	import protogeni.Util;
 	import protogeni.XmlUtil;
 	import protogeni.communication.Request;
 	import protogeni.display.ColorUtil;
 	
+	/**
+	 * Manager within the GENI world
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class GeniManager
 	{
 		public static const STATUS_UNKOWN:int = 0;
@@ -45,6 +53,20 @@ package protogeni.resources
 		public var Version:int;
 		
 		[Bindable]
+		public var outputRspecVersion:Number;
+		[Bindable]
+		public var inputRspecVersion:Number;
+		
+		[Bindable]
+		public var outputRspecDefaultVersion:Number;
+		
+		public var inputRspecVersions:Vector.<Number>;
+		public var outputRspecVersions:Vector.<Number>;
+		
+		public var generated:Date;
+		public var expires:Date;
+		
+		[Bindable]
 		public var errorMessage:String = "";
 		public var errorDescription:String = "";
 		
@@ -63,10 +85,14 @@ package protogeni.resources
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();
 		
 		public var AllNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
+		[Bindable]
+		public var DiskImages:ArrayCollection = new ArrayCollection();
 		
 		public var colorIdx:int;
 		
 		public var data:*;
+		
+		public var isAm:Boolean = false;
 		
 		public function AllNodesAsArray():Array {
 			var allNodesArray:Array = new Array();
@@ -128,8 +154,6 @@ package protogeni.resources
 		
 		public var rspecProcessor:RspecProcessorInterface;
 		
-		public var lastRequest:Request;
-		
 		public var type:int;
 		
 		public function GeniManager()
@@ -179,6 +203,7 @@ package protogeni.resources
 			Links = new PhysicalLinkGroupCollection();
 			AllNodes = new Vector.<PhysicalNode>();
 			AllLinks = new Vector.<PhysicalLink>();
+			DiskImages = new ArrayCollection();
 		}
 		
 		public function getGraphML():String {

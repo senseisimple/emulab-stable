@@ -27,24 +27,32 @@ package protogeni.communication
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.Site;
 	
-	public final class RequestResolvePl extends Request
+	/**
+	 * Gets additional information for PlanetLab sites like location
+	 * 
+	 * @author mstrum
+	 * 
+	 */
+	public final class RequestResolvePlSites extends Request
 	{
 		private var planetLabManager:PlanetlabAggregateManager;
 		
-		public function RequestResolvePl(newPlm:PlanetlabAggregateManager):void
+		public function RequestResolvePlSites(newPlanetLabManager:PlanetlabAggregateManager):void
 		{
-			super("Resolve (" + StringUtil.shortenString(newPlm.registryUrl, 15) + ")",
-				"Resolving resources for " + newPlm.registryUrl,
+			super("Resolve (" + StringUtil.shortenString(newPlanetLabManager.registryUrl, 15) + ")",
+				"Resolving resources for " + newPlanetLabManager.registryUrl,
 				CommunicationUtil.resolvePl,
 				true, true, false);
 			this.ignoreReturnCode = true;
 			op.timeout = 600;
-			planetLabManager = newPlm;
+			planetLabManager = newPlanetLabManager;
+			
+			// Build up the args
 			var a:ArrayList = new ArrayList();
 			for each(var s:Site in planetLabManager.sites)
 				a.addItem("plc." + s.id);
 			op.pushField(a.source);
-			op.pushField([Main.geniHandler.CurrentUser.credential]);	// credentials
+			op.pushField([Main.geniHandler.CurrentUser.Credential]);	// credentials
 			op.setExactUrl(planetLabManager.registryUrl);
 			planetLabManager.lastRequest = this;
 		}

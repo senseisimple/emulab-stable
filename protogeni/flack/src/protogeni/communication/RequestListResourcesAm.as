@@ -24,26 +24,40 @@ package protogeni.communication
 	import protogeni.StringUtil;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
+	import protogeni.resources.PlanetlabRspecProcessor;
+	import protogeni.resources.ProtogeniRspecProcessor;
 	
+	/**
+	 * Gets the manager's advertisement using the GENI AM API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestListResourcesAm extends Request
 	{
-		private var aggregateManager:AggregateManager;
+		private var aggregateManager:GeniManager;
 		
-		public function RequestListResourcesAm(newAm:AggregateManager):void
+		public function RequestListResourcesAm(newManager:GeniManager):void
 		{
-			super("ListResourcesAm (" + StringUtil.shortenString(newAm.Url, 15) + ")",
-				"Listing resources for " + newAm.Url,
+			super("ListResourcesAm (" + StringUtil.shortenString(newManager.Url, 15) + ")",
+				"Listing resources for " + newManager.Url,
 				CommunicationUtil.listResourcesAm,
 				true,
 				true,
 				false);
 			ignoreReturnCode = true;
 			op.timeout = 60;
-			aggregateManager = newAm;
-			op.pushField([Main.geniHandler.CurrentUser.credential]);
-			op.pushField({geni_available:false, geni_compressed:true});	// geni_available:false = show all, true = show only available
-			op.setExactUrl(newAm.Url);
-			aggregateManager.lastRequest = this;
+			aggregateManager = newManager;
+
+			// Build up the args
+			var options:Object = {geni_available:false, geni_compressed:true};
+			if(aggregateManager.rspecProcessor is ProtogeniRspecProcessor)
+				options.rspec_version = "ProtoGENI " + aggregateManager.outputRspecVersion
+					
+			op.pushField([Main.geniHandler.CurrentUser.Credential]);
+			op.pushField(options);	
+			op.setExactUrl(newManager.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*

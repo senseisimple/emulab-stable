@@ -16,6 +16,12 @@ package protogeni.communication
 {
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * Restarts a sliver using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliverRestart extends Request
 	{
 		public var sliver:Sliver;
@@ -26,8 +32,10 @@ package protogeni.communication
 				"Restarting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.restartSliver);
 			sliver = s;
+			
+			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		

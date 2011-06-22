@@ -95,11 +95,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	
 	<fx:Script>
 		<![CDATA[
+			import com.hurlant.util.der.DER;
+			import com.mstrum.Asn1Field;
+			import com.mstrum.DER;
+			import com.mstrum.Oids;
+			
 			import mx.controls.Alert;
+			import mx.utils.Base64Decoder;
 			
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.communication.RequestGeniBundle;
+			import protogeni.communication.RequestListAuthoritiesPublic;
 			import protogeni.communication.RequestRootBundle;
 			import protogeni.display.DisplayUtil;
 			import protogeni.display.ImageUtil;
@@ -124,8 +131,34 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Security.allowDomain("*");
 				Security.allowInsecureDomain("*");
 				Security.allowDomain("localhost");	
-				
+
 				ParamHandler.preload();
+				
+				/*var cert:String = "MIIDUzCCArygAwIBAgIDAMy1MA0GCSqGSIb3DQEBBAUAMIG4MQswCQYDVQQGEwJV"+
+									"UzENMAsGA1UECBMEVXRhaDEXMBUGA1UEBxMOU2FsdCBMYWtlIENpdHkxHTAbBgNV"+
+									"BAoTFFV0YWggTmV0d29yayBUZXN0YmVkMR4wHAYDVQQLExVDZXJ0aWZpY2F0ZSBB"+
+									"dXRob3JpdHkxGDAWBgNVBAMTD2Jvc3MuZW11bGFiLm5ldDEoMCYGCSqGSIb3DQEJ"+
+									"ARYZdGVzdGJlZC1vcHNAZmx1eC51dGFoLmVkdTAeFw0xMTAzMDgxOTI5MzhaFw0x"+
+									"MjAzMDcxOTI5MzhaMIGoMQswCQYDVQQGEwJVUzENMAsGA1UECBMEVXRhaDEdMBsG"+
+									"A1UEChMUVXRhaCBOZXR3b3JrIFRlc3RiZWQxGjAYBgNVBAsTEXV0YWhlbXVsYWIu"+
+									"bXN0cnVtMS0wKwYDVQQDEyQ2NmYzYjMyZS05NjY2LTExZGUtOWJlMy0wMDExNDNl"+
+									"NDUzZmUxIDAeBgkqhkiG9w0BCQEWEW1zdHJ1bUBlbXVsYWIubmV0MIGfMA0GCSqG"+
+									"SIb3DQEBAQUAA4GNADCBiQKBgQDsh3vxJVpK9YGGjlGiyvVRcpahnlSp9UuVt9bt"+
+									"LDlPQwOKN06ApiJabUZs/IwGJKAQWT+AyRu1BtCcLpciNxDrNmrGEfgWyFmrRo8P"+
+									"pHNtMpQPiMAobjlHLewRobZpgNnIDlUI+WB1+nl9n8yTLCYpuioy3VIlbxnbeY0T"+
+									"MWtSdQIDAQABo3kwdzAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBSRbkYr8MLl"+
+									"tuwpeGLqGKQIU3irDjBFBgNVHREEPjA8hid1cm46cHVibGljaWQ6SUROK2VtdWxh"+
+									"Yi5uZXQrdXNlcittc3RydW2BEW1zdHJ1bUBlbXVsYWIubmV0MA0GCSqGSIb3DQEB"+
+									"BAUAA4GBAKeZfFmXnoH9LJd4C3AuIFEWiAE/RO1UW+Z9a5MvDlf0ymKrfWdWUW1t"+
+									"LQYUOVbhGRFMPb2Y8XFlaUsIEpfrIGVaqyx2Pgci/irgauojtIelqA0o5ddLf9lN"+
+									"HVz9fwpQu3J7/n3qCa6K8nw2rt2aAZspi8Xgt+dA43LiMZKKVS8w";
+				var decoder:Base64Decoder = new Base64Decoder();
+				decoder.decode(cert);
+				var ba:ByteArray = decoder.toByteArray();
+				//var s:* = com.hurlant.util.der.DER.parse(ba);
+				var d:Asn1Field = com.mstrum.DER.Parse(ba);
+				var val:Asn1Field = d.getHolderFor(Oids.SUBJECT_ALT_NAME);
+				val = val;*/
 			}
 			
 			private function init():void {
@@ -134,6 +167,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
 				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				Main.geniDispatcher.addEventListener(GeniEvent.QUEUE_CHANGED, queueChanged);
 				
 				// Default behavior (public)
 				allowAuthenticate = true;
@@ -154,6 +188,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
 					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
 				}
+				Main.geniHandler.requestHandler.pushRequest(new RequestListAuthoritiesPublic());
 				
 				// Always show the start options
 				var startOptions:StartOptionsWindow = new StartOptionsWindow();
@@ -206,17 +241,20 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			public function userChanged(pe:GeniEvent):void {
-				if(Main.geniHandler.CurrentUser == null
-					|| Main.geniHandler.CurrentUser.credential == null
-					|| Main.geniHandler.CurrentUser.credential.length == 0)
+				if(Main.geniHandler.unauthenticatedMode &&
+					(Main.geniHandler.CurrentUser == null
+					|| Main.geniHandler.CurrentUser.Credential.length == 0))
 				{
 					this.userButton.setStyle("icon", ImageUtil.noUserIcon);
-					this.userButton.toolTip = "Authenticate";
-					this.userButton.label = "Authenticate";
+					this.userButton.toolTip = "Log in";
+					this.userButton.label = "Log in";
 				} else {
 					this.userButton.setStyle("icon", ImageUtil.userIcon);
 					this.userButton.toolTip = "View user information"
-					this.userButton.label = Main.geniHandler.CurrentUser.uid;
+					if(Main.geniHandler.CurrentUser != null)
+						this.userButton.label = Main.geniHandler.CurrentUser.uid;
+					else
+						this.userButton.label = "";
 				}
 			}
 			
@@ -264,20 +302,31 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				//Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
-			public function setStatus(s:String, isError:Boolean):void
-			{
+			public function queueChanged(event:GeniEvent):void {
 				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
+				var workingCount:int = Main.geniHandler.requestHandler.queue.workingCount();
+				var waitingCount:int = Main.geniHandler.requestHandler.queue.waitingCount();
 				spinner.visible = isWorking;
 				if(isWorking)
 					spinner.startSpin();
 				else
 					spinner.stopSpin();
-				progressLabel.text = s;
-				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
-					waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
+				if(isWorking && workingCount > 1)
+					waitingCountLabel.text = workingCount + " active";
 				else
 					waitingCountLabel.text = "";
-				if(isWorking)
+				if(waitingCount > 0) {
+					if(waitingCountLabel.text.length > 0)
+						waitingCountLabel.text += ", ";
+					waitingCountLabel.text += waitingCount + " waiting";
+				}
+			}
+			
+			public function setStatus(s:String, isError:Boolean):void
+			{
+				progressLabel.text = s;
+				
+				if(Main.geniHandler.requestHandler.queue.working())
 					progressLabel.styleName = "inprogressStyle";
 				else if(isError)
 					progressLabel.styleName = "failedStyle";
@@ -297,8 +346,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 								toolTip="Console"/>
 		<s:Button icon="{ImageUtil.noUserIcon}"
 				  click="loadUser()"
-				  visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
-				  toolTip="Log in to get user-only features" label="Log in" styleName="unauthenticatedStyle"
+				  visible="{allowAuthenticate}"
+				  includeInLayout="{allowAuthenticate}"
+				  toolTip="Log in to get user-only features"
+				  label="Log in"
+				  styleName="unauthenticatedStyle"
 				  id="userButton" height="24" />
 		<s:Rect percentWidth="100" />
 		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>

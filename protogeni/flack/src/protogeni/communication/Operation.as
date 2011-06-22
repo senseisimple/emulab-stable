@@ -27,6 +27,12 @@ package protogeni.communication
 	
 	import protogeni.NetUtil;
 	
+	/**
+	 * Handles XML-RPC or HTTP calls for requests
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public class Operation
 	{
 		public static const XMLRPC:int = 0;

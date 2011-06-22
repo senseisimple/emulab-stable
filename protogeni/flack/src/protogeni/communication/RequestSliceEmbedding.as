@@ -18,6 +18,11 @@ package protogeni.communication
 	
 	import protogeni.resources.Sliver;
 	
+	/**
+	 * NOT WORKING. Binds unbound resources using the slice embedding service.  Uses the ProtoGENI API.
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestSliceEmbedding extends Request
 	{
 		public var sliver:Sliver;
@@ -34,7 +39,8 @@ package protogeni.communication
 			encoder.encode(sliver.manager.Rspec.toXMLString());
 			var encodedRspec:String = encoder.toString();
 			
-			op.addField("credential", newSliver.slice.creator.credential);
+			// Build up the args
+			op.addField("credential", newSliver.slice.creator.Credential);
 			op.addField("advertisement", encodedRspec);
 			op.addField("request", sliver.getRequestRspec(true));
 			op.setUrl(CommunicationUtil.sesUrl);

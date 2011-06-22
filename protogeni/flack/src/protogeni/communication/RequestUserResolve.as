@@ -16,7 +16,14 @@ package protogeni.communication
 {
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Slice;
+	import protogeni.resources.SliceCollection;
 	
+	/**
+	 * Gets the user information and list of slices from the user's slice authority using the ProtoGENI API
+	 * 
+	 * @author mstrum
+	 * 
+	 */
 	public final class RequestUserResolve extends Request
 	{
 		public function RequestUserResolve():void
@@ -24,13 +31,19 @@ package protogeni.communication
 			super("UserResolve",
 				"Resolve user",
 				CommunicationUtil.resolve);
-			op.addField("type", "User");
-			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
+		/**
+		 * Called immediately before the operation is run to add variables it may not have had when added to the queue
+		 * @return Operation to be run
+		 * 
+		 */
 		override public function start():Operation
 		{
-			op.addField("credential", Main.geniHandler.CurrentUser.credential);
+			// Build up the args
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
+			op.addField("type", "User");
+			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
 			op.addField("hrn", Main.geniHandler.CurrentUser.urn.full);
 			return op;
 		}
@@ -40,6 +53,9 @@ package protogeni.communication
 			var newCalls:RequestQueue = new RequestQueue();
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
+				// XXX needs to delete any external links to these...
+				Main.geniHandler.CurrentUser.slices = new SliceCollection();
+				
 				Main.geniHandler.CurrentUser.uid = response.value.uid;
 				Main.geniHandler.CurrentUser.hrn = response.value.hrn;
 				Main.geniHandler.CurrentUser.email = response.value.email;
