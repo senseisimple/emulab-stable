@@ -969,7 +969,11 @@ sub opModeTransition($$;$) {
     $mode     = $nodes{$node}{mode};
 
     if (defined($modeTrans{"$mode:$oldstate"}) || $force) {
-	if (!$force) {
+	#
+	# If there is a next state associated with mode:oldstate, use it.
+	# Otherwise we just remain in the old state.
+	#
+	if (defined($modeTrans{"$mode:$oldstate"})) {
 	    debug("Mode Transition check:\n");
 	    my $translist = join(",",@{$modeTrans{"$mode:$oldstate"}});
 	    #debug("translist=$translist\n");
@@ -981,7 +985,10 @@ sub opModeTransition($$;$) {
 	    }
 	    if (defined($trans{$newmode})) {
 		$nextstate=$trans{$newmode};
-	    } else {
+		if ($force) {
+		    info("$node: opMode force changing state along with mode\n");
+		}
+	    } elsif (!$force) {
 		notify("Invalid mode transition for $node from ".
 		       "$mode/$oldstate to $newmode!\n");
 	    }
