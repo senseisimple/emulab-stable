@@ -252,6 +252,7 @@ package protogeni.resources
 				newSliver.state = sliver.state;
 				newSliver.status = sliver.status;
 				newSliver.expires = sliver.expires;
+				newSliver.extensionNamespaces = sliver.extensionNamespaces;
 				
 				newSlice.slivers.add(newSliver);
 			}
@@ -304,6 +305,7 @@ package protogeni.resources
 					newNode.flackX = node.flackX;
 					newNode.flackY = node.flackY;
 					newNode.flackUnbound = node.flackUnbound;
+					newNode.extensionsNodes = node.extensionsNodes;
 					// depreciated
 					newNode.virtualizationType = node.virtualizationType;
 					newNode.virtualizationSubtype = node.virtualizationSubtype;

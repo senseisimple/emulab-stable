@@ -14,6 +14,8 @@
 
 package protogeni.resources
 {
+	import mx.collections.XMLListCollection;
+
 	/**
 	 * Resource within a slice
 	 * 
@@ -84,6 +86,10 @@ package protogeni.resources
 				Exclusive = this.Exclusive;
 			}
 		}
+		
+		// Extensions
+		public var extensionsString:String = "";
+		public var extensionsNodes:XMLListCollection = new XMLListCollection();
 		
 		// Depreciated
 		public var virtualizationType:String = "emulab-vnode";

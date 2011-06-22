@@ -497,7 +497,9 @@ package protogeni.resources
 						if(cmNode == null)
 							continue;
 						virtualNode.setToPhysicalNode(cmNode);
-					}
+						virtualNode.flackUnbound = false;
+					} else
+						virtualNode.flackUnbound = true;
 				}
 				else
 				{
@@ -558,11 +560,19 @@ package protogeni.resources
 									virtualInterface.id = String(nodeChildXml.@virtual_id);
 								} else {
 									virtualInterface.id = String(nodeChildXml.@client_id);
+									if(nodeChildXml.@component_id.length() == 1)
+										virtualInterface.componentId = String(nodeChildXml.@component_id);
+									if(nodeChildXml.@sliver_id.length() == 1)
+										virtualInterface.sliverId = new IdnUrn(String(nodeChildXml.@sliver_id));
+									if(nodeChildXml.@mac_address.length() == 1)
+										virtualInterface.macAddress = String(nodeChildXml.@mac_address);
+									
 									for each(var ipXml:XML in nodeChildXml.children()) {
 										if(ipXml.localName() == "ip") {
 											virtualInterface.ip = String(ipXml.@address);
-											virtualInterface.mask = String(ipXml.@mask);
 											virtualInterface.type = String(ipXml.@type);
+											if(ipXml.@mask.length() == 1)
+												virtualInterface.mask = String(ipXml.@mask);
 										}
 									}
 									if(virtualNode.physicalNode != null)
@@ -602,12 +612,19 @@ package protogeni.resources
 						}
 					}
 					// Extension stuff
-					else if(nodeChildXml.namespace() == XmlUtil.flackNamespace)
-					{
-						virtualNode.flackX = int(nodeChildXml.@x);
-						virtualNode.flackY = int(nodeChildXml.@y);
-						if(nodeChildXml.@unbound.length() == 1)
-							virtualNode.flackUnbound = String(nodeChildXml.@unbound) == "true" || String(nodeChildXml.@unbound) == "1";
+					else {
+						if(nodeChildXml.namespace() == XmlUtil.flackNamespace)
+						{
+							virtualNode.flackX = int(nodeChildXml.@x);
+							virtualNode.flackY = int(nodeChildXml.@y);
+							if(nodeChildXml.@unbound.length() == 1)
+								virtualNode.flackUnbound = String(nodeChildXml.@unbound) == "true" || String(nodeChildXml.@unbound) == "1";
+						} else {
+							// Preserve extensions
+							if(s.extensionNamespaces.indexOf(nodeChildXml.namespace()) == -1)
+								s.extensionNamespaces.push(nodeChildXml.namespace());
+							virtualNode.extensionsNodes.addItem(nodeChildXml);
+						}
 					}
 				}
 				
@@ -647,7 +664,8 @@ package protogeni.resources
 				} else {
 					virtualLink.clientId = String(linkXml.@client_id);
 					virtualLink.sliverId = String(linkXml.@sliver_id);
-					// vlantag?
+					if(linkXml.@vlantag.length() == 1)
+						virtualLink.vlantag = String(linkXml.@vlantag);
 				}
 				
 				for each(var linkChildXml:XML in linkXml.children()) {
@@ -701,6 +719,7 @@ package protogeni.resources
 										}
 									}
 								} else {
+									// XXX component_id and sliver_id are also available
 									var niid:String = String(linkChildXml.@client_id);
 									var interfacedNodeInterface:VirtualInterface = interfacesById[niid];
 									// Deal with outside node
@@ -802,8 +821,11 @@ package protogeni.resources
 					break;
 			}
 			requestRspec.setNamespace(defaultNamespace);
-			if(useInputRspecVersion >= 2)
+			if(useInputRspecVersion >= 2) {
 				requestRspec.addNamespace(XmlUtil.flackNamespace);
+				for each(var extensionNs:Namespace in s.extensionNamespaces)
+					requestRspec.addNamespace(extensionNs);
+			}
 			var xsiNamespace:Namespace = XmlUtil.xsiNamespace;
 			requestRspec.addNamespace(xsiNamespace);
 			
@@ -990,6 +1012,13 @@ package protogeni.resources
 				flackXml.@y = vn.flackY;
 				flackXml.@unbound = vn.flackUnbound;
 				nodeXml.appendChild(flackXml);
+			}
+			
+			// Add extensions that were preserved
+			if(vn.extensionsNodes != null && vn.extensionsNodes.length > 0) {
+				for each(var extension:XML in vn.extensionsNodes) {
+					nodeXml.appendChild(extension);
+				}
 			}
 			
 			return nodeXml;

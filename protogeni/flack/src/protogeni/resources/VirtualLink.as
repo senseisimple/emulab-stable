@@ -52,6 +52,8 @@ package protogeni.resources
 		[Bindable]
 		public var capacity:Number;
 		
+		public var vlantag:String = "";
+		
 		public function VirtualLink(owner:Sliver = null)
 		{
 			this.slivers = new SliverCollection();

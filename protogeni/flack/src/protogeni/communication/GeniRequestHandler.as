@@ -159,6 +159,7 @@ package protogeni.communication
 		 */
 		public function submitSlice(slice:Slice):void
 		{
+			this.isPaused = false;
 			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(slice.urn.full);
 			if(old != null && old.hasAllocatedResources())
 			{

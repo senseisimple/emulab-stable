@@ -49,6 +49,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					previewRspecButton.includeInLayout = true;
 					previewRspecButton.visible = true;
 				}
+				if(pl.rspec != null)
+					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
 				
 				if(link.capacity)
 					capacityInput.text = link.capacity.toString();
