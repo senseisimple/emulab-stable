@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 
 # Get rid of a bunch of nasty built-in implicit rules,
@@ -118,24 +118,3 @@ check: $(TESTS)
 	done
 endif
 
-ifeq ($(MERGE_BUILD),1)
-.PRECIOUS: ${SRCDIR}/*
-
-#
-# I really want to say something like:
-#   ${TESTBED_SRCDIR}/.merged: $(wildcard ${OBJDIR}/${MERGE_BUILD_SANDBOX}/${SUBDIR}/*)
-# but that causes problems if one the prereq. has a rule for it (such
-# as when both GNUmakefile and GNUmakefile.in exist in the source tree),
-# thus I do the equivalent manually
-#
-newest=$(shell ls -rtd "${OBJDIR}/${MERGE_BUILD_SANDBOX}/${SUBDIR}/"* "${TESTBED_SRCDIR}/.merged" | tail -n 1)
-ifneq ($(newest),${TESTBED_SRCDIR}/.merged)
-${TESTBED_SRCDIR}/.merged:
-	cd ${TESTBED_SRCDIR} && utils/merge-build sync
-.PHONY: ${TESTBED_SRCDIR}/.merged
-else
-${TESTBED_SRCDIR}/.merged:
-endif
-
-${SRCDIR}/*: ${TESTBED_SRCDIR}/.merged
-endif

@@ -3,11 +3,10 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ../..
-SUBDIR		= lib/event
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
@@ -26,7 +25,10 @@ SWIGLIBS        =
 # Re-entrant, multi-threaded version on FreeBSD and Linux, not on Windows.
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 LIBS           += libevent_r.a
-SWIGLIBS       += event.so _tbevent.so
+SWIGLIBS       += event.so
+ifneq ($(EMULAB_CLIENTSIDE),1)
+SWIGLIBS       += _tbevent.so
+endif
 endif
 PROGRAMS	= $(LIBS) $(SWIGLIBS)
 

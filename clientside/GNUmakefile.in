@@ -6,12 +6,12 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= @top_builddir@
-SUBDIR		= clientside
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= event
+SUBDIRS		= lib event
 
 all:	all-subdirs
 
@@ -19,13 +19,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 client:		client-subdirs
 client-install: client client-install-subdirs
-
-control-install: 
-	@$(MAKE) -C event control-install
-
-post-install: 
-	@$(MAKE) -C event post-install
-
+control-install: control-install-subdirs
+post-install:	post-install-subdirs
 clean:		clean-subdirs
 distclean:	distclean-subdirs
 

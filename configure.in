@@ -712,7 +712,6 @@ else
 		    event/nsetrafgen/nseinput.tcl \
 		    event/nsetrafgen/nse-makepatch \
                     event/delay-agent/GNUmakefile \
-		    clientside/event/program-agent/GNUmakefile \
 		    event/link-agent/GNUmakefile \
 		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated \
@@ -1083,7 +1082,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	node_usage/analy2 node_usage/refresh \
 	node_usage/from_ptop node_usage/sanity \
 	node_usage/gather node_usage/mk-php-pages \
-	node_usage/get-start-date"
+	node_usage/get-start-date \
+	clientside/GNUmakefile \
+	clientside/event/GNUmakefile \
+	clientside/event/program-agent/GNUmakefile"
 
 #
 # Do this for easy distclean.

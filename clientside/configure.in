@@ -3,7 +3,12 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-AC_INIT(Makefile.in)
+AC_PREREQ(2.62)
+
+AC_INIT(Makeconf.in)
+AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
+AC_CONFIG_HEADER(config.h)
+
 AC_PROG_CPP
 AC_PROG_CXX
 AC_PROG_LN_S
@@ -13,6 +18,10 @@ AC_PROG_INSTALL
 AC_PATH_PROG(AR, ar)
 if test -z "$AR" ; then
     AC_MSG_ERROR([no acceptable ar found in \$PATH])
+fi
+AC_PATH_PROG(STRIP, strip)
+if test -z "$STRIP" ; then
+    AC_MSG_ERROR([no acceptable strip found in \$PATH])
 fi
 AC_PATH_PROG(RM, rm)
 if test -z "$RM" ; then
@@ -30,14 +39,17 @@ AC_PATH_PROG(TAR, tar)
 if test -z "$TAR" ; then
     AC_MSG_ERROR([no tar found in \$PATH])
 fi
-AC_PATH_PROG(LIBTOOL, libtool)
-if test -z "$LIBTOOL" ; then
-    AC_MSG_ERROR([no libtool found in \$PATH])
-fi
 AC_PATH_PROG(RPM, rpm, rpm)
 if test -z "$RPM" ; then
     AC_MSG_ERROR([no rpm found in \$PATH])
 fi
+
+# Need this for Makeconf.
+AC_SUBST(PATH)
+
+# Tell build it is the clientside.
+AC_SUBST(EMULAB_CLIENTSIDE)
+EMULAB_CLIENTSIDE=1
 
 #
 # The only option is if we build in elvin compat support.
@@ -51,5 +63,38 @@ AC_ARG_ENABLE(elvin_compat,
 if test "$enable_elvin_compat" = "yes"; then
     ELVIN_COMPAT=1
 fi
+if test $ELVIN_COMPAT -eq 1; then
+    AC_DEFINE_UNQUOTED(ELVIN_COMPAT, 1)
+fi
 
-AC_OUTPUT(Makefile 2.pubsubd.sh linux-pubsubd.sh)
+AC_SUBST(CLIENT_ETCDIR)
+AC_SUBST(CLIENT_BINDIR)
+AC_SUBST(CLIENT_VARDIR)
+AC_SUBST(CLIENT_MANDIR)
+CLIENT_ETCDIR="/etc/emulab"
+CLIENT_BINDIR="/usr/local/etc/emulab"
+CLIENT_VARDIR="/var/emulab"
+CLIENT_MANDIR="/usr/local/man"
+
+TBLOGFACIL="local5"
+LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
+AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
+AC_SUBST(LOG_TESTBED)
+AC_SUBST(TBLOGFACIL)
+
+outfiles="Makeconf GNUmakefile \
+          lib/GNUmakefile \
+          lib/libtb/GNUmakefile \
+          lib/event/GNUmakefile \
+	  event/GNUmakefile \
+	  event/program-agent/GNUmakefile"
+
+#
+# Do this for easy distclean.
+#
+DISTCLEAN_FILES="$outfiles"
+AC_SUBST(DISTCLEAN_FILES)
+
+AC_OUTPUT($outfiles)
+
+

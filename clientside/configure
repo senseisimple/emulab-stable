@@ -599,43 +599,6 @@ PACKAGE_STRING=
 PACKAGE_BUGREPORT=
 
 ac_unique_file="Makeconf.in"
-ac_default_prefix=/usr/testbed
-# Factoring default headers for most tests.
-ac_includes_default="\
-#include <stdio.h>
-#ifdef HAVE_SYS_TYPES_H
-# include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_STAT_H
-# include <sys/stat.h>
-#endif
-#ifdef STDC_HEADERS
-# include <stdlib.h>
-# include <stddef.h>
-#else
-# ifdef HAVE_STDLIB_H
-#  include <stdlib.h>
-# endif
-#endif
-#ifdef HAVE_STRING_H
-# if !defined STDC_HEADERS && defined HAVE_MEMORY_H
-#  include <memory.h>
-# endif
-# include <string.h>
-#endif
-#ifdef HAVE_STRINGS_H
-# include <strings.h>
-#endif
-#ifdef HAVE_INTTYPES_H
-# include <inttypes.h>
-#endif
-#ifdef HAVE_STDINT_H
-# include <stdint.h>
-#endif
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif"
-
 ac_subst_vars='SHELL
 PATH_SEPARATOR
 PACKAGE_NAME
@@ -673,8 +636,6 @@ LIBS
 build_alias
 host_alias
 target_alias
-PATH
-PYTHON
 CC
 CFLAGS
 LDFLAGS
@@ -683,207 +644,38 @@ ac_ct_CC
 EXEEXT
 OBJEXT
 CPP
-GREP
-EGREP
-PYTHON_INCLUDE
 CXX
-AR
+CXXFLAGS
+ac_ct_CXX
+LN_S
 RANLIB
+MKDIR_P
+INSTALL_PROGRAM
+INSTALL_SCRIPT
+INSTALL_DATA
+AR
 STRIP
-ELVIN_CONFIG
-JAVAC
-JAR
-SUDO
-UUIDGEN
-SSH
-optional_subdirs
-TBDBNAME
-TBERRORLOGDBNAME
-TBADMINGROUP
-DELAYCAPACITY
-IPBASE
-JAILIPBASE
-JAILIPMASK
-BOSSNODE
-USERNODE
-FSNODE
-EVENTSERVER
-BOSSEVENTPORT
-OURDOMAIN
-USERSROOT_DIR
-PROJROOT_DIR
-GROUPSROOT_DIR
-SCRATCHROOT_DIR
-SHAREROOT_DIR
-FSDIR_PROJ
-FSDIR_GROUPS
-FSDIR_USERS
-FSDIR_SHARE
-FSDIR_SCRATCH
-FS_WITH_QUOTAS
-TRACK_INTERSWITCH_BANDWIDTH
-TIMESTAMPS
-UNIFIED_BOSS_AND_OPS
-DISABLE_NSE
-DISABLE_NAMED_SETUP
-DISABLE_EXPORTS_SETUP
-DISABLE_EVENT_SCHED
+RM
+CP
+YACC
+TAR
+RPM
+PATH
+EMULAB_CLIENTSIDE
+ELVIN_COMPAT
 CLIENT_ETCDIR
 CLIENT_BINDIR
 CLIENT_VARDIR
 CLIENT_MANDIR
-SNMP_RW_COMMUNITY
-WWWHOST
-WWW
-TBBASE
-TBDEFS
-TBDOCBASE
-TBWWW
-THISHOMEBASE
-TBSECURECOOKIES
-TBCOOKIESUFFIX
-TBAUTHDOMAIN
-TBAUTHTIMEOUT
-TBMAINSITE
-FANCYBANNER
-SFSSUPPORT
-ELABINELAB
-OUTERBOSS_NODENAME
-OUTERBOSS_XMLRPCPORT
-OUTERBOSS_SSLCERTNAME
-SUBBOSS_SSLCERTNAME
-PLABSUPPORT
-PUBSUPPORT
-WIKISUPPORT
-MAILMANSUPPORT
-BUGDBSUPPORT
-OPSDBSUPPORT
-NFSTRACESUPPORT
-TBLOGFACIL
-TESTBED_NETWORK
-EXTERNAL_TESTBED_NETWORK
-TESTBED_NETMASK
-EXTERNAL_TESTBED_NETMASK
-BOSSNODE_IP
-EXTERNAL_BOSSNODE_IP
-USERNODE_IP
-EXTERNAL_USERNODE_IP
-FSNODE_IP
-EXTERNAL_FSNODE_IP
-CONTROL_ROUTER_IP
-CONTROL_NETWORK
-CONTROL_NETMASK
-PRIVATE_NETWORK
-PRIVATE_ROUTER
-PRIVATE_NETMASK
-PUBLIC_NETWORK
-PUBLIC_ROUTER
-PUBLIC_NETMASK
-VIRTNODE_NETWORK
-VIRTNODE_NETMASK
-DHCPD_DYNRANGE
-DHCPD_CONTROLNET_DECL
-NAMED_FORWARDERS
-SSLCERT_COUNTRY
-SSLCERT_STATE
-SSLCERT_LOCALITY
-SSLCERT_ORGNAME
-FRISEBEEMCASTADDR
-FRISEBEEMCASTPORT
-FRISEBEENUMPORTS
-WINSUPPORT
-NSVERIFY
-CVSSUPPORT
-TRACSUPPORT
-CHATSUPPORT
-STAMPS
-ARCHIVESUPPORT
-MIN_UNIX_UID
-MIN_UNIX_GID
-DELAYTHRESH
-PELABSUPPORT
-ELVIN_COMPAT
-ISOLATEADMINS
-DYNAMICROOTPASSWORDS
-TPM
-REMOTEWIKIDOCS
-PROTOGENI_SUPPORT
-PROTOGENI_CLEARINGHOUSE
-PROTOGENI_DOMAIN
-STANDALONE_CLEARINGHOUSE
-GMAP_API_KEY
-NODE_USAGE_SUPPORT
-NOSTACKMIB
-EXP_VIS_SUPPORT
-NOSHAREDFS
-SELFLOADER_DATA
-TBUSEDBI
-NEEDMROUTED
-TBOPSEMAIL
-TBOPSEMAIL_NOSLASH
-TBROBOCOPSEMAIL
-TBROBOCOPSEMAIL_NOSLASH
-TBLOGSEMAIL
-TBLOGSEMAIL_NOSLASH
-TBWWWEMAIL
-TBWWWEMAIL_NOSLASH
-TBAPPROVALEMAIL
-TBAPPROVALEMAIL_NOSLASH
-TBAUDITEMAIL
-TBAUDITEMAIL_NOSLASH
-TBSTATEDEMAIL
-TBSTATEDEMAIL_NOSLASH
-TBTESTSUITEEMAIL
-TBTESTSUITEEMAIL_NOSLASH
-TBAUTOMAILEMAIL
-TBAUTOMAILEMAIL_NOSLASH
-TBACTIVEARCHIVE
-TBACTIVEARCHIVE_NOSLASH
-TBUSERSARCHIVE
-TBUSERSARCHIVE_NOSLASH
-TBERRORSEMAIL
-TBERRORSEMAIL_NOSLASH
 LOG_TESTBED
-LEDA
-ASSIGN
-SSH_ARGS
-INSTALL_RCDIR
-INSTALL_APACHE_CONFIG
-BRAINSTEM_DIR
-OPT_CFLAGS
-EVENTSYS
-HAVE_ULXMLRPCPP
-GTK_CONFIG
-HAVE_MEZZANINE
-CXXFLAGS
-ac_ct_CXX
-CXXCPP
-HAVE_XERCES
-TESTMODE
-INSTALL_PROGRAM
-INSTALL_SCRIPT
-INSTALL_DATA
-RSYNC
-MERGE_BUILD
-MERGE_BUILD_SANDBOX
+TBLOGFACIL
 DISTCLEAN_FILES
 LIBOBJS
 LTLIBOBJS'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
-with_TBDEFS
-with_LEDA
-with_assignbinary
-with_ssh_args
-with_rcdir
-with_apache_config_dir
-with_brainstem
-enable_debug
-enable_events
-enable_windows
-enable_mezzanine
-enable_testmode
+enable_elvin_compat
 '
       ac_precious_vars='build_alias
 host_alias
@@ -896,8 +688,7 @@ CPPFLAGS
 CPP
 CXX
 CXXFLAGS
-CCC
-CXXCPP'
+CCC'
 
 
 # Initialize some variables set by options.
@@ -1517,24 +1308,7 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-debug        Build with debug flags (-g -DDEBUG)
-  --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)
-  --disable-events      Disable events (requires Elvin libraries)
-  --enable-windows      Enable Windows XP support (default)
-  --enable-mezzanine    Enable mezzanine support
-  --enable-testmode     Enable test mode
-  --disable-testmode    Disable test mode
-
-Optional Packages:
-  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
-  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-TBDEFS=name	Specify definitions file (defs-default default)
-  --with-LEDA		Specify LEDA path (/usr/testbed default)
-  --with-assignbinary	Specify assign binary (overrides LEDA, default on)
-  --with-ssh-args	Specify ssh arguments when running from testbed scripts
-  --with-rcdir		Specify path to install rc.d scripts (/usr/local/etc/rc.d default)
-  --with-apache-config	Specify path to install apache config files (/usr/local/etc/apache default)
-  --with-brainstem=<DIR> Specify the path to the brainstem installation.
+  --enable-elvin_compat[=yes/no]  Include Elvin Hash compat [default=no]
 
 Some influential environment variables:
   CC          C compiler command
@@ -1547,7 +1321,6 @@ Some influential environment variables:
   CPP         C preprocessor
   CXX         C++ compiler command
   CXXFLAGS    C++ compiler flags
-  CXXCPP      C++ preprocessor
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -2017,128 +1790,9 @@ ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
 ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
-
 ac_config_headers="$ac_config_headers config.h"
 
 
-# We use separate source and obj trees in Emulab.  Configuring in a source
-# tree messes it up, so throw an error.
-#
-# Check that $srcdir, (which defaults to the argv[0] path to the configure
-# script,) is different from the current directory.
-#
-if test `(cd $srcdir; pwd)` = `pwd`; then
-    if test "$ac_srcdir_defaulted" = yes; then
-	{ { $as_echo "$as_me:$LINENO: error: You are running the configure script in the current directory.
-Output from configure must go into an Emulab obj tree, not a source tree!
-cd to the top of an obj tree, and run the configure in your source tree." >&5
-$as_echo "$as_me: error: You are running the configure script in the current directory.
-Output from configure must go into an Emulab obj tree, not a source tree!
-cd to the top of an obj tree, and run the configure in your source tree." >&2;}
-   { (exit 1); exit 1; }; }
-    else
-	{ { $as_echo "$as_me:$LINENO: error: You specified --srcdir= to be the current directory.
-Output from configure should go into an Emulab obj tree, not a source tree!
-cd to the top of an obj tree, and run the configure in your source tree.
-Then --srcdir= will be unnecessary." >&5
-$as_echo "$as_me: error: You specified --srcdir= to be the current directory.
-Output from configure should go into an Emulab obj tree, not a source tree!
-cd to the top of an obj tree, and run the configure in your source tree.
-Then --srcdir= will be unnecessary." >&2;}
-   { (exit 1); exit 1; }; }
-    fi
-fi
-#
-# Double-check that there isn't a Makeconf.in (the UNIQUE-FILE-IN-SOURCE-DIR)
-# in the current directory.
-#
-if test -f $ac_unique_file; then
-    { { $as_echo "$as_me:$LINENO: error: The current directory is a source tree containing $ac_unique_file .
-Output from configure should go into an Emulab obj tree, not a source tree!
-cd to the top of an obj tree, and run the configure in your source tree." >&5
-$as_echo "$as_me: error: The current directory is a source tree containing $ac_unique_file .
-Output from configure should go into an Emulab obj tree, not a source tree!
-cd to the top of an obj tree, and run the configure in your source tree." >&2;}
-   { (exit 1); exit 1; }; }
-fi
-
-for tbarch in arm/3.4.1; do
-    PATH="/usr/local/$tbarch/bin:${PATH}"
-done
-
-if test x"${JAVA_HOME}" != x""; then
-    PATH="${JAVA_HOME}/bin:${PATH}"
-else
-    for jdk in /usr/local/jdk*; do
-	PATH="${jdk}/bin:${PATH}"
-	break
-    done
-fi
-
-
-
-CPPFLAGS="-I/usr/local/include"
-
-# BEGIN Python detection.
-for ac_prog in python python2.6 python2.5 python2.4 python2.3 python2.2
-do
-  # Extract the first word of "$ac_prog", so it can be a program name with args.
-set dummy $ac_prog; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_PYTHON+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  case $PYTHON in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_PYTHON="$PYTHON" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_PYTHON="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-PYTHON=$ac_cv_path_PYTHON
-if test -n "$PYTHON"; then
-  { $as_echo "$as_me:$LINENO: result: $PYTHON" >&5
-$as_echo "$PYTHON" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-  test -n "$PYTHON" && break
-done
-
-
-if test x"$PYTHON" = x""; then
-    { { $as_echo "$as_me:$LINENO: error: python not detected" >&5
-$as_echo "$as_me: error: python not detected" >&2;}
-   { (exit 1); exit 1; }; }
-fi
-
-PYTHON_VERSION=`${PYTHON} -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2`
-PYTHON_PATH=`dirname ${PYTHON}`
-if test ! -d "$PYTHON_PATH/include"; then
-    PYTHON_PATH=`dirname ${PYTHON_PATH}`
-fi
-PYTHON_INCLUDE="${PYTHON_PATH}/include/python${PYTHON_VERSION}"
-CPPFLAGS="${CPPFLAGS} -I${PYTHON_INCLUDE}"
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -3070,7 +2724,6 @@ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
-
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -3304,2659 +2957,6 @@ ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
-
-
-{ $as_echo "$as_me:$LINENO: checking for grep that handles long lines and -e" >&5
-$as_echo_n "checking for grep that handles long lines and -e... " >&6; }
-if test "${ac_cv_path_GREP+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -z "$GREP"; then
-  ac_path_GREP_found=false
-  # Loop through the user's path and test for each of PROGNAME-LIST
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH$PATH_SEPARATOR/usr/xpg4/bin
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_prog in grep ggrep; do
-    for ac_exec_ext in '' $ac_executable_extensions; do
-      ac_path_GREP="$as_dir/$ac_prog$ac_exec_ext"
-      { test -f "$ac_path_GREP" && $as_test_x "$ac_path_GREP"; } || continue
-# Check for GNU ac_path_GREP and select it if it is found.
-  # Check for GNU $ac_path_GREP
-case `"$ac_path_GREP" --version 2>&1` in
-*GNU*)
-  ac_cv_path_GREP="$ac_path_GREP" ac_path_GREP_found=:;;
-*)
-  ac_count=0
-  $as_echo_n 0123456789 >"conftest.in"
-  while :
-  do
-    cat "conftest.in" "conftest.in" >"conftest.tmp"
-    mv "conftest.tmp" "conftest.in"
-    cp "conftest.in" "conftest.nl"
-    $as_echo 'GREP' >> "conftest.nl"
-    "$ac_path_GREP" -e 'GREP$' -e '-(cannot match)-' < "conftest.nl" >"conftest.out" 2>/dev/null || break
-    diff "conftest.out" "conftest.nl" >/dev/null 2>&1 || break
-    ac_count=`expr $ac_count + 1`
-    if test $ac_count -gt ${ac_path_GREP_max-0}; then
-      # Best one so far, save it but keep looking for a better one
-      ac_cv_path_GREP="$ac_path_GREP"
-      ac_path_GREP_max=$ac_count
-    fi
-    # 10*(2^10) chars as input seems more than enough
-    test $ac_count -gt 10 && break
-  done
-  rm -f conftest.in conftest.tmp conftest.nl conftest.out;;
-esac
-
-      $ac_path_GREP_found && break 3
-    done
-  done
-done
-IFS=$as_save_IFS
-  if test -z "$ac_cv_path_GREP"; then
-    { { $as_echo "$as_me:$LINENO: error: no acceptable grep could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&5
-$as_echo "$as_me: error: no acceptable grep could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&2;}
-   { (exit 1); exit 1; }; }
-  fi
-else
-  ac_cv_path_GREP=$GREP
-fi
-
-fi
-{ $as_echo "$as_me:$LINENO: result: $ac_cv_path_GREP" >&5
-$as_echo "$ac_cv_path_GREP" >&6; }
- GREP="$ac_cv_path_GREP"
-
-
-{ $as_echo "$as_me:$LINENO: checking for egrep" >&5
-$as_echo_n "checking for egrep... " >&6; }
-if test "${ac_cv_path_EGREP+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if echo a | $GREP -E '(a|b)' >/dev/null 2>&1
-   then ac_cv_path_EGREP="$GREP -E"
-   else
-     if test -z "$EGREP"; then
-  ac_path_EGREP_found=false
-  # Loop through the user's path and test for each of PROGNAME-LIST
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH$PATH_SEPARATOR/usr/xpg4/bin
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_prog in egrep; do
-    for ac_exec_ext in '' $ac_executable_extensions; do
-      ac_path_EGREP="$as_dir/$ac_prog$ac_exec_ext"
-      { test -f "$ac_path_EGREP" && $as_test_x "$ac_path_EGREP"; } || continue
-# Check for GNU ac_path_EGREP and select it if it is found.
-  # Check for GNU $ac_path_EGREP
-case `"$ac_path_EGREP" --version 2>&1` in
-*GNU*)
-  ac_cv_path_EGREP="$ac_path_EGREP" ac_path_EGREP_found=:;;
-*)
-  ac_count=0
-  $as_echo_n 0123456789 >"conftest.in"
-  while :
-  do
-    cat "conftest.in" "conftest.in" >"conftest.tmp"
-    mv "conftest.tmp" "conftest.in"
-    cp "conftest.in" "conftest.nl"
-    $as_echo 'EGREP' >> "conftest.nl"
-    "$ac_path_EGREP" 'EGREP$' < "conftest.nl" >"conftest.out" 2>/dev/null || break
-    diff "conftest.out" "conftest.nl" >/dev/null 2>&1 || break
-    ac_count=`expr $ac_count + 1`
-    if test $ac_count -gt ${ac_path_EGREP_max-0}; then
-      # Best one so far, save it but keep looking for a better one
-      ac_cv_path_EGREP="$ac_path_EGREP"
-      ac_path_EGREP_max=$ac_count
-    fi
-    # 10*(2^10) chars as input seems more than enough
-    test $ac_count -gt 10 && break
-  done
-  rm -f conftest.in conftest.tmp conftest.nl conftest.out;;
-esac
-
-      $ac_path_EGREP_found && break 3
-    done
-  done
-done
-IFS=$as_save_IFS
-  if test -z "$ac_cv_path_EGREP"; then
-    { { $as_echo "$as_me:$LINENO: error: no acceptable egrep could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&5
-$as_echo "$as_me: error: no acceptable egrep could be found in $PATH$PATH_SEPARATOR/usr/xpg4/bin" >&2;}
-   { (exit 1); exit 1; }; }
-  fi
-else
-  ac_cv_path_EGREP=$EGREP
-fi
-
-   fi
-fi
-{ $as_echo "$as_me:$LINENO: result: $ac_cv_path_EGREP" >&5
-$as_echo "$ac_cv_path_EGREP" >&6; }
- EGREP="$ac_cv_path_EGREP"
-
-
-{ $as_echo "$as_me:$LINENO: checking for ANSI C header files" >&5
-$as_echo_n "checking for ANSI C header files... " >&6; }
-if test "${ac_cv_header_stdc+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <float.h>
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  ac_cv_header_stdc=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	ac_cv_header_stdc=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-
-if test $ac_cv_header_stdc = yes; then
-  # SunOS 4.x string.h does not declare mem*, contrary to ANSI.
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <string.h>
-
-_ACEOF
-if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
-  $EGREP "memchr" >/dev/null 2>&1; then
-  :
-else
-  ac_cv_header_stdc=no
-fi
-rm -f conftest*
-
-fi
-
-if test $ac_cv_header_stdc = yes; then
-  # ISC 2.0.2 stdlib.h does not declare free, contrary to ANSI.
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <stdlib.h>
-
-_ACEOF
-if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
-  $EGREP "free" >/dev/null 2>&1; then
-  :
-else
-  ac_cv_header_stdc=no
-fi
-rm -f conftest*
-
-fi
-
-if test $ac_cv_header_stdc = yes; then
-  # /bin/cc in Irix-4.0.5 gets non-ANSI ctype macros unless using -ansi.
-  if test "$cross_compiling" = yes; then
-  :
-else
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <ctype.h>
-#include <stdlib.h>
-#if ((' ' & 0x0FF) == 0x020)
-# define ISLOWER(c) ('a' <= (c) && (c) <= 'z')
-# define TOUPPER(c) (ISLOWER(c) ? 'A' + ((c) - 'a') : (c))
-#else
-# define ISLOWER(c) \
-		   (('a' <= (c) && (c) <= 'i') \
-		     || ('j' <= (c) && (c) <= 'r') \
-		     || ('s' <= (c) && (c) <= 'z'))
-# define TOUPPER(c) (ISLOWER(c) ? ((c) | 0x40) : (c))
-#endif
-
-#define XOR(e, f) (((e) && !(f)) || (!(e) && (f)))
-int
-main ()
-{
-  int i;
-  for (i = 0; i < 256; i++)
-    if (XOR (islower (i), ISLOWER (i))
-	|| toupper (i) != TOUPPER (i))
-      return 2;
-  return 0;
-}
-_ACEOF
-rm -f conftest$ac_exeext
-if { (ac_try="$ac_link"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_link") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
-  { (case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_try") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  :
-else
-  $as_echo "$as_me: program exited with status $ac_status" >&5
-$as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-( exit $ac_status )
-ac_cv_header_stdc=no
-fi
-rm -rf conftest.dSYM
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
-fi
-
-
-fi
-fi
-{ $as_echo "$as_me:$LINENO: result: $ac_cv_header_stdc" >&5
-$as_echo "$ac_cv_header_stdc" >&6; }
-if test $ac_cv_header_stdc = yes; then
-
-cat >>confdefs.h <<\_ACEOF
-#define STDC_HEADERS 1
-_ACEOF
-
-fi
-
-# On IRIX 5.3, sys/types and inttypes.h are conflicting.
-
-
-
-
-
-
-
-
-
-for ac_header in sys/types.h sys/stat.h stdlib.h string.h memory.h strings.h \
-		  inttypes.h stdint.h unistd.h
-do
-as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-{ $as_echo "$as_me:$LINENO: checking for $ac_header" >&5
-$as_echo_n "checking for $ac_header... " >&6; }
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-else
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-$ac_includes_default
-
-#include <$ac_header>
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  eval "$as_ac_Header=yes"
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	eval "$as_ac_Header=no"
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
-ac_res=`eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if test `eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'` = yes; then
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-
-done
-
-
-
-for ac_header in Python.h
-do
-as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  { $as_echo "$as_me:$LINENO: checking for $ac_header" >&5
-$as_echo_n "checking for $ac_header... " >&6; }
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-fi
-ac_res=`eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-else
-  # Is the header compilable?
-{ $as_echo "$as_me:$LINENO: checking $ac_header usability" >&5
-$as_echo_n "checking $ac_header usability... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-$ac_includes_default
-#include <$ac_header>
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  ac_header_compiler=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	ac_header_compiler=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
-$as_echo "$ac_header_compiler" >&6; }
-
-# Is the header present?
-{ $as_echo "$as_me:$LINENO: checking $ac_header presence" >&5
-$as_echo_n "checking $ac_header presence... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <$ac_header>
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_c_preproc_warn_flag$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  ac_header_preproc=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  ac_header_preproc=no
-fi
-
-rm -f conftest.err conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
-$as_echo "$ac_header_preproc" >&6; }
-
-# So?  What about this header?
-case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
-  yes:no: )
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&5
-$as_echo "$as_me: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the compiler's result" >&5
-$as_echo "$as_me: WARNING: $ac_header: proceeding with the compiler's result" >&2;}
-    ac_header_preproc=yes
-    ;;
-  no:yes:* )
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: present but cannot be compiled" >&5
-$as_echo "$as_me: WARNING: $ac_header: present but cannot be compiled" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header:     check for missing prerequisite headers?" >&5
-$as_echo "$as_me: WARNING: $ac_header:     check for missing prerequisite headers?" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: see the Autoconf documentation" >&5
-$as_echo "$as_me: WARNING: $ac_header: see the Autoconf documentation" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&5
-$as_echo "$as_me: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the preprocessor's result" >&5
-$as_echo "$as_me: WARNING: $ac_header: proceeding with the preprocessor's result" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: in the future, the compiler will take precedence" >&5
-$as_echo "$as_me: WARNING: $ac_header: in the future, the compiler will take precedence" >&2;}
-
-    ;;
-esac
-{ $as_echo "$as_me:$LINENO: checking for $ac_header" >&5
-$as_echo_n "checking for $ac_header... " >&6; }
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-else
-  eval "$as_ac_Header=\$ac_header_preproc"
-fi
-ac_res=`eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-
-fi
-if test `eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'` = yes; then
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
-
-else
-  { $as_echo "$as_me:$LINENO: WARNING: \"Cannot find Python.h in ${PYTHON_INCLUDE}\"" >&5
-$as_echo "$as_me: WARNING: \"Cannot find Python.h in ${PYTHON_INCLUDE}\"" >&2;}
-fi
-
-done
-
-
-# END Python detection.
-
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
-set dummy ${ac_tool_prefix}gcc; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_CC+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$CC"; then
-  ac_cv_prog_CC="$CC" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_CC="${ac_tool_prefix}gcc"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-CC=$ac_cv_prog_CC
-if test -n "$CC"; then
-  { $as_echo "$as_me:$LINENO: result: $CC" >&5
-$as_echo "$CC" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-fi
-if test -z "$ac_cv_prog_CC"; then
-  ac_ct_CC=$CC
-  # Extract the first word of "gcc", so it can be a program name with args.
-set dummy gcc; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_ac_ct_CC+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$ac_ct_CC"; then
-  ac_cv_prog_ac_ct_CC="$ac_ct_CC" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_ac_ct_CC="gcc"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-ac_ct_CC=$ac_cv_prog_ac_ct_CC
-if test -n "$ac_ct_CC"; then
-  { $as_echo "$as_me:$LINENO: result: $ac_ct_CC" >&5
-$as_echo "$ac_ct_CC" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-  if test "x$ac_ct_CC" = x; then
-    CC=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:$LINENO: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&5
-$as_echo "$as_me: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&2;}
-ac_tool_warned=yes ;;
-esac
-    CC=$ac_ct_CC
-  fi
-else
-  CC="$ac_cv_prog_CC"
-fi
-
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
-set dummy ${ac_tool_prefix}g++; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_CXX+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$CXX"; then
-  ac_cv_prog_CXX="$CXX" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_CXX="${ac_tool_prefix}g++"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-CXX=$ac_cv_prog_CXX
-if test -n "$CXX"; then
-  { $as_echo "$as_me:$LINENO: result: $CXX" >&5
-$as_echo "$CXX" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-fi
-if test -z "$ac_cv_prog_CXX"; then
-  ac_ct_CXX=$CXX
-  # Extract the first word of "g++", so it can be a program name with args.
-set dummy g++; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_ac_ct_CXX+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$ac_ct_CXX"; then
-  ac_cv_prog_ac_ct_CXX="$ac_ct_CXX" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_ac_ct_CXX="g++"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-ac_ct_CXX=$ac_cv_prog_ac_ct_CXX
-if test -n "$ac_ct_CXX"; then
-  { $as_echo "$as_me:$LINENO: result: $ac_ct_CXX" >&5
-$as_echo "$ac_ct_CXX" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-  if test "x$ac_ct_CXX" = x; then
-    CXX=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:$LINENO: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&5
-$as_echo "$as_me: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&2;}
-ac_tool_warned=yes ;;
-esac
-    CXX=$ac_ct_CXX
-  fi
-else
-  CXX="$ac_cv_prog_CXX"
-fi
-
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
-set dummy ${ac_tool_prefix}ar; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_AR+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$AR"; then
-  ac_cv_prog_AR="$AR" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_AR="${ac_tool_prefix}ar"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-AR=$ac_cv_prog_AR
-if test -n "$AR"; then
-  { $as_echo "$as_me:$LINENO: result: $AR" >&5
-$as_echo "$AR" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-fi
-if test -z "$ac_cv_prog_AR"; then
-  ac_ct_AR=$AR
-  # Extract the first word of "ar", so it can be a program name with args.
-set dummy ar; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_ac_ct_AR+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$ac_ct_AR"; then
-  ac_cv_prog_ac_ct_AR="$ac_ct_AR" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_ac_ct_AR="ar"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-ac_ct_AR=$ac_cv_prog_ac_ct_AR
-if test -n "$ac_ct_AR"; then
-  { $as_echo "$as_me:$LINENO: result: $ac_ct_AR" >&5
-$as_echo "$ac_ct_AR" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-  if test "x$ac_ct_AR" = x; then
-    AR=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:$LINENO: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&5
-$as_echo "$as_me: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&2;}
-ac_tool_warned=yes ;;
-esac
-    AR=$ac_ct_AR
-  fi
-else
-  AR="$ac_cv_prog_AR"
-fi
-
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
-set dummy ${ac_tool_prefix}ranlib; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_RANLIB+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$RANLIB"; then
-  ac_cv_prog_RANLIB="$RANLIB" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_RANLIB="${ac_tool_prefix}ranlib"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-RANLIB=$ac_cv_prog_RANLIB
-if test -n "$RANLIB"; then
-  { $as_echo "$as_me:$LINENO: result: $RANLIB" >&5
-$as_echo "$RANLIB" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-fi
-if test -z "$ac_cv_prog_RANLIB"; then
-  ac_ct_RANLIB=$RANLIB
-  # Extract the first word of "ranlib", so it can be a program name with args.
-set dummy ranlib; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_ac_ct_RANLIB+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$ac_ct_RANLIB"; then
-  ac_cv_prog_ac_ct_RANLIB="$ac_ct_RANLIB" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_ac_ct_RANLIB="ranlib"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-ac_ct_RANLIB=$ac_cv_prog_ac_ct_RANLIB
-if test -n "$ac_ct_RANLIB"; then
-  { $as_echo "$as_me:$LINENO: result: $ac_ct_RANLIB" >&5
-$as_echo "$ac_ct_RANLIB" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-  if test "x$ac_ct_RANLIB" = x; then
-    RANLIB=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:$LINENO: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&5
-$as_echo "$as_me: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&2;}
-ac_tool_warned=yes ;;
-esac
-    RANLIB=$ac_ct_RANLIB
-  fi
-else
-  RANLIB="$ac_cv_prog_RANLIB"
-fi
-
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
-set dummy ${ac_tool_prefix}strip; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_STRIP+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$STRIP"; then
-  ac_cv_prog_STRIP="$STRIP" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_STRIP="${ac_tool_prefix}strip"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-STRIP=$ac_cv_prog_STRIP
-if test -n "$STRIP"; then
-  { $as_echo "$as_me:$LINENO: result: $STRIP" >&5
-$as_echo "$STRIP" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-fi
-if test -z "$ac_cv_prog_STRIP"; then
-  ac_ct_STRIP=$STRIP
-  # Extract the first word of "strip", so it can be a program name with args.
-set dummy strip; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_ac_ct_STRIP+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$ac_ct_STRIP"; then
-  ac_cv_prog_ac_ct_STRIP="$ac_ct_STRIP" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_ac_ct_STRIP="strip"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-ac_ct_STRIP=$ac_cv_prog_ac_ct_STRIP
-if test -n "$ac_ct_STRIP"; then
-  { $as_echo "$as_me:$LINENO: result: $ac_ct_STRIP" >&5
-$as_echo "$ac_ct_STRIP" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-  if test "x$ac_ct_STRIP" = x; then
-    STRIP=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:$LINENO: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&5
-$as_echo "$as_me: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&2;}
-ac_tool_warned=yes ;;
-esac
-    STRIP=$ac_ct_STRIP
-  fi
-else
-  STRIP="$ac_cv_prog_STRIP"
-fi
-
-
-
-
-# Extract the first word of "elvin-config", so it can be a program name with args.
-set dummy elvin-config; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_ELVIN_CONFIG+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  case $ELVIN_CONFIG in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_ELVIN_CONFIG="$ELVIN_CONFIG" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_ELVIN_CONFIG="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-ELVIN_CONFIG=$ac_cv_path_ELVIN_CONFIG
-if test -n "$ELVIN_CONFIG"; then
-  { $as_echo "$as_me:$LINENO: result: $ELVIN_CONFIG" >&5
-$as_echo "$ELVIN_CONFIG" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-# Extract the first word of "javac", so it can be a program name with args.
-set dummy javac; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_JAVAC+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  case $JAVAC in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_JAVAC="$JAVAC" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_JAVAC="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-JAVAC=$ac_cv_path_JAVAC
-if test -n "$JAVAC"; then
-  { $as_echo "$as_me:$LINENO: result: $JAVAC" >&5
-$as_echo "$JAVAC" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-# Extract the first word of "jar", so it can be a program name with args.
-set dummy jar; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_JAR+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  case $JAR in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_JAR="$JAR" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_JAR="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-JAR=$ac_cv_path_JAR
-if test -n "$JAR"; then
-  { $as_echo "$as_me:$LINENO: result: $JAR" >&5
-$as_echo "$JAR" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-# Extract the first word of "sudo", so it can be a program name with args.
-set dummy sudo; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_SUDO+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  case $SUDO in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_SUDO="$SUDO" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_SUDO="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-SUDO=$ac_cv_path_SUDO
-if test -n "$SUDO"; then
-  { $as_echo "$as_me:$LINENO: result: $SUDO" >&5
-$as_echo "$SUDO" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-# Extract the first word of "uuidgen", so it can be a program name with args.
-set dummy uuidgen; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_UUIDGEN+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  case $UUIDGEN in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_UUIDGEN="$UUIDGEN" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_UUIDGEN="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-  ;;
-esac
-fi
-UUIDGEN=$ac_cv_path_UUIDGEN
-if test -n "$UUIDGEN"; then
-  { $as_echo "$as_me:$LINENO: result: $UUIDGEN" >&5
-$as_echo "$UUIDGEN" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
-set dummy ${ac_tool_prefix}ssh; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_SSH+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$SSH"; then
-  ac_cv_prog_SSH="$SSH" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_SSH="${ac_tool_prefix}ssh"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-SSH=$ac_cv_prog_SSH
-if test -n "$SSH"; then
-  { $as_echo "$as_me:$LINENO: result: $SSH" >&5
-$as_echo "$SSH" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-fi
-if test -z "$ac_cv_prog_SSH"; then
-  ac_ct_SSH=$SSH
-  # Extract the first word of "ssh", so it can be a program name with args.
-set dummy ssh; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_ac_ct_SSH+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$ac_ct_SSH"; then
-  ac_cv_prog_ac_ct_SSH="$ac_ct_SSH" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_ac_ct_SSH="ssh"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-ac_ct_SSH=$ac_cv_prog_ac_ct_SSH
-if test -n "$ac_ct_SSH"; then
-  { $as_echo "$as_me:$LINENO: result: $ac_ct_SSH" >&5
-$as_echo "$ac_ct_SSH" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-  if test "x$ac_ct_SSH" = x; then
-    SSH=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:$LINENO: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&5
-$as_echo "$as_me: WARNING: In the future, Autoconf will not detect cross-tools
-whose name does not start with the host triplet.  If you think this
-configuration is useful to you, please write to autoconf@gnu.org." >&2;}
-ac_tool_warned=yes ;;
-esac
-    SSH=$ac_ct_SSH
-  fi
-else
-  SSH="$ac_cv_prog_SSH"
-fi
-
-
-
-for ac_func in srandomdev
-do
-as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
-{ $as_echo "$as_me:$LINENO: checking for $ac_func" >&5
-$as_echo_n "checking for $ac_func... " >&6; }
-if { as_var=$as_ac_var; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-else
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
-   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
-#define $ac_func innocuous_$ac_func
-
-/* System header to define __stub macros and hopefully few prototypes,
-    which can conflict with char $ac_func (); below.
-    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
-    <limits.h> exists even on freestanding compilers.  */
-
-#ifdef __STDC__
-# include <limits.h>
-#else
-# include <assert.h>
-#endif
-
-#undef $ac_func
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char $ac_func ();
-/* The GNU C library defines this for functions which it implements
-    to always fail with ENOSYS.  Some functions are actually named
-    something starting with __ and the normal name is an alias.  */
-#if defined __stub_$ac_func || defined __stub___$ac_func
-choke me
-#endif
-
-int
-main ()
-{
-return $ac_func ();
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext conftest$ac_exeext
-if { (ac_try="$ac_link"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_link") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest$ac_exeext && {
-	 test "$cross_compiling" = yes ||
-	 $as_test_x conftest$ac_exeext
-       }; then
-  eval "$as_ac_var=yes"
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	eval "$as_ac_var=no"
-fi
-
-rm -rf conftest.dSYM
-rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
-      conftest$ac_exeext conftest.$ac_ext
-fi
-ac_res=`eval 'as_val=${'$as_ac_var'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if test `eval 'as_val=${'$as_ac_var'}
-		 $as_echo "$as_val"'` = yes; then
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-done
-
-
-
-
-#
-# These get defined in the definitions file (--with-TBDEFS).
-# NB: See AC_DEFINE_UNQUOTED() calls below, if you want a variable
-# to appear in config.h.
-#
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#
-# Offer both versions of the email addresses that have the @ escaped
-# for perl (the default), and that don't
-#
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#
-# Defaults for for above variables.
-#
-TBERRORLOGDBNAME="errorlog"
-TBADMINGROUP="flux"
-CLIENT_ETCDIR="/etc/emulab"
-CLIENT_BINDIR="/usr/local/etc/emulab"
-CLIENT_VARDIR="/var/emulab"
-CLIENT_MANDIR="/usr/local/man"
-TBSECURECOOKIES=1
-TBMAINSITE=0
-TBUSEDBI=0
-FANCYBANNER=0
-VIRTNODE_NETWORK=172.16.0.0
-VIRTNODE_NETMASK=255.240.0.0
-JAILIPBASE=$VIRTNODE_NETWORK
-JAILIPMASK=$VIRTNODE_NETMASK
-IPBASE=10
-SFSSUPPORT=0
-ELABINELAB=0
-OUTERBOSS_NODENAME=""
-OUTERBOSS_XMLRPCPORT=3069
-OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
-SUBBOSS_SSLCERTNAME="/etc/subboss.pem"
-PLABSUPPORT=0
-PUBSUPPORT=0
-WIKISUPPORT=0
-BUGDBSUPPORT=0
-OPSDBSUPPORT=0
-MAILMANSUPPORT=0
-WINSUPPORT=0
-NSVERIFY=1
-CVSSUPPORT=0
-TRACSUPPORT=0
-CHATSUPPORT=0
-STAMPS=0
-ARCHIVESUPPORT=0
-NFSTRACESUPPORT=0
-TBLOGFACIL="local5"
-BOSSEVENTPORT=16505
-UNIFIED_BOSS_AND_OPS=0
-FRISEBEEMCASTADDR="234.5.6"
-FRISEBEEMCASTPORT=3564
-FRISEBEENUMPORTS=0
-MIN_UNIX_UID=10000
-MIN_UNIX_GID=6000
-DELAYTHRESH=2
-PELABSUPPORT=0
-ELVIN_COMPAT=0
-ISOLATEADMINS=1
-DYNAMICROOTPASSWORDS=1
-TPM=0
-REMOTEWIKIDOCS=1
-PROTOGENI_SUPPORT=0
-PROTOGENI_CLEARINGHOUSE=0
-PROTOGENI_DOMAIN="unknown"
-STANDALONE_CLEARINGHOUSE=0
-NODE_USAGE_SUPPORT=0
-EXP_VIS_SUPPORT=0
-NOSTACKMIB=0
-NOSHAREDFS=0
-NFSRACY=1
-SELFLOADER_DATA="__DATA__"
-NEEDMROUTED=0
-
-#
-# XXX You really don't want to change these!
-# They are ingrained and who knows what might break if you change them.
-#
-USERSROOT_DIR="/users"
-PROJROOT_DIR="/proj"
-GROUPSROOT_DIR="/groups"
-SHAREROOT_DIR="/share"
-SCRATCHROOT_DIR=""
-
-#
-# Okay, I know this is improper usage of --with. Too bad.
-#
-
-# Check whether --with-TBDEFS was given.
-if test "${with_TBDEFS+set}" = set; then
-  withval=$with_TBDEFS;
-    if test "$withval" = "yes"; then
-	{ { $as_echo "$as_me:$LINENO: error: Invalid TBDEFS - Must specify the value" >&5
-$as_echo "$as_me: error: Invalid TBDEFS - Must specify the value" >&2;}
-   { (exit 1); exit 1; }; }
-    fi
-    TBDEFS="$withval"
-    TBPATH=`dirname $withval`
-
-else
-
-    { { $as_echo "$as_me:$LINENO: error: The required --with-TBDEFS= argument was not given.
-The value of --with-TBDEFS= must be the path to your Emulab defs file.
-Copy and modify the defs-example file for your Emulab installation.
-defs-default has values for Utah, including client-side image compilations." >&5
-$as_echo "$as_me: error: The required --with-TBDEFS= argument was not given.
-The value of --with-TBDEFS= must be the path to your Emulab defs file.
-Copy and modify the defs-example file for your Emulab installation.
-defs-default has values for Utah, including client-side image compilations." >&2;}
-   { (exit 1); exit 1; }; }
-
-fi
-
-
-if test -f $TBDEFS; then
-    #
-    # Remove the comments and newlines.  Really, that's what it does.
-    #
-    OLDPATH=$PATH
-    PATH="$TBPATH:$PATH"
-    . $TBDEFS
-    PATH=$OLDPATH
-else
-	{ { $as_echo "$as_me:$LINENO: error: Definitions file $TBDEFS was not found." >&5
-$as_echo "$as_me: error: Definitions file $TBDEFS was not found." >&2;}
-   { (exit 1); exit 1; }; }
-fi
-
-# XXX this can optionally be set in the defs file
-if test -n "$FSDIR_SCRATCH"; then
-    SCRATCHROOT_DIR="/scratch"
-fi
-
-#
-# These must come after the "eval" above, since the variables are not
-# defined until the defs file is taken in.
-#
-# Be sure to add to config.h.in!
-#
-if test x"$prefix" = x"NONE"; then
-    cat >>confdefs.h <<_ACEOF
-#define TBROOT "/usr/testbed"
-_ACEOF
-
-else
-    cat >>confdefs.h <<_ACEOF
-#define TBROOT "$prefix"
-_ACEOF
-
-fi
-cat >>confdefs.h <<_ACEOF
-#define TBDBNAME "$TBDBNAME"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define TBERRORLOGDBNAME "$TBERRORLOGDBNAME"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define TBADMINGROUP "$TBADMINGROUP"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define IPBASE "$IPBASE"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define JAILIPBASE "$JAILIPBASE"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define JAILIPMASK "$JAILIPMASK"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define BOSSNODE "$BOSSNODE"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define BOSSNODE_IP "$BOSSNODE_IP"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define EXTERNAL_BOSSNODE_IP "$EXTERNAL_BOSSNODE_IP"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define USERNODE "$USERNODE"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define USERNODE_IP "$USERNODE_IP"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define EXTERNAL_USERNODE_IP "$EXTERNAL_USERNODE_IP"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define FSNODE "$FSNODE"
-_ACEOF
-
-if test -n "$FSNODE_IP"; then
-	cat >>confdefs.h <<_ACEOF
-#define FSNODE_IP "$FSNODE_IP"
-_ACEOF
-
-elif test "$USERNODE" = "$FSNODE"; then
-	cat >>confdefs.h <<_ACEOF
-#define FSNODE_IP "$USERNODE_IP"
-_ACEOF
-
-fi
-cat >>confdefs.h <<_ACEOF
-#define CONTROL_ROUTER_IP "$CONTROL_ROUTER_IP"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define CONTROL_NETWORK "$CONTROL_NETWORK"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define CONTROL_NETMASK "$CONTROL_NETMASK"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define USERSROOT_DIR "$USERSROOT_DIR"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define PROJROOT_DIR "$PROJROOT_DIR"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define GROUPSROOT_DIR "$GROUPSROOT_DIR"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define SCRATCHROOT_DIR "$SCRATCHROOT_DIR"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define SHAREROOT_DIR "$SHAREROOT_DIR"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define FSDIR_PROJ "$FSDIR_PROJ"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define FSDIR_GROUPS "$FSDIR_GROUPS"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define FSDIR_USERS "$FSDIR_USERS"
-_ACEOF
-
-if test -n "$FSDIR_SHARE"; then
-    cat >>confdefs.h <<_ACEOF
-#define FSDIR_SHARE "$FSDIR_SHARE"
-_ACEOF
-
-fi
-if test -n "$FSDIR_SCRATCH"; then
-    cat >>confdefs.h <<_ACEOF
-#define FSDIR_SCRATCH "$FSDIR_SCRATCH"
-_ACEOF
-
-fi
-cat >>confdefs.h <<_ACEOF
-#define BOSSEVENTPORT "$BOSSEVENTPORT"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define FRISEBEEMCASTADDR "$FRISEBEEMCASTADDR"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define FRISEBEEMCASTPORT "$FRISEBEEMCASTPORT"
-_ACEOF
-
-cat >>confdefs.h <<_ACEOF
-#define FRISEBEENUMPORTS "$FRISEBEENUMPORTS"
-_ACEOF
-
-
-if test $OPSDBSUPPORT -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define OPSDBSUPPORT 1
-_ACEOF
-
-fi
-
-if test $ELVIN_COMPAT -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define ELVIN_COMPAT 1
-_ACEOF
-
-fi
-
-if test $ELABINELAB -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define ELABINELAB 1
-_ACEOF
-
-fi
-
-if test $ISOLATEADMINS -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define ISOLATEADMINS 1
-_ACEOF
-
-fi
-if test $DYNAMICROOTPASSWORDS -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define DYNAMICROOTPASSWORDS 1
-_ACEOF
-
-fi
-if test $TPM -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define TPM 1
-_ACEOF
-
-fi
-if test $NOSHAREDFS -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define NOSHAREDFS 1
-_ACEOF
-
-fi
-if test $NFSRACY -eq 1; then
-    cat >>confdefs.h <<_ACEOF
-#define NFSRACY 1
-_ACEOF
-
-fi
-
-LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
-cat >>confdefs.h <<_ACEOF
-#define LOG_TESTBED $LOG_TESTBED
-_ACEOF
-
-
-
-#
-# If the private network is different then the control network, we need
-# an extra subnet decl for it in dhcpd.conf.template. This is enormously
-# crude and simplistic, but works for the local case!
-#
-if test "$PRIVATE_NETWORK" != "$CONTROL_NETWORK"; then
-    DHCPD_CONTROLNET_DECL="subnet $PRIVATE_NETWORK netmask $PRIVATE_NETMASK {}"
-fi
-
-#
-# The email addresses need to be be munged for perl scripts. But,
-# php needs them un-escaped
-#
-TBOPSEMAIL_NOSLASH="$TBOPSEMAIL"
-TBOPSEMAIL="`echo $TBOPSEMAIL | sed -e 's/@/\\\@/'`"
-TBROBOCOPSEMAIL_NOSLASH="$TBROBOCOPSEMAIL"
-TBROBOCOPSEMAIL="`echo $TBROBOCOPSEMAIL | sed -e 's/@/\\\@/'`"
-TBLOGSEMAIL_NOSLASH="$TBLOGSEMAIL"
-TBLOGSEMAIL="`echo $TBLOGSEMAIL | sed -e 's/@/\\\@/'`"
-TBAUDITEMAIL_NOSLASH="$TBAUDITEMAIL"
-TBAUDITEMAIL="`echo $TBAUDITEMAIL | sed -e 's/@/\\\@/'`"
-TBWWWEMAIL_NOSLASH="$TBWWWEMAIL"
-TBWWWEMAIL="`echo $TBWWWEMAIL | sed -e 's/@/\\\@/'`"
-TBAPPROVALEMAIL_NOSLASH="$TBAPPROVALEMAIL"
-TBAPPROVALEMAIL="`echo $TBAPPROVALEMAIL | sed -e 's/@/\\\@/'`"
-TBSTATEDEMAIL_NOSLASH="$TBSTATEDEMAIL_NOSLASH"
-TBSTATEDEMAIL="`echo $TBSTATEDEMAIL | sed -e 's/@/\\\@/'`"
-TBTESTSUITEEMAIL_NOSLASH="$TBTESTSUITEEMAIL_NOSLASH"
-TBTESTSUITEEMAIL="`echo $TBTESTSUITEEMAIL | sed -e 's/@/\\\@/'`"
-
-if test -n "$TBAUTOMAILEMAIL"; then
-    TBAUTOMAILEMAIL_NOSLASH="$TBAUTOMAILEMAIL"
-    TBAUTOMAILEMAIL="`echo $TBAUTOMAILEMAIL | sed -e 's/@/\\\@/'`"
-else
-    TBAUTOMAILEMAIL_NOSLASH="$TBLOGSEMAIL_NOSLASH"
-    TBAUTOMAILEMAIL="$TBLOGSEMAIL"
-fi
-if test -n "$TBACTIVEARCHIVE"; then
-    TBACTIVEARCHIVE_NOSLASH="$TBACTIVEARCHIVE"
-    TBACTIVEARCHIVE="`echo $TBACTIVEARCHIVE | sed -e 's/@/\\\@/'`"
-else
-    TBACTIVEARCHIVE_NOSLASH="$TBOPSEMAIL_NOSLASH"
-    TBACTIVEARCHIVE="$TBOPSEMAIL"
-fi
-if test -n "$TBUSERSARCHIVE"; then
-    TBUSERSARCHIVE_NOSLASH="$TBUSERSARCHIVE"
-    TBUSERSARCHIVE="`echo $TBUSERSARCHIVE | sed -e 's/@/\\\@/'`"
-else
-    TBUSERSARCHIVE_NOSLASH="$TBOPSEMAIL_NOSLASH"
-    TBUSERSARCHIVE="$TBOPSEMAIL"
-fi
-if test -n "$TBERRORSEMAIL"; then
-    TBERRORSEMAIL_NOSLASH="$TBERRORSEMAIL"
-    TBERRORSEMAIL="`echo $TBERRORSEMAIL | sed -e 's/@/\\\@/'`"
-else
-    TBERRORSEMAIL_NOSLASH="$TBOPSEMAIL_NOSLASH"
-    TBERRORSEMAIL="$TBOPSEMAIL"
-fi
-
-# Default OURDOMAIN to the domain name of the boss node
-# This is gross beyond all description - autoconf changes m4's quote characters
-# to '[' and ']', which prevents them from working in the sed expression below.
-# So, we temporarily change them to something else then change them back.
-# Note: In newer versions of autoconf, this can be done with 'quadrigraphs'
-if test -z "$OURDOMAIN"; then
-    OURDOMAIN="`echo $BOSSNODE | sed -E -e 's/^[a-zA-Z0-9\-]+\.//'`"
-fi
-cat >>confdefs.h <<_ACEOF
-#define OURDOMAIN "$OURDOMAIN"
-_ACEOF
-
-
-if test -z "$EXTERNAL_TESTBED_NETWORK"; then
-    EXTERNAL_TESTBED_NETWORK=$TESTBED_NETWORK
-fi
-if test -z "$EXTERNAL_TESTBED_NETMASK"; then
-    EXTERNAL_TESTBED_NETMASK=$TESTBED_NETMASK
-fi
-if test -z "$EXTERNAL_BOSSNODE_IP"; then
-    EXTERNAL_BOSSNODE_IP=$BOSSNODE_IP
-fi
-if test -z "$EXTERNAL_USERNODE_IP"; then
-    EXTERNAL_USERNODE_IP=$USERNODE_IP
-fi
-if test -z "$FSNODE_IP"; then
-    FSNODE_IP=$USERNODE_IP
-fi
-if test -z "$EXTERNAL_FSNODE_IP"; then
-    EXTERNAL_FSNODE_IP=$FSNODE_IP
-fi
-if test -z "$TBAUTHDOMAIN"; then
-    TBAUTHDOMAIN=".$OURDOMAIN"
-fi
-if test -z "$TBAUTHTIMEOUT"; then
-    TBAUTHTIMEOUT="21600"
-fi
-if test -z "$WWW"; then
-    WWW="$WWWHOST"
-fi
-if test -z "$TBBASE"; then
-    TBBASE="https://$WWW"
-fi
-if test -z "$TBDOCBASE"; then
-    TBDOCBASE="http://$WWW"
-fi
-if test -z "$TBWWW"; then
-    TBWWW="<$TBBASE/>"
-fi
-cat >>confdefs.h <<_ACEOF
-#define TBBASE "$TBBASE"
-_ACEOF
-
-
-if test -z "$THISHOMEBASE"; then
-    THISHOMEBASE="Emulab.Net"
-fi
-if test -z "$EVENTSERVER"; then
-    EVENTSERVER="event-server"
-fi
-cat >>confdefs.h <<_ACEOF
-#define EVENTSERVER "$EVENTSERVER"
-_ACEOF
-
-
-#
-# Perl SelfLoader
-# XXX this is a hack which enables us to disable it on versions of perl
-# where there are problems with taint checking in the SelfLoader module.
-#
-cat >>confdefs.h <<_ACEOF
-#define SELFLOADER_DATA "$SELFLOADER_DATA"
-_ACEOF
-
-
-#
-# LEDA library path
-#
-
-# Check whether --with-LEDA was given.
-if test "${with_LEDA+set}" = set; then
-  withval=$with_LEDA;
-    if test "$withval" = "yes"; then
-        LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
-    else
-        LEDA="$withval"
-    fi
-
-else
-
-    if test -d "$ac_default_prefix/LEDA/LEDA-4.0"; then
-        LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
-    else
-        LEDA=""
-    fi
-
-fi
-
-
-
-#
-# Override LEDA with assign binary.
-#
-
-# Check whether --with-assignbinary was given.
-if test "${with_assignbinary+set}" = set; then
-  withval=$with_assignbinary;
-    if test "$withval" = "yes"; then
-        ASSIGN="assign.bin"
-        LEDA=""
-    else
-        ASSIGN="$withval"
-        LEDA=""
-    fi
-
-else
-
-    if test "$LEDA" = ""; then
-        ASSIGN="assign.bin"
-    else
-        ASSIGN=""
-    fi
-
-fi
-
-
-
-#
-# Arguments to ssh to disable strict host key checking, etc
-#
-
-# Check whether --with-ssh-args was given.
-if test "${with_ssh_args+set}" = set; then
-  withval=$with_ssh_args;
-    SSH_ARGS="$withval"
-
-else
-
-    SSH_ARGS="-q -o BatchMode=yes -o StrictHostKeyChecking=no"
-
-fi
-
-
-
-#
-# Path to install rc.d scripts in
-#
-
-# Check whether --with-rcdir was given.
-if test "${with_rcdir+set}" = set; then
-  withval=$with_rcdir;
-    INSTALL_RCDIR="$with_rcdir"
-
-else
-
-    INSTALL_RCDIR="/usr/local/etc/rc.d"
-
-fi
-
-
-
-#
-# Path to install apache config files in
-#
-
-# Check whether --with-apache-config-dir was given.
-if test "${with_apache_config_dir+set}" = set; then
-  withval=$with_apache_config_dir;
-    INSTALL_APACHE_CONFIG="$withval"
-
-else
-
-    INSTALL_APACHE_CONFIG="/usr/local/etc/apache"
-
-fi
-
-
-
-#
-# Path to garcia installation
-#
-
-# Check whether --with-brainstem was given.
-if test "${with_brainstem+set}" = set; then
-  withval=$with_brainstem;
-    if test x"$withval" != x""; then
-	BRAINSTEM_DIR="$withval"
-    else
-	{ { $as_echo "$as_me:$LINENO: error: You must specify a brainstem directory" >&5
-$as_echo "$as_me: error: You must specify a brainstem directory" >&2;}
-   { (exit 1); exit 1; }; };
-    fi
-
-else
-
-    BRAINSTEM_DIR=""
-
-fi
-
-
-
-
-#
-# Optionally build with optimization or aggressive non-optimization
-# (Actually three options: on, off or default.)
-#
-# Check whether --enable-debug was given.
-if test "${enable_debug+set}" = set; then
-  enableval=$enable_debug;
-fi
-
-
-if test "$enable_debug" = "yes"; then
-	OPT_CFLAGS="-g -DDEBUG";
-else
-	if test "$enable_debug" = "no"; then
-		OPT_CFLAGS="-O2 -DNDEBUG -UDEBUG";
-	else
-		OPT_CFLAGS="-g -O";
-	fi
-fi
-
-
-#
-# Disable event system. Relies on Elvin. On by default.
-#
-# Check whether --enable-events was given.
-if test "${enable_events+set}" = set; then
-  enableval=$enable_events;
-fi
-
-
-if test "$enable_events" = "no"; then
-	eventfiles="";
-        EVENTSYS=0;
-else
-	eventfiles="event/GNUmakefile lib/event/GNUmakefile \
-		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
-		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
-		    event/sched/GNUmakefile \
-		    event/new_sched/GNUmakefile \
-                    event/tbgen/GNUmakefile \
-                    event/example/GNUmakefile event/example/tbsend.pl \
-		    event/example/tbrecv.pl event/example/tbsend-short.pl \
-                    event/example/tbsend.py event/example/tbrecv.py \
-		    event/example/eventdebug.pl \
-		    event/trafgen/GNUmakefile \
-		    event/proxy/GNUmakefile \
-		    event/nsetrafgen/GNUmakefile \
-		    event/nsetrafgen/nseinput.tcl \
-		    event/nsetrafgen/nse-makepatch \
-                    event/delay-agent/GNUmakefile \
-		    event/link-agent/GNUmakefile \
-		    event/stated/waitForState \
-		    event/stated/GNUmakefile event/stated/stated \
-		    event/linktest/GNUmakefile \
-		    event/linktest/iperf/GNUmakefile \
-		    event/linktest/rude/GNUmakefile \
-		    event/linktest/weblinktest event/linktest/linktest.proxy \
-		    event/linktest/linktest_control \
-		    event/linktest/run_linktest.pl";
-
-	optional_subdirs="$optional_subdirs event";
-        EVENTSYS=1;
-fi
-
-
-#
-# Quickie pelab support.
-#
-if test $PELABSUPPORT -eq 0; then
-	pelabfiles="";
-else
-	pelabfiles="pelab/GNUmakefile pelab/db/GNUmakefile \
-		    pelab/bgmon/GNUmakefile ";
-	optional_subdirs="$optional_subdirs pelab";
-fi
-
-#
-# Enable Windows support.
-# Right now this means NTFS support in imagezip, maybe more things later.
-# Relies on Linux NTFS library.
-#
-# Check whether --enable-windows was given.
-if test "${enable_windows+set}" = set; then
-  enableval=$enable_windows;
-fi
-
-
-if test "$enable_windows" = "no"; then
-	WINSUPPORT=0;
-elif test "$enable_windows" = "yes"; then
-	WINSUPPORT=1;
-fi
-
-if test $WINSUPPORT -eq 0; then
-	winfiles="";
-else
-	winfiles="os/imagezip/ntfs/GNUmakefile \
-		  os/imagezip/ntfs/liblocale/GNUmakefile \
-		  os/imagezip/ntfs/libntfs/GNUmakefile \
-		  os/imagezip/fat/GNUmakefile"
-	optional_subdirs="$optional_subdirs";
-        cat >>confdefs.h <<_ACEOF
-#define WINSUPPORT 1
-_ACEOF
-
-fi
-
-#
-# Check for ulsshxmlrpc header
-#
-
-
-for ac_header in ulxmlrpcpp/ulxr_config.h
-do
-as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  { $as_echo "$as_me:$LINENO: checking for $ac_header" >&5
-$as_echo_n "checking for $ac_header... " >&6; }
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-fi
-ac_res=`eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-else
-  # Is the header compilable?
-{ $as_echo "$as_me:$LINENO: checking $ac_header usability" >&5
-$as_echo_n "checking $ac_header usability... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-$ac_includes_default
-#include <$ac_header>
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  ac_header_compiler=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	ac_header_compiler=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
-$as_echo "$ac_header_compiler" >&6; }
-
-# Is the header present?
-{ $as_echo "$as_me:$LINENO: checking $ac_header presence" >&5
-$as_echo_n "checking $ac_header presence... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <$ac_header>
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_c_preproc_warn_flag$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  ac_header_preproc=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  ac_header_preproc=no
-fi
-
-rm -f conftest.err conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
-$as_echo "$ac_header_preproc" >&6; }
-
-# So?  What about this header?
-case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
-  yes:no: )
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&5
-$as_echo "$as_me: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the compiler's result" >&5
-$as_echo "$as_me: WARNING: $ac_header: proceeding with the compiler's result" >&2;}
-    ac_header_preproc=yes
-    ;;
-  no:yes:* )
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: present but cannot be compiled" >&5
-$as_echo "$as_me: WARNING: $ac_header: present but cannot be compiled" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header:     check for missing prerequisite headers?" >&5
-$as_echo "$as_me: WARNING: $ac_header:     check for missing prerequisite headers?" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: see the Autoconf documentation" >&5
-$as_echo "$as_me: WARNING: $ac_header: see the Autoconf documentation" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&5
-$as_echo "$as_me: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the preprocessor's result" >&5
-$as_echo "$as_me: WARNING: $ac_header: proceeding with the preprocessor's result" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: in the future, the compiler will take precedence" >&5
-$as_echo "$as_me: WARNING: $ac_header: in the future, the compiler will take precedence" >&2;}
-
-    ;;
-esac
-{ $as_echo "$as_me:$LINENO: checking for $ac_header" >&5
-$as_echo_n "checking for $ac_header... " >&6; }
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-else
-  eval "$as_ac_Header=\$ac_header_preproc"
-fi
-ac_res=`eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-
-fi
-if test `eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'` = yes; then
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
- cat >>confdefs.h <<\_ACEOF
-#define HAVE_ULXMLRPCPP 1
-_ACEOF
-
-		  HAVE_ULXMLRPCPP="yes"
-fi
-
-done
-
-
-
-#
-# Check for the robot vision system dependencies.
-#
-
-for ac_header in linux/videodev.h
-do
-as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  { $as_echo "$as_me:$LINENO: checking for $ac_header" >&5
-$as_echo_n "checking for $ac_header... " >&6; }
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-fi
-ac_res=`eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-else
-  # Is the header compilable?
-{ $as_echo "$as_me:$LINENO: checking $ac_header usability" >&5
-$as_echo_n "checking $ac_header usability... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-$ac_includes_default
-#include <$ac_header>
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  ac_header_compiler=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	ac_header_compiler=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
-$as_echo "$ac_header_compiler" >&6; }
-
-# Is the header present?
-{ $as_echo "$as_me:$LINENO: checking $ac_header presence" >&5
-$as_echo_n "checking $ac_header presence... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <$ac_header>
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_c_preproc_warn_flag$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  ac_header_preproc=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  ac_header_preproc=no
-fi
-
-rm -f conftest.err conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
-$as_echo "$ac_header_preproc" >&6; }
-
-# So?  What about this header?
-case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
-  yes:no: )
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&5
-$as_echo "$as_me: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the compiler's result" >&5
-$as_echo "$as_me: WARNING: $ac_header: proceeding with the compiler's result" >&2;}
-    ac_header_preproc=yes
-    ;;
-  no:yes:* )
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: present but cannot be compiled" >&5
-$as_echo "$as_me: WARNING: $ac_header: present but cannot be compiled" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header:     check for missing prerequisite headers?" >&5
-$as_echo "$as_me: WARNING: $ac_header:     check for missing prerequisite headers?" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: see the Autoconf documentation" >&5
-$as_echo "$as_me: WARNING: $ac_header: see the Autoconf documentation" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&5
-$as_echo "$as_me: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the preprocessor's result" >&5
-$as_echo "$as_me: WARNING: $ac_header: proceeding with the preprocessor's result" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: $ac_header: in the future, the compiler will take precedence" >&5
-$as_echo "$as_me: WARNING: $ac_header: in the future, the compiler will take precedence" >&2;}
-
-    ;;
-esac
-{ $as_echo "$as_me:$LINENO: checking for $ac_header" >&5
-$as_echo_n "checking for $ac_header... " >&6; }
-if { as_var=$as_ac_Header; eval "test \"\${$as_var+set}\" = set"; }; then
-  $as_echo_n "(cached) " >&6
-else
-  eval "$as_ac_Header=\$ac_header_preproc"
-fi
-ac_res=`eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'`
-	       { $as_echo "$as_me:$LINENO: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-
-fi
-if test `eval 'as_val=${'$as_ac_Header'}
-		 $as_echo "$as_val"'` = yes; then
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
- cat >>confdefs.h <<\_ACEOF
-#define HAVE_LINUX_VIDEODEV_H 1
-_ACEOF
-
-		  HAVE_LINUX_VIDEODEV_H="yes"
-fi
-
-done
-
-# Extract the first word of "gtk-config", so it can be a program name with args.
-set dummy gtk-config; ac_word=$2
-{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_prog_GTK_CONFIG+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  if test -n "$GTK_CONFIG"; then
-  ac_cv_prog_GTK_CONFIG="$GTK_CONFIG" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_GTK_CONFIG="gtk-config"
-    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-GTK_CONFIG=$ac_cv_prog_GTK_CONFIG
-if test -n "$GTK_CONFIG"; then
-  { $as_echo "$as_me:$LINENO: result: $GTK_CONFIG" >&5
-$as_echo "$GTK_CONFIG" >&6; }
-else
-  { $as_echo "$as_me:$LINENO: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-
-# Check whether --enable-mezzanine was given.
-if test "${enable_mezzanine+set}" = set; then
-  enableval=$enable_mezzanine;
-fi
-
-
-if test x"$HAVE_LINUX_VIDEODEV_H" != x"" && test x"$GTK_CONFIG" != x""; then
-    HAVE_MEZZANINE="$enable_mezzanine"
-    cat >>confdefs.h <<\_ACEOF
-#define HAVE_MEZZANINE 1
-_ACEOF
-
-else
-    HAVE_MEZZANINE="no"
-fi
-
-
-#
-# Check for Xerces (required for XML support in assign).
-#
-
-ac_ext=cpp
-ac_cpp='$CXXCPP $CPPFLAGS'
-ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
@@ -6328,405 +3328,161 @@ else
     CXXFLAGS=
   fi
 fi
-ac_ext=cpp
-ac_cpp='$CXXCPP $CPPFLAGS'
-ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
-
-
-ac_ext=cpp
-ac_cpp='$CXXCPP $CPPFLAGS'
-ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
-{ $as_echo "$as_me:$LINENO: checking how to run the C++ preprocessor" >&5
-$as_echo_n "checking how to run the C++ preprocessor... " >&6; }
-if test -z "$CXXCPP"; then
-  if test "${ac_cv_prog_CXXCPP+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-      # Double quotes because CXXCPP needs to be expanded
-    for CXXCPP in "$CXX -E" "/lib/cpp"
-    do
-      ac_preproc_ok=false
-for ac_cxx_preproc_warn_flag in '' yes
-do
-  # Use a header file that comes with gcc, so configuring glibc
-  # with a fresh cross-compiler works.
-  # Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
-  # <limits.h> exists even on freestanding compilers.
-  # On the NeXT, cc -E runs the code through the compiler's parser,
-  # not just through cpp. "Syntax error" is here to catch this case.
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#ifdef __STDC__
-# include <limits.h>
-#else
-# include <assert.h>
-#endif
-		     Syntax error
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_cxx_preproc_warn_flag$ac_cxx_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  :
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  # Broken: fails on valid input.
-continue
-fi
-
-rm -f conftest.err conftest.$ac_ext
-
-  # OK, works on sane cases.  Now check whether nonexistent headers
-  # can be detected and how.
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <ac_nonexistent.h>
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_cxx_preproc_warn_flag$ac_cxx_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  # Broken: success on invalid input.
-continue
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  # Passes both tests.
-ac_preproc_ok=:
-break
-fi
-
-rm -f conftest.err conftest.$ac_ext
-
-done
-# Because of `break', _AC_PREPROC_IFELSE's cleaning code was skipped.
-rm -f conftest.err conftest.$ac_ext
-if $ac_preproc_ok; then
-  break
-fi
-
-    done
-    ac_cv_prog_CXXCPP=$CXXCPP
-
-fi
-  CXXCPP=$ac_cv_prog_CXXCPP
-else
-  ac_cv_prog_CXXCPP=$CXXCPP
-fi
-{ $as_echo "$as_me:$LINENO: result: $CXXCPP" >&5
-$as_echo "$CXXCPP" >&6; }
-ac_preproc_ok=false
-for ac_cxx_preproc_warn_flag in '' yes
-do
-  # Use a header file that comes with gcc, so configuring glibc
-  # with a fresh cross-compiler works.
-  # Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
-  # <limits.h> exists even on freestanding compilers.
-  # On the NeXT, cc -E runs the code through the compiler's parser,
-  # not just through cpp. "Syntax error" is here to catch this case.
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#ifdef __STDC__
-# include <limits.h>
-#else
-# include <assert.h>
-#endif
-		     Syntax error
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_cxx_preproc_warn_flag$ac_cxx_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  :
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  # Broken: fails on valid input.
-continue
-fi
-
-rm -f conftest.err conftest.$ac_ext
-
-  # OK, works on sane cases.  Now check whether nonexistent headers
-  # can be detected and how.
-  cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <ac_nonexistent.h>
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_cxx_preproc_warn_flag$ac_cxx_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  # Broken: success on invalid input.
-continue
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  # Passes both tests.
-ac_preproc_ok=:
-break
-fi
-
-rm -f conftest.err conftest.$ac_ext
-
-done
-# Because of `break', _AC_PREPROC_IFELSE's cleaning code was skipped.
-rm -f conftest.err conftest.$ac_ext
-if $ac_preproc_ok; then
-  :
-else
-  { { $as_echo "$as_me:$LINENO: error: C++ preprocessor \"$CXXCPP\" fails sanity check
-See \`config.log' for more details." >&5
-$as_echo "$as_me: error: C++ preprocessor \"$CXXCPP\" fails sanity check
-See \`config.log' for more details." >&2;}
-   { (exit 1); exit 1; }; }
-fi
-
-ac_ext=cpp
-ac_cpp='$CXXCPP $CPPFLAGS'
-ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
-
-
-if test "${ac_cv_header_xercesc_dom_DOM_hpp+set}" = set; then
-  { $as_echo "$as_me:$LINENO: checking for xercesc/dom/DOM.hpp" >&5
-$as_echo_n "checking for xercesc/dom/DOM.hpp... " >&6; }
-if test "${ac_cv_header_xercesc_dom_DOM_hpp+set}" = set; then
-  $as_echo_n "(cached) " >&6
-fi
-{ $as_echo "$as_me:$LINENO: result: $ac_cv_header_xercesc_dom_DOM_hpp" >&5
-$as_echo "$ac_cv_header_xercesc_dom_DOM_hpp" >&6; }
-else
-  # Is the header compilable?
-{ $as_echo "$as_me:$LINENO: checking xercesc/dom/DOM.hpp usability" >&5
-$as_echo_n "checking xercesc/dom/DOM.hpp usability... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-$ac_includes_default
-#include <xercesc/dom/DOM.hpp>
-_ACEOF
-rm -f conftest.$ac_objext
-if { (ac_try="$ac_compile"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_compile") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } && {
-	 test -z "$ac_cxx_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest.$ac_objext; then
-  ac_header_compiler=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	ac_header_compiler=no
-fi
-
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
-$as_echo "$ac_header_compiler" >&6; }
-
-# Is the header present?
-{ $as_echo "$as_me:$LINENO: checking xercesc/dom/DOM.hpp presence" >&5
-$as_echo_n "checking xercesc/dom/DOM.hpp presence... " >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <xercesc/dom/DOM.hpp>
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
-$as_echo "$ac_try_echo") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_cxx_preproc_warn_flag$ac_cxx_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  ac_header_preproc=yes
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  ac_header_preproc=no
-fi
-
-rm -f conftest.err conftest.$ac_ext
-{ $as_echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
-$as_echo "$ac_header_preproc" >&6; }
-
-# So?  What about this header?
-case $ac_header_compiler:$ac_header_preproc:$ac_cxx_preproc_warn_flag in
-  yes:no: )
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp: accepted by the compiler, rejected by the preprocessor!" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp: accepted by the compiler, rejected by the preprocessor!" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp: proceeding with the compiler's result" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp: proceeding with the compiler's result" >&2;}
-    ac_header_preproc=yes
-    ;;
-  no:yes:* )
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp: present but cannot be compiled" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp: present but cannot be compiled" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp:     check for missing prerequisite headers?" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp:     check for missing prerequisite headers?" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp: see the Autoconf documentation" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp: see the Autoconf documentation" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp:     section \"Present But Cannot Be Compiled\"" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp:     section \"Present But Cannot Be Compiled\"" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp: proceeding with the preprocessor's result" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp: proceeding with the preprocessor's result" >&2;}
-    { $as_echo "$as_me:$LINENO: WARNING: xercesc/dom/DOM.hpp: in the future, the compiler will take precedence" >&5
-$as_echo "$as_me: WARNING: xercesc/dom/DOM.hpp: in the future, the compiler will take precedence" >&2;}
-
-    ;;
-esac
-{ $as_echo "$as_me:$LINENO: checking for xercesc/dom/DOM.hpp" >&5
-$as_echo_n "checking for xercesc/dom/DOM.hpp... " >&6; }
-if test "${ac_cv_header_xercesc_dom_DOM_hpp+set}" = set; then
-  $as_echo_n "(cached) " >&6
-else
-  ac_cv_header_xercesc_dom_DOM_hpp=$ac_header_preproc
-fi
-{ $as_echo "$as_me:$LINENO: result: $ac_cv_header_xercesc_dom_DOM_hpp" >&5
-$as_echo "$ac_cv_header_xercesc_dom_DOM_hpp" >&6; }
-
-fi
-if test $ac_cv_header_xercesc_dom_DOM_hpp = yes; then
-  HAVE_XERCES=yes
-fi
-
-
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
-
-
-#
-# Testing mode.  In testing mode scripts should not effect hardware state.
-# This is designed to be used with the testsuite software which operates
-# on a test copy of the DB.
-#
-# Check whether --enable-testmode was given.
-if test "${enable_testmode+set}" = set; then
-  enableval=$enable_testmode;
-fi
-
-
-if test "$enable_testmode" = "yes"; then
-	TESTMODE=1
+{ $as_echo "$as_me:$LINENO: checking whether ln -s works" >&5
+$as_echo_n "checking whether ln -s works... " >&6; }
+LN_S=$as_ln_s
+if test "$LN_S" = "ln -s"; then
+  { $as_echo "$as_me:$LINENO: result: yes" >&5
+$as_echo "yes" >&6; }
 else
-	TESTMODE=0
+  { $as_echo "$as_me:$LINENO: result: no, using $LN_S" >&5
+$as_echo "no, using $LN_S" >&6; }
+fi
+
+if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
+set dummy ${ac_tool_prefix}ranlib; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_prog_RANLIB+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$RANLIB"; then
+  ac_cv_prog_RANLIB="$RANLIB" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_prog_RANLIB="${ac_tool_prefix}ranlib"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+fi
+fi
+RANLIB=$ac_cv_prog_RANLIB
+if test -n "$RANLIB"; then
+  { $as_echo "$as_me:$LINENO: result: $RANLIB" >&5
+$as_echo "$RANLIB" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
 fi
 
 
-# Make sure $INSTALL is valid at any depth in our tree, i.e. make it absoulte.
-# This can be needed when no valid install is found and autoconf falls back on
-# the supplied install.sh, but we called 'configure' with a relative path.
+fi
+if test -z "$ac_cv_prog_RANLIB"; then
+  ac_ct_RANLIB=$RANLIB
+  # Extract the first word of "ranlib", so it can be a program name with args.
+set dummy ranlib; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_prog_ac_ct_RANLIB+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$ac_ct_RANLIB"; then
+  ac_cv_prog_ac_ct_RANLIB="$ac_ct_RANLIB" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_prog_ac_ct_RANLIB="ranlib"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+fi
+fi
+ac_ct_RANLIB=$ac_cv_prog_ac_ct_RANLIB
+if test -n "$ac_ct_RANLIB"; then
+  { $as_echo "$as_me:$LINENO: result: $ac_ct_RANLIB" >&5
+$as_echo "$ac_ct_RANLIB" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_ct_RANLIB" = x; then
+    RANLIB=":"
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:$LINENO: WARNING: In the future, Autoconf will not detect cross-tools
+whose name does not start with the host triplet.  If you think this
+configuration is useful to you, please write to autoconf@gnu.org." >&5
+$as_echo "$as_me: WARNING: In the future, Autoconf will not detect cross-tools
+whose name does not start with the host triplet.  If you think this
+configuration is useful to you, please write to autoconf@gnu.org." >&2;}
+ac_tool_warned=yes ;;
+esac
+    RANLIB=$ac_ct_RANLIB
+  fi
+else
+  RANLIB="$ac_cv_prog_RANLIB"
+fi
+
+{ $as_echo "$as_me:$LINENO: checking for a thread-safe mkdir -p" >&5
+$as_echo_n "checking for a thread-safe mkdir -p... " >&6; }
+if test -z "$MKDIR_P"; then
+  if test "${ac_cv_path_mkdir+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH$PATH_SEPARATOR/opt/sfw/bin
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_prog in mkdir gmkdir; do
+	 for ac_exec_ext in '' $ac_executable_extensions; do
+	   { test -f "$as_dir/$ac_prog$ac_exec_ext" && $as_test_x "$as_dir/$ac_prog$ac_exec_ext"; } || continue
+	   case `"$as_dir/$ac_prog$ac_exec_ext" --version 2>&1` in #(
+	     'mkdir (GNU coreutils) '* | \
+	     'mkdir (coreutils) '* | \
+	     'mkdir (fileutils) '4.1*)
+	       ac_cv_path_mkdir=$as_dir/$ac_prog$ac_exec_ext
+	       break 3;;
+	   esac
+	 done
+       done
+done
+IFS=$as_save_IFS
+
+fi
+
+  if test "${ac_cv_path_mkdir+set}" = set; then
+    MKDIR_P="$ac_cv_path_mkdir -p"
+  else
+    # As a last resort, use the slow shell script.  Don't cache a
+    # value for MKDIR_P within a source directory, because that will
+    # break other packages using the cache if that directory is
+    # removed, or if the value is a relative name.
+    test -d ./--version && rmdir ./--version
+    MKDIR_P="$ac_install_sh -d"
+  fi
+fi
+{ $as_echo "$as_me:$LINENO: result: $MKDIR_P" >&5
+$as_echo "$MKDIR_P" >&6; }
+
 # Find a good install program.  We prefer a C program (faster),
 # so one script is as good as another.  But avoid the broken or
 # incompatible versions:
@@ -6820,32 +3576,26 @@ test -z "$INSTALL_SCRIPT" && INSTALL_SCRIPT='${INSTALL}'
 
 test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
 
-case "$INSTALL" in
-..*)
-        INSTALL=`pwd`/$INSTALL
-        ;;
-esac
-
-# Extract the first word of "rsync", so it can be a program name with args.
-set dummy rsync; ac_word=$2
+# Extract the first word of "ar", so it can be a program name with args.
+set dummy ar; ac_word=$2
 { $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_RSYNC+set}" = set; then
+if test "${ac_cv_path_AR+set}" = set; then
   $as_echo_n "(cached) " >&6
 else
-  case $RSYNC in
+  case $AR in
   [\\/]* | ?:[\\/]*)
-  ac_cv_path_RSYNC="$RSYNC" # Let the user override the test with a path.
+  ac_cv_path_AR="$AR" # Let the user override the test with a path.
   ;;
   *)
   as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in ${PATH}
+for as_dir in $PATH
 do
   IFS=$as_save_IFS
   test -z "$as_dir" && as_dir=.
   for ac_exec_ext in '' $ac_executable_extensions; do
   if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_RSYNC="$as_dir/$ac_word$ac_exec_ext"
+    ac_cv_path_AR="$as_dir/$ac_word$ac_exec_ext"
     $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -6853,280 +3603,349 @@ done
 done
 IFS=$as_save_IFS
 
-  test -z "$ac_cv_path_RSYNC" && ac_cv_path_RSYNC=""""
   ;;
 esac
 fi
-RSYNC=$ac_cv_path_RSYNC
-if test -n "$RSYNC"; then
-  { $as_echo "$as_me:$LINENO: result: $RSYNC" >&5
-$as_echo "$RSYNC" >&6; }
+AR=$ac_cv_path_AR
+if test -n "$AR"; then
+  { $as_echo "$as_me:$LINENO: result: $AR" >&5
+$as_echo "$AR" >&6; }
 else
   { $as_echo "$as_me:$LINENO: result: no" >&5
 $as_echo "no" >&6; }
 fi
 
 
-if test x"$RSYNC" = x"" || test ! -x "$RSYNC"; then
-    { $as_echo "$as_me:$LINENO: WARNING: Rsync is required for logholes to work, see www.rsync.org." >&5
-$as_echo "$as_me: WARNING: Rsync is required for logholes to work, see www.rsync.org." >&2;}
+if test -z "$AR" ; then
+    { { $as_echo "$as_me:$LINENO: error: no acceptable ar found in \$PATH" >&5
+$as_echo "$as_me: error: no acceptable ar found in \$PATH" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+# Extract the first word of "strip", so it can be a program name with args.
+set dummy strip; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_STRIP+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  case $STRIP in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_STRIP="$STRIP" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_STRIP="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+STRIP=$ac_cv_path_STRIP
+if test -n "$STRIP"; then
+  { $as_echo "$as_me:$LINENO: result: $STRIP" >&5
+$as_echo "$STRIP" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
 fi
 
-# Turn on the new fancy banner - normally turned on only at Utah, but
-# overridable for other sites
-if test "$TBMAINSITE" = 1; then
-    FANCYBANNER=1
+
+if test -z "$STRIP" ; then
+    { { $as_echo "$as_me:$LINENO: error: no acceptable strip found in \$PATH" >&5
+$as_echo "$as_me: error: no acceptable strip found in \$PATH" >&2;}
+   { (exit 1); exit 1; }; }
 fi
+# Extract the first word of "rm", so it can be a program name with args.
+set dummy rm; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_RM+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  case $RM in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_RM="$RM" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_RM="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+RM=$ac_cv_path_RM
+if test -n "$RM"; then
+  { $as_echo "$as_me:$LINENO: result: $RM" >&5
+$as_echo "$RM" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test -z "$RM" ; then
+    { { $as_echo "$as_me:$LINENO: error: no acceptable rm found in \$PATH" >&5
+$as_echo "$as_me: error: no acceptable rm found in \$PATH" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+# Extract the first word of "cp", so it can be a program name with args.
+set dummy cp; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_CP+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  case $CP in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_CP="$CP" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_CP="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+CP=$ac_cv_path_CP
+if test -n "$CP"; then
+  { $as_echo "$as_me:$LINENO: result: $CP" >&5
+$as_echo "$CP" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test -z "$CP" ; then
+    { { $as_echo "$as_me:$LINENO: error: no acceptable cp found in \$PATH" >&5
+$as_echo "$as_me: error: no acceptable cp found in \$PATH" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+# Extract the first word of "byacc", so it can be a program name with args.
+set dummy byacc; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_YACC+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  case $YACC in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_YACC="$YACC" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_YACC="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+YACC=$ac_cv_path_YACC
+if test -n "$YACC"; then
+  { $as_echo "$as_me:$LINENO: result: $YACC" >&5
+$as_echo "$YACC" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test -z "$YACC" ; then
+    { { $as_echo "$as_me:$LINENO: error: no byacc found in \$PATH" >&5
+$as_echo "$as_me: error: no byacc found in \$PATH" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+# Extract the first word of "tar", so it can be a program name with args.
+set dummy tar; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_TAR+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  case $TAR in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_TAR="$TAR" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_TAR="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+TAR=$ac_cv_path_TAR
+if test -n "$TAR"; then
+  { $as_echo "$as_me:$LINENO: result: $TAR" >&5
+$as_echo "$TAR" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test -z "$TAR" ; then
+    { { $as_echo "$as_me:$LINENO: error: no tar found in \$PATH" >&5
+$as_echo "$as_me: error: no tar found in \$PATH" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+# Extract the first word of "rpm", so it can be a program name with args.
+set dummy rpm; ac_word=$2
+{ $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_RPM+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  case $RPM in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_RPM="$RPM" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_RPM="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_RPM" && ac_cv_path_RPM="rpm"
+  ;;
+esac
+fi
+RPM=$ac_cv_path_RPM
+if test -n "$RPM"; then
+  { $as_echo "$as_me:$LINENO: result: $RPM" >&5
+$as_echo "$RPM" >&6; }
+else
+  { $as_echo "$as_me:$LINENO: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test -z "$RPM" ; then
+    { { $as_echo "$as_me:$LINENO: error: no rpm found in \$PATH" >&5
+$as_echo "$as_me: error: no rpm found in \$PATH" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+# Need this for Makeconf.
+
+
+# Tell build it is the clientside.
+
+EMULAB_CLIENTSIDE=1
 
 #
-# Merge build
+# The only option is if we build in elvin compat support.
 #
-MERGE_BUILD=0
-MERGE_BUILD_SANDBOX=
-if test -e "$srcdir/.merge-build"; then
-   merge_sandbox=`grep source-tree "$srcdir/.merge-build" | cut -d' ' -f2`
-   merge_tree=`grep merge-tree "$srcdir/.merge-build" | cut -d' ' -f2`
-   if test "$srcdir" -ef "$srcdir/$merge_sandbox/$merge_tree"; then
-      MERGE_BUILD=1
-      MERGE_BUILD_SANDBOX=$srcdir/$merge_sandbox
-      echo "#/bin/sh"   > sync
-      echo              >> sync
-      echo "cd \"$srcdir\"" >> sync
-      echo "utils/merge-build sync" >> sync
-      chmod +x sync
-      echo "Merge-build enabled"
-   fi
+
+ELVIN_COMPAT=0
+
+# Check whether --enable-elvin_compat was given.
+if test "${enable_elvin_compat+set}" = set; then
+  enableval=$enable_elvin_compat;
+fi
+
+
+if test "$enable_elvin_compat" = "yes"; then
+    ELVIN_COMPAT=1
+fi
+if test $ELVIN_COMPAT -eq 1; then
+    cat >>confdefs.h <<_ACEOF
+#define ELVIN_COMPAT 1
+_ACEOF
+
 fi
 
 
 
-outfiles="$outfiles Makeconf GNUmakefile \
-	assign/GNUmakefile \
-        named/GNUmakefile firewall/GNUmakefile \
-	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
-	capture/GNUmakefile \
-	db/GNUmakefile \
-	db/EmulabConstants.pm db/EmulabFeatures.pm db/Experiment.pm \
-	db/Firewall.pm db/Group.pm db/Image.pm db/Interface.pm \
-	db/Lan.pm db/Logfile.pm db/Node.pm db/NodeType.pm db/OSinfo.pm \
-	db/Project.pm db/User.pm db/VirtExperiment.pm \
-	db/nalloc db/nfree db/if2port db/backup \
-	db/webcontrol db/node_status db/genelists db/genelists.proxy \
-	db/dumperrorlog.proxy \
-	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
-	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/emdb.pm db/emdbi.pm db/emutil.pm \
-	db/dhcpd_makeconf db/nodelog db/unixgroups \
-	db/dbcheck db/interswitch db/dbboot db/schemacheck \
-	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
-	db/update_permissions \
-	db/grabron db/stategraph db/readycount \
-	db/idletimes db/idlemail db/xmlconvert \
-	db/libdb.py db/elabinelab_bossinit \
-	ipod/GNUmakefile \
-	lib/GNUmakefile lib/libtb/GNUmakefile \
-	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
-	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
-	os/imagezip/hashmap/GNUmakefile \
-	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
-        os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
-	os/genhostsfile/GNUmakefile os/zapdisk/GNUmakefile \
-	pxe/GNUmakefile pxe/bootinfo.restart \
-	security/GNUmakefile security/lastlog_daemon \
-        sensors/GNUmakefile sensors/slothd/GNUmakefile \
-	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
-        sensors/canaryd/GNUmakefile sensors/canaryd/feedbacklogs \
-	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
-	sensors/powermon/GNUmakefile sensors/powermon/powermon \
-	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
-	sensors/nfstrace/nfsdump2/GNUmakefile \
-	account/GNUmakefile account/tbacct \
-	account/addpubkey account/addsfskey account/genpubkeys \
-	account/quotamail account/mkusercert account/newproj account/newuser \
-	backend/GNUmakefile backend/moduserinfo backend/newgroup \
-	backend/newmmlist backend/editexp backend/editimageid \
-	backend/editnodetype backend/editsitevars backend/newimageid \
-	backend/editgroup backend/newimageid_ez \
-	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
-	tbsetup/snmpit_test/GNUmakefile  \
-	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
-	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
-	tbsetup/power_mail.pm tbsetup/power_whol.pm \
-	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
-	tbsetup/node_reboot tbsetup/nscheck \
-	tbsetup/resetvlans tbsetup/rmuser tbsetup/rmproj \
-	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
-	tbsetup/batchexp tbsetup/batch_daemon tbsetup/repos_daemon \
-	tbsetup/wanlinkinfo tbsetup/wanassign \
-	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
-	tbsetup/eventsys.proxy \
-	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
-	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
-	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
-	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
-	tbsetup/ns2ir/sim.tcl tbsetup/nseswap tbsetup/nseparse/GNUmakefile \
-	tbsetup/nseparse/nse.parse.proxy tbsetup/nseparse/parse-nse \
-	tbsetup/nseparse/nse.parse.tcl \
-	tbsetup/nsverify/GNUmakefile tbsetup/nsverify/nstbparse \
-	tbsetup/nsverify/verify-ns \
-	tbsetup/db2ns \
-	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend tbsetup/tbrestart \
-	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
-	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
-	tbsetup/assign_wrapper2 \
-	tbsetup/node_update \
-	tbsetup/savelogs tbsetup/setgroups \
-	tbsetup/savelogs.proxy tbsetup/rmgroup tbsetup/mkexpdir \
-	tbsetup/node_control tbsetup/node_attributes \
-        tbsetup/mkgroup tbsetup/eventsys_start \
-	tbsetup/eventsys_control \
-	tbsetup/mkproj tbsetup/libtestbed.pm \
-	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
-	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
-	tbsetup/smbpasswd_setup.proxy \
-	tbsetup/checkports tbsetup/libaudit.pm \
-	tbsetup/libreboot.pm tbsetup/libosload.pm tbsetup/libadminmfs.pm \
-	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
-	tbsetup/idleswap tbsetup/switchmac \
-	tbsetup/newnode_reboot \
-        tbsetup/libtestbed.py \
-	tbsetup/libArchive.pm tbsetup/archive_control \
-	tbsetup/tarfiles_setup \
-	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
-	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
-        tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
-        tbsetup/plab/mod_PLCNM.py \
-	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
-        tbsetup/plab/plabrenewonce \
-	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
-	tbsetup/plab/plabmonitord tbsetup/plab/libplabmon.pm \
-        tbsetup/plab/plabmon_badpool.pm tbsetup/plab/plabmon_goodpool.pm \
-        tbsetup/plab/plablinkdata \
-	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
-	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
-	tbsetup/plab/plabdiscover tbsetup/plab/etc/netbed_files/GNUmakefile \
-	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
-	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
-	tbsetup/panic tbsetup/tbrsync tbsetup/nfstrace \
-	tbsetup/checkup/GNUmakefile tbsetup/checkup/checkup_daemon \
-	tbsetup/libtblog.pm tbsetup/template_cvsroot/GNUmakefile \
-	tip/GNUmakefile tip/console \
-	tmcd/GNUmakefile tmcd/tmcd.restart \
-	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
-	tmcd/freebsd/GNUmakefile tmcd/freebsd/init/GNUmakefile \
-	tmcd/freebsd/init/4/GNUmakefile tmcd/freebsd/init/5/GNUmakefile \
-	tmcd/freebsd/init/6/GNUmakefile tmcd/freebsd/init/7/GNUmakefile \
-	tmcd/freebsd/init/8/GNUmakefile \
-	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
-	tmcd/linux/GNUmakefile tmcd/linux/supfile \
-	tmcd/linux/sethostname.dhclient \
-	tmcd/linux/xen/emulab-cnet \
-	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
-	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
-        tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
-	tmcd/ubuntu10/GNUmakefile \
-	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
-	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
-	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \
-	tmcd/cygwinxp/GNUmakefile tmcd/dp/GNUmakefile \
-	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
-	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
-	utils/sshtb utils/create_image utils/node_admin \
-	utils/firstuser utils/export_tables utils/eventping \
-	utils/cvsupd.pl utils/newnode utils/grantnodetype \
-	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
-	utils/link_config utils/import_commitlog \
-	utils/opsreboot utils/deletenode utils/spewleds \
-	utils/grabwebcams utils/loghole utils/webcopy \
-	utils/setdest utils/grabswitchconfig \
-        utils/backupswitches utils/setbuildinfo utils/checkquota \
-	utils/spewconlog utils/xlogin \
-	utils/opsdb_control utils/opsdb_control.proxy \
-	utils/remove_old_www utils/epmodeset \
-	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
-	www/xmlrpcpipe.php3 \
-	www/swish.conf www/websearch \
-	www/garcia-telemetry/GNUmakefile www/tutorial/GNUmakefile \
-	www/sec-check/GNUmakefile www/emusearch.xml \
-	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
-	vis/prerender vis/prerender_all vis/render \
-	vis/floormap vis/webfloormap \
-	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
-	rc.d/2.elvind.sh rc.d/3.plab.sh rc.d/2.dhcpd.sh rc.d/3.and.sh \
-	rc.d/3.elvin_gateway.sh rc.d/pelab.sh rc.d/capture.sh \
-	rc.d/3.mfrisbeed.sh rc.d/3.mfrisbeed-subboss.sh \
-	tools/GNUmakefile rc.d/1.mysql-server.sh tools/svn/GNUmakefile \
-	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
-        tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \
-        tools/selectapplet/GNUmakefile tools/rmanage/GNUmakefile \
-	$eventfiles \
-	$winfiles \
-	$pelabfiles \
-	apache/GNUmakefile apache/httpd.conf \
-        xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
-	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
-	xmlrpc/sslxmlrpc_client.py xmlrpc/sslxmlrpc_server.py \
-	xmlrpc/webxmlrpc xmlrpc/script_wrapper.py xmlrpc/libxmlrpc.pm \
-	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
-	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
-	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
-	cdrom/groklilo/GNUmakefile \
-	flash/GNUmakefile \
-	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
-	dhcpd/dhcpd.conf.subboss.template \
-	install/GNUmakefile \
-	install/ops-install install/boss-install install/fs-install \
-	install/load-descriptors install/dump-descriptors \
-	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
-        install/clrhouse-install \
-	install/libinstall.pm install/update-install install/update-testbed \
-	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
-	mote/sgtools/GNUmakefile \
-	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
-	robots/mtp/GNUmakefile robots/emc/GNUmakefile \
-	robots/emc/test_emcd.sh robots/emc/loclistener \
-	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
-	robots/rmcd/GNUmakefile robots/primotion/GNUmakefile \
-	robots/primotion/test_gorobot.sh robots/primotion/dgrobot/GNUmakefile \
-	robots/mezzanine/GNUmakefile robots/mezzanine/rtk2/GNUmakefile \
-	robots/mezzanine/libfg/GNUmakefile \
-	robots/mezzanine/libmezz/GNUmakefile \
-	robots/mezzanine/mezzanine/GNUmakefile \
-	robots/tracker/GNUmakefile \
-	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord \
-        wiki/GNUmakefile wiki/addwikiuser wiki/wikiproxy \
-	wiki/usertemplate wiki/webhometemplate wiki/LocalSite.cfg \
-        wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
-        bugdb/GNUmakefile bugdb/bugdbproxy \
-        protogeni/GNUmakefile protogeni/security/GNUmakefile \
-        protogeni/xmlrpc/GNUmakefile protogeni/lib/GNUmakefile \
-        protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
-        protogeni/test/GNUmakefile protogeni/rspec/GNUmakefile \
-        protogeni/rspec/0.1/GNUmakefile \
-	protogeni/rspec/0.2/GNUmakefile \
-	protogeni/rspec/2/GNUmakefile \
-        collab/GNUmakefile \
-        collab/trac/GNUmakefile \
-        collab/jabber/GNUmakefile \
-        collab/mailman/GNUmakefile collab/cvstools/GNUmakefile \
-	collab/mailman/mmlistmembership \
-	collab/mailman/addmmlist collab/mailman/mmsetup \
-	collab/mailman/delmmlist collab/mailman/mmxlogin \
-	collab/mailman/genaliases collab/mailman/setmmlistmembers \
-	collab/mailman/mailmanproxy collab/mailman/setmmpasswd \
-	collab/cvstools/cvs.proxy collab/cvstools/cvs_ctrl \
-	collab/cvstools/cvsrepo_ctrl.proxy collab/cvstools/cvsrepo_ctrl \
-	collab/cvstools/webcvsrepo_ctrl \
-	collab/exp-vis/GNUmakefile collab/exp-vis/fetch-vis \
-	node_usage/GNUmakefile node_usage/mk-plots \
-	node_usage/analy node_usage/publish \
-	node_usage/analy2 node_usage/refresh \
-	node_usage/from_ptop node_usage/sanity \
-	node_usage/gather node_usage/mk-php-pages \
-	node_usage/get-start-date \
-	clientside/GNUmakefile \
-	clientside/event/GNUmakefile \
-	clientside/event/program-agent/GNUmakefile"
+
+
+CLIENT_ETCDIR="/etc/emulab"
+CLIENT_BINDIR="/usr/local/etc/emulab"
+CLIENT_VARDIR="/var/emulab"
+CLIENT_MANDIR="/usr/local/man"
+
+TBLOGFACIL="local5"
+LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
+cat >>confdefs.h <<_ACEOF
+#define LOG_TESTBED $LOG_TESTBED
+_ACEOF
+
+
+
+
+outfiles="Makeconf GNUmakefile \
+          lib/GNUmakefile \
+          lib/libtb/GNUmakefile \
+          lib/event/GNUmakefile \
+	  event/GNUmakefile \
+	  event/program-agent/GNUmakefile"
 
 #
 # Do this for easy distclean.
@@ -7615,6 +4434,7 @@ gives unlimited permission to copy, distribute and modify it."
 ac_pwd='$ac_pwd'
 srcdir='$srcdir'
 INSTALL='$INSTALL'
+MKDIR_P='$MKDIR_P'
 test -n "\$AWK" || AWK=awk
 _ACEOF
 
@@ -8216,6 +5036,11 @@ ac_abs_srcdir=$ac_abs_top_srcdir$ac_dir_suffix
   [\\/$]* | ?:[\\/]* ) ac_INSTALL=$INSTALL ;;
   *) ac_INSTALL=$ac_top_build_prefix$INSTALL ;;
   esac
+  ac_MKDIR_P=$MKDIR_P
+  case $MKDIR_P in
+  [\\/$]* | ?:[\\/]* ) ;;
+  */*) ac_MKDIR_P=$ac_top_build_prefix$MKDIR_P ;;
+  esac
 _ACEOF
 
 cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
@@ -8272,6 +5097,7 @@ s&@builddir@&$ac_builddir&;t t
 s&@abs_builddir@&$ac_abs_builddir&;t t
 s&@abs_top_builddir@&$ac_abs_top_builddir&;t t
 s&@INSTALL@&$ac_INSTALL&;t t
+s&@MKDIR_P@&$ac_MKDIR_P&;t t
 $ac_datarootdir_hack
 "
 eval sed \"\$ac_sed_extra\" "$ac_file_inputs" | $AWK -f "$tmp/subs.awk" >$tmp/out \
@@ -8368,4 +5194,6 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:$LINENO: WARNING: Unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: Unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
+
+
 

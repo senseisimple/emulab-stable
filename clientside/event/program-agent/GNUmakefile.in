@@ -6,7 +6,7 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= @top_builddir@
-SUBDIR		= clientside/event/program-agent
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 SYSTEM	       := $(shell uname -s)
 PROGRAMS	= program-agent
@@ -61,6 +61,8 @@ install:	$(INSTALL_DIR)/opsdir/sbin/program-agent
 		$(INSTALL_DIR)/opsdir/man/man8/program-agent.8
 
 control-install:	$(INSTALL_SBINDIR)/program-agent
+
+post-install:
 
 client: $(PROGRAMS)
 client-install: client

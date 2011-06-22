@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -735,6 +735,7 @@ main(int argc, char **argv)
 	    setenv("NODECNETIP", inet_ntoa(ia), 1);	    
 	}
 
+#ifdef EMULAB_CLIENTSIDE
 	/*
 	 * XXX for planetlab, hostname is the official hostname as opposed
 	 * to the per-experiment Emulab alias.  To be consistent, we want
@@ -757,7 +758,7 @@ main(int argc, char **argv)
 		}
 	} else
 		setenv("NODECNET", buf, 1);
-
+#endif
 	/*
 	 * Now find "the default" experimental network interface by stripping
 	 * the domain qualifier and looking that up.  If the short name fails
