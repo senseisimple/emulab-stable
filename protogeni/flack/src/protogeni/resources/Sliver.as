@@ -58,6 +58,8 @@ package protogeni.resources
 		
 		public var expires:Date;
 		
+		public var extensionNamespaces:Vector.<Namespace> = new Vector.<Namespace>();
+		
 		public function Sliver(owner:Slice,
 							   newManager:GeniManager = null)
 		{

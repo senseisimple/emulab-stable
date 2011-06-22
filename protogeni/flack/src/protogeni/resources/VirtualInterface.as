@@ -38,6 +38,10 @@ package protogeni.resources
 		[Bindable]
 		public var id:String;
 		
+		public var componentId:String = "";
+		public var sliverId:IdnUrn;
+		public var macAddress:String = "";
+		
 		// tunnel stuff
 		public var ip:String = "";
 		public var mask:String = ""; // 255.255.255.0

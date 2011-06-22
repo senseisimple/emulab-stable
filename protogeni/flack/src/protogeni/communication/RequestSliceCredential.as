@@ -66,7 +66,7 @@ package protogeni.communication
 				}
 				
 				/*for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
-					if(manager.Urn.authority == "plc") {
+					if(manager.isAm) {
 						var newSliver:Sliver = new Sliver(slice, manager);
 						Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
 					}
