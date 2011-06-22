@@ -110,7 +110,8 @@ trace.o:	decls.h trace.h log.h
 
 install:
 	$(INSTALL) frisbee $(DESTDIR)$(BINDIR)/frisbee
+	$(INSTALL) frisupload $(DESTDIR)$(BINDIR)/frisupload
 	$(INSTALL) frisbeed $(DESTDIR)$(SBINDIR)/frisbeed
 
 clean:
-	rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug
+	rm -f *.o *.a frisbee frisupload frisbeed frisbee.debug frisupload.debug frisbeed.debug
