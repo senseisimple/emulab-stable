@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # This library mostly contains old stuff that should phased out in
@@ -1391,8 +1391,10 @@ sub TBNodeAdminOSID($)
 
     my $mfs;
     
-    return 0
-	if ($node->NodeTypeAttribute("adminmfs_osid", \$mfs) != 0);
+    if ($node->NodeAttribute("adminmfs_osid", \$mfs) || !defined($mfs)) {
+	return 0
+	    if ($node->NodeTypeAttribute("adminmfs_osid", \$mfs) != 0);
+    }
 
     $mfs = TB_OSID_FREEBSD_MFS()
 	if (!defined($mfs));
