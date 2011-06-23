@@ -20,7 +20,19 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 <s:Line xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		xmlns:s="library://ns.adobe.com/flex/spark" 
 		xmlns:mx="library://ns.adobe.com/flex/mx">
+	<fx:Script>
+		<![CDATA[
+			[Bindable]
+			public var lineColor:uint = 0xCCCCCC;
+			
+			[Bindable]
+			public var lineThickness:Number = 2;
+			
+			[Bindable]
+			public var lineAlpha:Number = 0.6;
+		]]>
+	</fx:Script>
 	<s:stroke>
-		<s:SolidColorStroke color="gray" alpha=".6" weight="2"/>
+		<s:SolidColorStroke color="{lineColor}" alpha="{lineAlpha}" weight="{lineThickness}" />
 	</s:stroke>
 </s:Line>

@@ -70,7 +70,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
 				this.authorities.setFocus();
 				if(Main.useJavascript) {
-					this.passwordField.textInput.text = FlackCache.userPassword;
+					this.passwordField.Text = FlackCache.userPassword;
+					this.cacheCheckbox.selected = this.passwordField.Text.length > 0;
 					this.sslPem.text = FlackCache.userSslPem;
 					if(this.sslPem.text.length > 0)
 						this.passwordField.textInput.setFocus();

@@ -53,7 +53,7 @@ package protogeni.communication
 			// Build up the args
 			var options:Object = {geni_available:false, geni_compressed:true};
 			if(aggregateManager.rspecProcessor is ProtogeniRspecProcessor)
-				options.rspec_version = "ProtoGENI " + aggregateManager.outputRspecVersion
+				options.rspec_version = {type:"ProtoGENI", version:aggregateManager.outputRspecVersion};
 					
 			op.pushField([Main.geniHandler.CurrentUser.Credential]);
 			op.pushField(options);	
