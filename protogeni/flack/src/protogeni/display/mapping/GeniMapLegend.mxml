@@ -27,7 +27,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		 title="Resources"
 		 creationComplete="init()">
 	<components:layout>
-		<s:VerticalLayout gap="2" paddingBottom="2" paddingLeft="2" paddingTop="2" horizontalAlign="center"/>
+		<s:VerticalLayout gap="2" paddingTop="2" horizontalAlign="center"/>
 	</components:layout>
 	<fx:Declarations>
 		<s:RadioButtonGroup id="sliceRadiogroup" change="sliceSelected(event)" />
@@ -109,11 +109,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				var u:GeniUser = e.changedObject as GeniUser;
 				if(u != null && u.Credential.length > 0) {
-					managerGroup.percentHeight = 70;
 					userGroup.includeInLayout = true;
 					userGroup.visible = true;
 				} else {
-					managerGroup.percentHeight = 100;
 					userGroup.includeInLayout = false;
 					userGroup.visible = false;
 				}
@@ -175,16 +173,22 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 		]]>
 	</fx:Script>
-	<s:VGroup width="100%" height="100%" id="managerGroup">
-		<s:CheckBox id="selectAllCheckbox" change="selectAllChange()" selected="true" />
-		<s:Scroller height="100%" width="100%">
-			<s:VGroup height="100%" width="100%" id="managerItems" gap="2" paddingRight="2" />
-		</s:Scroller>
-	</s:VGroup>
-	<components:DefaultLine percentWidth="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
-	<s:VGroup width="100%" height="30%" minHeight="120"
+	<s:VGroup width="100%" maxHeight="160"
+			  paddingLeft="2"
 			  id="userGroup"
 			  includeInLayout="false" visible="false">
+		<s:HGroup verticalAlign="middle" paddingRight="2"
+				  visible="{Main.geniHandler.CurrentUser.authority != null}"
+				  includeInLayout="{Main.geniHandler.CurrentUser.authority != null}">
+			<display:KeyboardTextInput id="sliceName"
+									   prompt="Create slice..."
+									   width="100%"
+									   creationComplete="readyInput()" />
+			<components:ImageButton id="createButton"
+									toolTip="Create a blank slice to be able to allocate resources in"
+									icon="{ImageUtil.actionIcon}"
+									click="createSlice();" />
+		</s:HGroup>
 		<s:CheckBox id="mineOnlyCheckbox"
 					label="Show only mine"
 					click="Main.geniHandler.mapHandler.userResourcesOnly = mineOnlyCheckbox.selected; Main.geniHandler.mapHandler.drawMap()" />
@@ -193,16 +197,21 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					   selected="true"
 					   enabled="{mineOnlyCheckbox.selected}" />
 		<s:Scroller height="100%" width="100%">
-			<s:VGroup height="100%" width="100%" id="userItems" gap="2" paddingRight="2" />
+			<s:VGroup width="100%" gap="2" paddingRight="2"
+					  id="userItems" />
 		</s:Scroller>
-		<s:HGroup verticalAlign="middle" paddingRight="2">
-			<s:Label text="+" />
-			<display:KeyboardTextInput id="sliceName"
-									   width="100%"
-									   creationComplete="readyInput()" />
-			<components:ImageButton id="createButton"
-									icon="{ImageUtil.actionIcon}"
-									click="createSlice();" />
-		</s:HGroup>
+	</s:VGroup>
+	<components:DefaultLine percentWidth="100"
+							includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
+							visible="{!Main.geniHandler.unauthenticatedMode}" />
+	<s:VGroup width="100%" height="100%" paddingLeft="2"
+			  id="managerGroup">
+		<s:CheckBox id="selectAllCheckbox"
+					label="Show Managers"
+					change="selectAllChange()"
+					selected="true" />
+		<s:Scroller height="100%" width="100%">
+			<s:VGroup width="100%" id="managerItems" gap="2" paddingRight="2" paddingBottom="2" />
+		</s:Scroller>
 	</s:VGroup>
 </components:CollapsiblePanel>

@@ -46,7 +46,7 @@ package protogeni.communication
 			// Build up the args
 			var options:Object = {geni_available:false, geni_compressed:true, geni_slice_urn:sliver.slice.urn.full};
 			if(sliver.manager.rspecProcessor is ProtogeniRspecProcessor)
-				options.rspec_version = "ProtoGENI " + sliver.manager.outputRspecVersion
+				options.rspec_version = {type:"ProtoGENI", version:sliver.manager.outputRspecVersion};
 					
 			op.pushField([sliver.slice.credential]);
 			op.pushField(options);
