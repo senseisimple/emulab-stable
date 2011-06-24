@@ -81,11 +81,13 @@ package protogeni.communication
 		
 		public static const chUrl:String = "https://boss.emulab.net/protogeni/xmlrpc/";
 		
+		// SA
 		public static var getCredential:Array = new Array(sa, "GetCredential");
 		public static var getKeys:Array = new Array(sa, "GetKeys");
 		public static var resolve:Array = new Array(sa, "Resolve");
 		public static var remove:Array = new Array(sa, "Remove");
 		public static var register:Array = new Array(sa, "Register");
+		public static var renewSlice:Array = new Array(sa, "RenewSlice");
 		
 		public static var getVersion:Array = new Array(cm, "GetVersion");
 		public static var discoverResources:Array = new Array(cm, "DiscoverResources");
@@ -117,6 +119,7 @@ package protogeni.communication
 		public static var stopSliver:Array = new Array(cm, "StopSliver");
 		public static var restartSliver:Array = new Array(cm, "RestartSliver");
 		public static var updateSliver:Array = new Array(cm, "UpdateSliver");
+		public static var renewSliver:Array = new Array(cm, "RenewSlice");
 		
 		public static var map:Array = new Array(ses, "Map");
 		

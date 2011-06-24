@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.DateUtil;
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
@@ -24,14 +25,14 @@ package protogeni.communication
 	 * @author mstrum
 	 * 
 	 */
-	public final class RequestSliverStatusAm extends Request
+	public final class RequestSliverRenewAm extends Request
 	{
 		public var sliver:Sliver;
 		
-		public function RequestSliverStatusAm(newSliver:Sliver):void
+		public function RequestSliverRenewAm(newSliver:Sliver, newExpirationDate:Date):void
 		{
-			super("SliverStatusAM",
-				"Getting the sliver status on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
+			super("SliverRenewAM",
+				"Renewing the sliver on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
 				CommunicationUtil.sliverStatusAm,
 				true,
 				true);
@@ -41,36 +42,13 @@ package protogeni.communication
 			// Build up the args
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
+			op.pushField(DateUtil.toW3CDTF(newExpirationDate));
 			op.setExactUrl(sliver.manager.Url);
-		}
-		
-		override public function start():Operation {
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			return op;
 		}
 		
 		override public function complete(code:Number, response:Object):*
 		{
-			try
-			{
-				sliver.status = response.geni_status;
-				sliver.urn = new IdnUrn(response.geni_urn);
-				for each(var nodeObject:Object in response.geni_resources)
-				{
-					var vn:VirtualNode = sliver.nodes.getBySliverUrn(nodeObject.geni_urn);
-					if(vn == null)
-						vn = sliver.nodes.getByComponentUrn(nodeObject.geni_urn);
-					if(vn != null)
-					{
-						vn.status = nodeObject.geni_status;
-						vn.error = nodeObject.geni_error;
-					}
-				}
-			}
-			catch(e:Error)
-			{
-				// do nothing
-			}
+			// did it work???
 			
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			

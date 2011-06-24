@@ -54,5 +54,9 @@ package protogeni
 			else
 				return original;
 		}
+		
+		public static function notSet(value:String):Boolean {
+			return value == null || value.length == 0;
+		}
 	}
 }

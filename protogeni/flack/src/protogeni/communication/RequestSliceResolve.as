@@ -28,7 +28,7 @@ package protogeni.communication
 	 */
 	public final class RequestSliceResolve extends Request
 	{
-		private var slice:Slice;
+		public var slice:Slice;
 		private var isCreating:Boolean;
 		
 		public function RequestSliceResolve(s:Slice, willBeCreating:Boolean = false):void

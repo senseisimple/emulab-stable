@@ -25,13 +25,14 @@ package protogeni.communication
 	 */
 	public final class RequestSliverStatus extends Request
 	{
-		private var sliver:Sliver;
+		public var sliver:Sliver;
 		
 		public function RequestSliverStatus(newSliver:Sliver):void
 		{
 			super("SliverStatus",
 				"Getting the sliver status on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
 				CommunicationUtil.sliverStatus,
+				true,
 				true);
 			sliver = newSliver;
 			
@@ -39,6 +40,11 @@ package protogeni.communication
 			op.addField("slice_urn", sliver.slice.urn.full);
 			op.addField("credentials", new Array(sliver.slice.credential));
 			op.setUrl(sliver.manager.Url);
+		}
+		
+		override public function start():Operation {
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			return op;
 		}
 		
 		override public function complete(code:Number, response:Object):*
@@ -57,13 +63,13 @@ package protogeni.communication
 						vn.error = nodeObject.error;
 					}
 				}
-				
-				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			}
 			else
 			{
 				// do nothing
 			}
+			
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			
 			return null;
 		}

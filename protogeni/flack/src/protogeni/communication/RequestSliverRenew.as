@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.DateUtil;
 	import protogeni.GeniEvent;
 	import protogeni.resources.Sliver;
 	
@@ -23,22 +24,23 @@ package protogeni.communication
 	 * @author mstrum
 	 * 
 	 */
-	public final class RequestSliverResolve extends Request
+	public final class RequestSliverRenew extends Request
 	{
 		public var sliver:Sliver;
 		
-		public function RequestSliverResolve(newSliver:Sliver):void
+		public function RequestSliverRenew(newSliver:Sliver, newExpirationDate:Date):void
 		{
-			super("SliverResolve",
-				"Resolving sliver on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
-				CommunicationUtil.resolveResource,
+			super("SliverRenew",
+				"Renewing sliver on " + newSliver.manager.Hrn + " on slice named " + newSliver.slice.hrn,
+				CommunicationUtil.renewSliver,
 				true,
 				true);
 			sliver = newSliver;
 			
 			// Build up the args
-			op.addField("urn", sliver.urn.full);
-			op.addField("credentials", [sliver.credential]);
+			op.addField("slice_urn", sliver.slice.urn.full);
+			op.addField("expiration", DateUtil.toW3CDTF(newExpirationDate));
+			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		
@@ -46,21 +48,7 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				sliver.rspec = new XML(response.value.manifest);
-				sliver.created = true;
-				sliver.parseRspec();
-				if(!sliver.slice.slivers.contains(sliver))
-					sliver.slice.slivers.add(sliver);
-				
-				if(sliver.slice.isCreated())
-					Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATED);
-				else
-					Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-				return new RequestSliverStatus(sliver);
-			}
-			else
-			{
-				// do nothing
+				// XXX what now???
 			}
 			
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);

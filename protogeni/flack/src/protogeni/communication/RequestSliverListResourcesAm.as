@@ -31,14 +31,15 @@ package protogeni.communication
 	 */
 	public final class RequestSliverListResourcesAm extends Request
 	{
-		private var sliver:Sliver;
+		public var sliver:Sliver;
 		
-		public function RequestSliverListResourcesAm(s:Sliver):void
+		public function RequestSliverListResourcesAm(s:Sliver/*, notFirst:Boolean = false*/):void
 		{
 			super("ListResources(Sliver)AM (" + StringUtil.shortenString(s.manager.Url, 15) + ")",
 				"Listing resources for sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn,
 				CommunicationUtil.listResourcesAm,
-				true);
+				true,
+				true /*notFirst*/);
 			ignoreReturnCode = true;
 			op.timeout = 60;
 			sliver = s;
@@ -82,6 +83,8 @@ package protogeni.communication
 			} catch(e:Error)
 			{
 			}
+			
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			
 			return null;
 		}

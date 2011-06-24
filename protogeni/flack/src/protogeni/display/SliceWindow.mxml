@@ -103,9 +103,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			/**
 			 * The slice has been changed somewhere, apply changes
 			 */
+			private var waitingForSliceUrn:String = "";
 			public function sliceChanged(e:GeniEvent):void
 			{
-				if(e.changedObject.hrn == sliceCanvas.slice.hrn)
+				if(waitingForSliceUrn.length>0) {
+					if(waitingForSliceUrn == e.changedObject.urn.full
+						&& e.changedObject.CompletelyReady) {
+						this.loadSlice(e.changedObject as Slice);
+						waitingForSliceUrn = "";
+					}
+				} else if(e.changedObject.urn.full == sliceCanvas.slice.urn.full)
 					refreshSlice();
 			}
 			
@@ -174,6 +181,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					if(sliversExpire != null)
 						this.expireButton.toolTip += "\nSoonest sliver expiration: " + sliversExpire.toLocaleString();
 				}
+				
 				this.sliceCanvas.refreshStatus();
 			}
 			
@@ -191,6 +199,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			 */
 			public function loadSlice(s:Slice):void
 			{
+				if(!s.CompletelyReady) {
+					waitingForSliceUrn = s.urn.full;
+					return;
+				}
 				sliceCanvas.load(s);
 				
 				/*

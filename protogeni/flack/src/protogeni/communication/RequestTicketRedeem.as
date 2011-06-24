@@ -33,10 +33,12 @@ package protogeni.communication
 				"Updating ticket for sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
 				CommunicationUtil.redeemTicket);
 			sliver = newSliver;
+			op.timeout = 300;
 			
 			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("ticket", sliver.ticket.toXMLString());var keys:Array = [];
+			op.addField("ticket", sliver.ticket);
+			var keys:Array = [];
 			for each(var key:Key in sliver.slice.creator.keys) {
 				keys.push({type:key.type, key:key.value});
 			}
@@ -53,11 +55,12 @@ package protogeni.communication
 				sliver.created = true;
 				
 				sliver.rspec = new XML(response.value[1]);
-				//sliver.parseRspec();
-				// update existing?
+				sliver.parseRspec();
 				
 				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+				
+				return new RequestSliverStatus(sliver);
 			}
 			else
 			{

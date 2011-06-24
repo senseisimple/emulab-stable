@@ -88,6 +88,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				  icon="{ImageUtil.authenticationIcon}"
 				  toolTip="Log in to view and be able to allocate resources"
 				  click="doAuthenticate()" />
+		<s:Button label="Tutorial" id="tutorialButton"
+				  width="100%" height="28"
+				  icon="{ImageUtil.helpIcon}"
+				  toolTip="View a quick tutorial on how to use Flack"
+				  click="NetUtil.showTutorial();" />
 		<s:Label text="Not a user?" />
 		<s:Button label="View resources"
 				  width="100%" height="28"
@@ -95,8 +100,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				  click="doPublic()" />
 		<s:Button label="Become a user"
 				  width="100%" height="28"
+				  icon="{ImageUtil.userIcon}"
 				  toolTip="Follow a few simple steps to be able to allocate resources"
-				  click="NetUtil.openWebsite('https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup')" />
+				  click="NetUtil.showBecomingAUser();" />
 		<s:Label text="Want to use the cached data?"
 				 visible="{showOffline}" includeInLayout="{showOffline}" />
 		<s:Button label="Load cached data"

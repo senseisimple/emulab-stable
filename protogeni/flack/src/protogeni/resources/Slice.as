@@ -23,6 +23,7 @@ package protogeni.resources
 	import protogeni.Util;
 	import protogeni.XmlUtil;
 	import protogeni.communication.CommunicationUtil;
+	import protogeni.communication.RequestQueueNode;
 	import protogeni.display.ChooseManagerWindow;
 	import protogeni.display.ImageUtil;
 
@@ -58,6 +59,31 @@ package protogeni.resources
 		
 		public function Slice()
 		{
+		}
+		
+		public function get CompletelyReady():Boolean {
+			// Return false if there are any calls being made for the slice
+			var testNode:RequestQueueNode = Main.geniHandler.requestHandler.queue.head;
+			while(testNode != null) {
+				try {
+					if(testNode.item.sliver.slice == this)
+						return false;
+				} catch(e:Error) {}
+				try {
+					if(testNode.item.slice == this)
+						return false;
+				} catch(e:Error) {}
+				testNode = testNode.next;
+			}
+			// Return false if any sliver hasn't gotten its status
+			if(this.credential.length > 0) {
+				for each(var sliver:Sliver in this.slivers.collection) {
+					if(!sliver.created || sliver.status.length == 0)
+						return false;
+				}
+				return true;
+			} else
+				return false;
 		}
 		
 		public function Status():String {

@@ -44,7 +44,7 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				sliver.ticket = new XML(response.value);
+				sliver.ticket = response.value;
 				return new RequestTicketRedeem(sliver);
 			}
 			else
