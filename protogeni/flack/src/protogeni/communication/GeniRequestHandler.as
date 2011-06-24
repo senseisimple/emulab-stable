@@ -266,6 +266,7 @@ package protogeni.communication
 				else if(sliver.manager is ProtogeniComponentManager)
 					this.pushRequest(new RequestSliverDelete(sliver));
 			}
+			Main.geniDispatcher.dispatchSliceChanged(slice);
 		}
 		
 		/**

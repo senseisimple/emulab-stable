@@ -67,10 +67,6 @@ package protogeni.communication
 			{
 				// NO SLICE FOUND HERE
 			}
-			else
-			{
-				// do nothing
-			}
 			
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			

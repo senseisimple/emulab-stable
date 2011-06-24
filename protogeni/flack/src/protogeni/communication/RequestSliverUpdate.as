@@ -26,7 +26,7 @@ package protogeni.communication
 		 * @param newSliver
 		 * 
 		 */
-		public function RequestSliverUpdate(newSliver:Sliver):void
+		public function RequestSliverUpdate(newSliver:Sliver, rspec:XML = null):void
 		{
 			super("SliverUpdate",
 				"Updating sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
@@ -35,7 +35,10 @@ package protogeni.communication
 			
 			// Build up the args
 			op.addField("sliver_urn", sliver.urn.full);
-			op.addField("rspec", sliver.getRequestRspec(false).toXMLString());
+			if(rspec != null)
+				op.addField("rspec", rspec.toXMLString());
+			else
+				op.addField("rspec", sliver.getRequestRspec(false).toXMLString());
 			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
