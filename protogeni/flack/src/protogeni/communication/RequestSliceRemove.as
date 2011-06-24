@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.GeniEvent;
 	import protogeni.resources.Slice;
 	
 	/**
@@ -24,14 +25,16 @@ package protogeni.communication
 	 */
 	public final class RequestSliceRemove extends Request
 	{
-		private var slice:Slice;
+		public var slice:Slice;
+		private var tryCreate:Boolean;
 		
-		public function RequestSliceRemove(s:Slice):void
+		public function RequestSliceRemove(s:Slice, shouldTryCreate:Boolean = true):void
 		{
 			super("SliceRemove",
 				"Remove slice named " + s.hrn,
 				CommunicationUtil.remove);
 			slice = s;
+			tryCreate = shouldTryCreate;
 			
 			// Build up the args
 			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
@@ -46,7 +49,10 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS
 				|| code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)
 			{
-				newRequest = new RequestSliceRegister(slice);
+				if(tryCreate)
+					newRequest = new RequestSliceRegister(slice);
+				else
+					Main.geniDispatcher.dispatchSliceChanged(slice, GeniEvent.ACTION_REMOVED);
 			}
 			else
 			{

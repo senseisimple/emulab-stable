@@ -160,6 +160,7 @@ package protogeni.communication
 		public function submitSlice(slice:Slice):void
 		{
 			this.isPaused = false;
+			Main.geniDispatcher.dispatchSliceChanged(slice);
 			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(slice.urn.full);
 			if(old != null && old.hasAllocatedResources())
 			{
@@ -216,6 +217,7 @@ package protogeni.communication
 				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 				for each(sliver in slice.slivers.collection) {
 					sliver.created = false;
+					sliver.staged = false;
 				}
 				for each(sliver in slice.slivers.collection) {
 					if(sliver.manager.isAm)
@@ -256,6 +258,7 @@ package protogeni.communication
 		{
 			this.isPaused = false;
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+			// SliceRemove doesn't work because the slice hasn't expired yet...
 			for each(var sliver:Sliver in slice.slivers.collection)
 			{
 				if(sliver.manager.isAm)
@@ -495,7 +498,7 @@ package protogeni.communication
 				tryNext();
 			}
 			
-			if(msg.search("#2048") > -1 || msg.search("#2032") > -1)
+			/*if(msg.search("#2048") > -1 || msg.search("#2032") > -1)
 			{
 				if(!Main.geniHandler.unauthenticatedMode
 					&& Main.geniHandler.CurrentUser.Credential.length == 0)
@@ -505,11 +508,11 @@ package protogeni.communication
 						{
 							if(e.detail == Alert.YES)
 							{
-								NetUtil.showSetup();
+								NetUtil.showBecomingAUser();
 							}
 						});
 				}
-			}
+			}*/
 		}
 		
 		/**

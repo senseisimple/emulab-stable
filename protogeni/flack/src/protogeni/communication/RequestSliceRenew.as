@@ -14,9 +14,11 @@
 
 package protogeni.communication
 {
+	import protogeni.DateUtil;
 	import protogeni.Util;
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 	
 	/**
 	 * Creates a new slice and gets its credential using the ProtoGENI API
@@ -24,27 +26,32 @@ package protogeni.communication
 	 * @author mstrum
 	 * 
 	 */
-	public final class RequestSliceRegister extends Request
+	public final class RequestSliceRenew extends Request
 	{
 		public var slice:Slice;
+		private var renewSlivers:Boolean;
+		private var expirationDate:Date;
 		
-		public function RequestSliceRegister(s:Slice):void
+		public function RequestSliceRenew(s:Slice, newExpirationDate:Date, shouldRenewSlivers:Boolean = false):void
 		{
-			super("SliceRegister",
-				"Register slice named " + s.hrn,
-				CommunicationUtil.register);
+			super("SliceRenew",
+				"Renewing slice named " + s.hrn,
+				CommunicationUtil.renewSlice,
+				false,
+				true);
 			slice = s;
+			renewSlivers = shouldRenewSlivers;
+			expirationDate = newExpirationDate;
 			
 			// Build up the args
-			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
-			op.addField("hrn", slice.urn.full);
-			op.addField("type", "Slice");
+			op.addField("credential", slice.credential);
+			op.addField("expiration", DateUtil.toW3CDTF(newExpirationDate));
 			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*
 		{
-			var newRequest:Request = null;
+			var newRequest:RequestQueueNode = null;
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				slice.credential = String(response.value);
@@ -52,13 +59,19 @@ package protogeni.communication
 				var cred:XML = new XML(slice.credential);
 				slice.expires = Util.parseProtogeniDate(cred.credential.expires);
 				
-				Main.geniHandler.CurrentUser.slices.add(slice);
-				Main.geniDispatcher.dispatchSlicesChanged();
-				DisplayUtil.viewSlice(slice);
-			}
-			else
-			{
-				Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
+				if(renewSlivers) {
+					var newRequest = new RequestQueueNode();
+					var currentRequest = newRequest;
+					for each(var sliver:Sliver in slice.slivers.collection) {
+						var nextRequest:RequestQueueNode = new RequestQueueNode();
+						if(sliver.manager.isAm)
+							nextRequest.item = new RequestSliverRenewAm(sliver, expirationDate);
+						else
+							nextRequest.item = new RequestSliverRenew(sliver, expirationDate);
+						currentRequest.next = nextRequest;
+						currentRequest = newRequest;
+					}
+				}
 			}
 			
 			return newRequest;

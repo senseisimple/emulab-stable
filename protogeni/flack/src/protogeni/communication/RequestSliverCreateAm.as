@@ -32,12 +32,16 @@ package protogeni.communication
 		{
 			super("SliverCreateAM",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
-				CommunicationUtil.createSliverAm);
+				CommunicationUtil.createSliverAm,
+				false,
+				true);
 			ignoreReturnCode = true;
 			sliver = s;
 			s.created = false;
 			s.staged = false;
 			op.timeout = 360;
+			
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			
 			// Build up the args
 			op.pushField(sliver.slice.urn.full);
@@ -85,6 +89,8 @@ package protogeni.communication
 				// Show the error
 				LogHandler.viewConsole();
 			}
+			
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			
 			return null;
 		}

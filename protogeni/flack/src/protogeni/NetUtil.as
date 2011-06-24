@@ -33,13 +33,17 @@ package protogeni
 	 */
 	public final class NetUtil
 	{
-		public static function showSetup():void
+		public static function showBecomingAUser():void
 		{
-			navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlackManual#Setup"), "_blank");
+			navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlackManual#BecomingaUser"), "_blank");
 		}
 		public static function showManual():void
 		{
 			navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlackManual"), "_blank");
+		}
+		public static function showTutorial():void
+		{
+			navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlackTutorial"), "_blank");
 		}
 		
 		public static function openWebsite(url:String):void

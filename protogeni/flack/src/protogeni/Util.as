@@ -47,12 +47,16 @@ package protogeni
 		
 		public static function parseProtogeniDate(value:String):Date
 		{
-			var dateString:String = value;
+			if(value.indexOf("Z") == -1)
+				value += "Z";
+			return DateUtil.parseRFC3339(value);
+			
+			/*var dateString:String = value;
 			dateString = dateString.replace(/(\d{4,4})\-(\d{2,2})\-(\d{2,2})/g, "$1/$2/$3");
 			dateString = dateString.replace("T", " ");
 			dateString = dateString.replace(/(\+|\-)(\d+):(\d+)/g, " GMT$1$2$3");
 			dateString = dateString.replace("Z", " GMT-0000");
-			return new Date(Date.parse(dateString));
+			return new Date(Date.parse(dateString));*/
 		}
 		
 		public static function addIfNonexistingToArray(source:Array, o:*):void

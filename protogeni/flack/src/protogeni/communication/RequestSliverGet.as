@@ -27,12 +27,13 @@ package protogeni.communication
 	 */
 	public final class RequestSliverGet extends Request
 	{
-		private var sliver:Sliver;
+		public var sliver:Sliver;
 		
 		public function RequestSliverGet(s:Sliver):void
 		{
 			super("SliverGet", "Getting the sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn,
 				CommunicationUtil.getSliver,
+				true,
 				true);
 			sliver = s;
 			
@@ -55,9 +56,11 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				sliver.credential = String(response.value);
+				
 				var cred:XML = new XML(response.value);
 				sliver.urn = new IdnUrn(cred.credential.target_urn);
 				sliver.expires = Util.parseProtogeniDate(cred.credential.expires);
+				
 				newCall = new RequestSliverResolve(sliver);
 			}
 			else if(code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)
@@ -68,6 +71,8 @@ package protogeni.communication
 			{
 				// do nothing
 			}
+			
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			
 			return newCall;
 		}

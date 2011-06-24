@@ -42,6 +42,8 @@ package protogeni.communication
 			s.created = false;
 			s.staged = false;
 			
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			
 			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
 			op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
@@ -66,7 +68,7 @@ package protogeni.communication
 				
 				sliver.rspec = new XML(response.value[1]);
 				sliver.parseRspec();
-				
+
 				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);
 				if(old != null)
 				{

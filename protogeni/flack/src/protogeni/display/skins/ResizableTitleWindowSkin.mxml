@@ -26,7 +26,7 @@ in accordance with the terms of the license agreement accompanying it.
 			 minWidth="76"
 			 minHeight="76"
 			 alpha.disabled="0.5"
-			 alpha.disabledWithControlBar="0.5">
+			 alpha.disabledWithControlBar="0.5" xmlns:components="protogeni.display.components.*">
 	
 	<fx:Metadata>
 		<![CDATA[ 

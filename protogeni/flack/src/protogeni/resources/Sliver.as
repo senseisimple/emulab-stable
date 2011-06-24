@@ -44,11 +44,11 @@ package protogeni.resources
 		[Bindable]
 		public var urn:IdnUrn = new IdnUrn();
 		
-		public var ticket:XML;
+		public var ticket:String;
 		public var manifest:XML;
 		
-		public var state:String;
-		public var status:String;
+		public var state:String = "";
+		public var status:String = "";
 		
 		public var nodes:VirtualNodeCollection = new VirtualNodeCollection();
 		public var links:VirtualLinkCollection = new VirtualLinkCollection();
