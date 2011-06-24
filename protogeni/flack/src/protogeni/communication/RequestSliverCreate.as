@@ -33,7 +33,7 @@ package protogeni.communication
 	{
 		public var sliver:Sliver;
 		
-		public function RequestSliverCreate(s:Sliver):void
+		public function RequestSliverCreate(s:Sliver, rspec:XML = null):void
 		{
 			super("SliverCreate",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
@@ -46,7 +46,10 @@ package protogeni.communication
 			
 			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
+			if(rspec != null)
+				op.addField("rspec", rspec.toXMLString());
+			else
+				op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
 			var keys:Array = [];
 			for each(var key:Key in sliver.slice.creator.keys) {
 				keys.push({type:key.type, key:key.value});

@@ -596,9 +596,7 @@ package protogeni
 		}
 		
 		/**
-		 * Parses dates that conform to the W3C Date-time Format into Date objects.
-		 *
-		 * This function is useful for parsing RSS 1.0 and Atom 1.0 dates.
+		 * Parses dates that conform to the RFC 3339 Format into Date objects.
 		 *
 		 * @param str
 		 *
@@ -607,8 +605,6 @@ package protogeni
 		 * @langversion ActionScript 3.0
 		 * @playerversion Flash 9.0
 		 * @tiptext
-		 *
-		 * @see http://www.w3.org/TR/NOTE-datetime
 		 */		     
 		public static function parseRFC3339(str:String):Date
 		{
@@ -774,6 +770,31 @@ package protogeni
 			var offset:Number = d.getTimezoneOffset() * 60 * 1000; 
 			nd.setTime(d.getTime() + offset);
 			return nd;
+		}
+		
+		public static function getTimeUntil(date:Date):String {
+			return getTimeBetween(date, new Date());
+		}
+		
+		public static function getTimeBetween(beginning:Date, end:Date):String {
+			var differenceInMilliseconds:Number = beginning.time - end.time;
+			var days:Number = Math.floor(differenceInMilliseconds/(1000*60*60*24));
+			var hours:Number = Math.floor(differenceInMilliseconds/(1000*60*60) - days*24);
+			var minutes:Number = Math.floor(differenceInMilliseconds/(1000*60) - days*24*60 - hours*60);
+			
+			var value:String = "";
+			if(days != 0)
+				value = days + " Days"
+			if(hours != 0) {
+				if(value.length > 0)
+					value += ", ";
+				value += hours + " Hours";
+			}
+			if(value.length > 0)
+				value += ", ";
+			value += minutes + " Minutes";
+			
+			return value;
 		}
 	}
 }

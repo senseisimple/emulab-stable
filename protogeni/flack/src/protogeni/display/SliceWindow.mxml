@@ -25,8 +25,20 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						title="Slice"
 						initialize="me = this;"
 						creationComplete="onCreationComplete()">
+	<components:layout>
+		<s:VerticalLayout paddingBottom="2"
+						  paddingLeft="2"
+						  paddingRight="2"
+						  paddingTop="2"
+						  gap="2"/>
+	</components:layout>
 	<fx:Script>
 		<![CDATA[
+			import flash.globalization.DateTimeFormatter;
+			import flash.globalization.DateTimeNameStyle;
+			import flash.globalization.DateTimeStyle;
+			import flash.globalization.LocaleID;
+			
 			import mx.collections.ArrayCollection;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
@@ -34,6 +46,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import mx.events.DragEvent;
 			import mx.managers.DragManager;
 			
+			import protogeni.DateUtil;
 			import protogeni.GeniEvent;
 			import protogeni.Util;
 			import protogeni.display.components.AdvancedTextArea;
@@ -114,6 +127,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					}
 				} else if(e.changedObject.urn.full == sliceCanvas.slice.urn.full)
 					refreshSlice();
+				
+				spinner.visible = !e.changedObject.CompletelyReady;
+				if(spinner.visible)
+					spinner.startSpin();
+				else
+					spinner.stopSpin();
 			}
 			
 			/**
@@ -162,24 +181,21 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						this.hrnLabel.styleName = "unknownStyle";
 				}
 				
+				var dateFormatter:DateTimeFormatter = new DateTimeFormatter(LocaleID.DEFAULT, DateTimeStyle.LONG, DateTimeStyle.NONE);
 				if(this.sliceCanvas.slice.expires != null) {
-					this.expireButton.toolTip = "Slice expires on: "
-						+ this.sliceCanvas.slice.expires.toLocaleString();
-					
-					var differenceInMilliseconds:Number = this.sliceCanvas.slice.expires.time - (new Date()).time;
-					var days:Number = Math.floor(differenceInMilliseconds/(1000*60*60*24));
-					var hours:Number = Math.floor(differenceInMilliseconds/(1000*60*60) - days*24);
-					var minutes:Number = Math.floor(differenceInMilliseconds/(1000*60) - days*24*60 - hours*60);
-					
-					this.expireButton.toolTip += "\nTime left: " + days + " Days, "
-						+ hours + " Hours, "
-						+ minutes + " Minutes";
+					this.expireButton.toolTip = "Slice expires in\n\t"
+						+ DateUtil.getTimeUntil(this.sliceCanvas.slice.expires)
+						+ "\n\ton "
+						+ dateFormatter.format(this.sliceCanvas.slice.expires)
 				}
-				
 				if(this.sliceCanvas.slice.slivers != null) {
 					var sliversExpire:Date = this.sliceCanvas.slice.slivers.expires();
-					if(sliversExpire != null)
-						this.expireButton.toolTip += "\nSoonest sliver expiration: " + sliversExpire.toLocaleString();
+					if(sliversExpire != null) {
+						this.expireButton.toolTip += "\n\nFirst sliver expires in\n\t"
+							+ DateUtil.getTimeUntil(sliversExpire)
+							+ "\n\ton "
+							+ dateFormatter.format(sliversExpire);
+					}
 				}
 				
 				this.sliceCanvas.refreshStatus();
@@ -200,6 +216,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function loadSlice(s:Slice):void
 			{
 				if(!s.CompletelyReady) {
+					spinner.visible = true;
+					spinner.startSpin();
 					waitingForSliceUrn = s.urn.full;
 					return;
 				}
@@ -569,18 +587,22 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function viewExpires():void {
 				Alert.show(this.expireButton.toolTip);
 			}
-			
-			public function discoverAllocatedResources():void {
-				sliceCanvas.clear();
-				sliceCanvas.slice.slivers = new SliverCollection();
-				Main.geniHandler.requestHandler.discoverSliceAllocatedResources(sliceCanvas.slice);
-			}
 
 		]]>
 	</fx:Script>
 	
 	<s:HGroup width="100%" verticalAlign="middle">
-		<s:Label id="hrnLabel" text="{sliceCanvas.slice.urn.name}" toolTip="{sliceCanvas.slice.urn.full}" width="100%" fontSize="17" fontWeight="bold" />
+		<s:Label id="hrnLabel" text="{sliceCanvas.slice.urn.name}"
+				 toolTip="{sliceCanvas.slice.urn.full}"
+				 fontSize="17"
+				 fontWeight="bold" />
+		<components:Spinner id="spinner"
+							width="21"
+							height="21"
+							x="{(width / 2) - (spinner.width / 2)}"
+							y="{(height / 2) - (spinner.height / 2)}"
+							visible="false" includeInLayout="{spinner.visible}" />
+		<s:Rect percentWidth="100" />
 		<components:ImageButton id="clearCanvasButton"
 							 toolTip="Clear the canvas"
 							 click="clearCanvas()"
@@ -667,11 +689,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 									toolTip="Restart slivers"
 									click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
 									icon="{ImageUtil.repeatControlIcon}"/>
-			<components:DefaultLine percentHeight="90" />
-			<s:Button label="Discover allocated resources"
-					  toolTip="Ask each known manager if it has resources allocated to this slice"
-					  height="24"
-					  click="discoverAllocatedResources()" />
 		</s:HGroup>
 	</components:controlBarContent>
 </components:DefaultWindow>

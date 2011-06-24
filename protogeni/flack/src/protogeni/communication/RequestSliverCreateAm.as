@@ -28,7 +28,7 @@ package protogeni.communication
 	{
 		public var sliver:Sliver;
 		
-		public function RequestSliverCreateAm(s:Sliver):void
+		public function RequestSliverCreateAm(s:Sliver, rspec:XML = null):void
 		{
 			super("SliverCreateAM",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
@@ -46,7 +46,10 @@ package protogeni.communication
 			// Build up the args
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
-			op.pushField(sliver.getRequestRspec(true).toXMLString());
+			if(rspec != null)
+				op.addField("rspec", rspec.toXMLString());
+			else
+				op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
 			var userKeys:Array = [];
 			for each(var key:Key in sliver.slice.creator.keys) {
 				userKeys.push(key.value);
