@@ -42,7 +42,7 @@ package protogeni.communication
 			// Build up the args
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
-			op.pushField(DateUtil.toW3CDTF(newExpirationDate));
+			op.pushField(DateUtil.toRFC3339(newExpirationDate));
 			op.setExactUrl(sliver.manager.Url);
 		}
 		
@@ -50,9 +50,12 @@ package protogeni.communication
 		{
 			// did it work???
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }

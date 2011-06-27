@@ -214,16 +214,18 @@ package protogeni.communication
 				}
 			} else {
 				// Create
-				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-				for each(sliver in slice.slivers.collection) {
-					sliver.created = false;
-					sliver.staged = false;
-				}
-				for each(sliver in slice.slivers.collection) {
-					if(sliver.manager.isAm)
-						pushRequest(new RequestSliverCreateAm(sliver));
-					else if(sliver.manager is ProtogeniComponentManager)
-						pushRequest(new RequestSliverCreate(sliver));
+				if(slice.slivers.length > 0) {
+					Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+					for each(sliver in slice.slivers.collection) {
+						sliver.created = false;
+						sliver.staged = false;
+					}
+					for each(sliver in slice.slivers.collection) {
+						if(sliver.manager.isAm)
+							pushRequest(new RequestSliverCreateAm(sliver));
+						else if(sliver.manager is ProtogeniComponentManager)
+							pushRequest(new RequestSliverCreate(sliver));
+					}
 				}
 			}
 		}
@@ -237,14 +239,16 @@ package protogeni.communication
 		 */
 		public function refreshSlice(slice:Slice, skipDone:Boolean = false):void
 		{
-			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers.collection) {
-				if(skipDone && sliver.status == Sliver.STATUS_READY)
-					continue;
-				if(sliver.manager.isAm)
-					pushRequest(new RequestSliverStatusAm(sliver));
-				else if(sliver.manager is ProtogeniComponentManager)
-					pushRequest(new RequestSliverStatus(sliver));
+			if(slice.slivers.length > 0) {
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(var sliver:Sliver in slice.slivers.collection) {
+					if(skipDone && sliver.status == Sliver.STATUS_READY)
+						continue;
+					if(sliver.manager.isAm)
+						pushRequest(new RequestSliverStatusAm(sliver));
+					else if(sliver.manager is ProtogeniComponentManager)
+						pushRequest(new RequestSliverStatus(sliver));
+				}
 			}
 		}
 		
@@ -256,16 +260,42 @@ package protogeni.communication
 		 */
 		public function deleteSlice(slice:Slice):void
 		{
-			this.isPaused = false;
-			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			// SliceRemove doesn't work because the slice hasn't expired yet...
-			for each(var sliver:Sliver in slice.slivers.collection)
-			{
-				if(sliver.manager.isAm)
-					this.pushRequest(new RequestSliverDeleteAm(sliver));
-				else if(sliver.manager is ProtogeniComponentManager)
-					this.pushRequest(new RequestSliverDelete(sliver));
+			if(slice.slivers.length > 0) {
+				this.isPaused = false;
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				// SliceRemove doesn't work because the slice hasn't expired yet...
+				for each(var sliver:Sliver in slice.slivers.collection)
+				{
+					if(sliver.manager.isAm)
+						this.pushRequest(new RequestSliverDeleteAm(sliver));
+					else if(sliver.manager is ProtogeniComponentManager)
+						this.pushRequest(new RequestSliverDelete(sliver));
+				}
+				Main.geniDispatcher.dispatchSliceChanged(slice);
 			}
+		}
+		
+		/**
+		 * Renews a slice and/or slivers to the minimum times needed to use
+		 * the new expiration date
+		 *  
+		 * @param slice Slice to renew
+		 * @param newExpiresDate Date to ensure slice and slivers don't expire until
+		 * 
+		 */
+		public function renewSlice(slice:Slice, newExpiresDate:Date):void {
+			this.isPaused = false;
+			if(newExpiresDate.time < slice.expires.time) {
+				for each(var sliver:Sliver in slice.slivers.collection) {
+					if(sliver.expires.time < newExpiresDate.time) {
+						if(sliver.manager.isAm)
+							this.pushRequest(new RequestSliverRenewAm(sliver, newExpiresDate));
+						else
+							this.pushRequest(new RequestSliverRenew(sliver, newExpiresDate));
+					}
+				}
+			} else
+				this.pushRequest(new RequestSliceRenew(slice, newExpiresDate, true));
 			Main.geniDispatcher.dispatchSliceChanged(slice);
 		}
 		
@@ -290,9 +320,9 @@ package protogeni.communication
 		 */
 		public function startSlice(slice:Slice):void
 		{
-			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers.collection)
-			{
+			if(slice.slivers.length > 0) {
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(var sliver:Sliver in slice.slivers.collection)
 				pushRequest(new RequestSliverStart(sliver));
 			}
 		}
@@ -305,10 +335,10 @@ package protogeni.communication
 		 */
 		public function stopSlice(slice:Slice):void
 		{
-			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers.collection)
-			{
-				pushRequest(new RequestSliverStop(sliver));
+			if(slice.slivers.length > 0) {
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(var sliver:Sliver in slice.slivers.collection)
+					pushRequest(new RequestSliverStop(sliver));
 			}
 		}
 		
@@ -320,10 +350,12 @@ package protogeni.communication
 		 */
 		public function restartSlice(slice:Slice):void
 		{
-			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers.collection)
-			{
-				pushRequest(new RequestSliverRestart(sliver));
+			if(slice.slivers.length > 0) {
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(var sliver:Sliver in slice.slivers.collection)
+				{
+					pushRequest(new RequestSliverRestart(sliver));
+				}
 			}
 		}
 		

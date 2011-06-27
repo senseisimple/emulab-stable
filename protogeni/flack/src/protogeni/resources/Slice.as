@@ -61,20 +61,26 @@ package protogeni.resources
 		{
 		}
 		
-		public function get CompletelyReady():Boolean {
-			// Return false if there are any calls being made for the slice
+		public function get MakingCalls():Boolean {
 			var testNode:RequestQueueNode = Main.geniHandler.requestHandler.queue.head;
 			while(testNode != null) {
 				try {
 					if(testNode.item.sliver.slice == this)
-						return false;
+						return true;
 				} catch(e:Error) {}
 				try {
 					if(testNode.item.slice == this)
-						return false;
+						return true;
 				} catch(e:Error) {}
 				testNode = testNode.next;
 			}
+			return false;
+		}
+		
+		public function get CompletelyReady():Boolean {
+			// Return false if there are any calls being made for the slice
+			if(MakingCalls)
+				return false;
 			// Return false if any sliver hasn't gotten its status
 			if(this.credential.length > 0) {
 				for each(var sliver:Sliver in this.slivers.collection) {

@@ -45,13 +45,13 @@ package protogeni.communication
 			
 			// Build up the args
 			op.addField("credential", slice.credential);
-			op.addField("expiration", DateUtil.toW3CDTF(newExpirationDate));
+			op.addField("expiration", DateUtil.toRFC3339(newExpirationDate));
 			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function complete(code:Number, response:Object):*
 		{
-			var newRequest:RequestQueueNode = null;
+			var newCalls:RequestQueue = new RequestQueue();
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				slice.credential = String(response.value);
@@ -59,22 +59,31 @@ package protogeni.communication
 				var cred:XML = new XML(slice.credential);
 				slice.expires = Util.parseProtogeniDate(cred.credential.expires);
 				
+				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(slice.urn.full);
+				if(old != null) {
+					old.credential = slice.credential;
+					old.expires = slice.expires;
+				}
+				
 				if(renewSlivers) {
-					var newRequest = new RequestQueueNode();
-					var currentRequest = newRequest;
 					for each(var sliver:Sliver in slice.slivers.collection) {
-						var nextRequest:RequestQueueNode = new RequestQueueNode();
 						if(sliver.manager.isAm)
-							nextRequest.item = new RequestSliverRenewAm(sliver, expirationDate);
+							newCalls.push(new RequestSliverRenewAm(sliver, slice.expires));
 						else
-							nextRequest.item = new RequestSliverRenew(sliver, expirationDate);
-						currentRequest.next = nextRequest;
-						currentRequest = newRequest;
+							newCalls.push(new RequestSliverRenew(sliver, slice.expires));
 					}
 				}
+			} else
+			{
+				// failed because too long
 			}
 			
-			return newRequest;
+			return newCalls.head;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(slice);
 		}
 	}
 }

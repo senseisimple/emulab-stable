@@ -77,16 +77,18 @@ package protogeni.communication
 				
 				if(sliver.nodes.length > 0 && !sliver.slice.slivers.contains(sliver)) {
 					sliver.slice.slivers.add(sliver);
-					Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 					return new RequestSliverStatusAm(sliver);
 				}
 			} catch(e:Error)
 			{
 			}
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }

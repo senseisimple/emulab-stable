@@ -14,6 +14,8 @@
 
 package
 {
+	import protogeni.DateUtil;
+
 	/**
 	 * Details about some event which happened
 	 * 
@@ -75,7 +77,7 @@ package
 			return "-MSG-----------------\n" +
 				"Name: " + name + "\n" +
 				"Group ID: " + groupId + "\n" +
-				"Time: " + timeStamp + "\n" +
+				"Time: " + DateUtil.toRFC3339(timeStamp) + "\n" +
 				"Is Error?: " + isError + "\n" +
 				"Details:\n" + details +
 				"\n-----------------END-";

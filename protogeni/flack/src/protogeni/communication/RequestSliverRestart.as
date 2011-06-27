@@ -52,5 +52,10 @@ package protogeni.communication
 			
 			return null;
 		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+		}
 	}
 }

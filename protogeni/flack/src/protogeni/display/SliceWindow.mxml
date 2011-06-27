@@ -22,7 +22,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						xmlns:mx="library://ns.adobe.com/flex/mx"
 						xmlns:display="protogeni.display.*"
 						xmlns:components="protogeni.display.components.*"
-						title="Slice"
+						title="Slice" minWidth="600" minHeight="220"
 						initialize="me = this;"
 						creationComplete="onCreationComplete()">
 	<components:layout>
@@ -35,7 +35,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<fx:Script>
 		<![CDATA[
 			import flash.globalization.DateTimeFormatter;
-			import flash.globalization.DateTimeNameStyle;
 			import flash.globalization.DateTimeStyle;
 			import flash.globalization.LocaleID;
 			
@@ -59,7 +58,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.resources.Site;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
-			import protogeni.resources.SliverCollection;
 			import protogeni.resources.VirtualNode;
 			
 			import spark.components.NavigatorContent;
@@ -124,15 +122,22 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						&& e.changedObject.CompletelyReady) {
 						this.loadSlice(e.changedObject as Slice);
 						waitingForSliceUrn = "";
+						
+						spinner.visible = e.changedObject.MakingCalls;
+						if(spinner.visible)
+							spinner.startSpin();
+						else
+							spinner.stopSpin();
 					}
-				} else if(e.changedObject.urn.full == sliceCanvas.slice.urn.full)
+				} else if(e.changedObject.urn.full == sliceCanvas.slice.urn.full) {
 					refreshSlice();
-				
-				spinner.visible = !e.changedObject.CompletelyReady;
-				if(spinner.visible)
-					spinner.startSpin();
-				else
-					spinner.stopSpin();
+					
+					spinner.visible = e.changedObject.MakingCalls;
+					if(spinner.visible)
+						spinner.startSpin();
+					else
+						spinner.stopSpin();
+				}
 			}
 			
 			/**
@@ -181,22 +186,36 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						this.hrnLabel.styleName = "unknownStyle";
 				}
 				
-				var dateFormatter:DateTimeFormatter = new DateTimeFormatter(LocaleID.DEFAULT, DateTimeStyle.LONG, DateTimeStyle.NONE);
+				// Expire time stuff
+				this.expireButton.toolTip = "";
+				var dateFormatter:DateTimeFormatter = new DateTimeFormatter(LocaleID.DEFAULT, DateTimeStyle.SHORT, DateTimeStyle.NONE);
 				if(this.sliceCanvas.slice.expires != null) {
-					this.expireButton.toolTip = "Slice expires in\n\t"
+					var sliceExpiresDate:Date = this.sliceCanvas.slice.expires;
+					if(this.sliceCanvas.slice.slivers != null) {
+						var sliversExpire:Date = this.sliceCanvas.slice.slivers.expires();
+						if(sliversExpire != null && sliversExpire.time < sliceExpiresDate.time) {
+							sliceExpiresDate = sliceExpiresDate;
+							this.expireButton.toolTip = "Sliver expires before slice in\n\t"
+								+ DateUtil.getTimeUntil(sliversExpire)
+								+ "\n\ton "
+								+ dateFormatter.format(sliversExpire)
+								+ "\n\n";
+						}
+					}
+					
+					this.expireButton.toolTip += "Slice expires in\n\t"
 						+ DateUtil.getTimeUntil(this.sliceCanvas.slice.expires)
 						+ "\n\ton "
-						+ dateFormatter.format(this.sliceCanvas.slice.expires)
+						+ dateFormatter.format(this.sliceCanvas.slice.expires);
+					
+					// If expires soon, let the user know
+					// less than one hour
+					if(sliceExpiresDate.time - (new Date()).time < (1000*60*60*1))
+						this.expireButton.styleName = "failedStyle";
+					else
+						this.expireButton.styleName = "validStyle";
 				}
-				if(this.sliceCanvas.slice.slivers != null) {
-					var sliversExpire:Date = this.sliceCanvas.slice.slivers.expires();
-					if(sliversExpire != null) {
-						this.expireButton.toolTip += "\n\nFirst sliver expires in\n\t"
-							+ DateUtil.getTimeUntil(sliversExpire)
-							+ "\n\ton "
-							+ dateFormatter.format(sliversExpire);
-					}
-				}
+				
 				
 				this.sliceCanvas.refreshStatus();
 			}
@@ -587,6 +606,26 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function viewExpires():void {
 				Alert.show(this.expireButton.toolTip);
 			}
+			
+			public function renewSlice():void {
+				var addTime:Number = 1000*60*60*6; // 6 hours
+				switch(this.renewLengthDropdownlist.selectedIndex) {
+					case 1:
+						addTime *= 4;
+						break;
+					case 2:
+						addTime *= 12;
+						break;
+				}
+				
+				var sliverExpiresDate:Date = this.sliceCanvas.slice.slivers.expires();
+				var newExpiresDate:Date = new Date();
+				if(sliverExpiresDate != null
+					&& (sliverExpiresDate.time + addTime) < this.sliceCanvas.slice.expires.time) {
+					newExpiresDate.setTime(sliverExpiresDate.time + addTime);
+				}
+				Main.geniHandler.requestHandler.renewSlice(this.sliceCanvas.slice, newExpiresDate);
+			}
 
 		]]>
 	</fx:Script>
@@ -632,9 +671,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 								toolTip="Save preview RSPEC to file"
 								click="saveRequestRspec()" />
 		<components:DefaultLine height="14" visible="false" />
-		<components:ImageButton id="expireButton"
-								icon="{ImageUtil.timeIcon}"
-								click="viewExpires()" />
 		<components:ImageButton id="saveSliceCredentialButton"
 								toolTip="Save the slice credential to file"
 								click="saveCredential()"
@@ -689,6 +725,22 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 									toolTip="Restart slivers"
 									click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
 									icon="{ImageUtil.repeatControlIcon}"/>
+			<s:Rect percentWidth="100" />
+			<components:ImageButton id="expireButton"
+									icon="{ImageUtil.timeIcon}"
+									click="viewExpires()" />
+			<s:Button id="renewSliceButton" label="Renew" click="renewSlice()" height="24" />
+			<s:Label text="for" />
+			<s:DropDownList id="renewLengthDropdownlist" height="24"
+							requireSelection="true">
+				<s:dataProvider>
+					<s:ArrayList>
+						<fx:String>6 More Hours</fx:String>
+						<fx:String>1 More Day</fx:String>
+						<fx:String>3 More Days</fx:String>
+					</s:ArrayList>
+				</s:dataProvider>
+			</s:DropDownList>
 		</s:HGroup>
 	</components:controlBarContent>
 </components:DefaultWindow>

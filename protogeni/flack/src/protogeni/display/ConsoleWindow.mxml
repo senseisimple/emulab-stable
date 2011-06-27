@@ -20,7 +20,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 <components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						title="Console"
+						title="Console" minHeight="200" minWidth="600"
 						contentCreationComplete="onCreationComplete()" 
 						close="LogHandler.closeConsole();" xmlns:communication="protogeni.communication.*" xmlns:components="protogeni.display.components.*">
 	<components:layout>

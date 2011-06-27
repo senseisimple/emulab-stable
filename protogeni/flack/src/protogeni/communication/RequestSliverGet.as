@@ -68,9 +68,12 @@ package protogeni.communication
 				// NO SLICE FOUND HERE
 			}
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			
 			return newCall;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }

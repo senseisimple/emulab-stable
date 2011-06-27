@@ -56,7 +56,6 @@ package protogeni.communication
 						Main.geniDispatcher.dispatchSliceChanged(old);
 					}
 				}
-				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			}
 			catch(e:Error)
 			{
@@ -64,6 +63,11 @@ package protogeni.communication
 			}
 			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }

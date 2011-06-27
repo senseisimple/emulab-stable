@@ -72,7 +72,6 @@ package protogeni.communication
 						slice.slivers.add(newSliver);
 					}
 					
-					Main.geniDispatcher.dispatchSliceChanged(slice);
 					newRequest = new RequestSliceCredential(slice);
 				}
 			}
@@ -91,6 +90,11 @@ package protogeni.communication
 			}
 			
 			return newRequest;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(slice);
 		}
 	}
 }

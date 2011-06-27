@@ -81,7 +81,6 @@ package protogeni.communication
 					old.slivers.add(sliver);
 				}
 				
-				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 				Main.geniDispatcher.dispatchSlicesChanged();
 				
 				return new RequestSliverStatus(sliver);
@@ -109,8 +108,6 @@ package protogeni.communication
 				tryDeleteNode = tryDeleteNode.next;
 			}
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			
 			// Show the error
 			LogHandler.viewConsole();
 		}
@@ -120,6 +117,11 @@ package protogeni.communication
 			failed();
 			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }

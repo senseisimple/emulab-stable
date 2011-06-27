@@ -14,8 +14,11 @@
 
 package protogeni.communication
 {
+	import mx.controls.Alert;
+	
 	import protogeni.DateUtil;
 	import protogeni.GeniEvent;
+	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
 	/**
@@ -27,6 +30,7 @@ package protogeni.communication
 	public final class RequestSliverRenew extends Request
 	{
 		public var sliver:Sliver;
+		public var newExpires:Date;
 		
 		public function RequestSliverRenew(newSliver:Sliver, newExpirationDate:Date):void
 		{
@@ -36,10 +40,11 @@ package protogeni.communication
 				true,
 				true);
 			sliver = newSliver;
+			newExpires = newExpirationDate;
 			
 			// Build up the args
 			op.addField("slice_urn", sliver.slice.urn.full);
-			op.addField("expiration", DateUtil.toW3CDTF(newExpirationDate));
+			op.addField("expiration", DateUtil.toRFC3339(newExpirationDate));
 			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
@@ -48,12 +53,29 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				// XXX what now???
+				sliver.expires = newExpires;
+				
+				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);
+				if(old != null) {
+					for each(var oldSliver:Sliver in old.slivers.collection) {
+						if(oldSliver.manager == sliver.manager) {
+							oldSliver.expires = sliver.expires;
+							break
+						}
+					}
+				}
+			} else
+			{
+				Alert.show("RenewSliver didn't work on " + sliver.manager.Hrn + ", most likely due to the manager now allowing slivers to be renewed further than a certain time in the future.  Either try a smaller increment of time or try later.",
+				"Sliver not renewed");
 			}
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }
