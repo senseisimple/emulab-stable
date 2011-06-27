@@ -1,0 +1,120 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Data::Dumper;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $SACERT   = "$TB/etc/genisa.pem";
+my $server   = "https://www.planet-lab.org:12345";
+
+# Geni libraries.
+use lib "@prefix@/lib";
+use Genixmlrpc;
+use GeniCertificate;
+use GeniAuthority;
+use GeniUser;
+
+$server = shift(@ARGV)
+    if (@ARGV);
+
+#
+# Load my cert to act as caller context.
+#
+my $certificate = GeniCertificate->LoadFromFile($SACERT);
+if (!defined($certificate)) {
+    print STDERR "*** Could not load certificate from $SACERT\n";
+    exit(1);
+}
+my $context = Genixmlrpc->Context($certificate);
+if (!defined($context)) {
+    print STDERR "*** Could not create context\n";
+    exit(1);
+}
+
+#
+# Grab a self credential
+#
+my $sacert = GeniCertificate->LoadFromFile($SACERT);
+if (!defined($sacert)) {
+    print STDERR "*** Could not load certificate from $SACERT\n";
+    exit(1);
+}
+my $authority = GeniAuthority->Lookup($sacert->urn());
+if (!defined($authority)) {
+    print STDERR "*** Could not find local authority object\n";
+    exit(1);
+}
+my $selfcred = GeniCredential->GetSelfCredential($authority);
+if (!defined($selfcred)) {
+    print STDERR "*** Could not find create selfcred\n";
+    exit(1);
+}
+my $response;
+
+if (0) {
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "Resolve",
+			       "urn:publicid:IDN+plc+authority+am",
+			       $selfcred->asString());
+}
+elsif (0) {
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "get_registries",
+			       $selfcred->asString(), "");
+}
+elsif (0) {
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "get_aggregates",
+			       $selfcred->asString(), "");
+}
+elsif (0) {
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "ListResources",
+			       $selfcred->asString(), {});
+}
+elsif (0) {
+    my $c   = "urn:publicid:IDN+emulab.net+slice+CE74290";
+    
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "ListResources",
+			       $selfcred->asString(),
+			       {'geni_slice_urn' => $c});
+}
+elsif (0) {
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "GetVersion");
+}
+elsif (0) {
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "List",
+
+		       $selfcred->asString());
+}
+elsif (1) {
+    my $foo  = "urn:publicid:IDN+plc:williams+node+planetlab1";
+    my $foo2 = "urn:publicid:IDN+plc:williams+node+n10858";
+    my $fee = "urn:publicid:IDN+plc:williams+authority+sa";
+    my $bar = "urn:publicid:IDN+plc+authority+am";
+    my $b   = "urn:publicid:IDN+plc:huberlin+node+planetlab1.wiwi.hu-berlin.de";
+    my $c   = "urn:publicid:IDN+emulab.net+slice+CE74290";
+    my $d   = "urn:publicid:IDN+plc:williams+user+jeannie";
+    my $e   = "urn:publicid:IDN+plc:utah+user+stoller";
+    my $f   = "urn:publicid:IDN+plc:utah+authority+sa";
+    my $g   = "urn:publicid:IDN+plc:bbn+authority+sa";
+    my $h   = "urn:publicid:IDN+ple+authority+sa";
+    my $i   = "urn:publicid:IDN+plc:utah+slice+lbs";
+    $response =
+	Genixmlrpc::CallMethod($server, $context, "Resolve",
+			       $i, $selfcred->asString());
+}
+print Dumper($response);
+exit(1);
+

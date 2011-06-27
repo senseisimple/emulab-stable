@@ -124,6 +124,9 @@ sub uri($)              { return field($_[0], "uri"); }
 sub urn($)              { return field($_[0], "urn"); }
 sub GetCertificate($)   { return $_[0]; }
 
+# Kludge for SFA certs.
+sub setuuid($$)		{ return $_[0]->{'CERT'}->{'uuid'} = $_[1]; }
+
 #
 # The fields are buried inside the DN.
 #
@@ -293,7 +296,10 @@ sub Flush($)
 {
     my ($self) = @_;
 
-    $self->GetCertificate()->Flush();
+    # Just in case we get something else.
+    $self->GetCertificate()->Flush()
+	if (ref($self) ne "GeniCertificate");
+
     delete($certificates{$self->uuid()});
 }
 
@@ -473,6 +479,11 @@ sub LoadFromArray($@)
     my $cert = join("", @certlines);
 
     # Dig out the uuid.
+    #
+    # The uuid that PLC puts in the certificate is not associated with the
+    # underlying object, so it is not useful to us. We end up generating
+    # one below.
+    #
     my $uuid;
     if ($DN =~ /\/CN=([-\w]*)/) {
 	$uuid = $1;
@@ -673,6 +684,11 @@ sub URL($)
 	defined( $alturl ) ? $alturl : undef;
     if (!defined($url)) {
 	print STDERR "Could not find url in $self\n";
+	return undef;
+    }
+    # Make sure its really a URL!
+    if (! ($url =~ /^http/)) {
+	print STDERR "Not a valid url in $self: $url\n";
 	return undef;
     }
     $self->{'CERT'}->{'uri'} = $url;

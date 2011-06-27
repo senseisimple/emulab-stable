@@ -212,7 +212,7 @@ sub WarnSlices()
 	#
 	# If expiration is greater then 24 hours out, skip. 
 	#
-	print STDERR "$stamp, $created, $grace, ". time() . "\n";
+	#print STDERR "$stamp, $created, $grace, ". time() . "\n";
 
 	if ($stamp > time() + $grace) {
 	    delete($expires{$idx});
@@ -399,7 +399,7 @@ sub ShutdownSlices()
 {
     my $query_result =
 	GeniDB::DBQueryWarn("select idx from geni_slices ".
-			    "where shutdown is not null");
+			    "where shutdown is not null and isshutdown=0");
 
     while (my ($idx) = $query_result->fetchrow_array()) {
 	my $slice = GeniSlice->Lookup($idx);
@@ -414,14 +414,14 @@ sub ShutdownSlices()
 	}
 
 	#
-	# This will get called everytime, but CleanupDeadSlice does
-	# not actually do anything if there are no slivers.
+	# The isshutdown flag avoids churning the system.
 	#
 	if (GeniCM::CleanupDeadSlice($slice, 0) != 0) {
 	    print STDERR "Could not shutdown $slice\n";
 	    SENDMAIL($TBOPS, "Could not shutdown slice",
 		     "Could not shutdown slice $slice");
 	}
+	$slice->SetShutdownFlag(1);
 	$slice->UnLock();
       skip:
 	$slice->Flush()

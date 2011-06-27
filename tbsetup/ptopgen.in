@@ -25,6 +25,344 @@ $V_0_1 = "0.1";
 $V_0_2 = "0.2";
 $V_2 = "2";
 
+$emulabns = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
+# XXX: This needs to be changed
+$emulaburl = "http://www.protogeni.net/resources/rspec/ext/emulab/1/ptop_extension.xsd";
+$stitchns = "http://company.com/rspec/ext/stitch/1";
+$stitchurl = "http://company.com/rspec/ext/stitch/1/ad.xsd";
+
+$stitchxml = <<'STITCH_END';
+<stitching xmlns="http://company.com/rspec/ext/stitch/1" lastUpdateTime="20110220:09:30:21">
+
+<aggregate id="urn:publicid:IDN+emulab.net+authority+cm" url="https://www.emulab.net/protogeni/xmlrpc/cm">
+ <aggregatetype>protogeni</aggregatetype>
+ <stitchingmode>chainANDTree</stitchingmode>
+ <scheduledServices>false</scheduledServices>
+ <negotiatedServices>false</negotiatedServices>
+ <Lifetime start="2011-06-01T20:57:53Z" end="2011-06-01T20:57:53Z"/>
+
+ <node id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-kans">
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-kans:10">
+      <capacity>1000000000</capacity>
+      <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-kans:10:ion">
+      <remoteLinkId>urn:publicid:IDN+ion.internet2.edu+interface+rtr.kans:ge-7/1/3:protogeni</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-kans:(null)">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-kans:(null):*">
+      <remoteLinkId>urn:publicid:IDN+emulab.net+interface+*:*:*</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+ </node>
+
+ <node id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-wash">
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-wash:10">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-wash:10:ion">
+      <remoteLinkId>"urn:publicid:IDN+ion.internet2.edu+interface+rtr.wash:ge-7/1/3:protogeni"</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-wash:11">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-wash:11:ion">
+      <remoteLinkId>"urn:publicid:IDN+dragon.maxgigapop.net+interface+mcln:1/2/2:*"</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-wash:(null)">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-wash:(null):*">
+      <remoteLinkId>urn:publicid:IDN+emulab.net+interface+*:*:*</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+ </node>
+
+ <node id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-losa">
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-losa:10">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-losa:10:ion">
+      <remoteLinkId>urn:publicid:IDN+ion.internet2.edu+interface+rtr.losa:ge-7/1/3:protogeni</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-losa:(null)">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-losa:(null):*">
+      <remoteLinkId>urn:publicid:IDN+emulab.net+interface+*:*:*</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+ </node>
+
+ <node id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-hous">
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-hous:10">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-hous:10:ion">
+      <remoteLinkId>urn:publicid:IDN+ion.internet2.edu+interface+rtr.hous:ge-9/1/4:protogeni</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-hous:(null)">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-hous:(null):*">
+      <remoteLinkId>urn:publicid:IDN+emulab.net+interface+*:*:*</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+ </node>
+
+ <node id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-atla">
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-atla:10">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-atla:10:ion">
+      <remoteLinkId>urn:publicid:IDN+ion.internet2.edu+interface+rtr.atla:ge-7/1/6:protogeni</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-atla:(null)">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-atla:(null):*">
+      <remoteLinkId>urn:publicid:IDN+emulab.net+interface+*:*:*</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+ </node>
+
+ <node id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-salt">
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-salt:10">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-salt:10:ion">
+      <remoteLinkId>urn:publicid:IDN+ion.internet2.edu+interface+rtr.salt:ge-7/1/2:protogeni</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+  <port id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-salt:(null)">
+    <capacity>1000000000</capacity>
+    <maximumReservableCapacity>1000000000</maximumReservableCapacity>
+    <minimumReservableCapacity>1000000</minimumReservableCapacity>
+    <granularity>1000000</granularity>
+    <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-salt:(null):*">
+      <remoteLinkId>urn:publicid:IDN+emulab.net+interface+*:*:*</remoteLinkId>
+      <trafficEngineeringMetric>10</trafficEngineeringMetric>
+      <capacity>10000000000</capacity>
+      <maximumReservableCapacity>10000000000</maximumReservableCapacity>
+      <minimumReservableCapacity>1000000</minimumReservableCapacity>
+      <granularity>1000000</granularity>
+      <SwitchingCapabilityDescriptors>
+        <switchingcapType>l2sc</switchingcapType>
+        <encodingType>ethernet</encodingType>
+        <switchingCapabilitySpecificInfo>
+           <interfaceMTU>9000</interfaceMTU>
+           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+           <vlanTranslation>true</vlanTranslation>
+        </switchingCapabilitySpecificInfo>
+      </SwitchingCapabilityDescriptors>
+    </link>
+  </port>
+ </node>
+
+</aggregate>
+</stitching>
+STITCH_END
+
+
 if ($PGENISUPPORT) {
   require GeniHRN;
 }
@@ -1674,8 +2012,6 @@ sub print_header {
 	    print "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ";
 	    my $ns = "";
 	    my $url = "";
-	    my $emulabns = "";
-	    my $emulaburl = "";
 	    if ($genimode eq $V_0_1) {
 		$ns = "http://www.protogeni.net/resources/rspec/0.1";
 		$url = "http://www.protogeni.net/resources/rspec/0.1/ad.xsd";
@@ -1685,14 +2021,15 @@ sub print_header {
 	    } elsif ($genimode eq $V_2) {
 		$ns = "http://www.protogeni.net/resources/rspec/2";
 		$url = "http://www.protogeni.net/resources/rspec/2/ad.xsd";
-		$emulabns = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
-# XXX: This needs to be changed
-		$emulaburl = "http://www.protogeni.net/resources/rspec/ext/emulab/1/ptop_extension.xsd";
 	    }
 	    print "xmlns=\"$ns\" ";
 	    if ($genimode eq $V_2) {
 		print "xmlns:emulab=\"$emulabns\" ";
-		print "xsi:schemaLocation=\"$ns $url $emulabns $emulaburl\" ";
+		print "xsi:schemaLocation=\"$ns $url $emulabns $emulaburl ";
+		if (defined($MAINSITE) && $MAINSITE) {
+		    print "$stitchns $stitchurl ";
+		}
+		print "\" ";
 	    }
 	    else {
 		print "xsi:schemaLocation=\"$ns $url\" ";
@@ -1724,6 +2061,9 @@ sub print_footer {
     } elsif ($do_xml && $genimode ne $NO_GENI) {
 	if ($genimode eq $V_2) {
 	    print_type_limits();
+	    if (defined($MAINSITE) && $MAINSITE) {
+		print $stitchxml;
+	    }
 	}
 	print "</rspec>\n";
     }
@@ -2155,11 +2495,9 @@ sub print_named_link_xml
     my $proto_count = scalar(@proto);
     if ($genimode ne $NO_GENI) {
 	print "<link ";
-	my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "sa");
+	my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "component_manager_uuid=\"$cmurn\" ";
-	} elsif ($genimode eq $V_2) {
-	    print "component_manager_id=\"$cmurn\" ";
 	}
 	print "component_name=\"$name\" ";
 	my $urn = GeniHRN::Generate($OURDOMAIN, "link", $name);
@@ -2169,6 +2507,9 @@ sub print_named_link_xml
 	    print "component_id=\"$urn\" ";
 	}
 	print ">\n";
+	if ($genimode eq $V_2) {
+	    print "<component_manager name=\"$cmurn\" />\n";
+	}
 	print_interface($source, $source_if);
 	print_interface($dest, $dest_if);
     } else {

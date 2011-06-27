@@ -127,7 +127,7 @@ sub Resolve($)
     #
     my (undef,$callertype,$callerid) = GeniHRN::Parse($credential->owner_urn());
     if ($callertype eq "user") {
-	my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+	my $user = GeniCM::CreateUserFromCertificate($credential);
 	if (!GeniResponse::IsResponse($user) &&
 	    $user->IsLocal() && $user->admin()) {
 	    $admin = 1;
@@ -341,6 +341,9 @@ sub CreateSliver($)
     #
     my ($slice,$aggregate) = Credential2SliceAggregate($credential);
     if (defined($slice)) {
+	return $slice
+	    if (GeniResponse::IsResponse($slice));
+
 	if ($slice_urn ne $slice->urn()) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
 					"Credential does not match the URN");
@@ -361,7 +364,7 @@ sub CreateSliver($)
 					    "Slice certificate mismatch");
 	    }
 	    my $user =
-		GeniCM::CreateUserFromCertificate($credential->owner_cert());
+		GeniCM::CreateUserFromCertificate($credential);
 	    if (GeniResponse::IsResponse($user)) {	    
 		$slice->UnLock();
 		return $user;
@@ -481,6 +484,9 @@ sub DeleteSliver($)
     # credential
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+    
     if (! (defined($slice) && defined($aggregate))) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "Sliver does not exist");
@@ -502,7 +508,7 @@ sub DeleteSliver($)
     #
     # We need the user to sign the new ticket to. 
     #
-    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+    my $user = GeniCM::CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
     
@@ -582,6 +588,9 @@ sub DeleteSlice($)
     # In this implementation, the user must provide a slice credential.
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! defined($slice)) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No such slice here");
@@ -623,6 +632,9 @@ sub GetSliver($)
     # In this implementation, the user must provide a slice credential.
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! (defined($slice) && defined($aggregate))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice or aggregate here");
@@ -703,6 +715,8 @@ sub SliverAction($$$$$)
     # For now, only allow top level aggregate or the slice
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
 
     if ( (!defined($slice)) && 
           ($credential->target_urn() =~ /\+authority\+cm$/)) {
@@ -893,6 +907,9 @@ sub SliverStatus($)
     # For now, only allow top level aggregate or the slice
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! (defined($slice) && defined($aggregate))) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice or aggregate here");
@@ -1061,6 +1078,9 @@ sub RenewSlice($)
     # In this implementation, the user must provide a slice credential.
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! (defined($slice) && defined($aggregate))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice or aggregate here");
@@ -1106,6 +1126,9 @@ sub GetTicket($)
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
     if (defined($slice)) {
+	return $slice
+	    if (GeniResponse::IsResponse($slice));
+	
 	if ($slice_urn ne $slice->urn()) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
 					"Credential does not match the URN");
@@ -1127,7 +1150,7 @@ sub GetTicket($)
 					    "Slice certificate mismatch");
 	    }
 	    my $user =
-		GeniCM::CreateUserFromCertificate($credential->owner_cert());
+		GeniCM::CreateUserFromCertificate($credential);
 	    if (GeniResponse::IsResponse($user)) {
 		$slice->UnLock();
 		return $user;
@@ -1205,6 +1228,9 @@ sub UpdateTicket($)
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
     if (defined($slice)) {
+	return $slice
+	    if (GeniResponse::IsResponse($slice));
+
 	if ($slice_urn ne $slice->urn()) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
 					"Credential does not match the URN");
@@ -1253,7 +1279,7 @@ sub UpdateTicket($)
     #
     # We need the user to sign the new ticket to. 
     #
-    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+    my $user = GeniCM::CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
     
@@ -1297,6 +1323,9 @@ sub UpdateSliver($)
 				      "Insufficient privilege" ));
 
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! (defined($slice) && defined($aggregate))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice or aggregate here");
@@ -1327,7 +1356,7 @@ sub UpdateSliver($)
     #
     # Any user can update the sliver. The ticket is signed to that user.
     #
-    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+    my $user = GeniCM::CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
     
@@ -1374,6 +1403,9 @@ sub RedeemTicket($)
 				    "This is not your ticket");
     }
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! (defined($slice))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice here");
@@ -1412,6 +1444,9 @@ sub BindToSlice($)
 				     "Insufficient privilege" );
 
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! (defined($slice))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice here");
@@ -1424,7 +1459,7 @@ sub BindToSlice($)
     #
     # Find or create the user.
     #
-    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+    my $user = GeniCM::CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
     
@@ -1472,6 +1507,9 @@ sub ReleaseTicket($)
 				     "Insufficient privilege" );
 
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
     if (! (defined($slice))) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice here");
@@ -1613,12 +1651,11 @@ sub ReserveVlanTags($)
 	# slice creation through the normal path, in which case the code
 	# needs to see if the slice was first created on this path.
 	#
-	my ($auth,$type,$id) = GeniHRN::Parse($slice_urn);
-	my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
-	my $authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
-	if (!defined($authority)) {
+	my $authority =
+	    GeniCMV2::CreateAuthorityFromRegistry($slice_certificate);
+	if (GeniResponse::IsResponse($authority)) {
 	    print STDERR "Could not create authority from registry\n";
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	    $response = $authority;
 	    goto done;
 	}
 	$slice = GeniSlice->Create($slice_certificate, undef, $authority);
@@ -1976,6 +2013,7 @@ sub LookupURN($)
 sub Credential2SliceAggregate($)
 {
     my ($credential) = @_;
+    my $target_cert  = $credential->target_cert();
     my $target_urn   = $credential->target_urn();
     my $target_uuid  = $credential->target_uuid();
     my $slice;
@@ -1988,12 +2026,29 @@ sub Credential2SliceAggregate($)
         $slice = GeniSlice->Lookup($target_uuid);
     }
     if (defined($slice)) {
-	if( $credential->expires() gt $slice->expires() ) {
-	    # The credential presented lasts longer than we though the
+	#
+	# Make sure the certificate has not changed. If it has, then
+	# this is really a new slice. That is an error. 
+	#
+	if (!$target_cert->SameCert($slice)) {
+	    return (GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				 "Duplicate slice URN already exists here"));
+	}
+	if ($credential->expires() gt $slice->expires()) {
+	    #
+	    # The credential presented lasts longer than we thought the
 	    # slice did: our expiry date must have been stale.  This can
 	    # happen because the SA is always free to extend the lifetime
 	    # of a slice, and is not required to tell us.
-	    $slice->SetExpiration( $credential->expires() );
+	    #
+	    # If the slice has already expired, then the expiration daemon will
+	    # take care of this, and lets not get in the way of that.
+	    # The user needed to renew the slice to prevent it.
+	    # 
+	    # If not expired, still do nothing; it is up to the user to renew
+	    # the sliver.
+	    #
+	    ;
 	}
 	$aggregate = GeniAggregate->SliceAggregate($slice);
     }

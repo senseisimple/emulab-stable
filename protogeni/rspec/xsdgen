@@ -61,6 +61,15 @@ for path in ext/emulab/1/; do
     done
 done
 
+for path in ext/delay/1/; do
+    for schema in request; do 
+	if [ -e ${path}/${schema}.rnc ]; then
+	    $TRANGCMD ${path}/${schema}.rnc ${path}/${schema}.xsd 
+	    sudo scp ${path}/${schema}.xsd ${path}/${schema}.rnc ops.emulab.net:/usr/local/www.geni/data/trac/resources/rspec/${path}/
+	fi
+    done
+done
+
 cd ../security
 
 for path in ext/policy/1; do

@@ -832,9 +832,11 @@ sub UnProvision($;$)
 	}
 
 	my $virt_type = GeniXML::GetVirtualizationType($self->rspec());
+	my $sub_type  = GeniXML::GetVirtualizationSubtype($self->rspec());
 	if (!$node->isremotenode() &&
-	    defined($virt_type) &&
-	    $virt_type eq "emulab-vnode") {
+	    (defined($virt_type) && $virt_type eq "emulab-vnode") &&
+	    !(defined($sub_type) &&
+	      ($sub_type eq "raw" || $sub_type eq "raw-pc"))) {
 	    my $pnode_id = $node->phys_nodeid();
 	    my $pnode = Node->Lookup($pnode_id);
 	    if (!defined($pnode)) {
@@ -1219,6 +1221,13 @@ sub UnProvision($)
 	print STDERR "Could not find aggregate for $self\n";
 	return -1;
     }
+
+    #
+    # Skip this for Tunnel aggregates; nothing to to, and the code below
+    # only applies for vlan links.
+    #
+    return 0
+	if ($aggregate->type() eq "Tunnel");
 
     #
     # This is terrible; we need an interface to remove ports form vlans,

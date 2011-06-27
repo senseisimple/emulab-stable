@@ -338,10 +338,11 @@ sub Destroy($)
 
 #
 # Class method to destroy all lans for an experiment.
+# XXX Purge flag is for protogeni tunnels.
 #
-sub DestroyExperimentLans($$)
+sub DestroyExperimentLans($$$)
 {
-    my ($class, $experiment) = @_;
+    my ($class, $experiment, $purge) = @_;
 
     return -1
 	if (! ref($experiment));
@@ -357,6 +358,16 @@ sub DestroyExperimentLans($$)
 	my $lan = Lan->Lookup($lanid);
 	return -1
 	    if (!$lan);
+	
+	if (!$purge && $lan->type() eq "tunnel") {
+	    #
+	    # XXX Terrible hack; Skip protogeni tunnels unless purging.
+	    #
+	    my $protogeni_tunnel;
+	    next 
+		if ($lan->GetAttribute("protogeni_tunnel",
+				       \$protogeni_tunnel) == 0);
+	}
 	$lan->Destroy() == 0 or return -1;
     }
     return 0;

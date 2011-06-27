@@ -18,7 +18,8 @@ GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf GetStartupCommand GetTarball
 GetVirtualizationType SetVirtualizationSubtype GetVirtualizationSubtype
 GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
-CreateDocument AddElement RemoveChild PolicyExists GetMask);
+CreateDocument AddElement RemoveChild PolicyExists GetMask
+GetDiskImage);
 
 use English;
 use XML::LibXML;
@@ -28,12 +29,16 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS);
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS $XSI_NS $REQUEST_URL $MANIFEST_URL);
 $RSPEC_0_1 = "0.1";
 $RSPEC_0_2 = "0.2";
 $RSPEC_2 = "2";
 
 $EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
+$XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
+
+$REQUEST_URL = "http://www.protogeni.net/resources/rspec/2/request.xsd";
+$MANIFEST_URL = "http://www.protogeni.net/resources/rspec/2/manifest.xsd";
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -347,7 +352,9 @@ sub GetIp($$)
 {
     my ($ifaceref, $node) = @_;
     my $result = undef;
-    if (! IsVersion0($ifaceref)) {
+    if (IsVersion0($ifaceref)) {
+	$result = GetText("tunnel_ip", $ifaceref);
+    } else {
 	my $id = GetInterfaceId($ifaceref);
 	my @ifaces = FindNodes("n:interface", $node)->get_nodelist();
 	foreach my $iface (@ifaces) {
@@ -538,6 +545,21 @@ sub GetVirtualizationSubtype($)
 	my $type = FindFirst("n:sliver_type", $node);
 	if (defined($type)) {
 	    $result = GetText("name", $type);
+	}
+    }
+    return $result;
+}
+
+sub GetDiskImage($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = FindFirst("n:disk_image", $node);
+    } else {
+	my $type = FindFirst("n:sliver_type", $node);
+	if (defined($type)) {
+	    $result = FindFirst("n:disk_image", $type);
 	}
     }
     return $result;

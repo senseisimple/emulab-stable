@@ -34,8 +34,8 @@ sub Create($$;$$)
     return undef
 	if (!defined($auth));
 
-    if ($auth =~ /^plc:/ || $auth eq "ple" || $auth eq "plc") {
-	return GeniRegistry::PLC->Create($auth, $context);
+    if ($auth =~ /^plc/) {
+	return GeniRegistry::PLC->Create($context, $credential);
     }
     else {
 	return GeniRegistry::ClearingHouse->Create($context, $credential);
@@ -588,7 +588,7 @@ use overload ('""' => 'Stringify');
 #
 sub Create($;$$)
 {
-    my ($class, $aggregate, $context) = @_;
+    my ($class, $context, $credential) = @_;
     
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
@@ -603,43 +603,31 @@ sub Create($;$$)
 	print STDERR "Could not find my own authority for $context\n";
 	return undef;
     }
-    my $credential = GeniCredential->GetSelfCredential($me);
     if (!defined($credential)) {
-	print STDERR "Could not create self credential for $me\n";
-	return undef;
+	$credential = GeniCredential->GetSelfCredential($me);
+	if (!defined($credential)) {
+	    print STDERR "Could not create self credential for $me\n";
+	    return undef;
+	}
     }
 
     #
-    # At the moment, we hardwire all this.
+    # XXX Hardwired to PLC.
     #
-    my $url;
-    if ($aggregate =~ /maxpl/) {
-	$url = "https://max-myplc.dragon.maxgigapop.net:12345";
-    }
-    elsif ($aggregate =~ /ple/) {
-	$url = "https://www.planet-lab.eu:12345";
-    }
-    elsif ($aggregate =~ /plc/) {
-	$url = "https://www.planet-lab.org:12345";
-    }
-    else {
-	print STDERR "Do not know anything about $aggregate\n";
-	return undef;
-    }
     my $self              = {};
-    $self->{'url'}        = $url;
+    $self->{'url'}        = "https://www.planet-lab.org:12345";
+    $self->{'urn'}        = "";
     $self->{'context'}    = $context;
     $self->{'credential'} = $credential;
-    $self->{'aggregate'}  = $aggregate;
     bless($self, $class);
 
     return $self;
 }
 sub authority($)	{ return undef; }
 sub url($)		{ return $_[0]->{"url"}; }
+sub urn($)		{ return $_[0]->{"urn"}; }
 sub context($)		{ return $_[0]->{"context"}; }
 sub credential($)	{ return $_[0]->{"credential"}; }
-sub aggregate($)	{ return $_[0]->{"aggregate"}; }
 
 #
 # Stringify for output.
@@ -647,23 +635,56 @@ sub aggregate($)	{ return $_[0]->{"aggregate"}; }
 sub Stringify($)
 {
     my ($self) = @_;
-    my $aggregate = $self->aggregate();
+    my $urn = $self->urn();
 
-    return "[GeniRegistry: $aggregate]";
+    return "[GeniRegistry: $urn]";
 }
 
 #
 # Lookup a record.
 #
-sub Resolve($$$$)
+sub Resolve($$;$$)
 {
     my ($self, $urn, $type, $pref) = @_;
 
-    $$pref = undef;
+    $$pref = undef
+	if (defined($pref));
 
     my $response =
 	Genixmlrpc::CallMethod($self->url(), $self->context(), "Resolve",
 			       $urn, $self->credential()->asString());
+
+    goto bad
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "Resolve: " . $response->Dump() . "\n"
+	    if ($response->code() != GENIRESPONSE_SEARCHFAILED());
+	goto bad;
+    }
+
+    return $response->value()
+	if (!defined($pref));
+    $$pref = $response->value();
+    return 0;
+  bad:
+    return undef
+	if (!defined($pref));
+    return -1;
+}
+
+#
+# Get the registry list
+#
+sub GetRegistries($$)
+{
+    my ($self, $pref) = @_;
+
+    $$pref = undef;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->url(), $self->context(), "get_registries",
+			       $self->credential()->asString(), "");
 
     return -1
 	if (!defined($response));
@@ -676,6 +697,33 @@ sub Resolve($$$$)
     
     $$pref = $response->value();
     return 0;
+}
+
+#
+# PLC exports three different interfaces, differentiated by port
+# number, but all with the same URN. This is really a pain since only
+# one of them supports Resolve(), and everything must by resolved
+# there.
+#
+sub CreateFromAuthority($$;$$)
+{
+    my ($class, $authority, $context, $credential) = @_;
+    require URI;
+
+    my $registry = GeniRegistry::PLC->Create($context, $credential);
+    return undef
+	if (!defined($registry));
+
+    #
+    # Gack. Replace the URL with a modified URL for the registry we are
+    # really trying to resolve at. Also change to the proper port number.
+    #
+    my $uri = URI->new($authority->url());
+    $uri->port(12345);
+
+    $registry->{'url'} = "$uri";
+    $registry->{'urn'} = $authority->urn();
+    return $registry;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

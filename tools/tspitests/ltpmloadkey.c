@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <err.h>
 #include <fcntl.h>
@@ -18,12 +19,55 @@
 
 #include "libtpm/tpmkeys.h"
 
+/* pcomp is the buffer that we must fill in with our PCR hash/info.
+ * The hash of this buffer (pcomp) is called the composite hash.  After
+ * we have the composite hash, we stick the composite hash in the next
+ * buffer (signedhash), fill in the nonce field, and then hash
+ * signedhash.  This hash is what the TPM gives to us but it is signed
+ * with the requested identity key.
+ *
+ * So if we decrypt the blob that the TPM gives us with the identity
+ * key's public key and it the resulting hash matches our hash with the
+ * expected PCR(s) and nonce, then the PCRs are indeed what we think
+ * they are.
+ */
+struct {
+	/* big endian */
+	unsigned short slen;
+	/* the length of this field is slen - it is 2 on our tpms.
+	 * This field is a bitmask of which PCRS have been included.
+	 * It is little endian. */
+	unsigned short s;
+	/* big endian */
+	uint32_t plen;
+	/* p will also be plen bytes long.  I only request one PCR so
+	 * it will be 20 bytes. */
+	unsigned char p[20];
+} pcomp;
+
+struct {
+	unsigned char fixed[8];
+	/* Hash of pcomp */
+	unsigned char comphash[20];
+	unsigned char nonce[20];
+} signedhash;
+
+void usage(char *name)
+{
+	printf("\n");
+	printf("%s -s <srkpass> [-f <keyfile>]\n", name);
+	printf("\n");
+	exit(EXIT_FAILURE);
+}
+
 int main(int argc, char **argv)
 {
 	int fd, size, i, ret;
 	uint32_t kh, pcrs;
 
-	unsigned char buf[1024], hash[20];
+	unsigned char buf[1024], hash[20], pass[20];
+	char *srkpass, *keyfile, ch;
+
 	/* SHA1 hash of TPM's SRK password */
 	char *tpmhash = "\x71\x10\xed\xa4\xd0\x9e\x06\x2a\xa5\xe4\xa3"
 			"\x90\xb0\xa5\x72\xac\x0d\x2c\x02\x20";
@@ -32,42 +76,32 @@ int main(int argc, char **argv)
 	keydata k;
 	RSA *rpub;
 
-	/* pcomp is the buffer that we must fill in with our PCR hash/info.
-	 * The hash of this buffer (pcomp) is called the composite hash.  After
-	 * we have the composite hash, we stick the composite hash in the next
-	 * buffer (signedhash), fill in the nonce field, and then hash
-	 * signedhash.  This hash is what the TPM gives to us but it is signed
-	 * with the requested identity key.
-	 *
-	 * So if we decrypt the blob that the TPM gives us with the identity
-	 * key's public key and it the resulting hash matches our hash with the
-	 * expected PCR(s) and nonce, then the PCRs are indeed what we think
-	 * they are.
-	 */
-	struct {
-		/* big endian */
-		unsigned short slen;
-		/* the length of this field is slen - it is 2 on our tpms.
-		 * This field is a bitmask of which PCRS have been included.
-		 * It is little endian. */
-		unsigned short s;
-		/* big endian */
-		uint32_t plen;
-		/* p will also be plen bytes long.  I only request one PCR so
-		 * it will be 20 bytes. */
-		unsigned char p[20];
-	} pcomp;
+	srkpass = keyfile = NULL;
+	while ((ch = getopt(argc, argv, "hs:f:")) != -1) {
+		switch (ch) {
+			case 's':
+				srkpass = optarg;
+				break;
+			case 'f':
+				keyfile = optarg;
+				break;
+			case 'h':
+			default:
+				usage(argv[0]);
+				break;
+		}
+	}
 
-	struct {
-		unsigned char fixed[8];
-		/* Hash of pcomp */
-		unsigned char comphash[20];
-		unsigned char nonce[20];
-	} signedhash;
+	if (!srkpass)
+		usage(argv[0]);
+	if (!keyfile)
+		keyfile = "key.blob";
 
-	fd = open("key.blob", O_RDONLY);
+	SHA1(srkpass, strlen(srkpass), pass);
+
+	fd = open(keyfile, O_RDONLY);
 	if (fd == -1)
-		errx(1, "couldn't open key.blob\n");
+		errx(1, "couldn't open %s\n", keyfile);
 
 	size = read(fd, buf, 1024);
 	if (size == -1)
@@ -80,14 +114,14 @@ int main(int argc, char **argv)
 
 	printf("loading . . .\n");
 	/* 0x40000000 is the UID for the SRK */
-	if (ret = TPM_LoadKey(0x40000000, tpmhash, &k, &kh)) {
+	if (ret = TPM_LoadKey(0x40000000, pass, &k, &kh)) {
 		printf("%s\n", TPM_GetErrMsg(ret));
 		errx(1, "TPM_LoadKey\n");
 	}
 
 	/* Quote PCR 0 */
 	printf("quoting . . .\n");
-	if (ret = TPM_Quote(kh, (0x00000001 << 0), tpmhash, nonce, &pcomp, buf,
+	if (ret = TPM_Quote(kh, (0x00000001 << 0), pass, nonce, &pcomp, buf,
 	    &size)) {
 		printf("%s\n", TPM_GetErrMsg(ret));
 		errx(1, "TPM_Quote\n");

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # To set this script up:
@@ -129,7 +129,20 @@ my $defmail = get_config("defmail",undef);
 # If set, *always* send mail to this address (even if one or more regexps
 # match). ($defmail will still be used if no regexps match)
 #
-my $alwaysmail = get_config("alwaysmail",undef);
+my @alwaysmail = get_config("alwaysmail",undef);
+
+#
+# This works exactly like alwaysmail, but it causes seperate mail to get sent
+# to each address (this mail is also seperate from the 'main' message that will
+# get sent to all of the other addresses)
+#
+my @archivemail = get_config("archivemail",undef);
+
+#
+# If set, set the 'Reply-To' header in the mail, so that discussion can
+# take place on, for example, a particular development mailing list
+#
+my $replyto = get_config("replyto",undef);
 
 #
 # If set to true, detach and run in background - the push doesn't return until
@@ -171,6 +184,7 @@ my $exclude_repo = get_config("excluderepo",undef);
 #
 my $GIT = "git";
 my $SENDMAIL = get_config("sendmail","sendmail");
+my $HOSTNAME = get_config("hostname","hostname");
 
 #
 # Magic 'hash' that indicates an empty or non-existant rev
@@ -205,11 +219,12 @@ sub uniq(@);
 sub flatten_arrayref($);
 sub commit_mail($\@$@);
 sub get_commits($$$);
-sub send_mail($$@);
+sub send_mail($$$@);
 sub short_refname($);
 sub debug(@);
 sub object_exists($$);
 sub filter_out_objects_in_repo($@);
+sub generate_messageid();
 
 ######################################################################
 # Main Body
@@ -257,11 +272,11 @@ if ($mailconfigfile) {
 #
 my @reflines;
 if ($testmode) {
-    my $fullref = `git rev-parse --symbolic-full-name $testbranch`;
+    my $fullref = `$GIT rev-parse --symbolic-full-name $testbranch`;
     if (!$fullref) {
 	    exit(1);
     }
-    my $newrev = `git rev-parse $fullref $STDERRNULL`;
+    my $newrev = `$GIT rev-parse $fullref $STDERRNULL`;
     chomp $newrev;
 
     #
@@ -378,13 +393,11 @@ foreach my $refline (@reflines) {
     # Based on the list of files, figure out who to mail
     #
     my @mailaddrs = get_mail_addresses($refname,@changed_files);
-    debug("Mailing to: ", join(",",@mailaddrs));
 
     #
     # Send off the mail!
     #
     if (@mailaddrs) {
-        print "Sending email notification to ", join(",",@mailaddrs), "\n";
         commit_mail($ct,@commits,$refname,@mailaddrs);
     }
 }
@@ -431,7 +444,7 @@ sub change_type($$$) {
 #
 sub rev_type($) {
     my ($rev) = @_;
-    my $rev_type = `git cat-file -t '$rev' $STDERRNULL`;
+    my $rev_type = `$GIT cat-file -t '$rev' $STDERRNULL`;
     chomp $rev_type;
     return $rev_type;
 }
@@ -500,7 +513,7 @@ sub changed_files(@) {
 #
 sub get_mail_addresses($@) {
     my ($refname, @changedfiles) = @_;
-    my @addrs;
+    my (@addrs,@archiveaddrs);
     my $matched = 0;
 
     #
@@ -511,10 +524,20 @@ sub get_mail_addresses($@) {
     #
     # If there's an address we're always supposed to send to, include that now
     #
-    if (defined($alwaysmail)) {
-        push @addrs, flatten_arrayref($alwaysmail);
-        debug("Used alwaysmail address $alwaysmail");
+    if (@alwaysmail) {
+        push @addrs, @alwaysmail;
+        debug("Used alwaysmail address(es) " . join(",",@alwaysmail));
     }
+
+    #
+    # If there are any 'archive' mail addresses, put them into array refs,
+    # which will cause them to get sent separately
+    #
+    if (@archivemail) {
+        push @archiveaddrs, map {[$_]} @archivemail;
+        debug("Used archivemail address(es) " . join(",",@archivemail));
+    }
+
 
     #
     # Find out if this is a branch, and of so, what it's name is. If it's not,
@@ -596,13 +619,13 @@ sub get_mail_addresses($@) {
     #
     if (!$matched && defined($defmail)) {
         @addrs = flatten_arrayref($defmail);
-        debug("Used default address $alwaysmail");
+        debug("Used default address $defmail");
     }
 
     #
     # Pull out unique values to return
     #
-    return uniq(@addrs);
+    return (uniq(@addrs),@archiveaddrs);
 }
 
 #
@@ -666,7 +689,7 @@ sub commit_mail($\@$@) {
     my $actionstring = ucfirst($ref_type) . ' ' . short_refname($refname) .
                        " has been $what_happened";
 
-    $short_rev = `git rev-parse --short $refname $STDERRNULL`;
+    $short_rev = `$GIT rev-parse --short $refname $STDERRNULL`;
     chomp $short_rev;
     $subject .= " ($short_rev)" if ($short_rev);
 
@@ -729,7 +752,8 @@ sub commit_mail($\@$@) {
 
         if ($separate_mail) {
             # Send this message by itself
-            send_mail($subject,$actionstring . join("",@body),@mailaddrs);
+            send_mail($subject,$actionstring . join("",@body),
+                short_refname($refname), @mailaddrs);
         } else {
             push @fullbody,\@body;
         }
@@ -742,6 +766,7 @@ sub commit_mail($\@$@) {
         send_mail($subject,
             $actionstring . join("\n" . "-"x72 . "\n\n",
                                  map { join "",@$_} @fullbody),
+            short_refname($refname),
             @mailaddrs);
     }
 }
@@ -828,60 +853,76 @@ sub get_commits($$$) {
         return @commits;
     }
 
-    #
-    # The following magic is from the contrib post-receive hook, and it tries
-    # to avoid sending the same commit in mail twice, by excluding commits that
-    # are reachable from other branches
-    #
-    #my @other_branches = `$GIT for-each-ref --format='%(refname)' refs/heads/ | grep -F -v $refname`;
-    #chomp @other_branches;
-    #my $other_branches = join(" ",@other_branches);
-    #if ($debug) {
-    #    print "other_branches magic: '$other_branches'\n";
-    #}
-    #my $rev_parse = `$GIT rev-parse --not $other_branches`;
-    #if ($debug) {
-    #    print "rev_parse magic: \n" . $rev_parse;
-    #}
-    #my @commits = `$GIT rev-parse --not $other_branches | $GIT rev-list --pretty --stdin $revspec`;
-
 }
 
 #
 # Send out some mail (or not, if in debug mode)
+# If any parameters are references to lists, then we send a seperate peice
+# of mail to each of those lists
 #
-sub send_mail($$@) {
-    my ($subject, $body, @to) = @_;
+sub send_mail($$$@) {
+    my ($subject, $body, $refname, @to) = @_;
 
-    if ($debug) {
-           open(MAIL,">&STDERR");
-           print MAIL "\n\n";
-    } else {
-           # sendmail args:
-           # -oem causes errors in mail to be "mailed back"
-           # -odb deliver mail in background
-           # -t causes sendmail to look in the message for 'To:' 'Cc:' and
-           #    'Bcc:' lines
-           open(MAIL, "| $SENDMAIL -odb -oem -t");
+    #
+    # Generate our own messageid - this will be helpful if we are sending
+    # multiple copies to multiple addesses, so that people's duplicate
+    # supression can pick up on the fact that they are the same message
+    #
+    my $messageid = generate_messageid();
+
+    my @regular_addresses = grep { ref($_) ne "ARRAY" } @to;
+    my @list_refs = grep { ref($_) eq "ARRAY" } @to;
+
+    debug("regular addresses are: ", join(",",@regular_addresses));
+    debug("there are " . scalar(@list_refs) . " list_refs");
+
+    foreach my $mailto (\@regular_addresses, @list_refs) {
+
+        # The list ref could be empty (eg. if there were no @regular_addresses)
+        next unless @$mailto;
+
+        print "Sending email notification to ", join(",",@$mailto), "\n";
+
+        if ($debug) {
+               open(MAIL,">&STDERR");
+               print MAIL "\n\n";
+        } else {
+               # sendmail args:
+               # -oem causes errors in mail to be "mailed back"
+               # -odb deliver mail in background
+               # -t causes sendmail to look in the message for 'To:' 'Cc:' and
+               #    'Bcc:' lines
+               open(MAIL, "| $SENDMAIL -odb -oem -t");
+        }
+
+        print MAIL "To: " . join(", ",@$mailto) . "\n";
+        print MAIL "Subject: $subject\n";
+        print MAIL "Message-Id: $messageid\n";
+        
+        # If requested, set the Reply-To header
+        if (defined($replyto)) {
+            print MAIL "Reply-To: $replyto\n"
+        }
+
+        #
+        # Add an X-Git-Repo header to help people procmail
+        #
+        if (defined($reponame)) {
+            print MAIL "X-Git-Repo: $reponame\n";
+        }
+        print MAIL "X-Git-Ref: $refname\n";
+
+        #
+        # Marks end of headers
+        #
+        print MAIL "\n";
+
+        print MAIL $body;
+
+        if ($debug) {
+            print MAIL "\n\n";
+        }
     }
-
-    print MAIL "To: " . join(", ",@to) . "\n";
-    print MAIL "Subject: $subject\n";
-
-    #
-    # Add an X-Git-Repo header to help people procmail
-    # TODO: Add branch too!
-    #
-    if (defined($reponame)) {
-        print MAIL "X-Git-Repo: $reponame\n";
-    }
-
-    #
-    # Marks end of headers
-    #
-    print MAIL "\n";
-
-    print MAIL $body;
 
 }
 
@@ -890,7 +931,7 @@ sub send_mail($$@) {
 #
 sub short_refname($) {
     my ($ref) = @_;
-    my $refname = `git rev-parse --abbrev-ref $ref $STDERRNULL`;
+    my $refname = `$GIT rev-parse --abbrev-ref $ref $STDERRNULL`;
     chomp $refname;
 
     # Fall back to full name if rev-parse fails for some reason
@@ -923,27 +964,64 @@ sub debug(@) {
 sub get_config($$) {
     my ($var,$default) = @_;
 
+    my $multivalue = 0;
+
+    # This lets us check whether the caller wanted multiple values or not -
+    # if we were called in list context, this will be true
+    if (wantarray()) {
+        $multivalue = 1;
+    }
+
     #
     # Allow the user to override on command line
     #
     if ($opt{o}) {
+        my @values;
         foreach my $pair (@{$opt{o}}) {
             my ($name,$value) = split /=/, $pair;
             if ($name eq $var) {
                 debug("Using config value $value for $name from command line");
-                return $value;
+                if ($multivalue) {
+                    push @values, $value;
+                } else {
+                    return $value;
+                }
             }
+        }
+        if ($multivalue && (@values > 0)) {
+            return @values;
         }
     }
 
-    my $value = `git config $CONFIGBASE.$var`;
-    chomp $value;
-    if ($value ne "") {
-        debug("Got $value from git config for $var");
-        return $value;
+    my $getcommand = "--get";
+    if ($multivalue) {
+        $getcommand = "--get-all";
+    }
+
+    # Note: We have to use 'git', not '$GIT' here, since the latter is fetched
+    # using this function
+    my @value = `git config $getcommand $CONFIGBASE.$var`;
+    chomp @value;
+
+    if (@value) {
+        if ($multivalue) {
+            foreach my $value (@value) {
+                debug("Got $value from git config for $var");
+            }
+            return @value;
+        } else {
+            debug("Got $value[0] from git config for $var");
+            return $value[0];
+        }
     } else {
-        debug("Using " , defined($default)?$default : "(undef)" , " for $var");
-        return $default;
+        if (!$multivalue) {
+            debug("Using " , defined($default)?$default : "(undef)" , " for $var");
+            return $default;
+        } else {
+            # Multivalue always returns the empty array for the defauly
+            debug("Using the emtpy list for $var");
+            return ();
+        }
     }
 }
 
@@ -954,7 +1032,7 @@ sub get_config($$) {
 sub get_merge_base($$)
 {
 	my ($rev_a, $rev_b) = @_;
-	my $mb = `git merge-base '$rev_a' '$rev_b'`;
+	my $mb = `$GIT merge-base '$rev_a' '$rev_b'`;
 	chomp $mb;
 
 	return $mb
@@ -987,4 +1065,26 @@ sub object_exists($$) {
 sub filter_out_objects_in_repo($@) {
     my $repo = shift @_;
     return grep { !object_exists($_,$repo)} @_;
+}
+
+#
+# Generate a value suitable for use in a Message-Id header
+#
+sub generate_messageid() {
+    # First part: current time
+    my $first = time();
+    # Second part: some random junk
+    my $second;
+    foreach my $i (0 .. 8) {
+        $second .= sprintf "%02x", int(rand(256));
+    }
+    # Third part: hostname
+    my $hostname = `$HOSTNAME -f`;
+    chomp $hostname;
+
+    my $msgid = "<$first.$second\@$hostname>";
+
+    debug("generated message id $msgid");
+
+    return $msgid;
 }

@@ -26,7 +26,9 @@ use emutil;
 use Compress::Zlib;
 use MIME::Base64;
 use XML::LibXML;
+use URI;
 use Data::Dumper;
+use Frontier::RPC2;
 
 # Disable UUID checks in GeniCredential.
 $GeniCredential::CHECK_UUID = 0;
@@ -81,47 +83,49 @@ sub GetVersion()
     my $url = $me->url();
     $url =~ s/cm$/am/;
 
+    my $coder = Frontier::RPC2->new('use_objects' => 1);
+
     my $default_ad = {
 	"type" => "ProtoGENI",
-	"version" => "0.1" };
+	"version" => $coder->string("0.1") };
     my $request_0_1 = {
 	"type" => "ProtoGENI",
-	"version" => "0.1",
+	"version" => $coder->string("0.1"),
 	"schema" => "http://www.protogeni.net/resources/rspec/0.1/request.xsd",
 	"namespace" => "http://www.protogeni.net/resources/rspec/0.1",
 	"extensions" => []
     };
     my $request_0_2 = {
 	"type" => "ProtoGENI",
-	"version" => "0.2",
+	"version" => $coder->string("0.2"),
 	"schema" => "http://www.protogeni.net/resources/rspec/0.2/request.xsd",
 	"namespace" => "http://www.protogeni.net/resources/rspec/0.2",
 	"extensions" => []
     };
     my $request_2 = {
 	"type" => "ProtoGENI",
-	"version" => "2",
+	"version" => $coder->string("2"),
 	"schema" => "http://www.protogeni.net/resources/rspec/2/request.xsd",
 	"namespace" => "http://www.protogeni.net/resources/rspec/2",
 	"extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
     };
     my $ad_0_1 = {
         "type" => "ProtoGENI",
-        "version" => "0.1",
+        "version" => $coder->string("0.1"),
         "schema" => "http://www.protogeni.net/resources/rspec/0.1/ad.xsd",
         "namespace" => "http://www.protogeni.net/resources/rspec/0.1",
         "extensions" => []
     };
     my $ad_0_2 = {
         "type" => "ProtoGENI",
-        "version" => "0.2",
+        "version" => $coder->string("0.2"),
         "schema" => "http://www.protogeni.net/resources/rspec/0.2/ad.xsd",
         "namespace" => "http://www.protogeni.net/resources/rspec/0.2",
         "extensions" => []
     };
     my $ad_2 = {
         "type" => "ProtoGENI",
-        "version" => "2",
+        "version" => $coder->string("2"),
         "schema" => "http://www.protogeni.net/resources/rspec/2/ad.xsd",
         "namespace" => "http://www.protogeni.net/resources/rspec/2",
         "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
@@ -246,12 +250,11 @@ sub auto_add_sa($)
     }
     my $url = $certificate->URL();
     if (!defined($url)) {
-        print STDERR "auto_add_sa: certificate does not have a URI extension";
-        return;
+        print STDERR "auto_add_sa: certificate does not have a URL extension\n";
     }
     my $urn = $certificate->urn();
     if (!defined($urn)) {
-        print STDERR "auto_add_sa: certificate does not have a URN extension";
+        print STDERR "auto_add_sa: certificate does not have a URN extension\n";
         return;
     }
     # Look to see if already registered.
@@ -264,20 +267,73 @@ sub auto_add_sa($)
 	    if ($certificate->SameCert($authority->GetCertificate()));
 
 	#
-	# Do nothing; needs more thought. The problem is that the caller
-	# could be from a conforming PG authority, and so setting the url
-	# to undef in the code below is wrong. We should probably probe the
-	# SA here, to see if it is conforming. Or maybe set the URL and not
-	# worry of the sliver registration throws an error. 
+	# Want to reuse the old uuid since we use it as a table cross
+	# reference index. Eventually need to use the URN. Anyway, change
+	# the uuid in the new certificate so that it goes into the DB
+	# with the original one. Then update the Authority record with
+	# the new certificate.
 	#
+	print STDERR "Updating $authority with new certificate: $certificate\n";
+	
+	$certificate->setuuid($authority->uuid());
+	if ($authority->UpdateCertificate($certificate)) {
+	    print STDERR "Failed to update $authority with $certificate\n";
+	    return;
+	}
 	return;
     }
+    #
+    # We want the URL! 
+    #
+    # First get the list of registries from PLC.
+    my $registry = GeniRegistry::PLC->Create();
+    if (!defined($registry)) {
+	print STDERR "Cannot create a PLC registry object\n";
+	return;
+    }
+    my $blob;
+    if ($registry->GetRegistries(\$blob)) {
+	print STDERR "Cannot get PLC registry listing\n";
+	return;
+    }
+    print STDERR Dumper($blob);
 
-    # if we're auto adding an authority, set the url to null
-    # so the PG/Emulab machinery does not try to contact the
-    # dynamic sa. It probably won't respond to the PG/Emulab
-    # protocols.
-    $url = undef;
+    #
+    # Now look at the last signer certificate; this is the actual authority.
+    #
+    my $authcertstr = @$signers[scalar(@$signers) - 1];
+    my $authcert = GeniCertificate->LoadFromString($authcertstr);
+    if (!defined($authcert)) {
+        print STDERR "auto_add_sa: could not get certificate from $authcertstr\n";
+        return;
+    }
+    my $authurn = $authcert->urn();
+    if (!defined($authurn)) {
+        print STDERR "auto_add_sa: $authcert does not have a URN extension\n";
+        return;
+    }
+
+    #
+    # Now search ...
+    #
+    foreach my $ref (@$blob) {
+	if ($ref->{'urn'} eq $authurn) {
+	    $url = $ref->{'url'};
+	    last;
+	}
+    }
+    if (!defined($url)) {
+        print STDERR "auto_add_sa: could not get a URL for $authcert\n";
+	return;
+    }
+    #
+    # Gack. Replace the URL with a modified URL which says https.
+    # Why does PLC set the scheme to http?
+    #
+    my $uri = URI->new($url);
+    $uri->scheme("https");
+    $url = "$uri";
+    
     if (!GeniAuthority->Create($certificate, $url, "sa")) {
         print STDERR "auto_add_sa: unable to add authority\n";
         return;

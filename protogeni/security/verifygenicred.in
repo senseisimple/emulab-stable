@@ -220,8 +220,10 @@ foreach my $credential ( keys( %credentials ) ) {
 	my $gid = lookup( $node, "target_gid" )->textContent;
 	my $parent_gid = lookup( $parent, "target_gid" )->textContent;
 
-	$gid =~ s/\s//;
-	$parent_gid =~ s/\s//;
+	$gid =~ s/-.*-//g;
+	$gid =~ s/\s//g;
+	$parent_gid =~ s/-.*-//g;
+	$parent_gid =~ s/\s//g;
 
 	fatal( "invalid delegation (GID mismatch)" )
 	    if $gid ne $parent_gid;
@@ -240,8 +242,8 @@ foreach my $credential ( keys( %credentials ) ) {
 					     "privileges" )->childNodes );
 	    my %allowed = ();
 	    $allowed{ lookup( $_, "name" )->textContent } = 1
-		foreach grep( lookup( $_, "can_delegate" )->textContent == 1,
-			      @parent_privs );
+		foreach grep( lookup( $_, "can_delegate" )->textContent =~
+			      /1|true/i, @parent_privs );
 
 	    foreach my $priv ( @privs ) {
 		my $name = lookup( $priv, "name" )->textContent;

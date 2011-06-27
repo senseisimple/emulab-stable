@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<RSpec type="SFA">
+  <network name="plc">
+   <sliver_defaults>
+      <initscript>emulab</initscript>
+    </sliver_defaults>
+    <site id="kentucky">
+      <name>Kentucky</name>
+      <node id="n73">
+        <hostname>planetlab1.netlab.uky.edu</hostname>
+        <urn>urn:publicid:IDN+plc:kentucky+node+planetlab1.netlab.uky.edu</urn>
+	<sliver />
+      </node>
+      <node id="n74">
+        <hostname>planetlab2.netlab.uky.edu</hostname>
+        <urn>urn:publicid:IDN+plc:kentucky+node+planetlab2.netlab.uky.edu</urn>
+	<sliver />
+      </node>
+    </site>
+  </network>
+</RSpec>
+

@@ -32,6 +32,7 @@ my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
 my $ADDIR         = "$TB/www/protogeni/advertisements";
+my $SALIST        = "$TB/www/protogeni/authorities/salist.txt";
 my $LOGFILE       = "$TB/log/ch_daemon.log";
 my $EMULAB_PEMFILE = "$TB/etc/genich.pem";
 my $SLEEP_INTERVAL = 60;
@@ -266,31 +267,34 @@ sub ExpireSlices()
     # (see below).
 }
 
-sub GenerateFederatesList()
+#
+# And a list of SAs for Flack.
+#
+sub GenerateSliceAuthorityList()
 {
     my @authorities = ();
-    my %federates   = ();
     
     if (GeniAuthority->ListAll(\@authorities)) {
 	fatal("Could not get authorities list from the DB");
     }
-    foreach my $authority (@authorities) {
-	my $urn = $authority->urn();
-    }
+    if (open(MAP, "> $SALIST")) {
+	foreach my $authority (@authorities) {
+	    next
+		if ($authority->type() ne "sa" || $authority->disabled());
 
-    if (open(MAP, "> $ADDIR/list.txt")) {
-#	foreach my $urn (keys(%ads)) {
-#	    print MAP "$urn\n";
-#	}
+	    my $urn = $authority->urn();
+	    my $url = $authority->url();
+	    print MAP "$urn $url\n";
+	}
 	close(MAP);
     }
     else {
-	notify("Could not open $ADDIR/list.txt for output\n");
-	next;
+	notify("Could not open $SALIST for output: $!\n");
     }
 }
 
 if ($oneshot) {
+    GenerateSliceAuthorityList();
     ProbeCMs();
     ExpireSlices();
     exit(0);
@@ -307,6 +311,7 @@ while (1) {
 
     $probe_countdown -= $SLEEP_INTERVAL;
     if ($probe_countdown <= 0) {
+	GenerateSliceAuthorityList();
 	ProbeCMs();
 	ExpireSlices();
 	$probe_countdown = $PROBE_INTERVAL;

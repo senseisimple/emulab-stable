@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <err.h>
 #include <fcntl.h>
 #include <openssl/ssl.h>
@@ -121,8 +122,16 @@ void pquote2(TSS_VALIDATION *valdata)
 	printf("info short %d\n", sizeof(TPM_PCR_INFO_SHORT));
 }
 
+void usage(char *name)
+{
+	printf("\n");
+	printf("%s -t <tpmpass> -s <srkpass> [-f <keyfile>]\n", name);
+	printf("\n");
+	exit(EXIT_FAILURE);
+}
+
 int
-main(void)
+main(int argc, char **argv)
 {
 	int ret, i, fd, j;
 	TSS_HCONTEXT hContext;
@@ -138,23 +147,48 @@ main(void)
 	TSS_HHASH	hHash;
 	TPM_QUOTE_INFO *qinfo;
 	TPM_QUOTE_INFO2 *qinfo2;
-	UINT32		rub1;
+	UINT32		rub1, ch;
 	BYTE		*rub2;
+	BYTE		*srkpass, *tpmpass, *keyfile;
 
 	RSA	*rsa;
 
-	fd = open("key.blob", O_RDONLY, 0);
+	srkpass = tpmpass = keyfile = NULL;
+	while ((ch = getopt(argc, argv, "f:hs:t:")) != -1) {
+		switch (ch) {
+			case 's':
+				srkpass = optarg;
+				break;
+			case 't':
+				tpmpass = optarg;
+				break;
+			case 'f':
+				keyfile = optarg;
+				break;
+			case 'h':
+			default:
+				usage(argv[0]);
+				break;
+		}
+	}
+
+	if (!srkpass || !tpmpass)
+		usage(argv[0]);
+
+	if (!keyfile)
+		keyfile = "key.blob";
+	fd = open(keyfile, O_RDONLY, 0);
 	if (fd < 0)
-		errx(1, "Couldn't open key.blob\n");
+		errx(1, "Couldn't open %s\n", keyfile);
 
 	printf("opened; fd %d\n", fd);
 	bloblen = read(fd, blob, 1024);
 	if (bloblen == -1) {
 		perror(NULL);
-		errx(1, "error reading key.blob\n");
+		errx(1, "error reading %s\n", keyfile);
 	}
 
-	printf("read %d bytes from key.blob\n", bloblen);
+	printf("read %d bytes from %s\n", bloblen, keyfile);
 
 	/* create context and connect */
 	ret = Tspi_Context_Create(&hContext);
@@ -169,7 +203,8 @@ main(void)
 	/* srk password */
 	ret = Tspi_GetPolicyObject(hSRK, TSS_POLICY_USAGE, &srkpol);
 	check("get policy object", ret);
-	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN, 4, "1234");
+	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN,
+	    strlen(srkpass), srkpass);
 	check("policy set secret", ret);
 
 	/* owner TPM password */

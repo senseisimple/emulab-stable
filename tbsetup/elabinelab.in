@@ -856,9 +856,12 @@ sub DumpDBGoo()
 
     #
     # Initial images; note that these images are not going to exist inside!
+    # Note that we exclude any encrypted images because we cannot expose
+    # the encryption keys that they would need to decode the images!
     # 
     DBQueryWarn("select * from images ".
-		"where pid='$pid' or (pid='$TBOPSPID' and global=1) ".
+		"where (pid='$pid' or (pid='$TBOPSPID' and global=1)) ".
+		"  and decryption_key is null ".
 		"into outfile '$statedir/images'")
 	or die("*** $0:\n".
 	       "    Could not dump table images\n");

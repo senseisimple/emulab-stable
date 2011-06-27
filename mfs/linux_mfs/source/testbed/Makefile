@@ -2,7 +2,7 @@ include ../../variables.mk
 
 BUILDROOT	:=	$(PWD)/$(BUILDROOT)
 
-PROGS	:= imageunzip imagezip frisbee growdisk tmcc.bin binoffset groklilo teachswitch dhcp_packet_dump sethostname.dhclient
+PROGS	:= imageunzip imagezip frisbee frisupload growdisk tmcc.bin binoffset groklilo teachswitch dhcp_packet_dump sethostname.dhclient
 BUILD_TARGETS := $(PROGS)
 INSTALL_TARGETS := $(addsuffix -install,$(PROGS))
 
@@ -24,7 +24,7 @@ DHCP_PACKET_DUMP_PATH = $(TESTBED_PATH)/tools/dhcp_packet_dump
 CFLAGS = -Os
 
 INSTALLED_BINS	:= $(addprefix $(TARGET_PATH)/usr/, \
-			$(addprefix bin/, binoffset imagezip imageunzip tmcc.bin frisbee teachswitch dhcp_packet_dump) \
+			$(addprefix bin/, binoffset imagezip imageunzip tmcc.bin frisbee frisupload teachswitch dhcp_packet_dump) \
 			$(addprefix sbin/, groklilo growdisk))
 
 all: $(BUILD_TARGETS)
@@ -105,6 +105,8 @@ imageunzip-install: $(TARGET_PATH)/usr/bin/imageunzip
 imagezip-install: $(TARGET_PATH)/usr/bin/imagezip
 
 frisbee-install: $(TARGET_PATH)/usr/bin/frisbee
+
+frisupload-install: $(TARGET_PATH)/usr/bin/frisupload
 
 growdisk-install: $(TARGET_PATH)/usr/sbin/growdisk
 
@@ -198,6 +200,17 @@ $(TESTBED_BUILD_PATH)/frisbee: $(SYSROOT_ZLIB_SHARED)
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) frisbee
 	mkdir -p $(dir $@)
 	mv $(FRISBEE_PATH)/frisbee $@
+	$(MAKE) -C $(FRISBEE_PATH) -f Makefile-linux.sa clean
+	$(STRIPCMD) --strip-unneeded $@
+
+$(TESTBED_BUILD_PATH)/frisupload: $(SYSROOT_ZLIB_SHARED)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	C_INCLUDE_PATH=$(STAGING_DIR)/usr/include/openssl \
+	$(MAKE) -C $(FRISBEE_PATH) -f Makefile-linux.sa \
+		CC=$(CROSS_COMPILER_PREFIX)gcc \
+		PATH=$(STAGING_DIR)/usr/bin:$(PATH) frisupload
+	mkdir -p $(dir $@)
+	mv $(FRISBEE_PATH)/frisupload $@
 	$(MAKE) -C $(FRISBEE_PATH) -f Makefile-linux.sa clean
 	$(STRIPCMD) --strip-unneeded $@
 

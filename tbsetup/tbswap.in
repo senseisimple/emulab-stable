@@ -882,7 +882,8 @@ sub doSwapout($) {
     #
     if ( $type >= CLEANUP ) {
 	print STDERR "Resetting DB.\n";
-	$experiment->RemovePhysicalState();
+	# Add purge flag.
+	$experiment->RemovePhysicalState(1);
 	# Special. 
 	$experiment->ClearPortRegistration();
     }

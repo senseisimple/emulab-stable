@@ -963,6 +963,34 @@ sub Start($$$)
     }
 
     if ($version >= 2) {
+	#
+	# Dump the manifest into the experiment directory.
+	#
+	my $userdir       = $experiment->UserDir();
+	my $manifest_file = "$userdir/tbdata/geni_manifest";
+	my $manifest      = $self->GetManifest(1);
+	if (open(MAN, ">$manifest_file")) {
+	    print MAN $manifest;
+	    close(MAN);
+	}
+
+	#
+	# Now we need a mapping of node_id to sliver_urn.
+	#
+	my $mapping_file = "$userdir/tbdata/geni_mapping";
+	if (open(MAP, ">$mapping_file")) {
+	    foreach my $sliver (@slivers) {
+		next
+		    if (ref($sliver) ne "GeniSliver::Node");
+
+		print MAP $sliver->resource_id();
+		print MAP " ";
+		print MAP $sliver->sliver_urn();
+		print MAP "\n";
+	    }
+	    close(MAP);
+	}
+	
 	if (system("$GENTOPOFILE $pid $eid")) {
 	    print STDERR "$GENTOPOFILE failed\n";
 	    return -1;
@@ -1429,6 +1457,7 @@ use GeniCertificate;
 use GeniRegistry;
 use GeniAggregate;
 use GeniUtil;
+use GeniXML;
 use Experiment;
 use Interface;
 use Data::Dumper;
@@ -1440,8 +1469,11 @@ sub Create($$$$$$)
     my $clearinghouse;
 
     my $linkname = GeniXML::GetVirtualId($linkrspec);
-    return undef
-	if (!defined($linkname));
+    if (!defined($linkname)) {
+	print STDERR "Could not create tunnel aggregate: Undefined linkname";
+	print STDERR GeniXML::Serialize($linkrspec, 1);
+	return undef;
+    }
     my @interfaces = GeniXML::FindNodes("n:interface_ref",
 					$linkrspec)->get_nodelist();
     
@@ -1458,8 +1490,10 @@ sub Create($$$$$$)
 
     my $aggregate = GeniAggregate->Create($slice, $owner, "Tunnel",
 					  $hrn, $linkname);
-    goto bad
-	if (!defined($aggregate));
+    if (!defined($aggregate)) {
+	print STDERR "Could not create tunnel aggregate: Undefined aggregate";
+	return undef;
+    }
 
     #
     # Create a tunnel entry in the lans table.
@@ -1469,6 +1503,8 @@ sub Create($$$$$$)
 	print STDERR "Could not create tunnel entry in lans table\n";
 	return undef;
     }
+    # Mark it as a tunnel for a protogeni sliver.
+    $tunnel->SetAttribute("protogeni_tunnel", "Yep");
 
     my $iface1ref = $interfaces[0];
     my $iface2ref = $interfaces[1];
@@ -1480,8 +1516,7 @@ sub Create($$$$$$)
     my $virtid2  = GeniXML::GetVirtualId($node2rspec);
     my $ctrlip1;
     my $ctrlip2;
-    my $iface1;
-    my $iface2;
+    my ($iface1, $iface2, $member1, $member2, $node1, $node2);
     my $manager1;
     my $manager2;
     my $testing = 0;
@@ -1489,7 +1524,7 @@ sub Create($$$$$$)
     # We need the control network addresses, but it is possible that
     # one of the nodes is not on this testbed.
     if (defined($node1sliver)) {
-	my $node1 = Node->Lookup($node1sliver->resource_id());
+	$node1 = Node->Lookup($node1sliver->resource_id());
 	if (!defined($node1)) {
 	    print STDERR "Tunnel: Could not lookup node for $node1sliver\n";
 	    goto bad;
@@ -1504,12 +1539,16 @@ sub Create($$$$$$)
 	    }
 	    $manager1 = $manager_id;
 	}
-	my $interface = Interface->LookupControl($node1);
-	goto bad
-	    if (!defined($interface));
+	my $interface = Interface->LookupControl($node1->isvirtnode() ?
+						 $node1->phys_nodeid() : $node1);
+	if (!defined($interface)) {
+	    print STDERR "No control interface for $node1\n";
+	    goto bad;
+	}
 	$ctrlip1 = $interface->IP();
-	$iface1  = $tunnel->AddMember($node1);
-	if (!defined($iface1)) {
+	$iface1  = $interface->iface();
+	$member1 = $tunnel->AddMember($node1, $interface->iface());
+	if (!defined($member1)) {
 	    print STDERR "Could not add $node1 to $tunnel\n";
 	    goto bad;
 	}
@@ -1546,7 +1585,7 @@ sub Create($$$$$$)
 	}
     }
     if (defined($node2sliver)) {
-	my $node2 = Node->Lookup($node2sliver->resource_id());
+	$node2 = Node->Lookup($node2sliver->resource_id());
 	if (!defined($node2)) {
 	    print STDERR "Tunnel: Could not lookup node for $node2sliver\n";
 	    goto bad;
@@ -1561,12 +1600,16 @@ sub Create($$$$$$)
 	    }
 	    $manager2 = $manager_id;
 	}
-	my $interface = Interface->LookupControl($node2);
-	goto bad
-	    if (!defined($interface));
+	my $interface = Interface->LookupControl($node2->isvirtnode() ?
+						 $node2->phys_nodeid() : $node2);
+	if (!defined($interface)) {
+	    print STDERR "No control interface for $node2\n";
+	    goto bad;
+	}
 	$ctrlip2 = $interface->IP();
-	$iface2  = $tunnel->AddMember($node2);
-	if (!defined($iface2)) {
+	$iface2  = $interface->iface();
+	$member2 = $tunnel->AddMember($node2, $interface->iface());
+	if (!defined($member2)) {
 	    print STDERR "Could not add $node2 to $tunnel\n";
 	    goto bad;
 	}
@@ -1604,31 +1647,63 @@ sub Create($$$$$$)
     }
     # print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
 
-    if (defined($iface1)) {
-	$iface1->SetAttribute("tunnel_ip", $ip1);
-	$iface1->SetAttribute("tunnel_peerip", $ip2);
-	$iface1->SetAttribute("tunnel_srcip", $ctrlip1);
-	$iface1->SetAttribute("tunnel_dstip", ($testing ? "" : $ctrlip2));
-	$iface1->SetAttribute("tunnel_dsturn", $manager2)
+    if (defined($member1)) {
+	$member1->SetAttribute("tunnel_ip", $ip1);
+	$member1->SetAttribute("tunnel_peerip", $ip2);
+	$member1->SetAttribute("tunnel_srcip", $ctrlip1);
+	$member1->SetAttribute("tunnel_dstip", ($testing ? "" : $ctrlip2));
+	$member1->SetAttribute("tunnel_dsturn", $manager2)
 	    if (defined($manager2));
-	$iface1->SetAttribute("tunnel_ipmask", "255.255.255.0");
-	$iface1->SetAttribute("tunnel_lan", $linkname);
-	$iface1->SetAttribute("tunnel_unit", $iface1->memberid() + 1);
-	$iface1->SetAttribute("tunnel_style", "gre");
-	$iface1->SetAttribute("tunnel_peerid", $virtid2);
+	$member1->SetAttribute("tunnel_ipmask", "255.255.255.0");
+	$member1->SetAttribute("tunnel_lan", $linkname);
+	$member1->SetAttribute("tunnel_unit", $member1->memberid() + 1);
+	$member1->SetAttribute("tunnel_style", "gre");
+	$member1->SetAttribute("tunnel_peerid", $virtid2);
+
+	my $sliver = GeniSliver::Interface->Create($slice,
+						   $owner,
+						   $node1->node_id(),
+						   $iface1,
+						   $linkname,
+						   $iface1ref);
+	if (!defined($sliver)) {
+	    print STDERR
+		"Could not create sliver object for $member1 in $tunnel\n";
+	    goto bad;
+	}
+	if ($sliver->SetAggregate($aggregate) != 0) {
+	    print STDERR "Could not add link sliver $sliver to $aggregate\n";
+	    goto bad;
+	}
     }
-    if (defined($iface2)) {
-	$iface2->SetAttribute("tunnel_ip", $ip2);
-	$iface2->SetAttribute("tunnel_peerip", $ip1);
-	$iface2->SetAttribute("tunnel_srcip", $ctrlip2);
-	$iface2->SetAttribute("tunnel_dstip", ($testing ? "" : $ctrlip1));
-	$iface2->SetAttribute("tunnel_dsturn", $manager1)
+    if (defined($member2)) {
+	$member2->SetAttribute("tunnel_ip", $ip2);
+	$member2->SetAttribute("tunnel_peerip", $ip1);
+	$member2->SetAttribute("tunnel_srcip", $ctrlip2);
+	$member2->SetAttribute("tunnel_dstip", ($testing ? "" : $ctrlip1));
+	$member2->SetAttribute("tunnel_dsturn", $manager1)
 	    if (defined($manager1));
-	$iface2->SetAttribute("tunnel_ipmask", "255.255.255.0");
-	$iface2->SetAttribute("tunnel_lan", $linkname);
-	$iface2->SetAttribute("tunnel_unit", $iface2->memberid() + 1);
-	$iface2->SetAttribute("tunnel_style", "gre");
-	$iface2->SetAttribute("tunnel_peerid", $virtid1);
+	$member2->SetAttribute("tunnel_ipmask", "255.255.255.0");
+	$member2->SetAttribute("tunnel_lan", $linkname);
+	$member2->SetAttribute("tunnel_unit", $member2->memberid() + 1);
+	$member2->SetAttribute("tunnel_style", "gre");
+	$member2->SetAttribute("tunnel_peerid", $virtid1);
+
+	my $sliver = GeniSliver::Interface->Create($slice,
+						   $owner,
+						   $node2->node_id(),
+						   $iface2,
+						   $linkname,
+						   $iface2ref);
+	if (!defined($sliver)) {
+	    print STDERR
+		"Could not create sliver object for $member2 in $tunnel\n";
+	    goto bad;
+	}
+	if ($sliver->SetAggregate($aggregate) != 0) {
+	    print STDERR "Could not add link sliver $sliver to $aggregate\n";
+	    goto bad;
+	}
     }
     return $aggregate;
 
@@ -1743,16 +1818,39 @@ sub Start($$)
 		print STDERR "Could not lookup authority $dsturn\n";
 		return -1;
 	    }
-	    my $blob = $authority->Resolve($slice->urn());
-	    if (!defined($blob)) {
-		print STDERR "Could not resolve $slice at $authority\n";
+	    #
+	    # The other side might not have seen the request yet, and so it
+	    # will not know anything about the slice, or might not have a
+	    # manifest yet. Lets loop for a bit, hoping to get it. This is
+	    # a bit fragile since once we start looping, there is no way for
+	    # the client to stop us. Need to add such a capability.
+	    #
+	    my $count    = 500;
+	    my $interval = 30;
+	    my $manifest;
+	    while ($count >= 0) {
+		my $blob = $authority->Resolve($slice->urn());
+		if (defined($blob)) {
+		    if (exists($blob->{'manifest'})) {
+			$manifest = $blob->{'manifest'};
+			last;
+		    }
+		    print STDERR
+			"No manifest returned for $dsturn from $authority\n";
+		}
+		else {
+		    print STDERR "Could not resolve $slice at $authority\n";
+		}
+		print STDERR "Will try again in $interval seconds\n";
+		$count -= $interval;
+		sleep($interval);
+	    }
+	    if (!defined($manifest)) {
+		print STDERR
+		    "Could not get manifest for $dsturn from $authority\n";
 		return -1;
 	    }
-	    if (!exists($blob->{'manifest'})) {
-		print STDERR "No manifest returned for $dsturn from $self\n";
-		return -1;
-	    }
-	    my $manifest = GeniXML::Parse($blob->{'manifest'});
+	    $manifest = GeniXML::Parse($manifest);
 	    #
 	    # Need to find the peer node in the nodes section.
 	    #

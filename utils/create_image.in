@@ -573,13 +573,7 @@ if ($result eq "toobig") {
     fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
 }
 if ($result != 0) {
-    # it is a wait return value
-    if ($result & 127) {
-	fatal("FAILED: Died with signal $result generating image ... \n");
-    } else {
-	$result = $result >> 8;
-	fatal("FAILED: Returned error code $result generating image ... \n");
-    }
+    fatal("FAILED: Returned error code $result generating image ... \n");
 }
 
 #
@@ -630,9 +624,7 @@ if (defined($logfile)) {
     # And restore the original logfile as current spew.
     $experiment->SetLogFile($oldlogfile)
 	if (defined($oldlogfile));
-    $logfile->Delete();
-    # This was mailed so no longer needed.
-    unlink("$logfile->filename()");
+    $logfile->Delete(1);
 }
 exit 0;
 
@@ -811,6 +803,13 @@ sub run_with_ssh($$)
 	# ssh finished
 	if ($kid == $mypid) {
 	    $stat = $?;
+	    if ($stat & 127) {
+		# died with a signal, return the signal
+		$stat = $stat & 127;
+	    } else {
+		# else return the exit code
+		$stat = $stat >> 8;
+	    }
 	    last;
 	}
 

@@ -65,7 +65,7 @@ AvailableContents =
 LinkContents &=
   # Component identifiers
   attribute component_id { text } &
-  attribute component_manager_id { text } &
+  element component_manager { attribute name { text } }* &
   attribute component_name { text }?
 
 InterfaceContents &=

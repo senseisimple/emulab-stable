@@ -32,6 +32,11 @@ SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
 SERVEROBJS	= server.o $(SHAREDOBJS)
 
+# Master server based image uploader client
+UPLOADFLAGS	= $(CFLAGS)
+UPLOADLIBS	=
+UPLOADOBJS	= upload.o uploadio.o log.o network.o utils.o
+
 ifeq ($(WITH_CRYPTO),1)
 IUZFLAGS	+= -DWITH_CRYPTO -DSIGN_CHECKSUM
 IUZLIBS		+= -lcrypto
@@ -63,12 +68,17 @@ CFLAGS		+= -DCONDVARS_WORK
 #CLIENTLIBS	+= `elvin-config --libs vin4c`
 #EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` -I$(TESTBED_SRCDIR)
 
-all: frisbee frisbeed
+all: frisbee frisupload frisbeed
 
 frisbee: $(CLIENTOBJS)
 	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) $(IUZLIBS) -o frisbee
 	cp frisbee frisbee.debug
 	strip frisbee
+
+frisupload: $(UPLOADOBJS)
+	$(CC) $(LDFLAGS) $(UPLOADFLAGS) $(UPLOADOBJS) $(UPLOADLIBS) -o frisupload
+	cp frisupload frisupload.debug
+	strip frisupload
 
 frisbeed: $(SERVEROBJS)
 	$(CC) $(LDFLAGS) $(SERVERFLAGS) $(SERVEROBJS) $(SERVERLIBS) -o frisbeed
@@ -100,7 +110,8 @@ trace.o:	decls.h trace.h log.h
 
 install:
 	$(INSTALL) frisbee $(DESTDIR)$(BINDIR)/frisbee
+	$(INSTALL) frisupload $(DESTDIR)$(BINDIR)/frisupload
 	$(INSTALL) frisbeed $(DESTDIR)$(SBINDIR)/frisbeed
 
 clean:
-	rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug
+	rm -f *.o *.a frisbee frisupload frisbeed frisbee.debug frisupload.debug frisbeed.debug

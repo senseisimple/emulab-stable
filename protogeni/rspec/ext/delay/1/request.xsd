@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  Extension for the "delay" type in RSpecV2
+  Version 1
+  
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/ext/delay/1" xmlns:delay="http://www.protogeni.net/resources/rspec/ext/delay/1">
+  <!-- Extend SliverType with shaping information -->
+  <xs:element name="sliver_type_shaping">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="delay:pipe"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="pipe">
+    <xs:complexType>
+      <xs:attributeGroup ref="delay:PipeContents"/>
+    </xs:complexType>
+  </xs:element>
+  <!--
+    To specify bridging without traffic shaping, a pipe should omit the
+    capacity, latency, and packet_loss attributes.
+    Pipes are uni-directional.
+  -->
+  <xs:attributeGroup name="PipeContents">
+    <xs:attribute name="source" use="required"/>
+    <xs:attribute name="dest" use="required"/>
+    <xs:attribute name="capacity" type="xs:int"/>
+    <xs:attribute name="latency" type="xs:int"/>
+    <xs:attribute name="packet_loss" type="xs:float"/>
+    <xs:attribute name="gentle" type="xs:boolean"/>
+    <xs:attribute name="red" type="xs:boolean"/>
+    <xs:attribute name="queue_in_bytes" type="xs:boolean"/>
+    <xs:attribute name="limit" type="xs:int"/>
+    <xs:attribute name="maxthresh" type="xs:int"/>
+    <xs:attribute name="thresh" type="xs:int"/>
+    <xs:attribute name="linterm" type="xs:int"/>
+    <xs:attribute name="q_weight" type="xs:float"/>
+  </xs:attributeGroup>
+  <!-- Both of the above are start elements. -->
+</xs:schema>

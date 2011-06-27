@@ -30,6 +30,6 @@
                  virtual_interface_id="virt1"
                  tunnel_ip="192.168.1.2"
                  />
- </link
+ </link>
 </rspec>
 

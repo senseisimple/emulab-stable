@@ -42,6 +42,7 @@ use Experiment;
 use English;
 use Data::Dumper;
 use XML::Simple;
+use XML::LibXML;
 use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
@@ -392,7 +393,7 @@ sub GetTicketAux($$$$$$$)
     #
     # Create user from the certificate.
     #
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
     
@@ -407,11 +408,8 @@ sub GetTicketAux($$$$$$$)
 					"No slice found for UpdateTicket");
 	}
 	$slice = CreateSliceFromCertificate($credential, $user);
-	if (!defined($slice)) {
-	    print STDERR "Could not create $slice_urn\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not create slice");
-	}
+	return $slice
+	    if (GeniResponse::IsResponse($slice));
     }
     
     return GetTicketAuxAux($slice, $user, $rspecstr,
@@ -492,7 +490,8 @@ sub GetTicketAuxAux($$$$$$$$$)
     # ticket is redeemed, it will expire according to the rspec request.
     # If nothing specified in the rspec, then it will expire when the
     # slice record expires, which was given by the expiration time of the
-    # slice credential.
+    # slice credential, or the local policy max_sliver_lifetime. See
+    # CreateSliceFromCertificate() in this file.
     #
     my $expires = GeniXML::GetExpires($rspec);
     if (defined($expires)) {
@@ -655,7 +654,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
     # Turn off fixnode; we will control this on the commandline.
     $virtexperiment->allowfixnode(0);
-    $virtexperiment->multiplex_factor(3);
+    $virtexperiment->multiplex_factor(1);
 
     #
     # An rspec is a structure that requests specific nodes. If those
@@ -795,7 +794,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	#
 	# Check for disk_image request. Specified as a URN. 
 	#
-	my $diskref = GeniXML::FindFirst("n:disk_image", $ref);
+	my $diskref = GeniXML::GetDiskImage($ref);
 	if (defined($diskref)) {
 	    my $dname = GeniXML::GetText("name", $diskref);
 
@@ -1003,8 +1002,10 @@ sub GetTicketAuxAux($$$$$$$$$)
 			"osname"  => $osname,
 			"ips"     => '', # deprecated
 			"cmd_line"=> '', # bogus
+			"routertype" => "static-ddijk",
 			"fixed"   => (defined($subnode_of) ? $subnode_of :
 				      defined($node) ? $node->node_id() : ""),
+			    
 			};
 
 	if ($isbridge) {
@@ -1516,7 +1517,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	
 	unlink($tmpfile);
 	if ($isupdate) {
-	    $slice_experiment->RemovePhysicalState();
+	    $slice_experiment->RemovePhysicalState(1);
 	    $slice_experiment->RestorePhysicalState();
 	}
 	#
@@ -2080,7 +2081,7 @@ sub SliverWorkAux($$$$$$$)
     #
     # Create the user.
     #
-    my $owner = CreateUserFromCertificate($owner_cert);
+    my $owner = CreateUserFromCertificate($credential);
     return $owner
 	if (GeniResponse::IsResponse($owner));
 
@@ -2116,6 +2117,21 @@ sub SliverWorkAux($$$$$$$)
 
     # The Manifest starts out as a copy of the rspec. 
     my $manifest = $rspec->cloneNode(1);
+    if (! GeniXML::IsVersion0($manifest)) {
+	GeniXML::SetText("type", $manifest, "manifest");
+	my $schemaLocation = GeniXML::FindNodesNS('@n:schemaLocation',
+						  $manifest,
+						  $GeniXML::XSI_NS)->pop();
+	if (defined($schemaLocation) &&
+	    $schemaLocation->nodeType() == XML_ATTRIBUTE_NODE) {
+	    my $requestUrl = $GeniXML::REQUEST_URL;
+	    my $manifestUrl = $GeniXML::MANIFEST_URL;
+	    my $value = $schemaLocation->getValue();
+	    $value =~ s/$requestUrl/$manifestUrl/;
+	    $schemaLocation->setValue($value);
+	}
+    }
+
 
     #
     # Find current slivers and save.
@@ -2374,7 +2390,7 @@ sub SliverWorkAux($$$$$$$)
 	#
 	# Remove physical state.
 	#
-	if ($experiment->RemovePhysicalState()) {
+	if ($experiment->RemovePhysicalState(1)) {
 	    print STDERR "Could not remove physical state!\n";
 	    goto bad;
 	}
@@ -2613,44 +2629,22 @@ sub SliverWorkAux($$$$$$$)
 
 	my $is_tunnel = GeniXML::IsTunnel($linkref);
 
-	# Do not worry about modifying a link that is setup, unless a tunnel.
-	# Need to deal with this later.
+	# Do not worry about modifying a link that is setup.
 	if (grep {$_ eq $linkname} keys(%linkmap)) {
-	    if (!$is_tunnel) {
-		#
-		# Need to find the old manifest entry and make sure it
-		# gets into the new manifest.
-		#
-		if (defined($oldmanifest)) {
-		    my $oldlink = GeniXML::GetLinkByVirtualId($linkname,
-							      $oldmanifest);
-		    my $curlink = GeniXML::GetLinkByVirtualId($linkname,
-							      $manifest);
-		    if (defined($oldlink) && defined($curlink)) {
-			GeniXML::ReplaceNode($curlink, $oldlink);
-		      }
+	    #
+	    # Need to find the old manifest entry and make sure it
+	    # gets into the new manifest.
+	    #
+	    if (defined($oldmanifest)) {
+		my $oldlink = GeniXML::GetLinkByVirtualId($linkname,
+							  $oldmanifest);
+		my $curlink = GeniXML::GetLinkByVirtualId($linkname,
+							  $manifest);
+		if (defined($oldlink) && defined($curlink)) {
+		    GeniXML::ReplaceNode($curlink, $oldlink);
 		}
-		next;
 	    }
-
-	    #
-	    # Gack, we have to recreate all the tunnel physical state, but
-	    # that was lost when we did the RemovePhysicalState() above.
-	    # The aggregate needs to get rebuilt, so delete the existing
-	    # one. Needs a lot more thought.
-	    #
-	    my $sliver_urn = GeniXML::GetSliverId($linkref);
-	    if (!defined($sliver_urn)) {
-		print STDERR
-		    "Could not find sliver_urn in existing link $linkname\n";
-		next;
-	    }
-	    my $tunnel_aggregate = GeniAggregate->Lookup($sliver_urn);
-	    if (!defined($tunnel_aggregate)) {
-		print STDERR "No aggregate for existing tunnel $sliver_urn\n";
-		next;
-	    }
-	    $tunnel_aggregate->Delete(GENI_PURGEFLAG);
+	    next;
 	}
 
 	#
@@ -2692,6 +2686,14 @@ sub SliverWorkAux($$$$$$$)
 		$message = "$linkname: Missing nodes for tunnels";
 		goto bad;
 	    }
+	    
+	    print STDERR Dumper([$node1sliver,
+				 $node2sliver,
+				 Serialize($linkref, 1),
+				 Serialize($node1rspec, 1),
+				 Serialize($node2rspec, 1)])
+		if (0);
+	    
 	    my $tunnel = GeniAggregate::Tunnel->Create($slice,
 						       $owner,
 						       $node1sliver,
@@ -2713,6 +2715,19 @@ sub SliverWorkAux($$$$$$$)
 		GeniXML::SetText("sliver_urn", $linkref, $tunnel->urn());
 	    } else {
 		GeniXML::SetText("sliver_id", $linkref, $tunnel->urn());
+	    }
+
+	    if (!GeniXML::IsVersion0($linkref)) {
+		my @tunnel_slivers = ();
+		if ($tunnel->SliverList(\@tunnel_slivers) != 0) {
+		    $message = "Could not get slivers for $tunnel\n";
+		    goto bad;
+		}
+		foreach my $tunnel_sliver (@tunnel_slivers) {
+		    my $id = GeniXML::GetInterfaceId($tunnel_sliver->rspec());
+		    GeniXML::SetText("sliver_id", $ifacexml{$id},
+				     $tunnel_sliver->sliver_urn());
+		}
 	    }
 
 	    # Add to the aggregate.
@@ -3106,7 +3121,7 @@ sub SliverWorkAux($$$$$$$)
 	#
 	if ($restorephys) {
 	    if ($experiment->ReserveSharedBandwidth(1, 1) ||
-		$experiment->RemovePhysicalState() ||
+		$experiment->RemovePhysicalState(1) ||
 		$experiment->RestorePhysicalState()) {
 		print STDERR "Could not restore backup state for $pid,$eid\n";
 	    }
@@ -3122,6 +3137,11 @@ sub SliverWorkAux($$$$$$$)
 	system("$SNMPIT -r $pid $eid");
 	if ($?) {
 	    print STDERR "Could not tear down vlans\n";
+	}
+
+	# Remove any residual state.
+	if ($experiment->RemovePhysicalState(1)) {
+	    print STDERR "Could not remove physical state!\n";
 	}
     }
     
@@ -3196,8 +3216,19 @@ sub RenewSliverAux($$)
     }
 
     #
-    # If credential is providing the time, we are done. Otherwise have
-    # to sanity check it. 
+    # A sitevar controls the sliver lifetime.
+    #
+    my $max_sliver_lifetime = 0;
+    if (!GetSiteVar('protogeni/max_sliver_lifetime',
+		    \$max_sliver_lifetime)){
+	# Cannot get the value, default it to 90 days.
+	$max_sliver_lifetime = 90;
+    }
+
+    #
+    # If no time is specified, then the user says they want to use
+    # the time in the slice credential, but must still check that
+    # against the local policy. 
     #
     if (defined($expires)) {
 	# Convert to a localtime.
@@ -3205,16 +3236,6 @@ sub RenewSliverAux($$)
 	if (!defined($when)) {
 	    $message = "Could not parse expiration";
 	    goto bad;
-	}
-	#
-	# Do we need a policy limit?
-	# A sitevar controls the sliver lifetime.
-	#
-	my $max_sliver_lifetime = 0;
-	if (!GetSiteVar('protogeni/max_sliver_lifetime',
-			  \$max_sliver_lifetime)){
-	    # Cannot get the value, default it to 90 days.
-	    $max_sliver_lifetime = 90;
 	}
 
 	# Check if the user has a credential that lets him obtain slivers
@@ -3231,8 +3252,13 @@ sub RenewSliverAux($$)
 
 	my $diff = $when - time();
 
-	if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
-	    $message = "expiration out of range";
+	if ($diff < (60 * 5)) {
+	    $message = "such a short life for a sliver? More time please.";
+	    goto bad;
+	}
+	if ($diff > (3600 * 24 * $max_sliver_lifetime)) {
+	    $message = "expiration is greater then the maximum number ".
+		"(" . (60 * 24 * $max_sliver_lifetime) . ") of minutes";
 	    goto bad;
 	}
 	if ($when > $slice_when) {
@@ -3241,6 +3267,11 @@ sub RenewSliverAux($$)
 	}
     }
     else {
+	if (($slice_when - time()) > (3600 * 24 * $max_sliver_lifetime)) {
+	    $message = "slice expiration is greater then the maximum number ".
+		"(" . (60 * 24 * $max_sliver_lifetime) . ") of minutes";
+	    goto bad;
+	}
 	$when = $slice_when;
     }
     if ($when < time()) {
@@ -3494,7 +3525,8 @@ sub DeleteSliverAux($$$)
 					     "Could not delete sliver");
 	    goto bad;
 	}
-	$experiment->RemovePhysicalState();
+	# Add purge flag.
+	$experiment->RemovePhysicalState(1);
 	$experiment->SetState(EXPTSTATE_SWAPPED());
 
 	if (system("$EXPORTS_SETUP")) {
@@ -3599,7 +3631,7 @@ sub GetSliverAux($)
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -3677,7 +3709,7 @@ sub BindToSlice($)
     #
     # Find or create the user.
     #
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -4015,7 +4047,7 @@ sub SliverTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -4205,7 +4237,7 @@ sub ListTickets($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    my $user = CreateUserFromCertificate($credential->owner_cert());
+    my $user = CreateUserFromCertificate($credential);
     return $user
 	if (GeniResponse::IsResponse($user));
 
@@ -4244,34 +4276,36 @@ sub ListTickets($)
 sub CreateSliceFromCertificate($$)
 {
     my ($credential, $user) = @_;
-
     my $certificate = $credential->target_cert();
 
-    my $authority = CreateAuthorityFromRegistry($certificate);
-    return undef    
-	if (!defined($authority));
+    # Should no longer happen, but lets make sure.
+    if (!defined($certificate->urn()) &&
+	GeniHRN::IsValid($certificate->urn())) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN");
+    }
+    my $authority = CreateAuthorityFromCertificate($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
 
     #
-    # The problem with HRNs is that people will tend to reuse them.
-    # So check to see if we have a slice with the hrn.
+    # The problem with URNs is that people will tend to reuse them.
+    # So check to see if we have a slice with the same urn.
     #
-    my $slice = GeniSlice->Lookup($certificate->hrn());
+    my $slice = GeniSlice->Lookup($certificate->urn());
     if (defined($slice)) {
+	# Same certificate means it really is the same slice.
 	return $slice
-	    if ($slice->uuid() eq $certificate->uuid());
+	    if ($certificate->SameCert($slice));
 
-	if ($slice->Lock() != 0) {
-	    print STDERR "Could not lock $slice\n";
-	    return undef;
-	}
-	if (CleanupDeadSlice($slice) != 0) {
-	    print STDERR "Could not cleanup dead slice $slice\n";
-	    $slice->UnLock();
-	    return undef;
-	}
+	# In the past we would destroy the old slice, but no longer
+	# think this is the correct thing to do.
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Duplicate slice URN already exists here");
     }
     $slice = GeniSlice->Create($certificate, $user, $authority);
-    return undef
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Cannot create slice object")
 	if (!defined($slice));
 
     #
@@ -4285,7 +4319,7 @@ sub CreateSliceFromCertificate($$)
     }
     my $expires = $credential->expires();
     # This is already a localtime.
-    my $when = strptime($expires);
+    my $when = timelocal(strptime($expires));
     # Reverts to default in Create if this fails
     if (defined($when)) {
 	my $diff = $when - time();
@@ -4304,38 +4338,45 @@ sub CreateSliceFromCertificate($$)
 #
 sub CreateUserFromCertificate($)
 {
-    my ($certificate) = @_;
+    my ($credential) = @_;
+    my $certificate  = $credential->owner_cert();
 
     #
     # We now force people to have URNs in their certs.
     #
     if (!defined($certificate->urn()) &&
 	GeniHRN::IsValid($certificate->urn())) {
-	SENDMAIL($certificate->email(), "ProtoGENI Certificate Error",
-		 "Your user certificate is out of date! \n".
-		 "Please login to your Emulab and generate\n".
-		 "a new encrypted SSL certificate.\n",
-		 $TBOPS, "BCC: protogeni-errors\@flux.utah.edu");
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN");
     }
+    my $urn = $certificate->urn();
 
-    # Local users always exist.
+    # Local users always exist, so pass flag.
     my $user = GeniUser->Lookup($certificate->urn(), 1);
-    return $user
-	if (defined($user));
-
-    # Try using the uuid, in case we have a stale (pre-urn) certificate.
-    $user = GeniUser->Lookup($certificate->uuid());
     if (defined($user)) {
 	#
-	# Replace stale certificate with new onw.
+	# See if the certificate changed. If it did, we have to update the
+	# user record, but we want to use the old uuid since that is our
+	# table cross reference index. Eventually uuid will no longer be
+	# visible, but for now just keep on doing it.
 	#
-	print STDERR "Reloading certificate for $user from $certificate\n";
+	return $user
+	    if ($certificate->SameCert($user));
+
+	#
+	# Replace the user certificate. I think this is okay, since we
+	# do not sign anything with the user key anyway. As long as we
+	# keep the uuid from changing, all should be okay.
+	#
+	print STDERR "Updating certificate for $user to $certificate\n";
 	$user->Flush();
+	$certificate->Flush();
+	$certificate->setuuid($user->uuid());
 	$certificate->Store();
 	$user = GeniUser->Lookup($certificate->urn());
 	if (!defined($user)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			    "Problem loading your certificate");
+					"Problem reloading your certificate");
 	}
 	return $user;
     }
@@ -4343,15 +4384,14 @@ sub CreateUserFromCertificate($)
     #
     # Check urn. Must be a "user" urn. The uid is checked in Create().
     #
-    my (undef,$type,$uid) = GeniHRN::Parse($certificate->urn());
+    my (undef,$type,$uid) = GeniHRN::Parse($urn);
     if (!defined($uid) || $type ne "user") {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Malformed user URN");
     }
-    my $authority = CreateAuthorityFromRegistry($certificate);
-    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Could not create authority object")
-	if (!defined($authority));
+    my $authority = CreateAuthorityFromCertificate($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
 
     #
     # We want an email address to send expiration notifications to,
@@ -4362,39 +4402,40 @@ sub CreateUserFromCertificate($)
     my $email  = $certificate->email();
     my $username;
     if (!defined($email) || $email eq "" || $email eq "unknown") {
-	if (! $authority->IsSFA()) {
+	if (! defined($authority->url()) || !$authority->IsSFA()) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Your certificate does not include ".
 					"an email address");
 	}
-	#
-	# XXX: The SFA stores all records in the central registry, not at
-	# the SA like we do. 
-	#
-	my $registry = GeniRegistry->Create($certificate->urn());
+	print STDERR "No email address in certificate for $urn\n";
+	print STDERR "Trying to get email from $authority\n";
+
+	my $registry = GeniRegistry::PLC->CreateFromAuthority($authority);
 	if (!defined($registry)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not connect to PLC registry ".
+					"Could not get registry at $authority ".
 					"to get your email address");
 	}
-	my $blob;
-	    
-	if ($registry->Resolve($certificate->urn(), "User", \$blob) != 0) {
+
+	my $blob = $registry->Resolve($urn);
+	if (!defined($blob)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not resolve you at the PLC ".
-					"registry to get your email address");
+					"Could not resolve you at $registry ".
+					"to get your email address");
 	}
-	# Why does PLC resolve return an array of length one?
-	$email = $blob->[0]->{'email'};
+	# Why does PLC return an array?
+	$blob  = $blob->[0];
+	$email = $blob->{'email'};
 	if (!defined($email) || $email eq "") {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Your PLC registry record did ".
+					"Your authority record did ".
 					"not include your email address");
 	}
-	$username = $blob->[0]->{'first_name'}
-	    if (exists($blob->[0]->{'first_name'}));
-	$username = ($username ? "$username " : "") . $blob->[0]->{'last_name'}
-	    if (exists($blob->[0]->{'last_name'}));
+	# This is very PLC specific.
+	$username = $blob->{'first_name'}
+	    if (exists($blob->{'first_name'}));
+	$username = ($username ? "$username " : "") . $blob->{'last_name'}
+	    if (exists($blob->{'last_name'}));
 	$modify = 1;
     }
     $user = GeniUser->Create($certificate, $authority);
@@ -4413,28 +4454,107 @@ sub CreateUserFromCertificate($)
 }
 
 #
+# When we have a credential, we can create the authority object using
+# the signer certificate.
+#
+sub CreateAuthorityFromCertificate($)
+{
+    my ($credential) = @_;
+    my $signers = $credential->signer_certs();
+    my $certstr = @$signers[0];
+
+    my $certificate = GeniCertificate->LoadFromString($certstr);
+    if (!defined($certificate)) {
+        print STDERR "Could not get certificate from $certstr\n";
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Could not load signer certificate");
+    }
+    if (! (defined($certificate->urn()) &&
+	   GeniHRN::IsValid($certificate->urn()))) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN in $certstr");
+    }
+    my $authority = GeniAuthority->Lookup($certificate->urn());
+    if (defined($authority)) {
+	# Same certificate means it really is the same authority
+	return $authority
+	    if ($certificate->SameCert($authority));
+
+	#
+	# Want to reuse the old uuid since we use it as a table cross
+	# reference index. Eventually need to use the URN. Anyway, change
+	# the uuid in the new certificate so that it goes into the DB
+	# with the original one. Then update the Authority record with
+	# the new certificate.
+	#
+	# XXX What about a URL change? 
+	#
+	print STDERR "Updating $authority with new certificate: $certificate\n";
+	
+	$certificate->setuuid($authority->uuid());
+	if ($authority->UpdateCertificate($certificate)) {
+	    print STDERR "Failed to update $authority with $certificate\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not update $authority certificate");
+	}
+	return $authority;
+    }
+    #
+    # Check that this really is an SA.
+    #
+    my ($auth,$type,$id) = GeniHRN::Parse($certificate->urn());
+    if (! ($type eq "authority" && $id eq "sa")) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+			    "Signer certificate is not from a Slice Authority");
+    }
+    #
+    # Protogeni signer certificates will have a URL in them. Otherwise it
+    # is PLC or other framework and they must go through the AM interface.
+    #
+    my $url = $certificate->URL();
+    if (!defined($url)) {
+        print STDERR "$certificate does not have a URL extension\n";
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Signer certificate does not have a URL");
+    }
+    $authority = GeniAuthority->Create($certificate, $url, "sa");
+    if (!defined($authority)) {
+        print STDERR "unable to add authority from $certificate\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+		    "Could not create authority from $certificate");
+    }
+    return $authority;
+}
+
+#
 # Create authority from the ClearingHouse, by looking up the info.
+# We need this when we do not have a credential, wich at the moment
+# is just one place.
 #
 sub CreateAuthorityFromRegistry($)
 {
     my ($certificate) = @_;
-    my $authority;
 
-    if (defined($certificate->urn()) &&
-	GeniHRN::IsValid($certificate->urn())) {
-	my ($auth,$type,$id) = GeniHRN::Parse($certificate->urn());
-	my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
-	$authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
+    if (! (defined($certificate->urn()) &&
+	   GeniHRN::IsValid($certificate->urn()))) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed URN in certificate");
     }
-    else {
-	# This prefix stuff will go away when fully converted to urns.
-	my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
+    #
+    # Transform whatever the urn is, to the corresponding SA urn.
+    # Note that we will never find out if the slice authority has
+    # changed its certificate. But we do not want to put in a call
+    # to the authority from here, since it might block if it is
+    # unreachable, and we do not want to block on this path. 
+    #
+    my ($auth,$type,$id) = GeniHRN::Parse($certificate->urn());
+    my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
+    my $authority = GeniAuthority->CreateFromRegistry("SA", $sa_urn);
 
-	$authority = GeniAuthority->CreateFromRegistry("SA", "P${prefix}");
-    }
     if (!defined($authority)) {
-	print STDERR "Could not create authority from registry\n";
-	return undef;
+	print STDERR "Could not create authority for $sa_urn\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Could not create authority object for $sa_urn");
     }
     return $authority;
 }
@@ -4689,6 +4809,7 @@ sub CleanupDeadSlice($;$)
 	if (system("$NAMEDSETUP")) {
 	    print STDERR "$NAMEDSETUP failed\n";
 	}
+	$experiment->SetState(EXPTSTATE_SWAPPED());
     }
 
     return 0

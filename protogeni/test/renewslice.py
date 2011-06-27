@@ -15,7 +15,8 @@
 #
 
 #
-# Renew the sliver (and only the sliver). See renewslice.py ...
+# Renew the slice at the SA *and* the sliver at the CM.
+# Also see renewsliver.py ... to just renew the sliver. 
 #
 
 #
@@ -57,7 +58,7 @@ print "Found the slice, asking for a credential ..."
 # Get the slice credential.
 #
 slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, renewing the sliver at the CM ..."
+print "Got the slice credential, renewing the slice at the SA ..."
 
 #
 # Bump the expiration time.
@@ -65,13 +66,32 @@ print "Got the slice credential, renewing the sliver at the CM ..."
 valid_until = time.strftime("%Y%m%dT%H:%M:%S",
                             time.gmtime(time.time() + (60 * int(minutes))))
 
+#
+# Renew the slice at the SA.
+#
+params = {}
+params["credential"] = slicecred
+params["expiration"] = valid_until
+rval,response = do_method("sa", "RenewSlice", params)
+if rval:
+    Fatal("Could not renew slice at the SA")
+    pass
+print "The slice has been renewed successfully."
+print "Now asking for slice credential again...";
+
+#
+# Get the slice credential again so we have the new time in it.
+#
+slicecred = get_slice_credential( myslice, mycredential )
+print "Got the slice credential, attempting to renew the sliver...";
+
 params = {}
 params["credentials"]  = (slicecred,)
 params["slice_urn"]    = SLICEURN
 params["valid_until"]  = valid_until
 rval,response = do_method("cm", "RenewSlice", params, version="2.0")
 if rval:
-    Fatal("Could not renew sliver.")
+    Fatal("Renewed slice, but not sliver.")
     pass
 print "Sliver has been renewed until " + valid_until
 

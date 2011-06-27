@@ -62,6 +62,7 @@ CREATE TABLE `geni_slices` (
   `registered` tinyint(1) NOT NULL default '0',
   `needsfirewall` tinyint(1) NOT NULL default '0',
   `isplaceholder` tinyint(1) NOT NULL default '0',
+  `isshutdown` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `hrn` (`hrn`),
   UNIQUE KEY `uuid` (`uuid`)

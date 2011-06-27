@@ -1,5 +1,5 @@
 #
-# Add secondary lock to geni_slices for stitching.
+# Add isshutdown slot to geni_slices
 #
 use strict;
 use GeniDB;
@@ -10,9 +10,9 @@ sub DoUpdate($$$)
 
     DBSetDefault($dbhandle);
 
-    if (!DBSlotExists("geni_slices", "stitch_locked")) {
+    if (!DBSlotExists("geni_slices", "isshutdown")) {
 	DBQueryFatal("alter table geni_slices ".
-		     "  add `stitch_locked` datetime default NULL after locked");
+		     "  add `isshutdown` tinyint(1) NOT NULL default '0'");
     }
     return 0;
 }
