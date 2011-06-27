@@ -665,8 +665,10 @@ sub stateTransition($$) {
 	#
 	# XXX DEBUG ONLY!
 	# 
-	if ($soft_secviolation && $newstate eq TBDB_NODESTATE_SHUTDOWN) {
-	    notify("$node allowed to transition: SECVIOLATION => SHUTDOWN\n");
+	if ($soft_secviolation &&
+	    ($newstate eq TBDB_NODESTATE_SHUTDOWN ||
+	     $newstate eq TBDB_NODESTATE_GPXEBOOTING)) {
+	    notify("$node allowed to transition: SECVIOLATION => $newstate\n");
 	} else {
 	    notify("$node tried to leave SECVIOLATION (to $newstate)\n");
 	    $newstate = TBDB_NODESTATE_SECVIOLATION;
