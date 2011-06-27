@@ -180,8 +180,12 @@ package protogeni.display.components
 				return;
 			}
 			
-			width = prevWidth + (event.stageX - clickOffset.x);
-			height = prevHeight + (event.stageY - clickOffset.y);
+			var nextWidth:Number = prevWidth + (event.stageX - clickOffset.x);
+			var nextHeight:Number = prevHeight + (event.stageY - clickOffset.y);
+			if(nextWidth > this.minWidth)
+				width = nextWidth;
+			if(nextHeight > this.minHeight)
+				height = nextHeight;
 			event.updateAfterEvent();
 		}
 		

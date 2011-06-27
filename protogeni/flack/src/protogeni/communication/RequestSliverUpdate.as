@@ -50,12 +50,21 @@ package protogeni.communication
 				sliver.ticket = response.value;
 				return new RequestTicketRedeem(sliver);
 			}
+			if (code == CommunicationUtil.GENIRESPONSE_REFUSED)
+			{
+				//
+			}
 			else
 			{
 				// do nothing
 			}
 			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }

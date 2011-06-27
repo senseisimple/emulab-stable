@@ -54,8 +54,7 @@ package protogeni.communication
 				
 				if(sliver.slice.isCreated())
 					Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATED);
-				else
-					Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+				
 				return new RequestSliverStatus(sliver);
 			}
 			else
@@ -63,9 +62,12 @@ package protogeni.communication
 				// do nothing
 			}
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }

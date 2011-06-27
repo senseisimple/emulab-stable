@@ -668,6 +668,40 @@ package protogeni
 			return finalDate;
 		}
 		
+		public static function toRFC3339(d:Date):String {
+			var date:Number = d.getUTCDate();
+			var month:Number = d.getUTCMonth();
+			var hours:Number = d.getUTCHours();
+			var minutes:Number = d.getUTCMinutes();
+			var seconds:Number = d.getUTCSeconds();
+			var sb:String = new String();
+			
+			sb += d.getUTCFullYear();
+			sb += "-";
+			
+			if (month + 1 < 10)
+				sb += "0";
+			sb += month + 1;
+			sb += "-";
+			if (date < 10)
+				sb += "0";
+			sb += date;
+			sb += "T";
+			if (hours < 10)
+				sb += "0";
+			sb += hours;
+			sb += ":";
+			if (minutes < 10)
+				sb += "0";
+			sb += minutes;
+			sb += ":";
+			if (seconds < 10)
+				sb += "0";
+			sb += seconds;
+			sb += "Z";
+			return sb;
+		}
+		
 		/**
 		 * Returns a date string formatted according to W3CDTF.
 		 *
@@ -772,27 +806,35 @@ package protogeni
 			return nd;
 		}
 		
-		public static function getTimeUntil(date:Date):String {
+		public static function getTimeUntil(date:Date, short:Boolean=false):String {
 			return getTimeBetween(date, new Date());
 		}
 		
-		public static function getTimeBetween(beginning:Date, end:Date):String {
+		public static function getTimeBetween(beginning:Date, end:Date, short:Boolean=false):String {
 			var differenceInMilliseconds:Number = beginning.time - end.time;
 			var days:Number = Math.floor(differenceInMilliseconds/(1000*60*60*24));
 			var hours:Number = Math.floor(differenceInMilliseconds/(1000*60*60) - days*24);
 			var minutes:Number = Math.floor(differenceInMilliseconds/(1000*60) - days*24*60 - hours*60);
 			
 			var value:String = "";
-			if(days != 0)
-				value = days + " Days"
+			if(days != 0) {
+				value = days + " D";
+				if(!short)
+					value += "ays";
+			}
+			
 			if(hours != 0) {
 				if(value.length > 0)
 					value += ", ";
-				value += hours + " Hours";
+				value += hours + " H";
+				if(!short)
+					value += "ours";
 			}
 			if(value.length > 0)
 				value += ", ";
-			value += minutes + " Minutes";
+			value += minutes + " M";
+			if(!short)
+				value += "inutes";
 			
 			return value;
 		}

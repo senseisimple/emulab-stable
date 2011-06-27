@@ -57,7 +57,6 @@ package protogeni.communication
 				var cred:XML = new XML(slice.credential);
 				slice.expires = Util.parseProtogeniDate(cred.credential.expires);
 				
-				Main.geniDispatcher.dispatchSliceChanged(slice);
 				for each(var s:Sliver in slice.slivers.collection) {
 					if(s.manager.isAm)
 						newCalls.push(new RequestSliverListResourcesAm(s));
@@ -80,6 +79,11 @@ package protogeni.communication
 			}
 			
 			return newCalls.head;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(slice);
 		}
 	}
 }

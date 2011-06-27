@@ -22,13 +22,18 @@ package protogeni.communication
 	 */
 	public class RequestQueueNode
 	{
-		public var item:*;
+		public var _item:*;
+		public function get item():* { return _item; }
+		public function set item(newItem:*):void {
+			_item = newItem;
+			if(_item != null)
+				_item.node = this;
+		}
 		public var next:RequestQueueNode;
 		
-		public function RequestQueueNode(newItem:*):void
+		public function RequestQueueNode(newItem:* = null):void
 		{
 			item = newItem;
-			item.node = this;
 			next = null;
 		}
 	}

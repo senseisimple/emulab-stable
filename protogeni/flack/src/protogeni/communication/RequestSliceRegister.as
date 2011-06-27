@@ -63,5 +63,10 @@ package protogeni.communication
 			
 			return newRequest;
 		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(slice);
+		}
 	}
 }

@@ -74,7 +74,6 @@ package protogeni.communication
 					old.slivers.add(sliver);
 				}
 				
-				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 				Main.geniDispatcher.dispatchSlicesChanged();
 				
 				return new RequestSliverStatusAm(sliver);
@@ -93,9 +92,12 @@ package protogeni.communication
 				LogHandler.viewConsole();
 			}
 			
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
-			
 			return null;
+		}
+		
+		override public function cleanup():void {
+			super.cleanup();
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 	}
 }
