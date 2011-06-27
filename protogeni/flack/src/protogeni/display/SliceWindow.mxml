@@ -690,10 +690,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />
 	</mx:HDividedBox>
 	<components:controlBarLayout>
-		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="12" paddingTop="2" />
+		<s:HorizontalLayout paddingBottom="2"
+							paddingLeft="2"
+							paddingRight="12"
+							paddingTop="2" />
 	</components:controlBarLayout>
 	<components:controlBarContent>
-		<s:HGroup enabled="{!Main.offlineMode}" verticalAlign="middle" height="100%" width="100%">
+		<s:HGroup enabled="{!Main.offlineMode}" verticalAlign="middle" height="100%" width="100%" gap="2">
 			<s:Button id="createButton"
 					  toolTip="Create slivers"
 					  label="Create"
@@ -729,15 +732,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			<components:ImageButton id="expireButton"
 									icon="{ImageUtil.timeIcon}"
 									click="viewExpires()" />
-			<s:Button id="renewSliceButton" label="Renew" click="renewSlice()" height="24" />
+			<s:Button id="renewSliceButton"
+					  label="Add"
+					  click="renewSlice()"
+					  height="24" />
 			<s:Label text="for" />
-			<s:DropDownList id="renewLengthDropdownlist" height="24"
+			<s:DropDownList id="renewLengthDropdownlist" height="24" width="90"
 							requireSelection="true">
 				<s:dataProvider>
 					<s:ArrayList>
-						<fx:String>6 More Hours</fx:String>
-						<fx:String>1 More Day</fx:String>
-						<fx:String>3 More Days</fx:String>
+						<fx:String>6 Hours</fx:String>
+						<fx:String>1 Day</fx:String>
+						<fx:String>3 Days</fx:String>
 					</s:ArrayList>
 				</s:dataProvider>
 			</s:DropDownList>

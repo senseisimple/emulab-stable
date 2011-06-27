@@ -60,7 +60,7 @@ package protogeni.communication
 				sliver.rspec = new XML(response.value[1]);
 				sliver.parseRspec();
 				
-				return new RequestSliverStatus(sliver);
+				return new RequestSliverStart(sliver);
 			}
 			else
 			{
