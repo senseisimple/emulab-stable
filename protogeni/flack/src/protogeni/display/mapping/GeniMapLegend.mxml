@@ -67,10 +67,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				// remove any not used anymore
 				// build up list
 				var createManagers:ArrayCollection = new ArrayCollection();
+				var i:int;
+				var managerItem:GeniMapLegendManagerItem;
 				if(Main.geniHandler != null && Main.geniHandler.GeniManagers != null)
 					createManagers = new ArrayCollection(Main.geniHandler.GeniManagers.toArray());
-				for(var i:int = 0; i < managerItems.numElements; i++) {
-					var managerItem:GeniMapLegendManagerItem = managerItems.getElementAt(i) as GeniMapLegendManagerItem;
+				for(i = 0; i < managerItems.numElements; i++) {
+					managerItem = managerItems.getElementAt(i) as GeniMapLegendManagerItem;
 					if(createManagers.contains(managerItem.manager)) {
 						createManagers.removeItemAt(createManagers.getItemIndex(managerItem.manager));
 					} else {
@@ -84,7 +86,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				for each(var newManager:GeniManager in createManagers) {
 					var newManagerItem:GeniMapLegendManagerItem = new GeniMapLegendManagerItem();
 					newManagerItem.manager = newManager;
-					managerItems.addElement(newManagerItem);
+					
+					for(i = 0; i < managerItems.numElements; i++) {
+						managerItem = managerItems.getElementAt(i) as GeniMapLegendManagerItem;
+						if((newManager.Hrn.toLowerCase() < managerItem.manager.Hrn.toLowerCase() && managerItem.manager.Hrn != "utahemulab.cm") || newManager.Hrn == "utahemulab.cm")
+							break;
+					}
+					managerItems.addElementAt(newManagerItem, i);
 				}
 			}
 			

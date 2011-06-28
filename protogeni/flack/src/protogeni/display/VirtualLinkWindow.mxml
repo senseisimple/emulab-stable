@@ -20,7 +20,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 <components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						width="250" height="280"
 						title="Link Information" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
@@ -32,6 +31,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.ProtogeniRspecProcessor;
 			import protogeni.resources.VirtualInterface;
+			import protogeni.resources.VirtualInterfaceCollection;
 			import protogeni.resources.VirtualLink;
 			
 			import spark.components.Button;
@@ -41,6 +41,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			[Bindable]
 			public var types:ArrayList;
+			
+			[Bindable]
+			public var interfaces:ArrayList;
 			
 			public function loadLink(pl:VirtualLink):void {
 				link = pl;
@@ -71,8 +74,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			public function loadInterfaces():void {
+				interfaces = new ArrayList();
+				
 				for each(var i:VirtualInterface in link.interfaces.collection) {
-					interfaceVgroup.addElement(DisplayUtil.getVirtualNodeButton(i.owner));
+					interfaces.addItem(i);
 				}
 			}
 			
@@ -123,6 +128,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					return true;
 				}
 				
+				this.link.interfaces = new VirtualInterfaceCollection();
+				for each(var i:VirtualInterface in interfaces.source)
+					this.link.interfaces.add(i);
+				
 				this.link.clientId = this.idLabel.Text;
 				if(link.linkType != this.typeList.selectedItem.type) {
 					if(this.typeList.selectedItem.type == VirtualLink.TYPE_TUNNEL)
@@ -166,9 +175,72 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	</s:HGroup>
 	
 	<s:Label text="Connects" fontWeight="bold" />
-	<s:Scroller width="100%" height="100%">
-		<s:VGroup id="interfaceVgroup" width="100%" height="100%" />
-	</s:Scroller>
+	<s:DataGrid id="interfaceGrid" width="100%" height="100%" 
+				dataProvider="{interfaces}"
+				rowHeight="24"
+				editable="true">
+		<s:columns>
+			<s:ArrayList>
+				<s:GridColumn headerText="Node"
+							  dataField="owner"
+							  editable="false"
+							  itemRenderer="protogeni.display.components.GeniDataGridRenderer">
+				</s:GridColumn>
+				<s:GridColumn dataField="id"
+							  headerText="Interface">
+					<s:itemEditor>
+						<fx:Component>
+							<s:DefaultGridItemEditor />
+						</fx:Component>
+					</s:itemEditor>
+					<s:itemRenderer>
+						<fx:Component>
+							<s:DefaultGridItemRenderer />
+						</fx:Component>
+					</s:itemRenderer>
+				</s:GridColumn>
+				<s:GridColumn dataField="ip"
+							  headerText="IP">
+					<s:itemEditor>
+						<fx:Component>
+							<s:DefaultGridItemEditor />
+						</fx:Component>
+					</s:itemEditor>
+					<s:itemRenderer>
+						<fx:Component>
+							<s:DefaultGridItemRenderer />
+						</fx:Component>
+					</s:itemRenderer>
+				</s:GridColumn>
+				<s:GridColumn dataField="mask" 
+							  headerText="Mask">
+					<s:itemEditor>
+						<fx:Component>
+							<s:DefaultGridItemEditor />
+						</fx:Component>
+					</s:itemEditor>
+					<s:itemRenderer>
+						<fx:Component>
+							<s:DefaultGridItemRenderer />
+						</fx:Component>
+					</s:itemRenderer>
+				</s:GridColumn>
+				<s:GridColumn dataField="type" 
+							  headerText="Type">
+					<s:itemEditor>
+						<fx:Component>
+							<s:DefaultGridItemEditor />
+						</fx:Component>
+					</s:itemEditor>
+					<s:itemRenderer>
+						<fx:Component>
+							<s:DefaultGridItemRenderer />
+						</fx:Component>
+					</s:itemRenderer>
+				</s:GridColumn>
+			</s:ArrayList> 
+		</s:columns>
+	</s:DataGrid>
 	
 	<components:controlBarContent>
 		<s:Button id="cancelButton" label="Cancel" icon="{ImageUtil.cancelIcon}" click="closeWindow();" height="24" />

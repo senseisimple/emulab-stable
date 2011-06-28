@@ -71,6 +71,13 @@ package protogeni.communication
 						var newGm:GeniManager = null;
 						var url:String = obj.url;
 						var newUrn:IdnUrn = new IdnUrn(obj.urn);
+						// Skip these managers for now...
+						/*if(obj.hrn == "cron.loni.org.cm"
+							|| obj.hrn == "cron.cct.lsu.edu.cm"
+							|| obj.hrn == "wigims.cm"
+							|| obj.hrn == "mygeni.cm"
+							|| obj.hrn.toLowerCase().indexOf("etri") > 0)
+							continue;*/
 						// ProtoGENI Component Manager
 						if(newUrn.name == "cm") {
 							var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
@@ -78,9 +85,6 @@ package protogeni.communication
 							newCm.Url = obj.url.substr(0, obj.url.length-3);
 							newCm.Urn = newUrn;
 							newGm = newCm;
-							// Quick hack, giving exceptions in forge
-							if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.full.toLowerCase().indexOf("etri") > 0)
-								continue;
 							if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
 								newCm.supportsIon = true;
 							if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
