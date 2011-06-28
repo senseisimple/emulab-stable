@@ -671,8 +671,10 @@ sub GetTicketAuxAux($$$$$$$$$)
     my @nodeids  = ();
     my %lannodes = ();
     # For stitching, keep track of external nodes and links.
-    my %external_nodemap = ();
-    my %external_linkmap = ();
+    my %external_nodemap  = ();
+    my %external_linkmap  = ();
+    my %external_vportmap = ();
+    my %stitching_paths   = ();
 
     #
     # If this is a ticket update, we want to seed the namemap with
@@ -1131,7 +1133,34 @@ sub GetTicketAuxAux($$$$$$$$$)
 
     goto skiplinks
 	if (!defined(GeniXML::FindFirst("n:link", $rspec)));
-    
+
+    #
+    # Look for a stitching section. The paths are indexed by the id, which
+    # will match the client_id in the link.
+    #
+    if (defined(GeniXML::FindFirst("n:stitching", $rspec))) {
+	foreach my $ref (GeniXML::FindNodes("n:stitching",
+					    $rspec)->get_nodelist()) {
+	    foreach my $path (GeniXML::FindNodes("n:path",
+						 $ref)->get_nodelist()) {
+		my $path_id = GeniXML::GetText("id", $path);
+		
+		#
+		# Get the hop list and create and create a hash too.
+		#
+		my @hoplist = GeniXML::FindNodes("n:hop",
+						 $path)->get_nodelist();
+		my %hophash = ();
+		foreach my $hop (@hoplist) {
+		    my $hop_id = GeniXML::GetText("id", $hop);
+		    $hophash{$hop_id} = $hop;
+		}
+		$stitching_paths{$path_id} = { "path"    => $path,
+					       "hophash" => \%hophash,
+					       "hoplist" => \@hoplist };
+	    }
+	}
+    }
     #
     # Now deal with links for wildcarded nodes. 
     #
@@ -1251,69 +1280,98 @@ sub GetTicketAuxAux($$$$$$$$$)
 		# Not doing anything else.
 		next;
 	    }
-	    if (!exists($ifacemap{$node_nickname})) {
-		#
-		# If the interface refers to a node at another site, then
-		# lets try to stitch together a vlan. Assign will fail if
-		# the user has specified something impossible.
-		#
-		if (!exists($namemap{$node_nickname}) &&
-		    exists($external_nodemap{$node_nickname})) {
-		    #
-		    # Find the hop that says how we get to the edge. For
-		    # now I assume a single hop is all we ever have. 
-		    #
-		    my $hopref;
-		    my $hop_urn;
+	    #
+	    # If the interface refers to a node at another site, then
+	    # lets try to stitch together a vlan. Assign will fail if
+	    # the user has specified something impossible.
+	    #
+	    if (exists($external_nodemap{$node_nickname})) {
+		if (exists($stitching_paths{$lanname})) {
+		    my $GetHopLinkID = sub {
+			my ($ref)  = @_;
+			my $result = "";
+			
+			my $link = FindFirst("n:link", $ref);
+			if (defined($link)) {
+			    $result = GetText("id", $link);
+			}
+			return $result;
+		    };
 		    
-		    foreach my $urn (keys(%hops)) {
-			my ($auth,undef,undef) = GeniHRN::Parse($urn);
-			if (defined($auth) and $auth eq $OURDOMAIN) {
-			    $hopref = $hops{$urn};
-			    $hop_urn = $urn;
+		    #
+		    # The hop path is an ordered list; need to figure out which
+		    # end to start at. We want whichever end has he same domain
+		    # as us.
+		    #
+		    my @hoplist = @{ $stitching_paths{$lanname}->{'hoplist'} };
+		    my $hopurn  = &$GetHopLinkID($hoplist[0]);
+		    my ($hopauth,undef,undef) = GeniHRN::Parse($hopurn);
+		    if ($hopauth ne $OURDOMAIN) {
+			# Reverse the list to make life easier.
+			@hoplist = reverse(@hoplist);
+			$stitching_paths{$lanname}->{'hoplist'} = \@hoplist;
+		    }
+		    # Make sure the other end is really us. 
+		    $hopurn  = &$GetHopLinkID($hoplist[0]);
+		    ($hopauth,undef,undef) = GeniHRN::Parse($hopurn);
+		    if ($hopauth ne $OURDOMAIN) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "$lanname: no local path hop");
+			goto bad;
+		    }
+		    #
+		    # Go through the hop list to find the edge point. This will
+		    # be the first hop that is in a different domain.
+		    #
+		    my $edgehop;
+		    my $lasthop;
+		    foreach my $hop (@hoplist) {
+			my $hopurn = &$GetHopLinkID($hop);
+			next
+			    if (! GeniHRN::IsValid($hopurn));
+			
+			my ($auth,undef,undef) = GeniHRN::Parse($hopurn);
+			next
+			    if (!defined($auth));
+
+			if ($auth ne $OURDOMAIN) {
+			    $edgehop = $lasthop;
 			    last;
 			}
+			$lasthop = $hop;
 		    }
-		    if (!defined($hopref)) {
+		    if (!defined($edgehop)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "$lanname: no local component_hop");
+						 "$lanname: no edge hop");
 			goto bad;
 		    }
 		    #
-		    # Inside is an interface_ref.
+		    # Look inside the hop urn; it tells the local iface/node
+		    # which corresponds to our "fake" nodes.
 		    #
-		    my $ifaceref =
-			GeniXML::FindFirst("n:interface_ref", $hopref);
-		    if (!defined($ifaceref)) {
+		    my $edgeurn = &$GetHopLinkID($edgehop);
+		    my (undef,undef,$edgestuff) = GeniHRN::Parse($edgeurn);
+		    my (undef,$ifaceid,$edgenodeid) = split('//', $edgestuff);
+
+		    #
+		    # The edge node and the interface on that node must exist.
+		    #
+		    my $edgenode = Node->Lookup($edgenodeid);
+		    if (!defined($edgenode)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "$lanname: no iface in component_hop");
+						 "$lanname: unknown node ".
+						 "$edgenodeid in $edgestuff");
 			goto bad;
 		    }
-		    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
-		    # We seem to ignore this for now, since the node we want
-		    # to use is inside the network data structure.
-		    my $iface_node_urn =
-			GeniXML::GetText("component_node_urn", $ifaceref);
-		    my $iface_iface_id =
-			GeniXML::GetText("component_interface_id", $ifaceref);
-		    my (undef, undef, $iface_node_id) =
-			GeniHRN::Parse($iface_node_urn);
-		    
-		    if (! (defined($network_id) && defined($iface_node_id) &&
-			   defined($iface_iface_id))) {
+		    my $edgeiface = Interface->LookupByIface($edgenode,
+							     $ifaceid);
+		    if (!defined($edgeiface)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "$lanname: bad component_hop");
-			goto bad;
-		    }
-		    if (! ($network_id =~ /^[-\w]*$/ &&
-			   $iface_node_id =~ /^[-\w]*$/ &&
-			   $iface_iface_id =~ /^[-\w]*$/)) {
-			$response =
-			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "$lanname: bad network, node or iface");
+					"$lanname: unknown iface in $edgeurn");
 			goto bad;
 		    }
 
@@ -1321,18 +1379,11 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    # Look in the external networks table to get the hop
 		    # details. 
 		    #
-		    my $network = ExternalNetwork->Lookup($network_id);
+		    my $network = ExternalNetwork->Lookup($edgenodeid);
 		    if (!defined($network)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "$lanname: unknown component_hop");
-			goto bad;
-		    }
-		    my $network_node = Node->Lookup($network->node_id());
-		    if (!defined($network_node)) {
-			$response =
-			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "$lanname: unknown component_hop node");
+				 "$lanname: unknown network for $edgenodeid");
 			goto bad;
 		    }
 		    
@@ -1346,9 +1397,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 				     "osname"  => '',
 				     "ips"     => '', # deprecated
 				     "cmd_line"=> '', # bogus
-				     "fixed"   => $network_node->node_id()});
+				     "fixed"   => $edgenode->node_id()});
 		    if (!defined($virtnode)) {
-			print STDERR "Error creating bbg node\n";
+			print STDERR "Error creating edge node\n";
 			$response = GeniResponse->Create(GENIRESPONSE_ERROR);
 			goto bad;
 		    }
@@ -1358,14 +1409,22 @@ sub GetTicketAuxAux($$$$$$$$$)
 						  "desire"   => "pcshared",
 						  "weight"   => 0.95});
 		    $virtexperiment->encap_style("vlan");
-		    $iface_name  = $iface_iface_id;
-		    $iface_vport = 0;
+		    $iface_name  = $edgeiface->iface();
+
+		    #
+		    # We do this so we can keep track of vport numbers.
+		    #
+		    if (!exists($external_vportmap{$node_nickname})) {
+			$external_vportmap{$node_nickname} = 0;
+		    }
+		    $iface_vport = $external_vportmap{$node_nickname};
+		    $external_vportmap{$node_nickname} += 1;
 		    goto stitch;
 		}
 		else {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					  "$lanname: No such virtual_node_id: ".
+					  "$lanname: No stitching path to ".
 					  "$node_nickname");
 		    goto bad;
 		}
@@ -1400,14 +1459,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	    $iface_vport = $ifacemap{$node_nickname}->{$iface_id}->{"vport"};
 
-	  stitch:
 	    my $ip = GeniXML::GetIp($ref, $nodemap{$node_nickname}->{'rspec'});
 	    my $mask = GeniXML::GetMask($ref, $nodemap{$node_nickname}->{'rspec'});
 	    
+	  stitch:
 	    # XXX
 	    $ip     = "10.10.${linknum}.${ifacenum}" if (!defined($ip));
 	    $mask   = "255.255.255.0" if (!defined($mask));
-	    my $member = "$node_nickname:$iface_vport";
+	    my $member    = "$node_nickname:$iface_vport";
 	    my $bandwidth = 100000;
 	    my $latency   = 0.0;
 	    my $lossrate  = 0.0;
@@ -1745,7 +1804,54 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my ($linkref, $ifaceref) = @{ $external_linkmap{$linkname} };
 	my $slice_urn = $slice->urn();
 	my $retries   = 10;
+	my $chainmode = 0;
 
+	#
+	# Treemode; just reserve a local tag. Eventually has to deal with
+	# specific vlan tag requests.
+	#
+	if (!$chainmode) {
+	    my $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
+	    if (!defined($tag)) {
+		#
+		# The point of this is to create the VLan object, just long 
+		# enough to get a lanid and a tag assigned. 
+		#
+		my $vlan = VLan->Lookup($slice_experiment, $linkname);
+		if (!defined($vlan)) {
+		    $vlan = VLan->Create($slice_experiment, $linkname);
+		    if (!defined($vlan)) {
+			$response = GeniResponse->Create(GENIRESPONSE_ERROR,
+							 undef,
+					 "Internal Error creating vlan object");
+			goto bad;
+		    }
+		}
+		my $lanid = $vlan->lanid();
+		system("$SNMPIT -A $pid $eid $lanid");
+		if ($?) {
+		    $vlan->Destroy();
+		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not reserve vlan tag for $linkname");
+		    goto bad;
+		}
+		$vlan->Destroy();
+	    }
+	    $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
+	    if (!defined($tag)) {
+		# This should not happen. 
+		print STDERR "Did not find the reserved tag for $linkname\n";
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "Internal Error reserving vlan tag");
+		goto bad;
+	    }
+	    GeniXML::SetText("vlantag", $linkref, $tag);
+	    next;	    
+	}
+
+	#
+	# Chainmode
+	#
 	while ($retries) {
 	    #
 	    # Already have a reserved tag? This could happen if the other CM
@@ -4087,7 +4193,7 @@ sub SliverTicket($)
     # Update the returned ticket to reflect the current expiration time.
     #
     GeniXML::SetExpires($rspec,
-			POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+			POSIX::strftime("20%y-%m-%dT%H:%M:%SZ",
 					gmtime(str2time($slice->expires()))));
 
     my $rspec_xml = GeniXML::Serialize($rspec);
@@ -4255,7 +4361,7 @@ sub ListTickets($)
     foreach my $ticket (@tickets) {
 	# Convert to GMT.
 	my $expires =
-	    POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+	    POSIX::strftime("20%y-%m-%dT%H:%M:%SZ",
 			    gmtime(str2time($ticket->redeem_before())));
 	
 	my $blob = {"uuid"           => $ticket->ticket_uuid(),
