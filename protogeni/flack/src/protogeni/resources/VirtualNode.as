@@ -88,7 +88,6 @@ package protogeni.resources
 		}
 		
 		// Extensions
-		public var extensionsString:String = "";
 		public var extensionsNodes:XMLListCollection = new XMLListCollection();
 		
 		// Depreciated

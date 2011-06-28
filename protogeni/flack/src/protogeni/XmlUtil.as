@@ -33,6 +33,20 @@ package protogeni
 		
 		public static var flackNamespace:Namespace = new Namespace("flack", "http://www.protogeni.net/resources/rspec/ext/flack/1");
 		
+		public static function isKnownNamespace(ns:Namespace):Boolean {
+			switch(ns.uri) {
+				case rspec01Namespace:
+				case rspec02Namespace:
+				case rspec2Namespace:
+				case xsiNamespace:
+				case flackNamespace:
+				case delayNamespace:
+					return true;
+				default:
+					return false;
+			}
+		}
+		
 		// Schemas
 		public static const rspec01SchemaLocation:String = "http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd";
 		public static const rspec02SchemaLocation:String = "http://www.protogeni.net/resources/rspec/0.2 http://www.protogeni.net/resources/rspec/0.2/request.xsd";
