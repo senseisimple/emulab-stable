@@ -679,7 +679,7 @@ sub GetManifest($$)
     #
     # Update the manifest ticket to reflect the current expiration time.
     #
-    my $valid_date = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+    my $valid_date = POSIX::strftime("20%y-%m-%dT%H:%M:%SZ",
 				     gmtime(str2time($slice->expires())));
     if (GeniXML::IsVersion0($manifest)) {
 	GeniXML::SetText("valid_until", $manifest, $valid_date);

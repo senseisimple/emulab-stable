@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniTicket;
@@ -704,7 +704,7 @@ sub RunSigner($$)
     my $rspec_xml   = GeniXML::Serialize($self->rspec());
 
     # Convert to GMT.
-    $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+    $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%SZ",
 			       gmtime(str2time($expires)));
 
     #
