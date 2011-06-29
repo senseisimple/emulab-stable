@@ -1287,24 +1287,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    #
 	    if (exists($external_nodemap{$node_nickname})) {
 		if (exists($stitching_paths{$lanname})) {
-		    my $GetHopLinkID = sub {
-			my ($ref)  = @_;
-			my $result = "";
-			
-			my $link = FindFirst("n:link", $ref);
-			if (defined($link)) {
-			    $result = GetText("id", $link);
-			}
-			return $result;
-		    };
-		    
 		    #
 		    # The hop path is an ordered list; need to figure out which
 		    # end to start at. We want whichever end has he same domain
 		    # as us.
 		    #
 		    my @hoplist = @{ $stitching_paths{$lanname}->{'hoplist'} };
-		    my $hopurn  = &$GetHopLinkID($hoplist[0]);
+		    my $hopurn  = GetHopLinkID($hoplist[0]);
 		    my ($hopauth,undef,undef) = GeniHRN::Parse($hopurn);
 		    if ($hopauth ne $OURDOMAIN) {
 			# Reverse the list to make life easier.
@@ -1312,7 +1301,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$stitching_paths{$lanname}->{'hoplist'} = \@hoplist;
 		    }
 		    # Make sure the other end is really us. 
-		    $hopurn  = &$GetHopLinkID($hoplist[0]);
+		    $hopurn  = GetHopLinkID($hoplist[0]);
 		    ($hopauth,undef,undef) = GeniHRN::Parse($hopurn);
 		    if ($hopauth ne $OURDOMAIN) {
 			$response =
@@ -1327,7 +1316,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    my $edgehop;
 		    my $lasthop;
 		    foreach my $hop (@hoplist) {
-			my $hopurn = &$GetHopLinkID($hop);
+			my $hopurn = GetHopLinkID($hop);
 			next
 			    if (! GeniHRN::IsValid($hopurn));
 			
@@ -1351,7 +1340,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    # Look inside the hop urn; it tells the local iface/node
 		    # which corresponds to our "fake" nodes.
 		    #
-		    my $edgeurn = &$GetHopLinkID($edgehop);
+		    my $edgeurn = GetHopLinkID($edgehop);
 		    my (undef,undef,$edgestuff) = GeniHRN::Parse($edgeurn);
 		    my (undef,$ifaceid,$edgenodeid) = split('//', $edgestuff);
 
@@ -1846,6 +1835,27 @@ sub GetTicketAuxAux($$$$$$$$$)
 		goto bad;
 	    }
 	    GeniXML::SetText("vlantag", $linkref, $tag);
+
+	    my @hoplist = @{ $stitching_paths{$linkname}->{'hoplist'} };
+	    foreach my $hop (@hoplist) {
+		my $hopurn = GetHopLinkID($hop);
+		my ($auth,undef,undef) = GeniHRN::Parse($hopurn);
+		next
+		    if (!defined($auth) || $auth ne $OURDOMAIN);
+
+		#
+		# Need to change a couple of fields buried down inside. Ick.
+		#
+		my $tmp = FindFirst("n:link", $hop);
+		$tmp = FindFirst("n:SwitchingCapabilityDescriptors", $tmp)
+		    if (defined($tmp));
+		$tmp = FindFirst("n:switchingCapabilitySpecificInfo", $tmp)
+		    if (defined($tmp));
+		if (defined($tmp)) {
+		    SetText("vlanRangeAvailability", $tmp, "$tag");
+		    SetText("suggestedVLANRange", $tmp, "$tag");
+		}
+	    }
 	    next;	    
 	}
 
@@ -5321,6 +5331,18 @@ sub AddKeys($$$)
     return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys");
   error:
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef, "Internal Error");
+}
+
+sub GetHopLinkID($)
+{
+    my ($ref)  = @_;
+    my $result = "";
+			
+    my $link = FindFirst("n:link", $ref);
+    if (defined($link)) {
+	$result = GetText("id", $link);
+    }
+    return $result;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
