@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,7 +22,7 @@ use Exporter;
 	 os_groupdel os_getnfsmounts os_islocaldir os_mountextrafs
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
 	 os_get_disks os_get_disk_size os_get_partition_info os_nfsmount
-	 os_gendhcpdconf os_get_ctrlnet_ip
+	 os_get_ctrlnet_ip
        );
 
 sub VERSION()	{ return 1.0; }
@@ -1074,15 +1074,6 @@ sub os_mkdir($$)
 sub os_setup()
 {
     return 0;
-}
-
-#
-# Generate ISC dhcpd config file for subbosses
-#
-sub os_gendhcpdconf()
-{
-	return gendhcpdconf("/etc/dhcpd.conf",
-		"/etc/dhcpd.conf.subboss.template");
 }
 
 #

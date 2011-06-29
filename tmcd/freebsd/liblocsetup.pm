@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ use Exporter;
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir os_mountextrafs
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre os_nfsmount
-	 os_find_freedisk os_gendhcpdconf os_get_ctrlnet_ip
+	 os_find_freedisk os_get_ctrlnet_ip
        );
 
 sub VERSION()	{ return 1.0; }
@@ -501,15 +501,6 @@ sub os_setup()
 	print "Ignoring os setup on remote/MFS node!\n";
 	return 0;
     }
-}
-
-#
-# Generate ISC dhcpd config file for subbosses
-#
-sub os_gendhcpdconf()
-{
-	return libsetup::gendhcpdconf("/usr/local/etc/dhcpd.conf",
-		"/usr/local/etc/dhcpd.conf.subboss.template");
 }
 
 #

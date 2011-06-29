@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -33,6 +33,7 @@ my $restart = 0;
 # Configure variables
 #
 my $TBOPS       = "@TBOPSEMAIL@";
+my $ELABINELAB  = @ELABINELAB@;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
@@ -45,6 +46,14 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use NodeType;
+
+#
+# PXE boot constants
+#
+my $PXEBOOTDIR	    = "/tftpboot";
+my $PXELINUXPREFIX  = "$PXEBOOTDIR/pxelinux";
+my $PXELINUXBOOT    = "pxelinux.0";
+my $PXELINUXCONFIG  = "pxelinux.cfg";
 
 my $CRTLTAG	    = TBDB_IFACEROLE_CONTROL();
 my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
@@ -60,6 +69,8 @@ my $OUT		    = *STDOUT;
 my %subboss_dhcp_servers;
 
 sub RestartSubbossDhcp($$);
+sub SetupPXEBoot($$$$);
+sub ClearPXEBoot($$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -302,38 +313,31 @@ while (<IF>) {
 		    # defined.  Otherwise don't set anything (use the global
 		    # default).
 		    #
-		    if (defined($row{"pxe_boot_path"})) {
-			my $fn = $row{"pxe_boot_path"};
-			# make sure it is pretty constrained
-			if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
-			    $filename = "${spaces}\tfilename \"$fn\";\n";
-			}
-		    }
+		    $filename = SetupPXEBoot($node_id, $mac, 1,
+					     $row{"pxe_boot_path"});
 		    if (!$filename) {
 			# Get the type info for this type.
 			my $nodetype = NodeType->Lookup($row{"type"});
+
 			# Get the type specific version of pxe_boot_path
 			my $nt_pxe_boot_path;
-
 			$nodetype->pxe_boot_path(\$nt_pxe_boot_path) == 0
                             or fatal("Could not get pxe_boot_path for ".
 				     "$node_id");
 
-			if (defined($nt_pxe_boot_path)) {
-			    my $fn = $nt_pxe_boot_path;
-
-			    # make sure it is pretty constrained
-			    if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
-				$filename = "${spaces}\tfilename \"$fn\";\n";
-			    }
-			}
+			$filename = SetupPXEBoot($node_id, $mac, 0,
+						 $nt_pxe_boot_path);
+		    }
+		    if ($filename) {
+			$filename = "${spaces}\tfilename \"$filename\";\n";
 		    }
 
 		    # Need to make MAC look right..
 		    $mac =~ s/(..)\B/$1:/g;
 
 		    print $OUT "${spaces}host $ip {\n";
-		    print $OUT $filename;
+		    print $OUT $filename
+			if (defined($filename));
 		    print $OUT $next_server;
 		    print $OUT $bootinfo_server;
 		    print $OUT $dns;
@@ -388,6 +392,125 @@ if ($install) {
 exit(0);
 
 #
+# Special handling of pxe_boot_path argument.
+# Any specified pxeboot path must start with PXEBOOTDIR (/tftpboot).
+# If path starts with $PXELINUXPREFIX (/tftpboot/pxelinux/), then
+# the remainder of the path identifies the pxelinux configuration file
+# from $PXELINUXCONFIG (/tftpboot/pxelinux.cfg) to use. This config file
+# for the node (MAC address) will be symlinked to this config file.
+#
+# Returns the string to be used for the "filename" option in dhcpd.conf.
+#
+sub SetupPXEBoot($$$$)
+{
+    my ($node, $mac, $clear, $str) = @_;
+
+    # get rid of any old pxelinux magic
+    if ($clear) {
+	ClearPXEBoot($node, $mac);
+    }
+
+    return undef
+	if (!defined($str));
+
+    # don't allow if outside TFTP directory
+    if ($str !~ /^$PXEBOOTDIR\// || $str =~ /\.\./) {
+	print STDERR "$node: ignoring bogus pxe_boot_path '$str'\n";
+	return undef;
+    }
+
+    # if it starts with the magic pxelinux prefix, setup a config file
+    if ($str =~ /^$PXELINUXPREFIX\/(.*)$/) {
+	my $cfile = $1;
+	my $cpath = "$PXEBOOTDIR/$PXELINUXCONFIG";
+
+	if (! -r "$cpath/$cfile") {
+	    print STDERR "$node: ignoring invalid pxelinux config '$cfile'\n";
+	    return undef;
+	}
+
+	#
+	# XXX ugh. In an inner elab with an inner control network,
+	# pxelinux will use the MAC address of the real control net interface
+	# to construct its config file name. So we need to look that up.
+	#
+	if ($ELABINELAB) {
+	    my $qr = DBQueryWarn("select MAC from interfaces where ".
+				 " node_id='$node' and role='outer_ctrl'");
+	    if ($qr && $qr->numrows) {
+		my %row = $qr->fetchhash();
+		if (defined($row{"MAC"})) {
+		    $mac = $row{"MAC"};
+		}
+	    }
+	}
+
+	if ($mac =~ /^(..)(..)(..)(..)(..)(..)$/) {
+	    $macname = "01-$1-$2-$3-$4-$5-$6";
+	} else {
+	    print STDERR "$node: ignoring unparsable MAC address '$mac'\n";
+	    return undef;
+	}
+
+	if ($install) {
+	    if (-e "$cpath/$macname") {
+		if (!unlink("$cpath/$macname")) {
+		    print STDERR "$node: could not remove old pxelinux config\n";
+		    return undef;
+		}
+	    }
+	    if (!symlink($cfile, "$cpath/$macname")) {
+		print STDERR "$node: could not symlink to pxelinux config '$cfile'\n";
+		return undef;
+	    }
+	} else {
+	    print STDERR "WARNING: not changing pxelinux config for $node\n";
+	}
+
+	# return the pxelinux binary
+	$str = "$PXEBOOTDIR/$PXELINUXBOOT";
+    }
+
+    return $str;
+}
+
+#
+# Make sure there is no pxelinux config for the given node
+#
+sub ClearPXEBoot($$)
+{
+    my ($node, $mac) = @_;
+    my $cpath = "$PXEBOOTDIR/$PXELINUXCONFIG";
+
+    #
+    # XXX ugh. In an inner elab with an inner control network,
+    # pxelinux will use the MAC address of the real control net interface
+    # to construct its config file name. So we need to look that up.
+    #
+    if ($ELABINELAB) {
+	my $qr = DBQueryWarn("select MAC from interfaces where ".
+			     " node_id='$node' and role='outer_ctrl'");
+	if ($qr && $qr->numrows) {
+	    my %row = $qr->fetchhash();
+	    if (defined($row{"MAC"})) {
+		$mac = $row{"MAC"};
+	    }
+	}
+    }
+
+    if ($mac =~ /^(..)(..)(..)(..)(..)(..)$/) {
+	$macname = "01-$1-$2-$3-$4-$5-$6";
+	if ($install) {
+	    if (-e "$cpath/$macname" && !unlink("$cpath/$macname")) {
+		print STDERR "$node: could not remove old pxelinux config\n";
+	    }
+	} else {
+	    print STDERR "WARNING: not changing pxelinux config for $node\n";
+	}
+    }
+}
+
+#
 # Die.
 #
 sub fatal {
@@ -413,4 +536,3 @@ sub RestartSubbossDhcp($$)
 	    print STDERR "Failed to restart dhcpd on $subboss\n";
 	}
 }
-
