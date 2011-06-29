@@ -3,6 +3,34 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://www.protogeni.net/resources/rspec/2 http://\
 www.protogeni.net/resources/rspec/2/request.xsd http://www.protogeni.net/resources/rspec/ext/delay/1 http://www.protogeni.net/resources/rspec/ext/delay/1/request-delay.xsd" type="request">
+  <!-- This rspec implements the following topology:
+  
+                 left-link          right-link
+           left <---------> bridge <---------> right
+
+       The "bridge" is a special node type (sliver_type="delay") that
+       tells the CM to insert an Emulab delay node instead of a plain
+       (router) node. Within the node section, there is an Emulab
+       extension section call "sliver_type_shaping" where you define
+       the shaping parameters for the two pipes (one in each direction).
+       At the moment you can specify bandwidth, delay, and loss, and the
+       pipes may be shapped assymetrically. 
+
+       In this example, traffic flowing from left to right are subject
+       to the following shaping parameters:
+
+		bandwidth=1000Kbs, latency=50ms, plr=0.0
+
+       while traffic flowing from right to left:
+
+		bandwidth=10000Kbs, latency=25ms, plr=0.01
+
+       You can change the traffic shaping parameters on the fly using
+       the Emulab event system, but there is no Protogeni interface to
+       do so. Please see the web page for more details.
+
+          https://users.emulab.net/trac/emulab/wiki/BridgeNodes
+   -->
   <node client_id="left"
         exclusive="true">
     <sliver_type name="raw-pc" />
