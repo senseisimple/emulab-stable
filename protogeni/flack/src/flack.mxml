@@ -206,17 +206,19 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						return;
 				} catch(bad:Error) {}
 				
-				var errorMessage:String;
+				Main.geniHandler.requestHandler.pause();
+				
+				var errorMessage:String = "";
 				if(event.error is Error) {
 					var error:Error = event.error as Error;
-					errorMessage = error.name + " - " + error.message;
-					
 					var stackTrace:String = error.getStackTrace();
 					if(stackTrace != null)
-						errorMessage += "\n\nStack Trace: " + stackTrace;
+						errorMessage = stackTrace;
+					else
+						errorMessage = error.toString();
 				} else if(event.error is ErrorEvent) {
 					var errorEvent:ErrorEvent = event.error as ErrorEvent;
-					errorMessage = errorEvent.type + " - " + errorEvent.text;
+					errorMessage = errorEvent.toString();
 				}
 				else {
 					try{
@@ -224,16 +226,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					} catch(bad:Error) {}
 				}
 				
-				Main.geniHandler.requestHandler.pause();
-				var errorId:String = "";
-				try{
-					errorId = "Error ID: " + event.error.errorID + "\n";
-				} catch(bad:Error) {}
 				var uncaughtErrorMessage:LogMessage = new LogMessage("",
 					"Uncaught Error",
-					errorId
-					+ "Error: " + errorMessage
-					+ "\n\nEvent: " + event.toString(),
+					"Error: " + errorMessage + "\n\nEvent: " + event.toString(),
 					true);
 				LogHandler.appendMessage(uncaughtErrorMessage);
 				LogHandler.viewConsole();
@@ -406,7 +401,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 								icon="{ImageUtil.helpIcon}"
 								click="DisplayUtil.viewAboutWindow()"
 								toolTip="View more information about Flack" />
-		<s:Button click="throw new Error('ah crap')" />
 	</s:controlBarContent>
 	
 	<mapping:GeniMap id="map" />

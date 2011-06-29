@@ -634,6 +634,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				if(sliverExpiresDate != null
 					&& (sliverExpiresDate.time + addTime) < this.sliceCanvas.slice.expires.time) {
 					newExpiresDate.setTime(sliverExpiresDate.time + addTime);
+				} else {
+					newExpiresDate.setTime(this.sliceCanvas.slice.expires.time + addTime);
 				}
 				Main.geniHandler.requestHandler.renewSlice(this.sliceCanvas.slice, newExpiresDate);
 			}

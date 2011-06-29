@@ -21,7 +21,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
 			   xmlns:mx="library://ns.adobe.com/flex/mx"
 			   xmlns:display="protogeni.display.*"
-			   title="Welcome"
+			   title="v2011-6-29.6:23PM"
 			   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
 			   close="closeWindow()"
 			   defaultButton="{this.loginButton}"

@@ -72,6 +72,7 @@ package protogeni.resources
 					this.detectedOutputRspecVersion = 0.1;
 					break;
 				case XmlUtil.rspec02Namespace:
+				case XmlUtil.rspec02MalformedNamespace: // I've seen two of these...
 					this.detectedOutputRspecVersion = 0.2;
 					break;
 				case XmlUtil.rspec2Namespace:

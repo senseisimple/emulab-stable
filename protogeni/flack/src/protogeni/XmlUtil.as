@@ -25,6 +25,7 @@ package protogeni
 		// Namespaces
 		public static const rspec01Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
 		public static const rspec02Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
+		public static const rspec02MalformedNamespace:String = "http://protogeni.net/resources/rspec/0.2";
 		public static const rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/2";
 		
 		public static var xsiNamespace:Namespace = new Namespace("xsi", "http://www.w3.org/2001/XMLSchema-instance");
@@ -38,9 +39,9 @@ package protogeni
 				case rspec01Namespace:
 				case rspec02Namespace:
 				case rspec2Namespace:
-				case xsiNamespace:
-				case flackNamespace:
-				case delayNamespace:
+				case xsiNamespace.uri:
+				case flackNamespace.uri:
+				case delayNamespace.uri:
 					return true;
 				default:
 					return false;
