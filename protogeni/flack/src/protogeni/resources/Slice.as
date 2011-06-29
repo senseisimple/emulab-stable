@@ -540,6 +540,7 @@ package protogeni.resources
 						detectedRspecVersion = 0.1;
 						break;
 					case XmlUtil.rspec02Namespace:
+					case XmlUtil.rspec02MalformedNamespace:
 						detectedRspecVersion = 0.2;
 						break;
 					case XmlUtil.rspec2Namespace:
@@ -553,9 +554,12 @@ package protogeni.resources
 				for each(var nodeXml:XML in sliceRspec.defaultNamespace::node)
 				{
 					var managerUrn:String;
-					if(detectedRspecVersion < 1)
-						managerUrn = nodeXml.@component_manager_uuid;
-					else
+					if(detectedRspecVersion < 1) {
+						if(nodeXml.@component_manager_urn.length() == 1)
+							managerUrn = nodeXml.@component_manager_urn;
+						else
+							managerUrn = nodeXml.@component_manager_uuid;
+					} else
 						managerUrn = nodeXml.@component_manager_id;
 					if(managerUrn.length == 0) {
 						var chooseManagerWindow:ChooseManagerWindow = new ChooseManagerWindow();
@@ -584,6 +588,7 @@ package protogeni.resources
 						detectedRspecVersion = 0.1;
 						break;
 					case XmlUtil.rspec02Namespace:
+					case XmlUtil.rspec02MalformedNamespace:
 						detectedRspecVersion = 0.2;
 						break;
 					case XmlUtil.rspec2Namespace:
@@ -604,13 +609,16 @@ package protogeni.resources
 				for each(var testNodeXml:XML in sliceRspec.defaultNamespace::node)
 				{
 					var testManagerUrn:String;
-					if(detectedRspecVersion < 1)
-						testManagerUrn = testNodeXml.@component_manager_uuid;
-					else
+					if(detectedRspecVersion < 1) {
+						if(testNodeXml.@component_manager_urn.length() == 1)
+							testManagerUrn = testNodeXml.@component_manager_urn;
+						else
+							testManagerUrn = testNodeXml.@component_manager_uuid;
+					} else
 						testManagerUrn = testNodeXml.@component_manager_id;
 					if(testManagerUrn.length == 0) {
 						if(detectedRspecVersion < 1)
-							testNodeXml.@component_manager_uuid = defaultManager.Urn.full;
+							testNodeXml.@component_manager_urn = defaultManager.Urn.full;
 						else
 							testNodeXml.@component_manager_id = defaultManager.Urn.full;
 					}
@@ -621,9 +629,12 @@ package protogeni.resources
 			{
 				var managerUrn:String;
 				var detectedManager:GeniManager;
-				if(detectedRspecVersion < 1)
-					managerUrn = nodeXml.@component_manager_uuid;
-				else
+				if(detectedRspecVersion < 1) {
+					if(nodeXml.@component_manager_urn.length() == 1)
+						managerUrn = nodeXml.@component_manager_urn;
+					else
+						managerUrn = nodeXml.@component_manager_uuid;
+				} else
 					managerUrn = nodeXml.@component_manager_id;
 				if(managerUrn.length == 0) {
 					Alert.show("All nodes must have a manager associated with them");

@@ -72,7 +72,6 @@ package protogeni.resources
 					this.detectedOutputRspecVersion = 0.1;
 					break;
 				case XmlUtil.rspec02Namespace:
-				case XmlUtil.rspec02MalformedNamespace: // I've seen two of these...
 					this.detectedOutputRspecVersion = 0.2;
 					break;
 				case XmlUtil.rspec2Namespace:
@@ -452,6 +451,7 @@ package protogeni.resources
 					this.detectedInputRspecVersion = 0.1;
 					break;
 				case XmlUtil.rspec02Namespace:
+				case XmlUtil.rspec02MalformedNamespace: // I've seen two of these...
 					this.detectedInputRspecVersion = 0.2;
 					break;
 				case XmlUtil.rspec2Namespace:
@@ -480,19 +480,20 @@ package protogeni.resources
 				{
 					var managerIdString:String = "";
 					var componentIdString:String = "";
-					if(nodeXml.@component_manager_uuid.length() == 1)
-						managerIdString = String(nodeXml.@component_manager_uuid);
 					if(nodeXml.@component_manager_urn.length() == 1)
 						managerIdString = String(nodeXml.@component_manager_urn);
+					else if(nodeXml.@component_manager_uuid.length() == 1)
+						managerIdString = String(nodeXml.@component_manager_uuid);
+					
 					// Don't add outside nodes ... do that if found when parsing links ...
 					virtualNode.manager = Main.geniHandler.GeniManagers.getByUrn(managerIdString);
 					if(virtualNode.manager != s.manager)
 						continue;
 					
-					if(nodeXml.@component_uuid.length() == 1)
-						componentIdString = String(nodeXml.@component_uuid);
 					if(nodeXml.@component_urn.length() == 1)
 						componentIdString = String(nodeXml.@component_urn);
+					else if(nodeXml.@component_uuid.length() == 1)
+						componentIdString = String(nodeXml.@component_uuid);
 					if(componentIdString.length > 0) {
 						cmNode = s.manager.Nodes.GetByUrn(componentIdString);
 						if(cmNode == null)
@@ -525,7 +526,7 @@ package protogeni.resources
 					virtualNode._exclusive = String(nodeXml.@exclusive) == "1" || String(nodeXml.@exclusive).toLowerCase() == "true";
 					if(nodeXml.@sliver_urn.length() == 1)
 						virtualNode.sliverId = String(nodeXml.@sliver_urn);
-					if(nodeXml.@sliver_uuid.length() == 1)
+					else if(nodeXml.@sliver_uuid.length() == 1)
 						virtualNode.sliverId = String(nodeXml.@sliver_uuid);
 					if(nodeXml.@sshdport.length() == 1) {
 						if(virtualNode.loginServices.length == 0)
@@ -878,6 +879,7 @@ package protogeni.resources
 			if(useInputRspecVersion < 1) {
 				nodeXml.@virtual_id = vn.clientId;
 				nodeXml.@component_manager_uuid = vn.manager.Urn.full;
+				nodeXml.@component_manager_urn = vn.manager.Urn.full;
 				nodeXml.@virtualization_type = vn.virtualizationType;
 			} else {
 				nodeXml.@client_id = vn.clientId;
@@ -888,6 +890,7 @@ package protogeni.resources
 					!(removeNonexplicitBinding && vn.flackUnbound)) {
 				if(useInputRspecVersion < 1) {
 					nodeXml.@component_uuid = vn.physicalNode.id;
+					nodeXml.@component_urn = vn.physicalNode.id;
 				} else {
 					nodeXml.@component_id = vn.physicalNode.id;
 					nodeXml.@component_name = vn.physicalNode.name;
