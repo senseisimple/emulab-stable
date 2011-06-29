@@ -108,6 +108,9 @@ system("$FETCH -q -o /tmp/genicrl.bundle.$$ ".
        "     http://boss.emulab.net/genicrl.bundle") == 0
     or fatal("Could not fetch genicrl bundle from Utah");
 
+system( "/bin/cat $TB/etc/extracerts.bundle >> /tmp/genica.bundle.$$ " .
+	"2> /dev/null" );
+
 #
 # Split up the certs.
 #
