@@ -9,6 +9,8 @@
  * handler processes.
  * 
  * TODO:
+ * - FIX SOON: child servers are started with the single primary gid of the
+ *   user; we need to ferret out the whole group list and set that
  * - timeouts for child frisbee processes
  * - record the state of running frisbeeds in persistant store so that
  *   they can be restarted if we die and restart
