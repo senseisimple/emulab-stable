@@ -207,9 +207,28 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				} catch(bad:Error) {}
 				
 				Main.geniHandler.requestHandler.pause();
+				
+				var errorMessage:String = "";
+				if(event.error is Error) {
+					var error:Error = event.error as Error;
+					var stackTrace:String = error.getStackTrace();
+					if(stackTrace != null)
+						errorMessage = stackTrace;
+					else
+						errorMessage = error.toString();
+				} else if(event.error is ErrorEvent) {
+					var errorEvent:ErrorEvent = event.error as ErrorEvent;
+					errorMessage = errorEvent.toString();
+				}
+				else {
+					try{
+						errorMessage = event.error.toString();
+					} catch(bad:Error) {}
+				}
+				
 				var uncaughtErrorMessage:LogMessage = new LogMessage("",
 					"Uncaught Error",
-					"Error:\n" + event.error.toString() + "\n\nEvent:\n" + event.toString(),
+					"Error: " + errorMessage + "\n\nEvent: " + event.toString(),
 					true);
 				LogHandler.appendMessage(uncaughtErrorMessage);
 				LogHandler.viewConsole();

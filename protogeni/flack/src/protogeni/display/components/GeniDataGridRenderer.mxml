@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:GridItemRenderer
+	xmlns:fx="http://ns.adobe.com/mxml/2009"
+	xmlns:s="library://ns.adobe.com/flex/spark">
+	
+	<fx:Script>
+		<![CDATA[
+			import protogeni.display.DisplayUtil;
+			
+			import spark.components.Button;
+			override public function prepare(hasBeenRecycled:Boolean):void
+			{
+				this.removeAllElements();
+				if(data && data[column.dataField]) {
+					var newButton:Button = DisplayUtil.getButtonFor(data[column.dataField]);
+					if(newButton != null) {
+						newButton.percentWidth = 100;
+						newButton.percentHeight = 100;
+						this.addElement(newButton);
+					}
+				}
+			}
+		]]>
+	</fx:Script>
+	
+</s:GridItemRenderer>

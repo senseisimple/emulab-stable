@@ -69,7 +69,8 @@ package protogeni.communication
 				sliver.urn = new IdnUrn(cred.credential.target_urn);
 				sliver.created = true;
 				
-				sliver.rspec = new XML(response.value[1]);
+				sliver.manifest = new XML(response.value[1]);
+				sliver.rspec = sliver.manifest;
 				sliver.parseRspec();
 
 				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);

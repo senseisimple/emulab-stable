@@ -55,6 +55,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeGroup;
+			import protogeni.resources.ProtogeniComponentManager;
 			import protogeni.resources.Site;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
@@ -510,51 +511,61 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				managerButton.percentWidth = 100;
 				managerHgroup.addElement(managerButton);
 				
-				var delay:VirtualNode = new VirtualNode(null);
-				delay.clientId = "Delay";
-				delay.isDelayNode = true;
-				delay.manager = manager;
 				var addDelayButton:DataButton = new DataButton("",
 					"Add a delay node",
 					ImageUtil.timeIcon,
 					null,
 					"virtualnode");
-				addDelayButton.data = delay;
-				addDelayButton.addEventListener(MouseEvent.CLICK,
-					function addDelayClicked(e:MouseEvent):void {
-						sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
-					});
+				if(manager.supportsDelayNodes) {
+					var delay:VirtualNode = new VirtualNode(null);
+					delay.clientId = "Delay";
+					delay.isDelayNode = true;
+					delay.manager = manager;
+					addDelayButton.data = delay;
+					addDelayButton.addEventListener(MouseEvent.CLICK,
+						function addDelayClicked(e:MouseEvent):void {
+							sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
+						});
+				} else
+					addDelayButton.visible = false; // include in the layout
 				managerHgroup.addElement(addDelayButton);
 
-				var exclusive:VirtualNode = new VirtualNode(null);
-				exclusive.clientId = "Exclusive";
-				exclusive.Exclusive = true;
-				exclusive.manager = manager;
 				var addExclusiveButton:DataButton = new DataButton("",
 					"Add an exclusive node",
 					ImageUtil.exclusiveIcon,
 					null,
 					"virtualnode");
-				addExclusiveButton.data = exclusive;
-				addExclusiveButton.addEventListener(MouseEvent.CLICK,
-					function addExclusiveClicked(e:MouseEvent):void {
-						sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
-					});
+				if(manager.supportsExclusiveNodes) {
+					var exclusive:VirtualNode = new VirtualNode(null);
+					exclusive.clientId = "Exclusive";
+					exclusive.Exclusive = true;
+					exclusive.manager = manager;
+					addExclusiveButton.data = exclusive;
+					addExclusiveButton.addEventListener(MouseEvent.CLICK,
+						function addExclusiveClicked(e:MouseEvent):void {
+							sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
+						});
+				} else
+					addExclusiveButton.visible = false; // include in the layout
 				managerHgroup.addElement(addExclusiveButton);
 				
-				var shared:VirtualNode = new VirtualNode(null);
-				shared.clientId = "Shared";
-				shared.Exclusive = false;
-				shared.manager = manager;
 				var addSharedButton:DataButton = new DataButton("",
 					"Add a shared node",
 					ImageUtil.sharedIcon, null, "virtualnode");
-				addSharedButton.data = shared;
-				addSharedButton.addEventListener(MouseEvent.CLICK,
-					function addSharedClicked(e:MouseEvent):void {
-						sliceCanvas.addBasicCloneOfVirtualNode(shared);
-					});
+				if(manager.supportsSharedNodes) {
+					var shared:VirtualNode = new VirtualNode(null);
+					shared.clientId = "Shared";
+					shared.Exclusive = false;
+					shared.manager = manager;
+					addSharedButton.data = shared;
+					addSharedButton.addEventListener(MouseEvent.CLICK,
+						function addSharedClicked(e:MouseEvent):void {
+							sliceCanvas.addBasicCloneOfVirtualNode(shared);
+						});
+				} else
+					addSharedButton.visible = false; // include in the layout
 				managerHgroup.addElement(addSharedButton);
+				
 				this.sidePane.addElement(managerHgroup);
 			}
 			
@@ -623,6 +634,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				if(sliverExpiresDate != null
 					&& (sliverExpiresDate.time + addTime) < this.sliceCanvas.slice.expires.time) {
 					newExpiresDate.setTime(sliverExpiresDate.time + addTime);
+				} else {
+					newExpiresDate.setTime(this.sliceCanvas.slice.expires.time + addTime);
 				}
 				Main.geniHandler.requestHandler.renewSlice(this.sliceCanvas.slice, newExpiresDate);
 			}
@@ -630,7 +643,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		]]>
 	</fx:Script>
 	
+<<<<<<< HEAD
 	<s:HGroup width="100%" verticalAlign="middle">
+=======
+	<s:HGroup width="100%" verticalAlign="middle" gap="2">
+>>>>>>> origin/flack
 		<s:Label id="hrnLabel" text="{sliceCanvas.slice.urn.name}"
 				 toolTip="{sliceCanvas.slice.urn.full}"
 				 fontSize="17"
@@ -690,10 +707,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />
 	</mx:HDividedBox>
 	<components:controlBarLayout>
-		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="12" paddingTop="2" />
+		<s:HorizontalLayout paddingBottom="2"
+							paddingLeft="2"
+							paddingRight="12"
+							paddingTop="2" />
 	</components:controlBarLayout>
 	<components:controlBarContent>
-		<s:HGroup enabled="{!Main.offlineMode}" verticalAlign="middle" height="100%" width="100%">
+		<s:HGroup enabled="{!Main.offlineMode}" verticalAlign="middle" height="100%" width="100%" gap="2">
 			<s:Button id="createButton"
 					  toolTip="Create slivers"
 					  label="Create"
@@ -729,6 +749,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			<components:ImageButton id="expireButton"
 									icon="{ImageUtil.timeIcon}"
 									click="viewExpires()" />
+<<<<<<< HEAD
 			<s:Button id="renewSliceButton" label="Renew" click="renewSlice()" height="24" />
 			<s:Label text="for" />
 			<s:DropDownList id="renewLengthDropdownlist" height="24"
@@ -738,6 +759,19 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						<fx:String>6 More Hours</fx:String>
 						<fx:String>1 More Day</fx:String>
 						<fx:String>3 More Days</fx:String>
+=======
+			<s:Button id="renewSliceButton"
+					  label="Add"
+					  click="renewSlice()"
+					  height="24" width="60" />
+			<s:DropDownList id="renewLengthDropdownlist" height="24" width="90"
+							requireSelection="true">
+				<s:dataProvider>
+					<s:ArrayList>
+						<fx:String>6 Hours</fx:String>
+						<fx:String>1 Day</fx:String>
+						<fx:String>3 Days</fx:String>
+>>>>>>> origin/flack
 					</s:ArrayList>
 				</s:dataProvider>
 			</s:DropDownList>

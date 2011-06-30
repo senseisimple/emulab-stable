@@ -32,6 +32,10 @@ package protogeni.communication
 				"Updating sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
 				CommunicationUtil.updateSliver);
 			sliver = newSliver;
+			sliver.created = false;
+			sliver.staged = false;
+			
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			
 			// Build up the args
 			op.addField("sliver_urn", sliver.urn.full);

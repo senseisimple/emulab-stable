@@ -36,8 +36,9 @@
 			0xD4B2D3,	// dark purple
 			0xDDB8A9,	// dark red
 			0xEBBFD9,	// light purple
-			0xFFFFE0,	// NEW yellow
+			0xFFFCCF,	// NEW yellow
 			0x49E9BD,	// NEW green
+			0xFFD39B,	// NEW brown
 			// dark
 			0x010101,	// grey
 			0xED2D2E,	// red
@@ -47,8 +48,9 @@
 			0x662C91,	// dark purple
 			0xA11D20,	// dark red
 			0xB33893,	// light purple
-			0xFFD700,	// NEW yellow
-			0x388E8E);	// NEW green
+			0xCDAD00,	// NEW yellow
+			0x388E8E,	// NEW green
+			0x5C4033);	// NEW brown
 		public static const colorsMedium:Array = new Array(
 			0x727272,	// grey
 			0xF1595F,	// red
@@ -60,6 +62,7 @@
 			0xD77FB3,	// light purple
 			0xFFEC8B,	// NEW yellow
 			0x45C3B8,	// NEW green
+			0xAA6600,	// NEW brown
 			0x727272,	// grey
 			0xF1595F,	// red
 			0x79C36A,	// green
@@ -69,7 +72,8 @@
 			0xCD7058,	// dark red
 			0xD77FB3,	// light purple
 			0xFFEC8B,	// NEW yellow
-			0x45C3B8);	// NEW green
+			0x45C3B8,	// NEW green
+			0xAA6600);	// NEW brown
 		public static const colorsDark:Array = new Array(
 			0x010101,	// grey
 			0xED2D2E,	// red
@@ -79,8 +83,9 @@
 			0x662C91,	// dark purple
 			0xA11D20,	// dark red
 			0xB33893,	// light purple
-			0xFFD700,	// NEW yellow
+			0xCDAD00,	// NEW yellow
 			0x388E8E,	// NEW green
+			0x5C4033,	// NEW brown
 			// light
 			0xCCCCCC,	// grey
 			0xF2AEAC,	// red
@@ -90,8 +95,9 @@
 			0xD4B2D3,	// dark purple
 			0xDDB8A9,	// dark red
 			0xEBBFD9,	// light purple
-			0xFFFFE0,	// NEW yellow
-			0x49E9BD);	// NEW green
+			0xFFFCCF,	// NEW yellow
+			0x49E9BD,	// NEW green
+			0xFFD39B);	// NEW brown
 		
 		public static var nextColorIdx:int = 0;
 		public static function getColorIdx():int

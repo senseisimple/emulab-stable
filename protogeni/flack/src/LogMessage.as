@@ -22,7 +22,7 @@ package
 	 * @author mstrum
 	 * 
 	 */
-	public class LogMessage
+	final public class LogMessage
 	{
 		public static const TYPE_OTHER:int = 0;
 		public static const TYPE_START:int = 1;

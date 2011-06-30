@@ -32,6 +32,7 @@ package protogeni.resources
 			super();
 			this.rspecProcessor = new ProtogeniRspecProcessor(this);
 			this.type = GeniManager.TYPE_PROTOGENI;
+			this.supportsDelayNodes = true;
 		}
 	}
 }

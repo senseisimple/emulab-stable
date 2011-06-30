@@ -77,6 +77,9 @@ package protogeni.resources
 		
 		public var supportsIon:Boolean = false;
 		public var supportsGpeni:Boolean = false;
+		public var supportsDelayNodes:Boolean = false;
+		public var supportsSharedNodes:Boolean = true;
+		public var supportsExclusiveNodes:Boolean = true;
 		
 		[Bindable]
 		public var Show:Boolean = true;

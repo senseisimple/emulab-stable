@@ -219,6 +219,30 @@ package protogeni.display
 				DisplayUtil.viewLogMessage(data);
 		}
 		
+		public static function getButtonFor(data:*):Button {
+			if(data is PhysicalNode)
+				return DisplayUtil.getPhysicalNodeButton(data);
+			else if(data is PhysicalNodeGroup)
+				return DisplayUtil.getPhysicalNodeGroupButton(data);
+			else if(data is GeniManager)
+				return DisplayUtil.getGeniManagerButton(data);
+			else if(data is VirtualNode)
+				return DisplayUtil.getVirtualNodeButton(data);
+			else if(data is Slice)
+				return DisplayUtil.getSliceButton(data);
+			else if(data is SliceNode)
+				return DisplayUtil.getVirtualNodeButton((data as SliceNode).node);
+			else if(data is SliceLink)
+				return DisplayUtil.getVirtualLinkButton((data as SliceLink).virtualLink);
+			else if(data is Site)
+				return DisplayUtil.getSiteButton(data);
+			else if(data is Request)
+				return DisplayUtil.getRequestButton(data);
+			else if(data is LogMessage)
+				return DisplayUtil.getLogMessageButton(data);
+			return null;
+		}
+		
 		public static function viewLogMessage(msg:LogMessage):void {
 			var logw:LogMessageWindow = new LogMessageWindow();
 			logw.showWindow();
