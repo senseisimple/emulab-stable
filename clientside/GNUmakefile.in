@@ -11,7 +11,15 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= lib event
+SUBDIRS         =
+ifeq ($(EMULAB_CLIENTSIDE),1)
+#
+# lib is a common directory, and is added to the clientside tarball.
+# So not do not build it when building full emulab tree; already done.
+#
+SUBDIRS	       += lib
+endif
+SUBDIRS	       += event tools
 
 all:	all-subdirs
 

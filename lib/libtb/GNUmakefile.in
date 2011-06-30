@@ -12,8 +12,9 @@ include $(OBJDIR)/Makeconf
 
 all:	libtb.a
 
-client: all
-client-install: all
+client: libtb-nodb.a
+        cmp -s libtb-nodb.a libtb.a || cp -pf libtb-nodb.a libtb.a
+client-install: client
 
 # The point of this is to make sure a nodb version of the library is
 # built during the ops-install target when installing a new emulab.
@@ -23,14 +24,15 @@ control-install: client
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 OBJS		= log.o tbdefs.o popenf.o systemf.o be_user.o tmcc.o
-ifneq ($(EMULAB_CLIENTSIDE),1)
-OBJS           += tbdb.o
-endif
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 
-libtb.a:	$(OBJS) 
-	$(AR) crv $@ $(OBJS)
+libtb.a:	$(OBJS) tbdb.o
+	$(AR) crv $@ $(OBJS) tbdb.o
 	$(RANLIB) $@
+
+libtb-nodb.a:   $(OBJS)
+        $(AR) crv $@ $(OBJS)
+        $(RANLIB) $@
 
 log.o:		log.h
 tbdb.o:		tbdb.h log.h tbdefs.h

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Testbed Makefile
@@ -30,7 +30,7 @@ include Makeconf
 # Then things that depend on stuff we just did:
 #
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
-SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
+SUBDIRS = lib db assign www @optional_subdirs@ clientside ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
 		tools/svn wiki bugdb collab protogeni node_usage install
@@ -192,7 +192,8 @@ client-mkdirs:
 	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)
 
 client:
-	@$(MAKE) -C lib/libtb client
+	@$(MAKE) -C lib client
+	@$(MAKE) -C clientside client
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client
 endif
@@ -200,20 +201,20 @@ endif
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client
 	@$(MAKE) -C tip client
-	@$(MAKE) -C tools client
 endif
 	@$(MAKE) -C sensors client
 	@$(MAKE) -C tmcd client
 
 client-install: client client-mkdirs
+	@$(MAKE) -C lib client-install
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client-install
+	@$(MAKE) -C clientside client-install
 endif
 	@$(MAKE) -C os client-install
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
-	@$(MAKE) -C tools client-install
 endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
@@ -229,7 +230,6 @@ endif
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
-	@$(MAKE) -C tools client-install
 endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C utils subboss-install

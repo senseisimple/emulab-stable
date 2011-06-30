@@ -735,7 +735,7 @@ main(int argc, char **argv)
 	    setenv("NODECNETIP", inet_ntoa(ia), 1);	    
 	}
 
-#ifdef EMULAB_CLIENTSIDE
+#ifdef NOMORE
 	/*
 	 * XXX for planetlab, hostname is the official hostname as opposed
 	 * to the per-experiment Emulab alias.  To be consistent, we want

@@ -47,25 +47,11 @@ fi
 # Need this for Makeconf.
 AC_SUBST(PATH)
 
-# Tell build it is the clientside.
-AC_SUBST(EMULAB_CLIENTSIDE)
-EMULAB_CLIENTSIDE=1
-
 #
-# The only option is if we build in elvin compat support.
+# Elvin compat option, which we	still need.
 #
 AC_SUBST(ELVIN_COMPAT)
 ELVIN_COMPAT=0
-
-AC_ARG_ENABLE(elvin_compat,
-[  --enable-elvin_compat[[=yes/no]]  Include Elvin Hash compat [[default=no]]])
-
-if test "$enable_elvin_compat" = "yes"; then
-    ELVIN_COMPAT=1
-fi
-if test $ELVIN_COMPAT -eq 1; then
-    AC_DEFINE_UNQUOTED(ELVIN_COMPAT, 1)
-fi
 
 AC_SUBST(CLIENT_ETCDIR)
 AC_SUBST(CLIENT_BINDIR)
@@ -82,12 +68,97 @@ AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
 AC_SUBST(LOG_TESTBED)
 AC_SUBST(TBLOGFACIL)
 
+#
+# Allow tbdefs file that is supplied to full emulab build
+#
+AC_ARG_WITH(TBDEFS,
+[  --with-TBDEFS=name	Specify definitions file (defs-default default)],
+[
+    if test "$withval" = "yes"; then
+	AC_MSG_ERROR([Invalid TBDEFS - Must specify the value])
+    fi
+    TBDEFS="$withval"
+    TBPATH=`dirname $withval`
+
+    if test -f $TBDEFS; then
+        #
+        # Remove the comments and newlines.  Really, that's what it does.
+        #
+        OLDPATH=$PATH
+        PATH="$TBPATH:$PATH"
+        . $TBDEFS
+        PATH=$OLDPATH
+    else
+        AC_MSG_ERROR([Definitions file $TBDEFS was not found.])
+    fi
+])
+
+#
+# Internal option; supplied when building as part of full Emulab.
+#
+WITH_EMULAB=0
+
+AC_ARG_WITH(emulab,
+[  --with-emulab	Internal option; build with Emulab (default no)],
+[
+    if test "$withval" = "yes"; then
+	AC_MSG_ERROR([Invalid with-emulab directive - Must specify the value])
+    fi
+    WITH_EMULAB=1
+    EMULAB_SRCDIR=$withval
+    
+])
+AC_SUBST(WITH_EMULAB)
+
+#
+# Allow command line option, since might not have a defs file.
+#
+AC_ARG_ENABLE(elvin_compat,
+[  --enable-elvin_compat[[=yes/no]]  Include Elvin Hash compat [[default=no]]])
+
+if test "$enable_elvin_compat" = "yes"; then
+    ELVIN_COMPAT=1
+fi
+if test $ELVIN_COMPAT -eq 1; then
+    AC_DEFINE_UNQUOTED(ELVIN_COMPAT, 1)
+fi
+
+# BEGIN Python detection. For the event library.
+AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
+
+if test x"$PYTHON" = x""; then
+    AC_MSG_ERROR([python not detected])
+fi
+
+PYTHON_VERSION=`${PYTHON} -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2`
+PYTHON_PATH=`dirname ${PYTHON}`
+if test ! -d "$PYTHON_PATH/include"; then
+    PYTHON_PATH=`dirname ${PYTHON_PATH}`
+fi
+PYTHON_INCLUDE="${PYTHON_PATH}/include/python${PYTHON_VERSION}"
+CPPFLAGS="${CPPFLAGS} -I${PYTHON_INCLUDE}"
+AC_CHECK_HEADERS([Python.h],
+		 [],
+		 [AC_MSG_WARN("Cannot find Python.h in ${PYTHON_INCLUDE}")])
+AC_SUBST(PYTHON_INCLUDE)
+# END Python detection.
+
 outfiles="Makeconf GNUmakefile \
-          lib/GNUmakefile \
-          lib/libtb/GNUmakefile \
-          lib/event/GNUmakefile \
 	  event/GNUmakefile \
 	  event/program-agent/GNUmakefile"
+
+#
+# When building as part of a full emulab build, a few things come
+# from the outer (upper?) build. Otherwise, we have to add them
+# to the files list.
+#
+if test $WITH_EMULAB -eq 0; then
+   outfiles="$outfiles lib/GNUmakefile \
+             lib/libtb/GNUmakefile \
+             lib/event/GNUmakefile"
+else
+   AC_CONFIG_COMMANDS([lib], [rm -f lib; ln -s ../lib .])
+fi
 
 #
 # Do this for easy distclean.

@@ -57,26 +57,6 @@ AC_SUBST(PATH)
 
 CPPFLAGS="-I/usr/local/include"
 
-# BEGIN Python detection.
-AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
-
-if test x"$PYTHON" = x""; then
-    AC_MSG_ERROR([python not detected])
-fi
-
-PYTHON_VERSION=`${PYTHON} -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2`
-PYTHON_PATH=`dirname ${PYTHON}`
-if test ! -d "$PYTHON_PATH/include"; then
-    PYTHON_PATH=`dirname ${PYTHON_PATH}`
-fi
-PYTHON_INCLUDE="${PYTHON_PATH}/include/python${PYTHON_VERSION}"
-CPPFLAGS="${CPPFLAGS} -I${PYTHON_INCLUDE}"
-AC_CHECK_HEADERS([Python.h],
-		 [],
-		 [AC_MSG_WARN("Cannot find Python.h in ${PYTHON_INCLUDE}")])
-AC_SUBST(PYTHON_INCLUDE)
-# END Python detection.
-
 AC_CHECK_TOOL(CC,gcc)
 AC_CHECK_TOOL(CXX,g++)
 AC_CHECK_TOOL(AR,ar)
@@ -1082,10 +1062,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	node_usage/analy2 node_usage/refresh \
 	node_usage/from_ptop node_usage/sanity \
 	node_usage/gather node_usage/mk-php-pages \
-	node_usage/get-start-date \
-	clientside/GNUmakefile \
-	clientside/event/GNUmakefile \
-	clientside/event/program-agent/GNUmakefile"
+	node_usage/get-start-date"
+
+outfiles="Makeconf GNUmakefile"
+	
 
 #
 # Do this for easy distclean.
@@ -1093,4 +1073,13 @@ outfiles="$outfiles Makeconf GNUmakefile \
 DISTCLEAN_FILES="$outfiles"
 AC_SUBST(DISTCLEAN_FILES)
 
+#
+# Invoke configure in the clientside directory. 
+#
+DEFSFILE=`realpath $TBDEFS`
+AC_CONFIG_COMMANDS([clientside/Makeconf],
+                   [(cd clientside;
+		     $ac_srcdir/configure --with-TBDEFS=$DEFSFILE --with-emulab=$ac_top_srcdir)],
+		   [DEFSFILE=$DEFSFILE])
 AC_OUTPUT($outfiles)
+

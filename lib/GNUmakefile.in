@@ -22,6 +22,8 @@ install: install-subdirs
 
 control-install: control-install-subdirs
 
+client-install: client-install-subdirs
+
 clean:		clean-subdirs
 
 distclean:	distclean-subdirs

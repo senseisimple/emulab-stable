@@ -26,9 +26,7 @@ SWIGLIBS        =
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 LIBS           += libevent_r.a
 SWIGLIBS       += event.so
-ifneq ($(EMULAB_CLIENTSIDE),1)
 SWIGLIBS       += _tbevent.so
-endif
 endif
 PROGRAMS	= $(LIBS) $(SWIGLIBS)
 
