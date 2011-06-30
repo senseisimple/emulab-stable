@@ -57,7 +57,8 @@ package protogeni.communication
 				sliver.credential = response.value[0];
 				sliver.created = true;
 				
-				sliver.rspec = new XML(response.value[1]);
+				sliver.manifest = new XML(response.value[1]);
+				sliver.rspec = sliver.manifest;
 				sliver.parseRspec();
 				
 				return new RequestSliverStart(sliver);

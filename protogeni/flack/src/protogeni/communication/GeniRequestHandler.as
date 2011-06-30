@@ -202,6 +202,11 @@ package protogeni.communication
 				
 				// Update
 				for each(sliver in updateSlivers.collection) {
+					sliver.created = false;
+					sliver.staged = false;
+				}
+				for each(sliver in updateSlivers.collection) {
+					
 					pushRequest(new RequestSliverUpdate(sliver));
 				}
 				

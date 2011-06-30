@@ -45,9 +45,10 @@ package protogeni.communication
 			{
 				return new RequestSliverStatus(sliver);
 			}
+			// Already started
 			else if(code == CommunicationUtil.GENIRESPONSE_REFUSED)
 			{
-				// Already started ...
+				return new RequestSliverStatus(sliver);
 			}
 			else
 			{
