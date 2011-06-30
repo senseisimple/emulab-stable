@@ -53,7 +53,8 @@ struct emulab_ha_extra_info {
 	char *eid;	/* experiment */
 	char *sname;	/* swapper user name */
 	int suid;	/* swapper's unix uid */
-	int egid;	/* experiment's unix gid */
+	gid_t sgids[MAXGIDS];	/* swapper's unix gids */
+	int ngids;	/* number of gids */
 };
 
 static char *MC_BASEADDR = FRISEBEEMCASTADDR;
@@ -547,7 +548,7 @@ allow_stddirs(char *imageid,
 	 * that are accessible.
 	 */
 	if (imageid == NULL) {
-		int ni, i;
+		int ni, i, j;
 		size_t ns;
 		char *dirs[8];
 
@@ -579,7 +580,9 @@ allow_stddirs(char *imageid,
 				} else
 					ci->sig = NULL;
 				ci->uid = ei->suid;
-				ci->gid = ei->egid;
+				for (j = 0; j < ei->ngids; j++)
+					ci->gids[j] = ei->sgids[j];
+				ci->ngids = ei->ngids;
 				set_put_values(put, i);
 				ci->extra = NULL;
 			}
@@ -614,7 +617,9 @@ allow_stddirs(char *imageid,
 				} else
 					ci->sig = NULL;
 				ci->uid = ei->suid;
-				ci->gid = ei->egid;
+				for (j = 0; j < ei->ngids; j++)
+					ci->gids[j] = ei->sgids[j];
+				ci->ngids = ei->ngids;
 				set_get_values(get, i);
 				ci->extra = NULL;
 			}
@@ -651,6 +656,7 @@ allow_stddirs(char *imageid,
 	     (fdir = isindir(gdir, fpath)) ||
 	     (fdir = isindir(udir, fpath)) ||
 	     (fdir = isindir(scdir, fpath)))) {
+		int j;
 		assert(put->imageinfo == NULL);
 
 		put->imageinfo = mymalloc(sizeof(struct config_imageinfo));
@@ -668,7 +674,9 @@ allow_stddirs(char *imageid,
 		} else
 			ci->sig = NULL;
 		ci->uid = ei->suid;
-		ci->gid = ei->egid;
+		for (j = 0; j < ei->ngids; j++)
+			ci->gids[j] = ei->sgids[j];
+		ci->ngids = ei->ngids;
 		set_put_values(put, 0);
 		ci->extra = NULL;
 	}
@@ -678,6 +686,7 @@ allow_stddirs(char *imageid,
 	     (fdir = isindir(gdir, fpath)) ||
 	     (fdir = isindir(scdir, fpath)) ||
 	     (fdir = isindir(udir, fpath)))) {
+		int j;
 		assert(get->imageinfo == NULL);
 
 		get->imageinfo = mymalloc(sizeof(struct config_imageinfo));
@@ -695,7 +704,9 @@ allow_stddirs(char *imageid,
 		} else
 			ci->sig = NULL;
 		ci->uid = ei->suid;
-		ci->gid = ei->egid;
+		for (j = 0; j < ei->ngids; j++)
+			ci->gids[j] = ei->sgids[j];
+		ci->ngids = ei->ngids;
 		set_get_values(get, 0);
 		ci->extra = NULL;
 	}
@@ -789,9 +800,10 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	char		*node, *proxy, *role = NULL;
-	int		i, nrows;
+	int		i, j, nrows;
 	char		*wantpid = NULL, *wantname = NULL;
 	struct config_host_authinfo *get = NULL, *put = NULL;
+	struct emulab_ha_extra_info *ei = NULL;
 
 	if (getp == NULL && putp == NULL)
 		return 0;
@@ -935,15 +947,14 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 
 	/*
 	 * Find the pid/gid to which the node is currently assigned
-	 * and also the unix uid of the swapper and unix gid for the
-	 * experiment in case we need to run a server process.
+	 * and also the unix uid of the swapper of the experiment and
+	 * their gids in case we need to run a server process.
 	 */
-	res = mydb_query("SELECT e.pid,e.gid,r.eid,u.uid,u.unix_uid,g.unix_gid"
-			 " FROM reserved AS r,experiments AS e,"
-			 "  users AS u,groups as g"
+	res = mydb_query("SELECT e.pid,e.gid,r.eid,u.uid,u.unix_uid"
+			 " FROM reserved AS r,experiments AS e,users AS u"
 			 " WHERE r.pid=e.pid AND r.eid=e.eid"
-			 "  AND e.swapper_idx=u.uid_idx AND e.gid=g.gid"
-			 "  AND r.node_id='%s'", 6, node);
+			 "  AND e.swapper_idx=u.uid_idx"
+			 "  AND r.node_id='%s'", 5, node);
 	assert(res != NULL);
 
 	/* Node is free */
@@ -956,7 +967,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	}
 
 	row = mysql_fetch_row(res);
-	if (!row[0] || !row[1] || !row[2] || !row[3] || !row[4] || !row[5]) {
+	if (!row[0] || !row[1] || !row[2] || !row[3] || !row[4]) {
 		error("config_host_authinfo: null pid/gid/eid/uname/uid!?");
 		mysql_free_result(res);
 		emulab_free_host_authinfo(get);
@@ -966,24 +977,54 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	}
 
 	if (get != NULL) {
-		struct emulab_ha_extra_info *ei = mymalloc(sizeof *ei);
+		ei = mymalloc(sizeof *ei);
 		ei->pid = mystrdup(row[0]);
 		ei->gid = mystrdup(row[1]);
 		ei->eid = mystrdup(row[2]);
 		ei->sname = mystrdup(row[3]);
 		ei->suid = atoi(row[4]);
-		ei->egid = atoi(row[5]);
+		ei->ngids = 0;
 		get->extra = ei;
 	}
 	if (put != NULL) {
-		struct emulab_ha_extra_info *ei = mymalloc(sizeof *ei);
+		ei = mymalloc(sizeof *ei);
 		ei->pid = mystrdup(row[0]);
 		ei->gid = mystrdup(row[1]);
 		ei->eid = mystrdup(row[2]);
 		ei->sname = mystrdup(row[3]);
 		ei->suid = atoi(row[4]);
-		ei->egid = atoi(row[5]);
+		ei->ngids = 0;
 		put->extra = ei;
+	}
+	mysql_free_result(res);
+
+	/*
+	 * Get all unix groups the swapper is a member of.
+	 * XXX this does not include the extra non-Emulab managed groups
+	 *     from unixgroup_membership.
+	 */
+	res = mydb_query("SELECT g.unix_gid"
+			 " FROM groups AS g,group_membership AS gm"
+			 " WHERE g.gid_idx=gm.gid_idx AND gm.uid='%s'",
+			 1, ei->sname);
+	assert(res != NULL);
+
+	nrows = mysql_num_rows(res);
+	if (nrows > MAXGIDS)
+		warning("User '%s' in more than %d groups, truncating list",
+			ei->sname, MAXGIDS);
+	for (i = 0; i < nrows; i++) {
+		row = mysql_fetch_row(res);
+		if (get != NULL) {
+			ei = (struct emulab_ha_extra_info *)get->extra;
+			ei->sgids[i] = atoi(row[0]);
+			ei->ngids++;
+		}
+		if (put != NULL) {
+			ei = (struct emulab_ha_extra_info *)put->extra;
+			ei->sgids[i] = atoi(row[0]);
+			ei->ngids++;
+		}
 	}
 	mysql_free_result(res);
 
@@ -1091,7 +1132,14 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			} else
 				ci->sig = NULL;
 			ci->uid = ei->suid;
-			ci->gid = ei->egid;
+			/*
+			 * XXX note that we don't really need all of the
+			 * swapper's GIDs here, we could just include the
+			 * project and any group GID for the image.
+			 */
+			for (j = 0; j < ei->ngids; j++)
+				ci->gids[j] = ei->sgids[j];
+			ci->ngids = ei->ngids;
 			set_put_values(put, put->numimages);
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);
@@ -1161,7 +1209,14 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			} else
 				ci->sig = NULL;
 			ci->uid = ei->suid;
-			ci->gid = ei->egid;
+			/*
+			 * XXX note that we don't really need all of the
+			 * swapper's GIDs here, we could just include the
+			 * project and any group GID for the image.
+			 */
+			for (j = 0; j < ei->ngids; j++)
+				ci->gids[j] = ei->sgids[j];
+			ci->ngids = ei->ngids;
 			set_get_values(get, get->numimages);
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);

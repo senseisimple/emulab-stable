@@ -352,7 +352,8 @@ allow_stddirs(char *imageid,
 					ci->flags |= CONFIG_SIG_ISMTIME;
 				} else
 					ci->sig = NULL;
-				ci->uid = ci->gid = -1;
+				ci->uid = NOUID;
+				ci->ngids = 0;
 				set_put_values(put, i);
 				ci->extra = NULL;
 			}
@@ -382,7 +383,8 @@ allow_stddirs(char *imageid,
 					ci->flags |= CONFIG_SIG_ISMTIME;
 				} else
 					ci->sig = NULL;
-				ci->uid = ci->gid = -1;
+				ci->uid = NOUID;
+				ci->ngids = 0;
 				set_get_values(get, i);
 				ci->extra = NULL;
 			}
@@ -575,7 +577,8 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			ci->flags |= CONFIG_SIG_ISMTIME;
 		} else
 			ci->sig = NULL;
-		ci->uid = ci->gid = -1;
+		ci->uid = NOUID;
+		ci->ngids = 0;
 		set_put_values(put, 0);
 		ci->extra = NULL;
 	}
@@ -595,7 +598,8 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			ci->flags |= CONFIG_SIG_ISMTIME;
 		} else
 			ci->sig = NULL;
-		ci->uid = ci->gid = -1;
+		ci->uid = NOUID;
+		ci->ngids = 0;
 		set_get_values(get, 0);
 		ci->extra = NULL;
 	}

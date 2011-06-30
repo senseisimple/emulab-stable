@@ -2,6 +2,14 @@
 #include <arpa/inet.h>
 
 /*
+ * Maximum groups for a server process.
+ * We don't use NGROUPS_MAX because it is huge on Linux (64K).
+ */
+#define MAXGIDS	(16+1)
+
+#define NOUID (-1)
+
+/*
  * Config info for a single image
  * XXX needs to be extended for REs.
  */
@@ -12,7 +20,8 @@ struct config_imageinfo {
 	void *sig;		/* signature of image */
 	int flags;		/* */
 	int uid;		/* UID to run server process as */
-	int gid;		/* GID to run server process as */
+	gid_t gids[MAXGIDS];	/* GIDs to run server process as */
+	int ngids;		/* number of valid GIDs */
 	char *get_options;	/* command line options for GET server */
 	int get_methods;	/* allowed GET transfer mechanisms */
 	int get_timeout;	/* max time to allow GET server to run */

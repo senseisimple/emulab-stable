@@ -9,8 +9,6 @@
  * handler processes.
  * 
  * TODO:
- * - FIX SOON: child servers are started with the single primary gid of the
- *   user; we need to ferret out the whole group list and set that
  * - timeouts for child frisbee processes
  * - record the state of running frisbeeds in persistant store so that
  *   they can be restarted if we die and restart
@@ -45,14 +43,15 @@ static void	get_options(int argc, char **argv);
 static int	makesocket(int portnum, struct in_addr *ifip, int *tcpsockp);
 static void	handle_request(int sock);
 static int	reapchildren(int apid, int *status);
+static char *	gidstr(int ngids, gid_t gids[]);
 
 static int	daemonize = 1;
 int		debug = 0;
 static int	dumpconfig = 0;
 static int	onlymethods = (MS_METHOD_UNICAST|MS_METHOD_MULTICAST);
 static int	parentmethods = (MS_METHOD_UNICAST|MS_METHOD_MULTICAST);
-static int	myuid = -1;
-static int	mygid = -1;
+static int	myuid = NOUID;
+static int	mygid = NOUID;
 
 /*
  * For recursively GETing images:
@@ -212,7 +211,8 @@ struct childinfo {
 	int pid;
 	char *pidfile;
 	int uid;		/* UID to run child as */
-	int gid;		/* GID to run child as */
+	gid_t gids[MAXGIDS];	/* GID to run child as */
+	int ngids;		/* number of GIDs */
 	int retries;		/* # times to try starting up child */
 	int timeout;		/* max runtime (sec) for child */
 	in_addr_t servaddr;	/* -S arg */
@@ -283,6 +283,7 @@ static struct config_imageinfo *
 copy_imageinfo(struct config_imageinfo *ii)
 {
 	struct config_imageinfo *nii;
+	int i;
 
 	if ((nii = calloc(1, sizeof *nii)) == NULL)
 		goto fail;
@@ -296,7 +297,9 @@ copy_imageinfo(struct config_imageinfo *ii)
 		goto fail;
 	nii->flags = ii->flags;
 	nii->uid = ii->uid;
-	nii->gid = ii->gid;
+	for (i = 0; i < ii->ngids; i++)
+		nii->gids[i] = ii->gids[i];
+	nii->ngids = ii->ngids;
 	if (ii->get_options &&
 	    (nii->get_options = strdup(ii->get_options)) == NULL)
 		goto fail;
@@ -906,10 +909,13 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 
 		in.s_addr = htonl(ci->addr);
-		log("%s: started %s server on %s:%d (pid %d, ugid %d/%d, timo %ds)",
+		log("%s: started %s server on %s:%d (pid %d, timo %ds)",
 		    imageid, GetMSMethods(ci->method),
-		    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid,
-		    ci->timeout);
+		    inet_ntoa(in), ci->port, ci->pid, ci->timeout);
+		if (debug) {
+			log("  uid: %d, gids: %s",
+			    ci->uid, gidstr(ci->ngids, ci->gids));
+		}
 
 		/*
 		 * Watch for an immediate death so we don't tell our client
@@ -938,13 +944,16 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 		in.s_addr = htonl(ci->addr);
 		if (wantstatus)
-			log("%s: STATUS is running %s on %s:%d (pid %d, ugid %d/%d)",
+			log("%s: STATUS is running %s on %s:%d (pid %d)",
 			    imageid, GetMSMethods(ci->method),
-			    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid);
+			    inet_ntoa(in), ci->port, ci->pid);
 		else
-			log("%s: %s server already running on %s:%d (pid %d, ugid %d/%d)",
+			log("%s: %s server already running on %s:%d (pid %d)",
 			    imageid, GetMSMethods(ci->method),
-			    inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid);
+			    inet_ntoa(in), ci->port, ci->pid);
+		if (debug)
+			log("  uid: %d, gids: %s",
+			    ci->uid, gidstr(ci->ngids, ci->gids));
 	}
 
 	msg->body.getreply.hisize = htonl(isize >> 32);
@@ -1188,9 +1197,11 @@ handle_put(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	}
 
 	in.s_addr = htonl(ci->addr);
-	log("%s: started uploader on %s:%d (pid %d, ugid %d/%d, timo %ds)",
-	    imageid, inet_ntoa(in), ci->port, ci->pid, ci->uid, ci->gid,
-	    ci->timeout);
+	log("%s: started uploader on %s:%d (pid %d, timo %ds)",
+	    imageid, inet_ntoa(in), ci->port, ci->pid, ci->timeout);
+	if (debug)
+		log("  uid: %d, gids: %s",
+		    ci->uid, gidstr(ci->ngids, ci->gids));
 
 	/*
 	 * Watch for an immediate death so we don't tell our client
@@ -1513,10 +1524,16 @@ startchild(struct childinfo *ci)
 		char *pname, *opts;
 
 		if (myuid == 0) {
-			if ((ci->gid != mygid && setgid(ci->gid) != 0) ||
+			assert(ci->ngids >= 1);
+			if (setgroups(ci->ngids, ci->gids) != 0) {
+				perror("child: setgroups");
+				exit(-2);
+
+			}
+			if ((ci->gids[0] != mygid && setgid(ci->gids[0]) != 0) ||
 			    (ci->uid != myuid && setuid(ci->uid) != 0)) {
 				error("child: could not setuid/gid to %d/%d",
-				      ci->uid, ci->gid);
+				      ci->uid, ci->gids[0]);
 				exit(-2);
 			}
 		}
@@ -1683,14 +1700,19 @@ startserver(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	 * Otherwise just run it as our uid/gid.
 	 */
 	if (myuid == 0) {
-		if (ii->uid >= 0 && myuid != ii->uid)
+		if (ii->uid != NOUID && myuid != ii->uid)
 			ci->uid = ii->uid;
 		else
 			ci->uid = myuid;
-		if (ii->gid >= 0 && mygid != ii->gid)
-			ci->gid = ii->gid;
-		else
-			ci->gid = mygid;
+		if (ii->ngids > 0) {
+			int i;
+			for (i = 0; i < ii->ngids; i++)
+				ci->gids[i] = ii->gids[i];
+			ci->ngids = ii->ngids;
+		} else {
+			ci->gids[0] = mygid;
+			ci->ngids = 1;
+		}
 	}
 
 	ci->timeout = ii->get_timeout;
@@ -1786,7 +1808,8 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 
 	/* For now, we just run the client as us */
 	ci->uid = myuid;
-	ci->gid = mygid;
+	ci->gids[0] = mygid;
+	ci->ngids = 1;
 
 	ce = ci->extra = calloc(1, sizeof(struct clientextra));
 	if (ce == NULL)
@@ -1935,14 +1958,19 @@ startuploader(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	 * Otherwise just run it as our uid/gid.
 	 */
 	if (myuid == 0) {
-		if (ii->uid >= 0 && myuid != ii->uid)
+		if (ii->uid != NOUID && myuid != ii->uid)
 			ci->uid = ii->uid;
 		else
 			ci->uid = myuid;
-		if (ii->gid >= 0 && mygid != ii->gid)
-			ci->gid = ii->gid;
-		else
-			ci->gid = mygid;
+		if (ii->ngids > 0) {
+			int i;
+			for (i = 0; i < ii->ngids; i++)
+				ci->gids[i] = ii->gids[i];
+			ci->ngids = ii->ngids;
+		} else {
+			ci->gids[0] = mygid;
+			ci->ngids = 1;
+		}
 	}
 
 	ci->timeout = timo;
@@ -2087,4 +2115,23 @@ reapchildren(int wpid, int *statusp)
 	}
 
 	return corpses;
+}
+
+/*
+ * XXX debug
+ */
+static char *
+gidstr(int ngids, gid_t gids[])
+{
+	static char str[MAXGIDS*6+1];
+	char *cp = str;
+	int i;
+
+	assert(ngids > 0);
+	for (i = 0; i < ngids; i++) {
+		sprintf(cp, "%d%c", gids[i], (i == ngids-1) ? '\0' : '/');
+		cp = &str[strlen(str)];
+	}
+
+	return str;
 }
