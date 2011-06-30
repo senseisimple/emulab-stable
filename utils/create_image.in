@@ -738,6 +738,15 @@ sub check_progress($$)
     # been exceeded.
     #
     my $cursize = (stat($fname))[7];
+    if ($usefup && !defined($cursize)) {
+	#
+	# XXX avoid an ugly race.
+	# When done, frisuploadd moves foo.tmp -> foo
+	# If we didn't find foo.tmp, try foo now.
+	#
+	$fname =~ s/\.tmp$//;
+	$cursize = (stat($fname))[7];
+    }
     if ($cursize > $maximagesize) {
 	$result = "toobig";
 	return 0;
