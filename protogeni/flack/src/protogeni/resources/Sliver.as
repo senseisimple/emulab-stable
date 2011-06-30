@@ -122,7 +122,8 @@ package protogeni.resources
 		{
 			for each(var node:VirtualNode in this.nodes.collection)
 			{
-				if(node.physicalNode.virtualNodes.contains(node))
+				if(node.physicalNode != null
+					&& node.physicalNode.virtualNodes.contains(node))
 					node.physicalNode.virtualNodes.remove(node);
 			}
 		}

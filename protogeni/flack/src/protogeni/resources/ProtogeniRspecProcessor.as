@@ -464,6 +464,7 @@ package protogeni.resources
 			if(s.rspec.@expires.length() == 1)
 				s.expires = Util.parseProtogeniDate(String(s.rspec.@expires));
 			
+			s.removeOutsideReferences();
 			s.nodes = new VirtualNodeCollection();
 			s.links = new VirtualLinkCollection();
 			

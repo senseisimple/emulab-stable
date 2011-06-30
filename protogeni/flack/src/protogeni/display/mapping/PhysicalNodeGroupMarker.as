@@ -64,7 +64,7 @@ package protogeni.display.mapping
 			labelMc.mouseEnabled=false;
 			labelMc.width=28;
 			labelMc.height=28;
-			labelMc.text = newMarker.showGroups.GetAll().length.toString();
+			labelMc.htmlText = "<b>"+newMarker.showGroups.GetAll().length.toString()+"</b>";
 			labelMc.autoSize=TextFieldAutoSize.CENTER;
 			labelMc.y = 4;
 			sprite.addChild(labelMc);

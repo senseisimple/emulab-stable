@@ -96,7 +96,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		]]>
 	</fx:Script>
 	
-	<s:Label text="{group.original.city}" toolTip="{group.original.city}" id="txtLabel" maxWidth="{this.width}" maxDisplayedLines="1" />
+	<s:Label text="{group.original.city}"
+			 toolTip="{group.original.city}"
+			 id="txtLabel"
+			 maxWidth="{this.width - 24}"
+			 maxDisplayedLines="1" />
 	<components:DefaultLine width="140" />
 	<s:Label text="Nodes" fontWeight="bold"/>
 	<s:HGroup width="140" horizontalAlign="center">
