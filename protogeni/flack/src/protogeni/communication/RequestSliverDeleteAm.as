@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.GeniEvent;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	
@@ -67,7 +68,7 @@ package protogeni.communication
 		
 		override public function cleanup():void {
 			super.cleanup();
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATING);
 		}
 	}
 }

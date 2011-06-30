@@ -170,14 +170,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				sliceName.setEnter(createSlice);
 			}
 			
+			private var selectedSlice:Slice = null;
 			public function sliceSelected(e:Event):void {
-				/*
-				Main.geniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
-				onlyMyResourcesCheckbox.selected = Main.geniHandler.mapHandler.selectedSlice.hrn != null &&
-					Main.geniHandler.mapHandler.selectedSlice.hrn.length > 0;
-				Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
-				Main.geniHandler.mapHandler.drawMap();
-				*/
+				var t:* = e;
+				/*selectedSlice = e.currentTarget.selectedItem;
+				Main.geniHandler.mapHandler.drawUserResources(selectedSlice);*/
 			}
 		]]>
 	</fx:Script>
@@ -199,7 +196,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		</s:HGroup>
 		<s:CheckBox id="mineOnlyCheckbox"
 					label="Show only mine"
-					click="Main.geniHandler.mapHandler.userResourcesOnly = mineOnlyCheckbox.selected; Main.geniHandler.mapHandler.drawMap()" />
+					click="if(mineOnlyCheckbox.selected) Main.geniHandler.mapHandler.drawUserResources(selectedSlice); else Main.geniHandler.mapHandler.drawAll();" />
 		<s:RadioButton label="All"
 					   group="{sliceRadiogroup}"
 					   selected="true"

@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.GeniEvent;
 	import protogeni.resources.Key;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
@@ -47,9 +48,9 @@ package protogeni.communication
 			op.pushField(sliver.slice.urn.full);
 			op.pushField([sliver.slice.credential]);
 			if(rspec != null)
-				op.addField("rspec", rspec.toXMLString());
+				op.pushField(rspec.toXMLString());
 			else
-				op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
+				op.pushField(sliver.getRequestRspec(true).toXMLString());
 			var userKeys:Array = [];
 			for each(var key:Key in sliver.slice.creator.keys) {
 				userKeys.push(key.value);
@@ -97,7 +98,7 @@ package protogeni.communication
 		
 		override public function cleanup():void {
 			super.cleanup();
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATING);
 		}
 	}
 }

@@ -445,10 +445,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			// Side pane stuff
-			private const VIEW_MANAGERS:int = 0;
-			private const VIEW_MANAGER:int = 1;
-			private const VIEW_COLLECTION:int = 2;
-			private function setSidePane(type:int = VIEW_MANAGERS, data:* = null):void {
+			public static const VIEW_MANAGERS:int = 0;
+			public static const VIEW_MANAGER:int = 1;
+			public static const VIEW_COLLECTION:int = 2;
+			public function setSidePane(type:int = VIEW_MANAGERS, data:* = null):void {
 				this.sidePane.removeAllElements();
 				switch(type) {
 					case VIEW_MANAGERS:
@@ -510,25 +510,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				var managerButton:Button = DisplayUtil.getGeniManagerButton(manager);
 				managerButton.percentWidth = 100;
 				managerHgroup.addElement(managerButton);
-				
-				var addDelayButton:DataButton = new DataButton("",
-					"Add a delay node",
-					ImageUtil.timeIcon,
-					null,
-					"virtualnode");
-				if(manager.supportsDelayNodes) {
-					var delay:VirtualNode = new VirtualNode(null);
-					delay.clientId = "Delay";
-					delay.isDelayNode = true;
-					delay.manager = manager;
-					addDelayButton.data = delay;
-					addDelayButton.addEventListener(MouseEvent.CLICK,
-						function addDelayClicked(e:MouseEvent):void {
-							sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
-						});
-				} else
-					addDelayButton.visible = false; // include in the layout
-				managerHgroup.addElement(addDelayButton);
 
 				var addExclusiveButton:DataButton = new DataButton("",
 					"Add an exclusive node",
@@ -565,6 +546,26 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				} else
 					addSharedButton.visible = false; // include in the layout
 				managerHgroup.addElement(addSharedButton);
+				
+				var addDelayButton:DataButton = new DataButton("",
+					"Add a delay node",
+					ImageUtil.timeIcon,
+					null,
+					"virtualnode");
+				if(manager.supportsDelayNodes) {
+					addDelayButton.alpha = 0.8;
+					var delay:VirtualNode = new VirtualNode(null);
+					delay.clientId = "Delay";
+					delay.isDelayNode = true;
+					delay.manager = manager;
+					addDelayButton.data = delay;
+					addDelayButton.addEventListener(MouseEvent.CLICK,
+						function addDelayClicked(e:MouseEvent):void {
+							sliceCanvas.addBasicCloneOfVirtualNode(e.currentTarget.data);
+						});
+				} else
+					addDelayButton.visible = false; // include in the layout
+				managerHgroup.addElement(addDelayButton);
 				
 				this.sidePane.addElement(managerHgroup);
 			}

@@ -18,6 +18,7 @@ package protogeni.communication
 	
 	import mx.utils.Base64Decoder;
 	
+	import protogeni.GeniEvent;
 	import protogeni.StringUtil;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.ProtogeniRspecProcessor;
@@ -88,7 +89,7 @@ package protogeni.communication
 		
 		override public function cleanup():void {
 			super.cleanup();
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATING);
 		}
 	}
 }

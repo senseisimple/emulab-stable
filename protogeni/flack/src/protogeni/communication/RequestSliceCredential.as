@@ -63,15 +63,15 @@ package protogeni.communication
 					else
 						newCalls.push(new RequestSliverGet(s));
 				}
-				
-				//var first:Boolean = true;
+
+				/*
 				for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
 					if(manager.isAm) {
 						var newSliver:Sliver = new Sliver(slice, manager);
-						Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver/*, !first*/));
-						//first = false;
+						Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
 					}
 				}
+				*/
 			}
 			else
 			{

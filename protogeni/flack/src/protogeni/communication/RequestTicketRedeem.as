@@ -18,7 +18,9 @@ package protogeni.communication
         
         import flash.events.ErrorEvent;
         
+        import protogeni.GeniEvent;
         import protogeni.resources.Key;
+        import protogeni.resources.Slice;
         import protogeni.resources.Sliver;
         
         public final class RequestTicketRedeem extends Request
@@ -61,6 +63,15 @@ package protogeni.communication
                                 sliver.rspec = sliver.manifest;
                                 sliver.parseRspec();
                                 
+                                var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);
+                                if(old != null)
+                                {
+                                        var oldSliver:Sliver = old.slivers.getByGm(sliver.manager);
+                                        if(oldSliver != null)
+                                                old.slivers.remove(oldSliver);
+                                        old.slivers.add(sliver);
+                                }
+                                
                                 return new RequestSliverStart(sliver);
                         }
                         else
@@ -78,7 +89,7 @@ package protogeni.communication
                 
                 override public function cleanup():void {
                         super.cleanup();
-                        Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+                        Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATING);
                 }
         }
 }

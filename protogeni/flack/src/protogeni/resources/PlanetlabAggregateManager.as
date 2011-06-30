@@ -37,6 +37,8 @@ package protogeni.resources
 			//this.Urn = new IdnUrn("urn:publicid:IDN+planet-lab.org+authority+am");
 			this.sites = new Vector.<Site>();
 			this.type = GeniManager.TYPE_PLANETLAB;
+			this.supportsExclusiveNodes = false;
+			this.supportsSharedNodes = false;
 			
 			this.rspecProcessor = new PlanetlabRspecProcessor(this);
 		}

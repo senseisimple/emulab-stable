@@ -50,6 +50,7 @@ package protogeni.display.mapping
 		{
 			map = newMap;
 			Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, managerChanged);
+			Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
 		}
 		
 		public function destruct():void {
@@ -128,8 +129,31 @@ package protogeni.display.mapping
 			this.drawMap();
 		}
 		
+		public function sliceChanged(event:GeniEvent):void {
+			if(event.action != GeniEvent.ACTION_POPULATING)
+				return;
+			
+			if(this.userResourcesOnly
+				&& (this.selectedSlice == null || this.selectedSlice == event.changedObject)) {
+				if(Main.debugMode)
+					trace("MAP...Slice populating...: " + (event.changedObject as Slice).name);
+				this.drawMap();
+			}
+		}
+		
+		public function drawUserResources(slice:Slice = null):void {
+			this.selectedSlice = slice;
+			this.userResourcesOnly = true;
+			this.drawMap();
+		}
+		
+		public function drawAll():void {
+			this.userResourcesOnly = false;
+			this.drawMap();
+		}
+		
 		public function drawMap(junk:* = null):void {
-			drawMapNow();
+			this.drawMapNow();
 		}
 		
 		private static var LINK_ADD : int = 0;

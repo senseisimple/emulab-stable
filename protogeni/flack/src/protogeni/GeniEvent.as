@@ -29,6 +29,7 @@ package protogeni
 		public static const ACTION_CREATED:int = 2;
 		public static const ACTION_POPULATED:int = 3;
 		public static const ACTION_REMOVED:int = 4;
+		public static const ACTION_POPULATING:int = 5;
 		
 		public static const GENIMANAGER_CHANGED:String = "genimanager_changed";
 		public static const GENIMANAGERS_CHANGED:String = "genimanagers_changed";
