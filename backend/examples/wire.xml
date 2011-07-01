@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<newnode>
+  <attribute name="table">
+    <value>wire</value>
+  </attribute>
+  <attribute name="command">
+    <value>add</value>
+  </attribute>
+  <attribute name="id">
+    <value>4</value>
+  </attribute>
+  <attribute name="cable">
+    <value>6</value>
+  </attribute>
+  <attribute name="len">
+    <value>5</value>
+  </attribute>
+  <attribute name="type">
+    <value>Node</value>
+  </attribute>
+  <attribute name="node_id1">
+    <value>t_node_id1</value>
+  </attribute>
+  <attribute name="card1">
+    <value>1</value>
+  </attribute>
+  <attribute name="port1">
+    <value>3</value>
+  </attribute>
+  <attribute name="node_id2">
+    <value>t_node_id2</value>
+  </attribute>
+  <attribute name="card2">
+    <value>2</value>
+  </attribute>
+  <attribute name="port2">
+    <value>4</value>
+  </attribute>
+</newnode>

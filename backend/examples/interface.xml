@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<newnode>
+  <attribute name="table">
+    <value>interface</value>
+  </attribute>
+  <attribute name="command">
+    <value>list</value>
+  </attribute>
+  <attribute name="id">
+    <value>1</value>
+  </attribute>
+  <attribute name="node_id">
+    <value>5</value>
+  </attribute>
+  <attribute name="card">
+    <value>0</value>
+  </attribute>
+  <attribute name="port">
+    <value>1</value>
+  </attribute>
+  <attribute name="mac">
+    <value>000000000000</value>
+  </attribute>
+  <attribute name="type">
+    <value>t_type</value>
+  </attribute>
+</newnode>

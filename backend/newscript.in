@@ -1,0 +1,553 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Create a new node from a XML description. 
+#
+sub usage()
+{
+    print("Usage: newnode [-d] [-v] [-f] <xmlfile>\n\n");
+    print("  -d  print debug information\n");
+    print("  -v  verify permissions: do not execute commands\n");
+    print("  -n  print out commands: do not execute commands\n");
+    exit(-1);
+}
+my $optlist = "dvn";
+my $debug   = 0;
+my $verify  = 0;
+my $fake    = 0;
+
+#
+# Configure variables
+#
+#my $TB		= "@prefix@";
+my $TB = "/usr/testbed/";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+#use lib "@prefix@/lib";
+use lib "/usr/testbed/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+use OSinfo;
+
+# Protos
+sub fatal($);
+sub UserError(;$);
+sub PrintResult($);
+sub ModifyRow($);
+sub RemoveRow($);
+sub ResolveRow($);
+sub CommitNode($);
+sub CommitInterface($);
+sub CommitWire;
+sub CommitInterfaceType($);
+
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (defined($options{"n"})) {
+    $fake = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $xmlfile  = shift(@ARGV);
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and the
+# current user context is "implied" (see tbauth.php3).
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    fatal("You must have admin privledges to create new nodes")
+	if (!$this_user->IsAdmin());
+}
+else {
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+
+    # The web interface (and in the future the xmlrpc interface) sets this.
+    $this_user = User->ImpliedUser();
+
+    if (! defined($this_user)) {
+	fatal("Cannot determine implied user!");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+#
+# XXX We should encode all of this in the DB so that we can generate the
+# forms on the fly, as well as this checking code.
+#
+
+my %nodefields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("command"		=> ["command",		$SLOT_REQUIRED],
+     "table"		=> ["table",		$SLOT_REQUIRED],
+     "id"		=> ["new_node_id",	$SLOT_OPTIONAL,    undef],
+     "node_id"		=> ["node_id",		$SLOT_OPTIONAL,    undef],
+     "type"		=> ["type",		$SLOT_OPTIONAL,    undef],
+     "IP"		=> ["IP",		$SLOT_OPTIONAL,    undef],
+     "identifier"      	=> ["identifier",      	$SLOT_OPTIONAL,	   undef]);
+
+my %ifacefields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("command"          => ["command",          $SLOT_REQUIRED],
+     "table"		=> ["table",		$SLOT_REQUIRED],
+     "id"		=> ["new_interface_id",	$SLOT_OPTIONAL,    undef],
+     "node_id"          => ["new_node_id",      $SLOT_OPTIONAL,    undef],
+     "card"             => ["card",             $SLOT_OPTIONAL,    undef],
+     "port"             => ["port",             $SLOT_OPTIONAL,    undef],
+     "mac"              => ["mac",              $SLOT_OPTIONAL,    undef],
+     "type"             => ["interface_type",   $SLOT_OPTIONAL,    undef],
+     "role"		=> ["role",		$SLOT_OPTIONAL,    undef]);
+
+my %wirefields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("command"          => ["command",          $SLOT_REQUIRED],
+     "table"		=> ["table",		$SLOT_REQUIRED],
+     "id"		=> ["new_wire_id",	$SLOT_OPTIONAL,    undef],
+     "node_id1"        	=> ["node_id1",         $SLOT_OPTIONAL,    undef],
+     "card1"      	=> ["card1",      	$SLOT_OPTIONAL,    undef],
+     "port1"      	=> ["port1",      	$SLOT_OPTIONAL,    undef],
+     "node_id2"        	=> ["node_id2",        	$SLOT_OPTIONAL,    undef],
+     "card2"      	=> ["card2",      	$SLOT_OPTIONAL,    undef],
+     "port2"      	=> ["port2",      	$SLOT_OPTIONAL,    undef],
+     "cable"            => ["cable",            $SLOT_OPTIONAL,    undef],
+     "len"              => ["len",              $SLOT_OPTIONAL,    undef],
+     "type"             => ["type",             $SLOT_OPTIONAL,    undef]);
+
+my %interfacetypefields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("command"          => ["command",          $SLOT_REQUIRED],
+     "table"		=> ["table",		$SLOT_REQUIRED],
+     "id"		=> ["new_interface_type_id",	$SLOT_OPTIONAL,    ""],
+     "type"		=> ["type",		$SLOT_OPTIONAL,    ""],
+     "max_speed"       	=> ["max_speed",	$SLOT_OPTIONAL,    ""],
+     "full_duplex"	=> ["full_duplex",	$SLOT_OPTIONAL,    ""],
+     "manufacturer"	=> ["manufacturer",	$SLOT_OPTIONAL,    ""],
+     "model"		=> ["model",		$SLOT_OPTIONAL,    ""],
+     "ports"		=> ["ports",		$SLOT_OPTIONAL,    ""],
+     "connector"	=> ["connector",	$SLOT_OPTIONAL,    ""],
+    );
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+#
+# Process and dump the errors (formatted for the web interface).
+# We should probably XML format the errors instead but not sure I want
+# to go there yet.
+#
+my %errors = ();
+my %xmlfields;
+my $table;
+my $tableid;
+my $tabledb;
+
+if (exists($xmlparse->{'attribute'}->{"table"}->{"value"})) {
+    $table = $xmlparse->{'attribute'}->{"table"}->{"value"};
+} else {
+    $errors{"table"} = "Required value not provide";
+}
+UserError()
+    if (keys(%errors));
+
+my $commit;
+
+if ($table eq "node") {
+    %xmlfields = %nodefields;
+    $commit = \&CommitNode;
+    $tableid = "new_node_id";
+    $tabledb = "new_nodes";
+} elsif ($table eq "interface") {
+    %xmlfields = %ifacefields;
+    $commit = \&CommitInterface;
+    $tableid = "new_interface_id";
+    $tabledb = "new_interfaces";
+} elsif ($table eq "wire") {
+    %xmlfields = %wirefields;
+    $commit = \&CommitWire;
+    $tableid = "new_wire_id";
+    $tabledb = "new_wires";
+} elsif ($table eq "interface_type") {
+    %xmlfields = %interfacetypefields;
+    $commit = \&CommitInterfaceType;
+    $tableid = "new_interface_type_id";
+    $tabledb = "new_interface_types";
+} else {
+    $errors{"table"} = "Table value not valid";
+}
+UserError()
+    if (keys(%errors));
+
+#
+# Make sure all the required arguments were provided.
+#
+my $key;
+foreach $key (keys(%xmlfields)) {
+    my (undef, $required, undef) = @{$xmlfields{$key}};
+
+    $errors{$key} = "Required value not provided"
+	if ($required & $SLOT_REQUIRED  &&
+	    ! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+UserError()
+    if (keys(%errors));
+
+
+#
+# We build up an array of arguments to pass to the database as we check
+# the attributes.
+#
+my %args = ();
+
+foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+    if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+    }
+
+    print STDERR "User attribute: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $field = $key;
+    if (!exists($xmlfields{$key})) {
+	$errors{$key} = "Unknown attribute";
+	next; # foreach $key
+    }
+
+    my ($dbslot, $required, $default) = @{$xmlfields{$field}};
+
+    if ($required & $SLOT_REQUIRED) {
+	# A slot that must be provided, so do not allow a null value.
+	if (!defined($value)) {
+	    $errors{$key} = "Must provide a non-null value";
+	    next;
+	}
+    }
+    if ($required & $SLOT_OPTIONAL) {
+	# Optional slot. If value is null skip it. Might not be the correct
+	# thing to do all the time?
+	if (!defined($value)) {
+	    next
+		if (!defined($default));
+	    $value = $default;
+	}
+    }
+    if ($required & $SLOT_ADMINONLY) {
+	# Admin implies optional, but thats probably not correct approach.
+	$errors{$key} = "Administrators only"
+	    if (! $this_user->IsAdmin());
+    }
+
+    $args{$dbslot} = $value;
+
+    # Now check that the value is legal.
+
+# TODO: Exempt command and table
+#    if (! TBcheck_dbslot($value, "new_nodes",
+#			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+#	$errors{$key} = TBFieldErrorString();
+#	next;
+#    }
+}
+UserError()
+    if (keys(%errors));
+
+my $id = $args{$tableid};
+if (! defined($id) && $args{"command"} ne "list"
+    && $args{"command"} ne "add") {
+    $errors{"id"} = "Command " . $args{"command"} . " must have an id";
+}
+if ($args{"command"} eq "add") {
+} elsif ($args{"command"} eq "update") {
+} elsif ($args{"command"} eq "rollback") {
+} elsif ($args{"command"} eq "commit") {
+} elsif ($args{"command"} eq "resolve") {
+} elsif ($args{"command"} eq "list") {
+} else {
+    $errors{"command"} = "Command must be add, update, rollback, commit, ".
+	"resolve, or list";
+}
+UserError()
+    if (keys(%errors));
+
+exit(0)
+    if ($verify);
+
+my $rowlist;
+if ($args{"command"} eq "add") {
+    ModifyRow(undef);
+} elsif ($args{"command"} eq "update") {
+    ModifyRow($id);
+} elsif ($args{"command"} eq "rollback") {
+    RemoveRow($id);
+} elsif ($args{"command"} eq "commit") {
+    &$commit($id);
+} elsif ($args{"command"} eq "resolve") {
+    $rowlist = ResolveRow($id);
+    PrintResult($rowlist);
+} elsif ($args{"command"} eq "list") {
+    $rowlist = ResolveRow(undef);
+    PrintResult($rowlist);
+}
+UserError()
+    if (keys(%errors));
+
+print "Completed ".$args{"command"}." on table $table\n";
+
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    # Exit with negative status so web interface treats it as system error.
+    exit(-1);
+}
+
+sub UserError(;$)
+{
+    my ($mesg) = @_;
+
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+    }
+    print "$mesg\n"
+	if (defined($mesg));
+
+    # Exit with positive status so web interface treats it as user error.
+    exit(1);
+}
+
+sub PrintResult($)
+{
+    my ($result) = @_;
+    my @current;
+    while (@current = $result->fetchrow()) {
+	for (my $i = 0; $i < scalar(@current); ++$i) {
+	    if (! defined($current[$i])) {
+		$current[$i] = "<NULL>";
+	    }
+	}
+	print join(" ", @current)."\n";
+    }
+}
+
+sub ModifyRow($)
+{
+    my ($id) = @_;
+    my $query;
+    my $none_changed = 1;
+    if (defined($id)) {
+	$query = "UPDATE";
+    } else {
+	$query = "INSERT";
+    }
+    $query .= " $tabledb SET";
+    foreach $key (keys(%args)) {
+	my $value = $args{$key};
+	if ($key ne "table" && $key ne "command" && $key ne $tableid
+	    && defined($value)) {
+	    if ($query ne "UPDATE $tabledb SET"
+		&& $query ne "INSERT $tabledb SET") {
+		$query .= ",";
+	    }
+	    $query .= " $key='$value'";
+	    $none_changed = 0;
+	}
+    }
+    if (defined($id)) {
+	$query .= " WHERE $tableid='$id'";
+    }
+    if ($none_changed == 1) {
+	$errors{$tableid} = "At least one field must be specified to update ".
+	    "or add";
+    } else {
+	if ($fake) {
+	    print $query."\n";
+	} else {
+	    DBQueryFatal($query);
+	}
+    }
+}
+
+sub RemoveRow($)
+{
+    my ($id) = @_;
+    my $query = "DELETE FROM $tabledb WHERE $tableid='$id'";
+    if ($fake) {
+	print $query."\n";
+    } else {
+	DBQueryFatal($query);
+    }
+}
+
+sub ResolveRow($)
+{
+    my ($id) = @_;
+    my $query = "SELECT ";
+    if ($table eq "node") {
+	$query .= 
+	    "new_node_id, node_id, type, IP, " .
+	    "DATE_FORMAT(created,'%M %e %H:%i:%s') as created, dmesg, " .
+	    "identifier, building";
+    } elsif ($table eq "interface") {
+	$query .= "new_interface_id, new_node_id, card, port, mac, interface_type";
+    } elsif ($table eq "wire") {
+	$query .= "new_wire_id, cable, len, type, node_id1, card1, port1, " .
+	    "node_id2, card2, port2";
+    } elsif ($table eq "interface_type") {
+	$query .= "new_interface_type_id, type, max_speed, full_duplex, " .
+	    "manufacturer, model, ports, connector";
+    } else {
+	$query .= " *";
+    }
+    $query .= " FROM $tabledb";
+    if (defined($id)) {
+	$query .= " WHERE $tableid='$id'";
+    } else {
+	$query .= " ORDER BY $tableid";
+    }
+    if ($fake) {
+	print $query."\n";
+    }
+    return DBQueryFatal($query);
+}
+
+
+sub CommitNode($)
+{
+    my ($id) = @_;
+    my $result = ResolveRow($id);
+    while (my ($skip, $nodeid) = $result->fetchrow()) {
+	my $command = "$TB/sbin/newnode -f $nodeid";
+	if ($fake) {
+	    print $command."\n";
+	} else {
+	    system($command);
+	}
+    }
+}
+
+sub CommitInterface($)
+{
+    $errors{"command"} = "Interfaces cannot be committed individually. ".
+	"Commit the node that they belong to.";
+}
+
+sub CommitWire
+{
+    my ($id) = @_;
+    my $result = ResolveRow($id);
+    while (my ($skip, $cable, $len, $type, $node_id1, $card1, $port1,
+	       $node_id2, $card2, $port2) = $result->fetchrow()) {
+	my $query = "INSERT wires SET ".
+	    "cable='$cable', len='$len', type='$type', node_id1='$node_id1', ".
+	    "card1='$card1', port1='$port1', node_id2='$node_id2', ".
+	    "card2='$card2', port2='$port2'";
+	if ($fake) {
+	    print $query."\n";
+	} else {
+	    DBQueryFatal($query);
+	}
+    }
+    RemoveRow($id);
+}
+
+sub CommitInterfaceType($)
+{
+    my ($id) = @_;
+    my $result= ResolveRow($id);
+    while (my ($skip, $type, $max_speed, $full_duplex, $manufacturer, $model,
+	       $ports, $connector) = $result->fetchrow()) {
+	my $query = "INSERT interface_types SET ".
+	    "type='$type', max_speed='$max_speed', full_duplex='$full_duplex', ".
+	    "manufacturer='$manufacturer', model='$model', ports='$ports', ".
+	    "connector='$connector'";
+	if ($fake) {
+	    print $query."\n";
+	} else {
+	    DBQueryFatal($query);
+	}
+    }
+    RemoveRow($id);
+}

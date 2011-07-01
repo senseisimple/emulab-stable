@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<newnode>
+  <attribute name="table">
+    <value>node</value>
+  </attribute>
+  <attribute name="command">
+    <value>add</value>
+  </attribute>
+  <attribute name="id">
+    <value>6</value>
+  </attribute>
+  <attribute name="node_id">
+    <value>t_node_id</value>
+  </attribute>
+  <attribute name="type">
+    <value>d710</value>
+  </attribute>
+  <attribute name="IP">
+    <value>5.5.5.5</value>
+  </attribute>
+  <attribute name="identifier">
+    <value>t_identifier</value>
+  </attribute>
+</newnode>

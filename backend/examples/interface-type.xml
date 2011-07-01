@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<newnode>
+  <attribute name="table">
+    <value>interface_type</value>
+  </attribute>
+  <attribute name="command">
+    <value>commit</value>
+  </attribute>
+  <attribute name="id">
+    <value>7</value>
+  </attribute>
+  <attribute name="type">
+    <value>t_type</value>
+  </attribute>
+  <attribute name="max_speed">
+    <value>600</value>
+  </attribute>
+  <attribute name="full_duplex">
+    <value>0</value>
+  </attribute>
+  <attribute name="manufacturer">
+    <value>t_manufacturer</value>
+  </attribute>
+  <attribute name="model">
+    <value>t_model</value>
+  </attribute>
+  <attribute name="ports">
+    <value>5</value>
+  </attribute>
+  <attribute name="connector">
+    <value>t_connector</value>
+  </attribute>
+</newnode>
