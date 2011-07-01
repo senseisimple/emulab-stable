@@ -1061,16 +1061,18 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			/* Interested in a specific image */
 			res = mydb_query("SELECT pid,gid,imagename,path,imageid"
 					 " FROM images"
-					 " WHERE pid='%s' AND gid='%s'"
-					 "  AND pid='%s' AND imagename='%s'"
-					 " ORDER BY pid,gid,imagename",
-					 5, ei->pid, ei->gid,
-					 wantpid, wantname);
+					 " WHERE pid='%s'"
+					 " AND (gid='%s' OR"
+					 "     (gid=pid AND shared=1))"
+					 " AND imagename='%s'",
+					 5, ei->pid, ei->gid, wantname);
 		} else {
 			/* Find all images that this pid/gid can PUT */
 			res = mydb_query("SELECT pid,gid,imagename,path,imageid"
 					 " FROM images"
-					 " WHERE pid='%s' AND gid='%s'"
+					 " WHERE pid='%s'"
+					 " AND (gid='%s' OR"
+					 "     (gid=pid AND shared=1))"
 					 " ORDER BY pid,gid,imagename",
 					 5, ei->pid, ei->gid);
 		}
