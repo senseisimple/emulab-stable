@@ -1,0 +1,22 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    if (! DBTableExists("new_wires")) {
+	DBQueryFatal("create table new_wires ( new_wire_id int not null auto_increment primary key, cable smallint(3) unsigned, len tinyint(3) unsigned, type enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl'), node_id1 char(32), card1 tinyint(3) unsigned, port1 tinyint(3) unsigned, node_id2 char(32), card2 tinyint(3) unsigned, port2 tinyint(3) unsigned )");
+    }
+
+    if (! DBTableExists("new_interface_types")) {
+	DBQueryFatal("create table new_interface_types (new_interface_type_id int not null auto_increment primary key, type varchar(30), max_speed int(11), full_duplex tinyint(1), manufacturer varchar(30), model varchar(30), ports tinyint(4), connector varchar(30) )");
+    }
+
+    if (! DBSlotExists("new_interfaces", "new_interface_id")) {
+	DBQueryFatal("alter table new_interfaces drop primary key");
+	DBQueryFatal("alter table new_interfaces add port tinyint(3) unsigned after card");
+	DBQueryFatal("alter table new_interfaces add new_interface_id int not null auto_increment primary key first");
+    }
+    return 0;
+}
+1;

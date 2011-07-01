@@ -2115,8 +2115,10 @@ CREATE TABLE `motelogfiles` (
 
 DROP TABLE IF EXISTS `new_interfaces`;
 CREATE TABLE `new_interfaces` (
+  `new_interface_id` int(11) NOT NULL auto_increment,
   `new_node_id` int(11) NOT NULL default '0',
   `card` int(11) NOT NULL default '0',
+  `port` tinyint(3) unsigned default NULL,
   `mac` varchar(12) NOT NULL default '',
   `interface_type` varchar(15) default NULL,
   `switch_id` varchar(32) default NULL,
@@ -2125,8 +2127,25 @@ CREATE TABLE `new_interfaces` (
   `cable` smallint(6) default NULL,
   `len` tinyint(4) default NULL,
   `role` tinytext,
-  PRIMARY KEY  (`new_node_id`,`card`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+  PRIMARY KEY  (`new_interface_id`)
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=latin1
+
+--
+-- Table structure for table `new_interface_types`
+--
+
+DROP TABLE IF EXISTS `new_interface_types`;
+CREATE TABLE `new_interface_types` (
+  `new_interface_type_id` int(11) NOT NULL auto_increment,
+  `type` varchar(30) default NULL,
+  `max_speed` int(11) default NULL,
+  `full_duplex` tinyint(1) default NULL,
+  `manufacturer` varchar(30) default NULL,
+  `model` varchar(30) default NULL,
+  `ports` tinyint(4) default NULL,
+  `connector` varchar(30) default NULL,
+  PRIMARY KEY  (`new_interface_type_id`)
+) ENGINE=MyISAM AUTO_INCREMENT=8 DEFAULT CHARSET=latin1
 
 --
 -- Table structure for table `new_nodes`
@@ -2152,6 +2171,25 @@ CREATE TABLE `new_nodes` (
   `role` varchar(32) NOT NULL default 'testnode',
   PRIMARY KEY  (`new_node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `new_wires`
+--
+
+DROP TABLE IF EXISTS `new_wires`;
+CREATE TABLE `new_wires` (
+  `new_wire_id` int(11) NOT NULL auto_increment,
+  `cable` smallint(3) unsigned default NULL,
+  `len` tinyint(3) unsigned default NULL,
+  `type` enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl') default NULL,
+  `node_id1` char(32) default NULL,
+  `card1` tinyint(3) unsigned default NULL,
+  `port1` tinyint(3) unsigned default NULL,
+  `node_id2` char(32) default NULL,
+  `card2` tinyint(3) unsigned default NULL,
+  `port2` tinyint(3) unsigned default NULL,
+  PRIMARY KEY  (`new_wire_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
 
 --
 -- Table structure for table `newdelays`
