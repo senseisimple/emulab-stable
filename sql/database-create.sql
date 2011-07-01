@@ -2128,7 +2128,7 @@ CREATE TABLE `new_interfaces` (
   `len` tinyint(4) default NULL,
   `role` tinytext,
   PRIMARY KEY  (`new_interface_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=latin1
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=latin1;
 
 --
 -- Table structure for table `new_interface_types`
@@ -2145,7 +2145,7 @@ CREATE TABLE `new_interface_types` (
   `ports` tinyint(4) default NULL,
   `connector` varchar(30) default NULL,
   PRIMARY KEY  (`new_interface_type_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=8 DEFAULT CHARSET=latin1
+) ENGINE=MyISAM AUTO_INCREMENT=8 DEFAULT CHARSET=latin1;
 
 --
 -- Table structure for table `new_nodes`
@@ -2189,7 +2189,7 @@ CREATE TABLE `new_wires` (
   `card2` tinyint(3) unsigned default NULL,
   `port2` tinyint(3) unsigned default NULL,
   PRIMARY KEY  (`new_wire_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
 -- Table structure for table `newdelays`
