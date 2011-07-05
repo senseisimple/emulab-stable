@@ -41,21 +41,23 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import mx.collections.ArrayCollection;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
 			import mx.events.DragEvent;
 			import mx.managers.DragManager;
 			
 			import protogeni.DateUtil;
 			import protogeni.GeniEvent;
+			import protogeni.NetUtil;
 			import protogeni.Util;
 			import protogeni.display.components.AdvancedTextArea;
 			import protogeni.display.components.DataButton;
 			import protogeni.display.components.DefaultWindow;
+			import protogeni.display.components.TextInputWindow;
 			import protogeni.display.mapping.GeniMapMarker;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeGroup;
-			import protogeni.resources.ProtogeniComponentManager;
 			import protogeni.resources.Site;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
@@ -91,7 +93,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			 */
 			public override function closeWindow(event:Event=null):void {
 				if(sliceCanvas.isEdited()) {
-					Alert.show("The slice appears to have been edited.  Close and clear any changes?", "Confirm", Alert.YES|Alert.NO, Main.Application(),
+					Alert.show("The slice appears to have been edited. Close and clear any changes?",
+						"Confirm",
+						Alert.YES|Alert.NO,
+						FlexGlobals.topLevelApplication as Sprite,
 						function closeClear(e:CloseEvent):void {
 							if(e.detail == Alert.YES)
 								doCloseWindow(event);
@@ -288,6 +293,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			 */
 			public function viewRspecs():void
 			{
+				if(sliceCanvas.slice == null) {
+					Alert.show("There is no slice loaded yet.");
+					return;
+				}
 				if(sliceCanvas.slice.slivers.length == 0)
 				{
 					Alert.show("There is no valid RSPEC for the slice yet", "No RSPEC");
@@ -378,7 +387,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				if(sliceCanvas.slice.isCreated())
 					Alert.show("The slice has resources allocated to it.  Please delete the slice before trying to create a new slice.", "Allocated Resources Exist");
 				else if(sliceCanvas.slice.GetAllNodes().length > 0)
-					Alert.show("The slice already has resources waiting to be allocated.  Clear the slice anyways?", "Resources Exist", Alert.YES|Alert.NO, Main.Application(),
+					Alert.show("The slice already has resources waiting to be allocated.  Clear the slice anyways?", "Resources Exist",
+						Alert.YES|Alert.NO,
+						FlexGlobals.topLevelApplication as Sprite,
 						function closeClear(e:CloseEvent):void {
 							if(e.detail == Alert.YES)
 								sliceCanvas.clear();
@@ -600,7 +611,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function tryCreateSlice():void {
 				if(Main.geniHandler.CurrentUser.keys.length == 0) {
-					Alert.show("You don't have any public keys to use when logging in to your nodes.  Would you like to add any public keys?", "No public keys", Alert.YES|Alert.NO|Alert.CANCEL, Main.Application(),
+					Alert.show("You don't have any public keys to use when logging in to your nodes.  Would you like to add any public keys?", "No public keys",
+						Alert.YES|Alert.NO|Alert.CANCEL,
+						FlexGlobals.topLevelApplication as Sprite,
 						function choiceHandler(event:CloseEvent):void {
 							if(event.detail == Alert.YES) {
 								DisplayUtil.viewUserWindow(true);
@@ -640,6 +653,42 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 				Main.geniHandler.requestHandler.renewSlice(this.sliceCanvas.slice, newExpiresDate);
 			}
+			
+			public var getRspec:URLLoader;
+			public function tryImportUrl(url:String = ""):void {
+				// Get a URL from the user if needed
+				if(url.length == 0) {
+					var getUrlWindow:TextInputWindow = new TextInputWindow();
+					getUrlWindow.title = "Please enter the full URL for the RSPEC";
+					getUrlWindow.showWindow();
+					getUrlWindow.onCancel = null;
+					getUrlWindow.onSuccess = tryImportUrl;
+				}
+					// Otherwise try to download
+				else
+				{
+					NetUtil.checkLoadCrossDomain(url);
+					var getRspecRequest:URLRequest = new URLRequest(url);
+					getRspec = new URLLoader();
+					getRspec.addEventListener(Event.COMPLETE, finishImport);
+					getRspec.addEventListener(ErrorEvent.ERROR, importError);
+					getRspec.addEventListener(IOErrorEvent.IO_ERROR, importError);
+					getRspec.addEventListener(SecurityErrorEvent.SECURITY_ERROR, importError);
+					try {
+						getRspec.load(getRspecRequest);
+					} catch(e:Error) {
+						Alert.show("Problem loading the URL\n\n" + e.toString());
+					}
+				}
+			}
+			
+			public function finishImport(e:Event):void {
+				this.sliceCanvas.slice.tryImport(String(getRspec.data));
+			}
+			
+			public function importError(e:*):void {
+				Alert.show("Problem downloading the RSPEC\n\n" + e.toString());
+			}
 
 		]]>
 	</fx:Script>
@@ -667,6 +716,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<components:ImageButton icon="{ImageUtil.openIcon}"
 							 toolTip="Load RSPEC from file"
 							 click="onFileBrowse(event)" />
+		<components:ImageButton icon="{ImageUtil.worldIcon}"
+								toolTip="Load RSPEC from a URL"
+								click="tryImportUrl()" />
 		<components:DefaultLine height="14" visible="false" />
 		<s:Label text="Use RSPECv" />
 		<s:DropDownList id="outputRspecDropdownlist"

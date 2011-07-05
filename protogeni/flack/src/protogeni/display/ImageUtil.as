@@ -265,5 +265,9 @@
 		[Bindable]
 		[Embed(source="../../../images/time.png")]
 		public static var timeIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/world.png")]
+		public static var worldIcon:Class;
 	}
 }

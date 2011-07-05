@@ -97,6 +97,9 @@ package protogeni.resources
 		
 		public var isAm:Boolean = false;
 		
+		public var linksUnadded:int = 0;
+		public var nodesUnadded:int = 0;
+		
 		public function AllNodesAsArray():Array {
 			var allNodesArray:Array = new Array();
 			for each (var elem:PhysicalNode in AllNodes) {
@@ -202,11 +205,13 @@ package protogeni.resources
 		}
 		
 		public function clearComponents():void {
-			Nodes = new PhysicalNodeGroupCollection(this);
-			Links = new PhysicalLinkGroupCollection();
-			AllNodes = new Vector.<PhysicalNode>();
-			AllLinks = new Vector.<PhysicalLink>();
-			DiskImages = new ArrayCollection();
+			this.Nodes = new PhysicalNodeGroupCollection(this);
+			this.Links = new PhysicalLinkGroupCollection();
+			this.nodesUnadded = 0;
+			this.linksUnadded = 0;
+			this.AllNodes = new Vector.<PhysicalNode>();
+			this.AllLinks = new Vector.<PhysicalLink>();
+			this.DiskImages = new ArrayCollection();
 		}
 		
 		public function getGraphML():String {

@@ -230,6 +230,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					"Uncaught Error",
 					"Error: " + errorMessage + "\n\nEvent: " + event.toString(),
 					true);
+				
 				LogHandler.appendMessage(uncaughtErrorMessage);
 				LogHandler.viewConsole();
 				DisplayUtil.viewLogMessage(uncaughtErrorMessage);

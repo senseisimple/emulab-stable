@@ -64,14 +64,12 @@ package protogeni.communication
 						newCalls.push(new RequestSliverGet(s));
 				}
 
-				/*
 				for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
 					if(manager.isAm) {
 						var newSliver:Sliver = new Sliver(slice, manager);
 						Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
 					}
 				}
-				*/
 			}
 			else
 			{

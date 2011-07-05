@@ -24,7 +24,7 @@ package protogeni.resources
 	{
 		// Process
 		function processResourceRspec(afterCompletion:Function):void;
-		function processSliverRspec(s:Sliver):void;
+		function processSliverRspec(s:Sliver, onlyListFromManifest:Boolean):void;
 		
 		// Generate
 		function generateSliverRspec(s:Sliver,

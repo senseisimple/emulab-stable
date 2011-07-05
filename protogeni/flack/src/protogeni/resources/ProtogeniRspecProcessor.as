@@ -291,6 +291,7 @@ package protogeni.resources
 					this.nodeNameDictionary[node.name] = node;
 					this.manager.AllNodes.push(node);
 				} catch(e:Error) {
+					this.manager.nodesUnadded++;
 					// skip if some problem
 					if(Main.debugMode)
 						trace("Skipped node which threw error in manager named " + manager.Hrn);
@@ -425,6 +426,7 @@ package protogeni.resources
 						l.interfaceRefs.collection[0].owner.owner.links = lg;
 					this.manager.AllLinks.push(l);
 				} catch(e:Error) {
+					this.manager.linksUnadded++;
 					// skip if some problem
 					if(Main.debugMode)
 						trace("Skipped link which threw error in manager named " + manager.Hrn);
@@ -443,7 +445,8 @@ package protogeni.resources
 		}
 		
 		private var detectedInputRspecVersion:Number;
-		public function processSliverRspec(s:Sliver):void
+		public function processSliverRspec(s:Sliver,
+										   onlyListFromManifest:Boolean):void
 		{
 			var defaultNamespace:Namespace = s.rspec.namespace();
 			switch(defaultNamespace.uri) {
@@ -543,6 +546,7 @@ package protogeni.resources
 						virtualNode.virtualizationType = String(nodeXml.@virtualization_type);
 					if(nodeXml.@virtualization_subtype.length() == 1)
 						virtualNode.virtualizationSubtype = String(nodeXml.@virtualization_subtype);
+				
 				} else {
 					virtualNode.clientId = String(nodeXml.@client_id);
 					if(virtualNode.manager == null)
@@ -550,6 +554,11 @@ package protogeni.resources
 					virtualNode._exclusive = String(nodeXml.@exclusive) == "true" || String(nodeXml.@exclusive) == "1";
 					virtualNode.sliverId = String(nodeXml.@sliver_id);
 				}
+				
+				// PlanetLab lists all, so this is to only keep sliver nodes
+				if(onlyListFromManifest
+					&& virtualNode.sliverId.length == 0)
+					continue;
 				
 				var sliverTypeShapingXml:XML = null;
 				for each(var nodeChildXml:XML in nodeXml.children()) {

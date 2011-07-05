@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						  xmlns:s="library://ns.adobe.com/flex/spark" 
+						  xmlns:mx="library://ns.adobe.com/flex/mx"
+						  xmlns:components="protogeni.display.components.*"
+						  xmlns:display="protogeni.display.*"
+						  height="102" width="400">
+	<components:layout>
+		<s:VerticalLayout paddingLeft="2"
+						  paddingTop="2"
+						  paddingRight="2"
+						  paddingBottom="2" />
+	</components:layout>
+
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			
+			import protogeni.display.ImageUtil;
+			
+			public function get Text():String {
+				return textInput.textInput.text;
+			}
+			public function set Text(val:String):void {
+				textInput.textInput.text = val;
+			}
+			
+			public var onSuccess:Function;
+			public var onCancel:Function;
+			
+			public function success():void {
+				if(this.Text.length == 0) {
+					Alert.show("You must enter a value");
+					return;
+				}
+				onSuccess(Text);
+				this.closeWindow();
+			}
+			
+			public function cancel():void {
+				if(onCancel != null)
+					onCancel();
+				this.closeWindow();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<display:KeyboardTextInput id="textInput"
+							   width="100%"
+							   creationComplete="textInput.setEnter(success);" />
+	
+	<components:controlBarContent>
+		<s:Button id="okButton"
+				  label="OK"
+				  click="success();"
+				  height="24" icon="{ImageUtil.availableIcon}" />
+		<s:Button label="Cancel"
+				  click="cancel();"
+				  height="24" icon="{ImageUtil.crossIcon}" />
+	</components:controlBarContent>
+</components:DefaultWindow>

@@ -651,7 +651,7 @@ package protogeni.resources
 					var newSliver:Sliver = this.getOrCreateSliverFor(detectedManager);
 					newSliver.rspec = sliceRspec;
 					try {
-						newSliver.parseRspec();
+						newSliver.parseRspec(false);
 						newSliver.staged = true;
 					} catch(e:Error) {
 						Alert.show("Error while parsing sliver RSPEC on " + detectedManager.Hrn + ": " + e.toString());
