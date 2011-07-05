@@ -3046,7 +3046,7 @@ sub doMakeVlan($$@) {
 		    $errors++;
 		}
 	    }
-	    VLan->RecordVLanModification($source_vlan->id(), undef, @ports);
+	    VLan->RecordVLanModification($source_vlan->id(), undef, \@ports);
 	}
 	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
 	    # This updates the port list, so always call it.
