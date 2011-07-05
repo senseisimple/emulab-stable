@@ -13,7 +13,7 @@ use Data::Dumper;
 #
 my $TB       = "@prefix@";
 my $SACERT   = "$TB/etc/genisa.pem";
-my $server   = "https://www.planet-lab.org:12345";
+my $server   = "https://www.planet-lab.org:12346";
 
 # Geni libraries.
 use lib "@prefix@/lib";
@@ -75,18 +75,11 @@ elsif (0) {
 	Genixmlrpc::CallMethod($server, $context, "get_aggregates",
 			       $selfcred->asString(), "");
 }
-elsif (0) {
-    $response =
-	Genixmlrpc::CallMethod($server, $context, "ListResources",
-			       $selfcred->asString(), {});
-}
-elsif (0) {
-    my $c   = "urn:publicid:IDN+emulab.net+slice+CE74290";
-    
+elsif (1) {
     $response =
 	Genixmlrpc::CallMethod($server, $context, "ListResources",
 			       $selfcred->asString(),
-			       {'geni_slice_urn' => $c});
+			       {'rspec_version' => "ProtoGENI 2"});
 }
 elsif (0) {
     $response =
