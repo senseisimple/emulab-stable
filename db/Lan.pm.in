@@ -65,7 +65,9 @@ sub InitOpenflowAttributes($$$$)
     return 0
 	if (!$query_result);	
     ($ofenabled, $ofcontroller) = $query_result->fetchrow_array()
-	if ($query_result->numrows);  
+	if ($query_result->numrows);
+    $ofcontroller = ""
+	if (!$ofenabled || !defined($ofcontroller));
 	
     #
     # Firstly check if the attribuets are there, if no values, 
