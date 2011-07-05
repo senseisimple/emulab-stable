@@ -833,10 +833,7 @@ sub UnProvision($;$)
 
 	my $virt_type = GeniXML::GetVirtualizationType($self->rspec());
 	my $sub_type  = GeniXML::GetVirtualizationSubtype($self->rspec());
-	if (!$node->isremotenode() &&
-	    (defined($virt_type) && $virt_type eq "emulab-vnode") &&
-	    !(defined($sub_type) &&
-	      ($sub_type eq "raw" || $sub_type eq "raw-pc"))) {
+	if (!$node->isremotenode() && $node->isvirtnode()) {
 	    my $pnode_id = $node->phys_nodeid();
 	    my $pnode = Node->Lookup($pnode_id);
 	    if (!defined($pnode)) {
