@@ -50,9 +50,9 @@ my %LanTables = ("lans"           => ["lanid"],
 #
 # Initialize Openflow attributes in lan_attributes table.
 #
-sub InitOpenflowAttributes($$$)
+sub InitOpenflowAttributes($$$$)
 {
-    my ($exptidx, $vname, $lanid) = @_;
+    my ($class, $exptidx, $vname, $lanid) = @_;
 
     my $ofenabled = 0;
     my $ofcontroller = "";
