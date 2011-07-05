@@ -369,7 +369,7 @@ else {
 	# This could happen if the child forks. 
 	#
 	if ($result) {
-	    print STDERR "Child forked but returned an error\n";
+	    print STDERR "Forked child returned an error\n";
 	}
     }
     else {
