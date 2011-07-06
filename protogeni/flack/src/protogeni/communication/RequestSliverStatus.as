@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+	import protogeni.GeniEvent;
+	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	
@@ -64,9 +66,21 @@ package protogeni.communication
 					}
 				}
 			}
-			else
-			{
-				// do nothing
+			// Slice was deleted
+			else if(code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED) {
+				sliver.removeOutsideReferences();
+				if(sliver.slice.slivers.contains(sliver))
+					sliver.slice.slivers.remove(sliver);
+				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);
+				if(old != null)
+				{
+					var oldSliver:Sliver = old.slivers.getByUrn(sliver.urn.full);
+					if(oldSliver != null) {
+						oldSliver.removeOutsideReferences();
+						old.slivers.remove(old.slivers.getByUrn(sliver.urn.full));
+					}
+					Main.geniDispatcher.dispatchSliceChanged(old);
+				}
 			}
 			
 			return null;

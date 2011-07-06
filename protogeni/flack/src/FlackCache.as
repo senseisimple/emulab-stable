@@ -35,6 +35,7 @@ package
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.PlanetlabRspecProcessor;
 	import protogeni.resources.ProtogeniComponentManager;
+	import protogeni.resources.ProtogeniRspecProcessor;
 	import protogeni.resources.Site;
 	import protogeni.resources.Slice;
 	import protogeni.resources.SliceAuthority;
@@ -82,7 +83,7 @@ package
 		}
 		
 		public function updateManager(event:GeniEvent):void {
-			if(!Main.offlineMode && event.action == GeniEvent.ACTION_POPULATED) {
+			if(!Main.offlineMode && !Main.useCache && event.action == GeniEvent.ACTION_POPULATED) {
 				setManagerOffline(event.changedObject as GeniManager);
 			}
 		}
@@ -115,14 +116,15 @@ package
 			var newManagerObject:Object = new Object();
 			newManagerObject.inputRspecVersion = manager.inputRspecVersion;
 			if(manager.rspecProcessor is PlanetlabRspecProcessor) {
-				newManagerObject.sites = [];
+				return;
+				/*newManagerObject.sites = [];
 				for each(var site:Site in (manager as PlanetlabAggregateManager).sites) {
 					var siteObject:Object = new Object();
 					siteObject.hrn = site.hrn;
 					siteObject.latitude = site.latitude;
 					siteObject.longitude = site.longitude;
 					newManagerObject.sites.push(siteObject);
-				}
+				}*/
 			}
 			newManagerObject.colorIdx = manager.colorIdx;
 			newManagerObject.Hrn = manager.Hrn;
@@ -137,10 +139,20 @@ package
 			newManagerObject.supportsGpeni = manager.supportsGpeni;
 			newManagerObject.supportsIon = manager.supportsIon;
 			newManagerObject.type = manager.type;
+			if(manager.rspecProcessor is ProtogeniRspecProcessor)
+				newManagerObject.rspecType = GeniManager.TYPE_PROTOGENI;
+			else if(manager.rspecProcessor is PlanetlabRspecProcessor)
+				newManagerObject.rspecType = GeniManager.TYPE_PLANETLAB;
 			newManagerObject.Url = manager.Url;
 			newManagerObject.urn = manager.Urn.full;
 			newManagerObject.Version = manager.Version;
+			newManagerObject.isAm = manager.isAm;
+			newManagerObject.supportsExclusiveNodes = manager.supportsExclusiveNodes;
+			newManagerObject.supportsSharedNodes = manager.supportsSharedNodes;
+			newManagerObject.supportsDelayNodes = manager.supportsDelayNodes;
+			
 			_offlineSharedObject.data.managers.push(newManagerObject);
+			_offlineSharedObject.data.lastChange = new Date();
 		}
 		
 		public function updateUser(event:GeniEvent):void {
@@ -409,31 +421,44 @@ package
 			}
 		}
 		
-		public static function applyOffline():void {
+		public static function getOfflineLastChange():Date {
+			if(offlineAvailable) {
+				try {
+					return _offlineSharedObject.data.lastChange;
+				} catch(e:Error) {}
+			}
+			return null;
+		}
+		
+		private static var after:Function;
+		public static function applyOffline(includeUser:Boolean = true, afterDone:Function = null):void {
+			after = afterDone;
 			if(offlineAvailable) {
 				try {
 					// get user info
-					if(_offlineSharedObject.data.credential != null) {
-						Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.credential;
-						Main.geniHandler.CurrentUser.sliceCredential = "";
-						_offlineSharedObject.data.credential = null;
-					}
-					else {
-						if(_offlineSharedObject.data.userCredential != null && _offlineSharedObject.data.userCredential.length > 0)
-							Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.userCredential;
-						else if(_offlineSharedObject.data.sliceCredential != null)
-							Main.geniHandler.CurrentUser.sliceCredential = _offlineSharedObject.data.sliceCredential;
-					}
-					
-					Main.geniHandler.CurrentUser.hrn = _offlineSharedObject.data.hrn;
-					Main.geniHandler.CurrentUser.keys = new Vector.<Key>();
-					for each(var key:String in _offlineSharedObject.data.keys)
+					if(includeUser) {
+						if(_offlineSharedObject.data.credential != null) {
+							Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.credential;
+							Main.geniHandler.CurrentUser.sliceCredential = "";
+							_offlineSharedObject.data.credential = null;
+						}
+						else {
+							if(_offlineSharedObject.data.userCredential != null && _offlineSharedObject.data.userCredential.length > 0)
+								Main.geniHandler.CurrentUser.userCredential = _offlineSharedObject.data.userCredential;
+							else if(_offlineSharedObject.data.sliceCredential != null)
+								Main.geniHandler.CurrentUser.sliceCredential = _offlineSharedObject.data.sliceCredential;
+						}
+						
+						Main.geniHandler.CurrentUser.hrn = _offlineSharedObject.data.hrn;
+						Main.geniHandler.CurrentUser.keys = new Vector.<Key>();
+						for each(var key:String in _offlineSharedObject.data.keys)
 						Main.geniHandler.CurrentUser.keys.push(new Key(key));
-					Main.geniHandler.CurrentUser.name = _offlineSharedObject.data.name;
-					Main.geniHandler.CurrentUser.uid = _offlineSharedObject.data.uid;
-					Main.geniHandler.CurrentUser.urn = new IdnUrn(_offlineSharedObject.data.urn);
-					
-					Main.geniDispatcher.dispatchUserChanged();
+						Main.geniHandler.CurrentUser.name = _offlineSharedObject.data.name;
+						Main.geniHandler.CurrentUser.uid = _offlineSharedObject.data.uid;
+						Main.geniHandler.CurrentUser.urn = new IdnUrn(_offlineSharedObject.data.urn);
+						
+						Main.geniDispatcher.dispatchUserChanged();
+					}
 					
 					for each(var initialManagerObject:Object in _offlineSharedObject.data.managers) {
 						var initialManager:GeniManager;
@@ -442,6 +467,8 @@ package
 							(initialManager as ProtogeniComponentManager).inputRspecVersion = initialManagerObject.inputRspecVersion;
 						} else if(initialManagerObject.type == GeniManager.TYPE_PLANETLAB) {
 							initialManager = new PlanetlabAggregateManager();
+							if(initialManagerObject.rspecType == GeniManager.TYPE_PROTOGENI)
+								initialManager.rspecProcessor = new ProtogeniRspecProcessor(initialManager);
 						}
 						
 						initialManager.colorIdx = initialManagerObject.colorIdx;
@@ -456,6 +483,10 @@ package
 						initialManager.Status = initialManagerObject.Status;
 						initialManager.supportsGpeni = initialManagerObject.supportsGpeni;
 						initialManager.supportsIon = initialManagerObject.supportsIon;
+						initialManager.isAm = initialManagerObject.isAm;
+						initialManager.supportsExclusiveNodes = initialManagerObject.supportsExclusiveNodes;
+						initialManager.supportsSharedNodes = initialManagerObject.supportsSharedNodes;
+						initialManager.supportsDelayNodes = initialManagerObject.supportsDelayNodes;
 						initialManager.type = initialManagerObject.type;
 						initialManager.Url = initialManagerObject.Url;
 						initialManager.Urn = new IdnUrn(initialManagerObject.urn);
@@ -467,11 +498,13 @@ package
 						Main.geniDispatcher.dispatchGeniManagerChanged(initialManager);
 					}
 					
+					Main.geniDispatcher.dispatchGeniManagersChanged();
+					
 					// get manager info
 					for each(var managerObject:Object in _offlineSharedObject.data.managers) {
 						var newManager:GeniManager = Main.geniHandler.GeniManagers.getByUrn(managerObject.urn);
 						
-						if(newManager.rspecProcessor is PlanetlabRspecProcessor) {
+						/*if(newManager.rspecProcessor is PlanetlabRspecProcessor) {
 							(newManager.rspecProcessor as PlanetlabRspecProcessor).callGetSites = false;
 							newManager.data = managerObject.sites;
 							newManager.rspecProcessor.processResourceRspec(
@@ -496,8 +529,12 @@ package
 									Main.geniDispatcher.dispatchGeniManagerChanged(finishedManager, GeniEvent.ACTION_POPULATED);
 									tryApplyOfflineSlices(finishedManager);
 								});
-						} else
+						} else*/
+						if(includeUser)
 							newManager.rspecProcessor.processResourceRspec(tryApplyOfflineSlices);
+						else {
+							newManager.rspecProcessor.processResourceRspec(tryFinishApplying);
+						}
 					}
 					
 					Main.geniDispatcher.dispatchGeniManagersChanged();
@@ -505,6 +542,14 @@ package
 					Alert.show(e.toString(), "Error applying offline data");
 				}
 			}
+		}
+		
+		public static function tryFinishApplying(manager:GeniManager):void {
+			for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
+				if(manager.Status == GeniManager.STATUS_INPROGRESS)
+					return;
+			}
+			after();
 		}
 		
 		public static function tryApplyOfflineSlices(manager:GeniManager):void {

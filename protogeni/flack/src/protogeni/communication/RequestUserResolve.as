@@ -17,6 +17,7 @@ package protogeni.communication
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Slice;
 	import protogeni.resources.SliceCollection;
+	import protogeni.resources.Sliver;
 	
 	/**
 	 * Gets the user information and list of slices from the user's slice authority using the ProtoGENI API
@@ -53,7 +54,12 @@ package protogeni.communication
 			var newCalls:RequestQueue = new RequestQueue();
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				// XXX needs to delete any external links to these...
+				for each(var slice:Slice in Main.geniHandler.CurrentUser.slices) {
+					if(slice.slivers.length > 0) {
+						for each(var sliver:Sliver in slice.slivers.collection)
+						sliver.removeOutsideReferences();
+					}
+				}
 				Main.geniHandler.CurrentUser.slices = new SliceCollection();
 				
 				Main.geniHandler.CurrentUser.uid = response.value.uid;

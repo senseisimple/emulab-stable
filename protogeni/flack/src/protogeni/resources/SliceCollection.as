@@ -54,5 +54,11 @@ package protogeni.resources
 			}
 			add(s);
 		}
+		
+		public function removeOutsideReferences():void {
+			for each(var existing:Slice in this) {
+				existing.removeOutsideReferences();
+			}
+		}
 	}
 }

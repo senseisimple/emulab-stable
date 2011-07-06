@@ -196,28 +196,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function loadHierarchy():void
 			{
-				hierarchyVbox.removeAllElements();
-
-				// Manager
-				var managerHbox:HGroup = new HGroup();
-				managerHbox.verticalAlign = "middle";
-				managerHbox.gap = 4;
-				managerHbox.addElement(DisplayUtil.getLabel("Hosted on"));
-				managerHbox.addElement(DisplayUtil.getGeniManagerButton(node.manager));
-				hierarchyVbox.addElement(managerHbox);
-				
+				hierarchyGroup.removeAllElements();
+				hierarchyGroup.addElement(DisplayUtil.getGeniManagerButton(node.manager));
+				hierarchyGroup.addElement(DisplayUtil.getLabel(">"));
 				// Parent node info
 				if(node.superNode != null)
 				{
-					var parentNodeHbox:HGroup = new HGroup();
-					parentNodeHbox.verticalAlign = "middle";
-					parentNodeHbox.gap = 4;
-					parentNodeHbox.addElement(DisplayUtil.getLabel("Subnode of"));
-					parentNodeHbox.addElement(DisplayUtil.getVirtualNodeButton(node.superNode));
-					hierarchyVbox.addElement(parentNodeHbox);
+					hierarchyGroup.addElement(DisplayUtil.getVirtualNodeButton(node.superNode));
+					hierarchyGroup.addElement(DisplayUtil.getLabel(">"));
 				}
 				
 				// Child node info
+				hierarchyVbox.removeAllElements();
 				if(node.subNodes.length > 0)
 				{
 					hierarchyVbox.addElement(DisplayUtil.getLabel("Subnodes:"));
@@ -270,17 +260,17 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				// Make sure extensions are valid
 				if(this.extensionsTextarea != null) {
 					try {
-					var extensions:XMLList = new XMLList(extensionsTextarea.text);
-					// Add any new namespaces to the sliver
-					for each(var extension:XML in extensions) {
-						var newNamespaces:Array = [];
-						for each(var extensionNamespace:Namespace in extension.namespaceDeclarations()) {
-							if(!XmlUtil.isKnownNamespace(extensionNamespace) && this.node.sliver.extensionNamespaces.indexOf(extensionNamespace) == -1) {
-								this.node.sliver.extensionNamespaces.push(extensionNamespace);
+						var extensions:XMLList = new XMLList(extensionsTextarea.text);
+						// Add any new namespaces to the sliver
+						for each(var extension:XML in extensions) {
+							var newNamespaces:Array = [];
+							for each(var extensionNamespace:Namespace in extension.namespaceDeclarations()) {
+								if(!XmlUtil.isKnownNamespace(extensionNamespace) && this.node.sliver.extensionNamespaces.indexOf(extensionNamespace) == -1) {
+									this.node.sliver.extensionNamespaces.push(extensionNamespace);
+								}
 							}
 						}
-					}
-					this.node.extensionsNodes = new XMLListCollection(extensions);
+						this.node.extensionsNodes = new XMLListCollection(extensions);
 					} catch(e:Error) {
 						if(e.errorID == 1063)
 							Alert.show("Prefixes must have namespaces declared. If they are, check that the XML is valid.");
@@ -369,7 +359,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		]]>
 	</fx:Script>
 	
-	<s:HGroup width="100%">
+	<s:HGroup width="100%" verticalAlign="middle" gap="2">
+		<s:HGroup id="hierarchyGroup" verticalAlign="middle" />
 		<display:KeyboardTextInput id="idLabel" Text="{node.clientId}" toolTip="{node.sliverId}" width="100%" />
 		<components:ImageButton id="rspecButton"
 							 icon="{ImageUtil.pageWhiteIcon}"
@@ -380,6 +371,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 							 icon="{ImageUtil.pageCodeIcon}"
 							 click="previewRspec()"
 							 toolTip="Preview the Request RSPEC" />
+	</s:HGroup>
+	
+	<s:HGroup width="100%" verticalAlign="middle">
+		<s:Label text="Login" fontWeight="bold" />
+		<mx:Label id="loginText" selectable="true" />
 	</s:HGroup>
 	
 	<mx:TabNavigator height="100%" width="100%">
@@ -395,7 +391,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					<s:Label text="{node.sliver.slice.hrn}" />
 				</s:HGroup>
 				
-				<s:VGroup width="100%" id="hierarchyVbox" />
+				<s:HGroup width="100%" id="hierarchyVbox" />
 				
 				<s:Label text="Binding" fontWeight="bold" />
 				<s:HGroup width="100%">
@@ -491,11 +487,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						</s:DataGrid> 
 					</s:NavigatorContent>
 				</mx:ViewStack>
-				
-				<s:HGroup width="100%">
-					<s:Label text="Login" fontWeight="bold" />
-					<s:Label id="loginText" />
-				</s:HGroup>
 				
 				<s:Label text="Links to" fontWeight="bold"/>
 				<s:Scroller width="100%" height="100%">

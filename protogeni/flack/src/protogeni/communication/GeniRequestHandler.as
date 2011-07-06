@@ -22,6 +22,7 @@ package protogeni.communication
 	import mx.events.CloseEvent;
 	
 	import protogeni.NetUtil;
+	import protogeni.Util;
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.IdnUrn;
@@ -64,7 +65,7 @@ package protogeni.communication
 				|| Main.geniHandler.CurrentUser.authority == null) {
 				DisplayUtil.viewInitialUserWindow();
 			} else {
-				startAuthenticatedInitiationSequence();
+				startAuthenticatedInitiationSequence(true);
 			}
 		}
 		
@@ -78,10 +79,13 @@ package protogeni.communication
 				DisplayUtil.viewInitialUserWindow();
 				return;
 			}
+			this.isPaused = false;
+			this.forceStop = false;
 			if(Main.geniHandler.CurrentUser.Credential.length == 0) {
 				pushRequest(new RequestGetCredential());
 				pushRequest(new RequestGetKeys());
 			}
+			
 			loadListAndComponentManagers(getSlices);
 			Main.Application().hideAuthenticate();
 		}
@@ -101,11 +105,28 @@ package protogeni.communication
 			newCm.Status = GeniManager.STATUS_INPROGRESS;
 			this.pushRequest(new RequestGetVersionAm(newCm));*/
 			
-			if(Main.geniHandler.unauthenticatedMode)
-				pushRequest(new RequestListComponentsPublic());
-			else
-				pushRequest(new RequestListComponents(true, getSlices));
-			
+			if(!Main.useCache) {
+				if(Main.geniHandler.unauthenticatedMode)
+					pushRequest(new RequestListComponentsPublic());
+				else
+					pushRequest(new RequestListComponents(true, getSlices));
+			} else {
+				FlackCache.applyOffline(false, loadUserAndSlices);
+			}
+		}
+		
+		public function loadUserAndSlices():void
+		{
+			if(Main.geniHandler.CurrentUser.userCredential.length > 0)
+				this.pushRequest(new RequestUserResolve());
+			else if(Main.geniHandler.CurrentUser.sliceCredential.length > 0) {
+				for each(var slice:Slice in Main.geniHandler.CurrentUser.slices) {
+					if(slice.credential == Main.geniHandler.CurrentUser.sliceCredential) {
+						Main.geniHandler.requestHandler.discoverSliceAllocatedResources(slice);
+						break;
+					}
+				}
+			}
 		}
 		
 		/**
@@ -204,9 +225,10 @@ package protogeni.communication
 				for each(sliver in updateSlivers.collection) {
 					sliver.created = false;
 					sliver.staged = false;
+					sliver.status = "";
+					sliver.state = "";
 				}
 				for each(sliver in updateSlivers.collection) {
-					
 					pushRequest(new RequestSliverUpdate(sliver));
 				}
 				
@@ -247,7 +269,9 @@ package protogeni.communication
 			if(slice.slivers.length > 0) {
 				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 				for each(var sliver:Sliver in slice.slivers.collection) {
-					if(skipDone && sliver.status == Sliver.STATUS_READY)
+					if(skipDone &&
+						(sliver.status == Sliver.STATUS_READY
+							|| sliver.status == Sliver.STATUS_FAILED))
 						continue;
 					if(sliver.manager.isAm)
 						pushRequest(new RequestSliverStatusAm(sliver));
@@ -255,6 +279,33 @@ package protogeni.communication
 						pushRequest(new RequestSliverStatus(sliver));
 				}
 			}
+		}
+		
+		/**
+		 * Redownloads everything for a slice
+		 * 
+		 * @param slice Slice to redownload everything
+		 * 
+		 */
+		public function regetSlice(slice:Slice):void
+		{
+			if(slice.slivers.length > 0) {
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(var sliver:Sliver in slice.slivers.collection) {
+					sliver.removeOutsideReferences();
+				}
+			}
+			this.pushRequest(new RequestSliceCredential(slice, true));
+		}
+		
+		
+		/**
+		 * Re-loads all of the slices from scratch
+		 * 
+		 */
+		public function regetSlices():void
+		{
+			this.pushRequest(new RequestUserResolve());
 		}
 		
 		/**
@@ -409,7 +460,7 @@ package protogeni.communication
 					Main.Application().setStatus(start.name, false);
 					LogHandler.appendMessage(new LogMessage(op.getUrl(),
 						start.name,
-						op.getSent(),
+						start.getSent(),
 						false,
 						LogMessage.TYPE_START));
 					
@@ -574,21 +625,23 @@ package protogeni.communication
 			{
 				if(code == CommunicationUtil.GENIRESPONSE_BUSY) {
 					Main.Application().setStatus(request.name + " busy", true);
-					if(request.numTries == 8) {
+					if(request.numTries == 10) {
 						LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
 																request.name + " busy",
 																"Reach limit of retries",
 																true,
 																LogMessage.TYPE_END ));
 					} else {
-						LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
-																request.name + " busy",
-																"Preparing to retry",
-																true,
-																LogMessage.TYPE_END ));
-						request.op.delaySeconds = 10;
+						// exponential backoff using the first number as the basic unit of seconds
+						
+						request.op.delaySeconds = Util.randomNumberBetween(10, 10 + Math.pow(2,request.numTries));
 						request.forceNext = true;
 						next = request;
+						LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
+																request.name + " busy",
+																"Preparing to retry in " + request.op.delaySeconds  + " seconds",
+																true,
+																LogMessage.TYPE_END ));
 					}
 				} else {
 					if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !request.ignoreReturnCode)
@@ -597,14 +650,14 @@ package protogeni.communication
 						LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
 																CommunicationUtil.GeniresponseToString(code),
 							"------------------------\nResponse:\n" +
-							request.op.getResponse() +
-							"\n\n------------------------\nRequest:\n" + request.op.getSent(),
+							request.getResponse() +
+							"\n\n------------------------\nRequest:\n" + request.getSent(),
 							true, LogMessage.TYPE_END));
 					} else {
 						Main.Application().setStatus(request.name + " done", false);
 						LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
 																request.name,
-																request.op.getResponse(),
+																request.getResponse(),
 																false,
 																LogMessage.TYPE_END));
 					}

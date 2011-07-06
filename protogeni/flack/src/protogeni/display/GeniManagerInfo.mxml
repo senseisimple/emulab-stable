@@ -166,7 +166,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			<s:Image id="statusIcon" />
 			<s:Label text="{gm.Hrn}" toolTip="{gm.Urn.full}" fontSize="17" fontWeight="bold" width="100%" id="hrnLabel" />
 			<components:ImageButton id="urlButton"
-								 icon="@Embed('../../../images/world.png')"
+								 icon="{ImageUtil.worldIcon}"
 								 click="navigateToURL(new URLRequest(gm.VisitUrl()), '_blank');"
 								 toolTip="Visit {gm.Url}" />
 			<components:ImageButton id="consoleButton"
@@ -189,8 +189,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		
 	</s:Group>
 	
-	<s:Button id="nodesButton" height="24"
-			  click="DisplayUtil.viewNodeCollection(new ArrayCollection(gm.AllNodesAsArray()));"/>
+	<s:HGroup>
+		<s:Button id="nodesButton" height="24"
+				  click="DisplayUtil.viewNodeCollection(new ArrayCollection(gm.AllNodesAsArray()));"/>
+		<s:Label id="nodesUnaddedLabel" fontWeight="bold" text="{this.gm.nodesUnadded}" />
+		<s:Label text="Nodes and" />
+		<s:Label id="linksUnaddedLabel" fontWeight="bold" text="{this.gm.linksUnadded}" />
+		<s:Label text="links not added" />
+	</s:HGroup>
 	
 	<s:VGroup id="diskImageGroup" visible="false" includeInLayout="{diskImageGroup.visible}" width="100%">
 		<s:Label text="Disk Images" fontWeight="bold" />

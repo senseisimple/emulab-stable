@@ -45,6 +45,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function init():void
 			{
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, tryUpdate);
+				update();
 			}
 			
 			public function destroy():void {
@@ -52,8 +53,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			public function tryUpdate(e:GeniEvent):void {
-				if(e.changedObject == slice)
+				var changedSlice:Slice = e.changedObject as Slice;
+				if(changedSlice.urn.full == slice.urn.full) {
+					slice = changedSlice;
 					update();
+				}
 			}
 			
 			public function update():void
@@ -85,8 +89,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 		]]>
 	</fx:Script>
-	<s:RadioButton enabled="{showCheckbox.selected}" id="sliceSelect"
-				   group="{radioGroup}"
+	<s:RadioButton enabled="{showCheckbox.selected}"
+				   id="sliceSelect"
+				   group="{radioGroup}" value="{slice}"
 				   fontSize="10" />
 	<s:Button id="sliceButton"
 			   height="24"

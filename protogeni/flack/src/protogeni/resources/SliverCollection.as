@@ -87,10 +87,17 @@ package protogeni.resources
 			if(this.collection.length == 0)
 				return null;
 			var fakeManager:ProtogeniComponentManager = new ProtogeniComponentManager();
-			fakeManager.inputRspecVersion = Util.defaultRspecVersion;
+			if(this.collection.length > 0)
+				fakeManager.inputRspecVersion = this.collection[0].slice.useInputRspecVersion;
+			else
+				fakeManager.inputRspecVersion = Util.defaultRspecVersion;
 			fakeManager.Hrn = "Combined";
 			var newSliver:Sliver = new Sliver(null, fakeManager);
 			for each(var sliver:Sliver in this.collection) {
+				for each(var ns:Namespace in sliver.extensionNamespaces) {
+					if(newSliver.extensionNamespaces.indexOf(ns) == -1)
+						newSliver.extensionNamespaces.push(ns);
+				}
 				if(newSliver.slice == null)
 					newSliver.slice = sliver.slice;
 				for each(var node:VirtualNode in sliver.nodes.collection) {

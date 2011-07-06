@@ -113,9 +113,9 @@ package protogeni.resources
 			return this.manager.rspecProcessor.generateSliverRspec(this, removeNonexplicitBinding, slice.useInputRspecVersion);
 		}
 		
-		public function parseRspec():void
+		public function parseRspec(onlyListFromManifest:Boolean = true):void
 		{
-			return this.manager.rspecProcessor.processSliverRspec(this);
+			return this.manager.rspecProcessor.processSliverRspec(this, onlyListFromManifest);
 		}
 		
 		public function removeOutsideReferences():void

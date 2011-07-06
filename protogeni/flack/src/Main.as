@@ -51,8 +51,10 @@
 	[Bindable]
 	public static var offlineMode:Boolean = false;
 	
+	public static var useCache:Boolean = false;
+	
 	public static var allowCaching:Boolean = true;
 	
-	public static const version:String = "v2011-6-30.5:28PM";
+	public static const version:String = "v2011-7-6.5:08PM";
   }
 }

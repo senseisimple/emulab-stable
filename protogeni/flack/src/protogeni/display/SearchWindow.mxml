@@ -27,10 +27,15 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						close="closeWindow()">
 	<fx:Script>
 		<![CDATA[
+			import mx.controls.Alert;
 			import mx.core.IVisualElement;
 			
 			protected function search():void
 			{
+				if(this.searchField.Text.length == 0) {
+					Alert.show("Please enter a string for a resource you want to search for (ID, URN, etc.)");
+					return;
+				}
 				resultsBox.removeAllElements();
 				var results:Array = Main.geniHandler.search(searchField.textInput.text, matchCheck.selected);
 				for each(var d:DisplayObject in results)

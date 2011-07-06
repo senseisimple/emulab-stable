@@ -169,14 +169,16 @@ package protogeni.resources
 					// Get location info
 					var lat:Number = -72.134678;
 					var lng:Number = 170.332031;
-					var locationXml:XML = nodeXml.defaultNamespace::location[0];
-					if(Number(locationXml.@latitude)
-						&& Number(locationXml.@latitude) != 0
-						&& Number(locationXml.@longitude)
-						&& Number(locationXml.@longitude) != 0)
-					{
-						lat = Number(locationXml.@latitude);
-						lng = Number(locationXml.@longitude);
+					if(nodeXml.defaultNamespace::location.length() == 1) {
+						var locationXml:XML = nodeXml.defaultNamespace::location[0];
+						if(Number(locationXml.@latitude)
+							&& Number(locationXml.@latitude) != 0
+							&& Number(locationXml.@longitude)
+							&& Number(locationXml.@longitude) != 0)
+						{
+							lat = Number(locationXml.@latitude);
+							lng = Number(locationXml.@longitude);
+						}
 					}
 					
 					// Assign to a group based on location
@@ -291,6 +293,7 @@ package protogeni.resources
 					this.nodeNameDictionary[node.name] = node;
 					this.manager.AllNodes.push(node);
 				} catch(e:Error) {
+					this.manager.nodesUnadded++;
 					// skip if some problem
 					if(Main.debugMode)
 						trace("Skipped node which threw error in manager named " + manager.Hrn);
@@ -353,16 +356,35 @@ package protogeni.resources
 						}
 					}
 					
-					var lg:PhysicalLinkGroup = this.manager.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(),
-															l.interfaceRefs.collection[0].owner.GetLongitude(),
-															l.interfaceRefs.collection[1].owner.GetLatitude(),
-															l.interfaceRefs.collection[1].owner.GetLongitude());
+					var lg:PhysicalLinkGroup = null;
+					if(l.interfaceRefs.length > 1) {
+						lg = this.manager.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(),
+							l.interfaceRefs.collection[0].owner.GetLongitude(),
+							l.interfaceRefs.collection[1].owner.GetLatitude(),
+							l.interfaceRefs.collection[1].owner.GetLongitude());
+					} else if(l.interfaceRefs.length == 1) {
+						lg = this.manager.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(),
+							l.interfaceRefs.collection[0].owner.GetLongitude(),
+							l.interfaceRefs.collection[0].owner.GetLatitude(),
+							l.interfaceRefs.collection[0].owner.GetLongitude());
+					}
+					
 					if(lg == null) {
-						lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(),
-													l.interfaceRefs.collection[0].owner.GetLongitude(),
-													l.interfaceRefs.collection[1].owner.GetLatitude(),
-													l.interfaceRefs.collection[1].owner.GetLongitude(),
-													this.manager.Links);
+						if(l.interfaceRefs.length > 1) {
+							lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(),
+								l.interfaceRefs.collection[0].owner.GetLongitude(),
+								l.interfaceRefs.collection[1].owner.GetLatitude(),
+								l.interfaceRefs.collection[1].owner.GetLongitude(),
+								this.manager.Links);
+						} else if(l.interfaceRefs.length == 1) {
+							lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(),
+								l.interfaceRefs.collection[0].owner.GetLongitude(),
+								l.interfaceRefs.collection[0].owner.GetLatitude(),
+								l.interfaceRefs.collection[0].owner.GetLongitude(),
+								this.manager.Links);
+						} else {
+							lg = new PhysicalLinkGroup(0, 0, 0, 0, this.manager.Links);
+						}
 						this.manager.Links.Add(lg);
 					}
 					l.owner = lg;
@@ -425,6 +447,7 @@ package protogeni.resources
 						l.interfaceRefs.collection[0].owner.owner.links = lg;
 					this.manager.AllLinks.push(l);
 				} catch(e:Error) {
+					this.manager.linksUnadded++;
 					// skip if some problem
 					if(Main.debugMode)
 						trace("Skipped link which threw error in manager named " + manager.Hrn);
@@ -443,7 +466,8 @@ package protogeni.resources
 		}
 		
 		private var detectedInputRspecVersion:Number;
-		public function processSliverRspec(s:Sliver):void
+		public function processSliverRspec(s:Sliver,
+										   onlyListFromManifest:Boolean):void
 		{
 			var defaultNamespace:Namespace = s.rspec.namespace();
 			switch(defaultNamespace.uri) {
@@ -543,6 +567,7 @@ package protogeni.resources
 						virtualNode.virtualizationType = String(nodeXml.@virtualization_type);
 					if(nodeXml.@virtualization_subtype.length() == 1)
 						virtualNode.virtualizationSubtype = String(nodeXml.@virtualization_subtype);
+				
 				} else {
 					virtualNode.clientId = String(nodeXml.@client_id);
 					if(virtualNode.manager == null)
@@ -550,6 +575,11 @@ package protogeni.resources
 					virtualNode._exclusive = String(nodeXml.@exclusive) == "true" || String(nodeXml.@exclusive) == "1";
 					virtualNode.sliverId = String(nodeXml.@sliver_id);
 				}
+				
+				// PlanetLab lists all, so this is to only keep sliver nodes
+				if(onlyListFromManifest
+					&& virtualNode.sliverId.length == 0)
+					continue;
 				
 				var sliverTypeShapingXml:XML = null;
 				for each(var nodeChildXml:XML in nodeXml.children()) {

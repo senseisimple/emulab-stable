@@ -164,7 +164,8 @@ package protogeni.resources
 			return;
 		}
 		
-		public function processSliverRspec(s:Sliver):void
+		public function processSliverRspec(s:Sliver,
+										   onlyListFromManifest:Boolean):void
 		{
 			/*var networkXml:XMLList = s.rspec.children();
 			for each(var siteXml:XML in networkXml[0].children()) {
