@@ -260,17 +260,17 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				// Make sure extensions are valid
 				if(this.extensionsTextarea != null) {
 					try {
-					var extensions:XMLList = new XMLList(extensionsTextarea.text);
-					// Add any new namespaces to the sliver
-					for each(var extension:XML in extensions) {
-						var newNamespaces:Array = [];
-						for each(var extensionNamespace:Namespace in extension.namespaceDeclarations()) {
-							if(!XmlUtil.isKnownNamespace(extensionNamespace) && this.node.sliver.extensionNamespaces.indexOf(extensionNamespace) == -1) {
-								this.node.sliver.extensionNamespaces.push(extensionNamespace);
+						var extensions:XMLList = new XMLList(extensionsTextarea.text);
+						// Add any new namespaces to the sliver
+						for each(var extension:XML in extensions) {
+							var newNamespaces:Array = [];
+							for each(var extensionNamespace:Namespace in extension.namespaceDeclarations()) {
+								if(!XmlUtil.isKnownNamespace(extensionNamespace) && this.node.sliver.extensionNamespaces.indexOf(extensionNamespace) == -1) {
+									this.node.sliver.extensionNamespaces.push(extensionNamespace);
+								}
 							}
 						}
-					}
-					this.node.extensionsNodes = new XMLListCollection(extensions);
+						this.node.extensionsNodes = new XMLListCollection(extensions);
 					} catch(e:Error) {
 						if(e.errorID == 1063)
 							Alert.show("Prefixes must have namespaces declared. If they are, check that the XML is valid.");

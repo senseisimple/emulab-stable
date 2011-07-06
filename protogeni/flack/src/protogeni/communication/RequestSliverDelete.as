@@ -14,6 +14,12 @@
 
 package protogeni.communication
 {
+	import com.mattism.http.xmlrpc.MethodFault;
+	
+	import flash.events.ErrorEvent;
+	
+	import mx.controls.Alert;
+	
 	import protogeni.GeniEvent;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
@@ -43,7 +49,8 @@ package protogeni.communication
 		
 		override public function complete(code:Number, response:Object):*
 		{
-			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS
+				|| code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)
 			{
 				sliver.removeOutsideReferences();
 				if(sliver.slice.slivers.contains(sliver))
@@ -61,15 +68,20 @@ package protogeni.communication
 			}
 			else
 			{
-				// problem removing??
+				Alert.show("Failed to delete sliver on " + this.sliver.manager.Hrn + ", check logs and try again.");
 			}
 			
 			return null;
 		}
 		
+		override public function fail(event:ErrorEvent, fault:MethodFault):* {
+			Alert.show("Failed to delete sliver on " + this.sliver.manager.Hrn + ", check logs and try again.");
+			return super.fail(event, fault);
+		}
+		
 		override public function cleanup():void {
 			super.cleanup();
-			Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_POPULATING);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice, GeniEvent.ACTION_REMOVING);
 		}
 	}
 }

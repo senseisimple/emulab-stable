@@ -123,22 +123,23 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			private var waitingForSliceUrn:String = "";
 			public function sliceChanged(e:GeniEvent):void
 			{
+				var changedSlice:Slice = e.changedObject as Slice;
 				if(waitingForSliceUrn.length>0) {
-					if(waitingForSliceUrn == e.changedObject.urn.full
-						&& e.changedObject.CompletelyReady) {
-						this.loadSlice(e.changedObject as Slice);
+					if(waitingForSliceUrn == changedSlice.urn.full
+						&& changedSlice.CompletelyReady) {
+						this.loadSlice(changedSlice);
 						waitingForSliceUrn = "";
 						
-						spinner.visible = e.changedObject.MakingCalls;
+						spinner.visible = (!changedSlice.CompletelyReady && !changedSlice.isStaged()) || this.sliceCanvas.slice.Status() == Sliver.STATUS_CHANGING;
 						if(spinner.visible)
 							spinner.startSpin();
 						else
 							spinner.stopSpin();
 					}
-				} else if(e.changedObject.urn.full == sliceCanvas.slice.urn.full) {
+				} else if(changedSlice.urn.full == sliceCanvas.slice.urn.full) {
 					refreshSlice();
 					
-					spinner.visible = e.changedObject.MakingCalls;
+					spinner.visible = (!changedSlice.CompletelyReady && !changedSlice.isStaged()) || this.sliceCanvas.slice.Status() == Sliver.STATUS_CHANGING;
 					if(spinner.visible)
 						spinner.startSpin();
 					else
@@ -282,10 +283,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					&& this.sliceCanvas.slice.hasAllAllocatedResources()
 					&& !this.sliceCanvas.slice.isStaged()
 					&& Main.geniHandler.requestHandler.queue.isEmpty()
-					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_READY
-					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_FAILED
-					&& !Main.offlineMode)
+					&& this.sliceCanvas.slice.Status() == Sliver.STATUS_CHANGING
+					&& !Main.offlineMode) {
 					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice, true);
+				}
 			}
 			
 			/**
@@ -660,7 +661,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				if(url.length == 0) {
 					var getUrlWindow:TextInputWindow = new TextInputWindow();
 					getUrlWindow.title = "Please enter the full URL for the RSPEC";
-					getUrlWindow.showWindow();
+					getUrlWindow.showWindow(true);
 					getUrlWindow.onCancel = null;
 					getUrlWindow.onSuccess = tryImportUrl;
 				}

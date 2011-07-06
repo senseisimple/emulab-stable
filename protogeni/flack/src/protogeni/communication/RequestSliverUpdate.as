@@ -19,6 +19,7 @@ package protogeni.communication
 	public final class RequestSliverUpdate extends Request
 	{
 		public var sliver:Sliver;
+		public var rspec:String = "";
 		
 		/**
 		 * Creates a redeemable ticket for a sliver with a different configuration using the ProtoGENI API
@@ -26,7 +27,7 @@ package protogeni.communication
 		 * @param newSliver
 		 * 
 		 */
-		public function RequestSliverUpdate(newSliver:Sliver, rspec:XML = null):void
+		public function RequestSliverUpdate(newSliver:Sliver, useRspec:XML = null):void
 		{
 			super("SliverUpdate",
 				"Updating sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
@@ -39,10 +40,11 @@ package protogeni.communication
 			
 			// Build up the args
 			op.addField("sliver_urn", sliver.urn.full);
-			if(rspec != null)
-				op.addField("rspec", rspec.toXMLString());
+			if(useRspec != null)
+				rspec = useRspec.toXMLString()
 			else
-				op.addField("rspec", sliver.getRequestRspec(false).toXMLString());
+				rspec = sliver.getRequestRspec(false).toXMLString();
+			op.addField("rspec", rspec);
 			op.addField("credentials", [sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
@@ -69,6 +71,10 @@ package protogeni.communication
 		override public function cleanup():void {
 			super.cleanup();
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+		}
+		
+		override public function getSent():String {
+			return op.getSent() + "\n\n********RSPEC********\n\n" + rspec;
 		}
 	}
 }

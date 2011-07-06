@@ -26,6 +26,7 @@ package protogeni.communication
 	import flash.utils.Timer;
 	
 	import protogeni.NetUtil;
+	import protogeni.Util;
 	
 	/**
 	 * Handles XML-RPC or HTTP calls for requests

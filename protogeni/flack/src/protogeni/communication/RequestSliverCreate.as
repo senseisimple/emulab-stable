@@ -18,6 +18,8 @@ package protogeni.communication
 	
 	import flash.events.ErrorEvent;
 	
+	import mx.controls.Alert;
+	
 	import protogeni.GeniEvent;
 	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Key;
@@ -42,6 +44,8 @@ package protogeni.communication
 			sliver = s;
 			s.created = false;
 			s.staged = false;
+			s.status = "";
+			s.state = "";
 			
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			
@@ -50,7 +54,7 @@ package protogeni.communication
 			if(rspec != null)
 				op.addField("rspec", rspec.toXMLString());
 			else
-				op.addField("rspec", sliver.getRequestRspec(true).toXMLString());
+				op.addField("rspec", sliver.slice.slivers.getCombined().getRequestRspec(true).toXMLString());
 			var keys:Array = [];
 			for each(var key:Key in sliver.slice.creator.keys) {
 				keys.push({type:key.type, key:key.value});
@@ -96,10 +100,11 @@ package protogeni.communication
 		}
 		
 		private function failed():void {
-			// Remove any pending SliverCreate calls
 			sliver.status = Sliver.STATUS_FAILED;
 			sliver.state = Sliver.STATE_NA;
+			Alert.show("Failed to create sliver on " + sliver.manager.Hrn);
 			
+			/*
 			// Cancel remaining calls
 			var tryDeleteNode:RequestQueueNode = this.node.next;
 			while(tryDeleteNode != null && tryDeleteNode.item is RequestSliverCreate && (tryDeleteNode.item as RequestSliverCreate).sliver.slice == sliver.slice)
@@ -112,6 +117,7 @@ package protogeni.communication
 			
 			// Show the error
 			LogHandler.viewConsole();
+			*/
 		}
 		
 		override public function fail(event:ErrorEvent, fault:MethodFault):*

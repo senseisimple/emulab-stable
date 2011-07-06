@@ -14,6 +14,12 @@
 
 package protogeni.communication
 {
+	import com.mattism.http.xmlrpc.MethodFault;
+	
+	import flash.events.ErrorEvent;
+	
+	import mx.controls.Alert;
+	
 	import protogeni.GeniEvent;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
@@ -32,7 +38,9 @@ package protogeni.communication
 		{
 			super("SliverDeleteAM",
 				"Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
-				CommunicationUtil.deleteSliverAm);
+				CommunicationUtil.deleteSliverAm,
+				true,
+				true);
 			ignoreReturnCode = true;
 			sliver = s;
 			
@@ -56,14 +64,22 @@ package protogeni.communication
 							old.slivers.remove(old.slivers.getByUrn(sliver.urn.full));
 						Main.geniDispatcher.dispatchSliceChanged(old);
 					}
-				}
+				} else if(response == false) {
+					Alert.show("Recieved false when trying to delete sliver on " + this.sliver.manager.Hrn + ".");
+				} else
+					throw new Error();
 			}
 			catch(e:Error)
 			{
-				// problem removing??
+				Alert.show("Failed to delete sliver on " + this.sliver.manager.Hrn + ", check logs and try again.");
 			}
 			
 			return null;
+		}
+		
+		override public function fail(event:ErrorEvent, fault:MethodFault):* {
+			Alert.show("Failed to delete sliver on " + this.sliver.manager.Hrn + ", check logs and try again. A possibility is that the sliver doesn't exist.");
+			return super.fail(event, fault);
 		}
 		
 		override public function cleanup():void {

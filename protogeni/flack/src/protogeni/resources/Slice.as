@@ -84,7 +84,7 @@ package protogeni.resources
 			// Return false if any sliver hasn't gotten its status
 			if(this.credential.length > 0) {
 				for each(var sliver:Sliver in this.slivers.collection) {
-					if(!sliver.created || sliver.status.length == 0)
+					if((!sliver.created || sliver.status == Sliver.STATUS_FAILED) || sliver.status.length == 0)
 						return false;
 				}
 				return true;
@@ -94,16 +94,15 @@ package protogeni.resources
 		
 		public function Status():String {
 			if(this.hrn == null) return null;
-			var status:String = Sliver.STATUS_NA;
+			var status:String = "";
 			for each(var sliver:Sliver in this.slivers.collection) {
-				if(sliver.status == Sliver.STATUS_FAILED)
-					return Sliver.STATUS_FAILED;
-				
-				if(status == Sliver.STATUS_NA) status = sliver.status;
-				else {
-					if(sliver.status != status)
-						return Sliver.STATUS_MIXED;
-				}
+				if(status.length == 0) status = sliver.status;
+				if(sliver.status.length > 0
+					&& sliver.status != Sliver.STATUS_READY
+					&& sliver.status != Sliver.STATUS_FAILED)
+					return Sliver.STATUS_CHANGING;
+				if(sliver.status != status)
+					status = Sliver.STATUS_MIXED;
 			}
 			return status;
 		}
@@ -128,7 +127,7 @@ package protogeni.resources
 			
 			for each(var existing:Sliver in this.slivers.collection)
 			{
-				if(!(existing.created || existing.staged))
+				if(!(existing.created || existing.status == Sliver.STATUS_FAILED || existing.staged))
 					return false;
 			}
 			return true;
@@ -152,7 +151,7 @@ package protogeni.resources
 			
 			for each(var existing:Sliver in this.slivers.collection)
 			{
-				if(!existing.created)
+				if(!(existing.created || existing.status == Sliver.STATUS_FAILED))
 					return false;
 			}
 			return true;
