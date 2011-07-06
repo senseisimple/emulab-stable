@@ -23,7 +23,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		  xmlns:display="protogeni.display.*"
 		  xmlns:components="protogeni.display.components.*"
 		  width="210" height="180"
-		  horizontalAlign="center" gap="2" paddingLeft="0">
+		  horizontalAlign="center" gap="2" paddingLeft="0"
+		  mouseWheel="event.stopPropagation()">
 	<fx:Script>
 		<![CDATA[
 			import com.google.maps.LatLng;

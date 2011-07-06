@@ -690,6 +690,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function importError(e:*):void {
 				Alert.show("Problem downloading the RSPEC\n\n" + e.toString());
 			}
+			
+			public function regetSlice():void {
+				sliceCanvas.clear();
+				Main.geniHandler.requestHandler.regetSlice(sliceCanvas.slice);
+			}
 
 		]]>
 	</fx:Script>
@@ -742,10 +747,15 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 								toolTip="Save the slice credential to file"
 								click="saveCredential()"
 								icon="{ImageUtil.credentialIcon}" />
+		<components:DefaultLine height="14" visible="false" />
 		<components:ImageButton id="rspecButton"
 								icon="{ImageUtil.pageWhiteIcon}"
 								click="viewRspecs()"
 								toolTip="View the most recent valid RSPEC" />
+		<components:ImageButton id="regetSliceButton"
+								icon="{ImageUtil.refreshIcon}"
+								click="regetSlice()"
+								toolTip="Re-load the entire slice from scratch" />
 	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
 		<s:Scroller height="100%" minWidth="150">

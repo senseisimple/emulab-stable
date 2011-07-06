@@ -82,18 +82,22 @@ package protogeni
 		}
 		
 		public function destroy():void {
+			this.requestHandler.stop();
+			this.clearComponents();
 			this.mapHandler.destruct();
-			this.requestHandler.pause();
-			this.requestHandler.clearAll();
 		}
 		
 		public function clearComponents() : void
 		{
 			Main.geniDispatcher.dispatchGeniManagersChanged(GeniEvent.ACTION_REMOVING);
 			Main.geniDispatcher.dispatchSlicesChanged(GeniEvent.ACTION_REMOVING);
-			this.GeniManagers = new GeniManagerCollection();
-			if(this.CurrentUser != null)
+			if(this.CurrentUser != null) {
+				this.CurrentUser.slices.removeOutsideReferences();
 				this.CurrentUser.slices = new SliceCollection();
+				Main.geniDispatcher.dispatchSlicesChanged(GeniEvent.ACTION_REMOVED);
+			}
+			this.GeniManagers = new GeniManagerCollection();
+			Main.geniDispatcher.dispatchGeniManagersChanged(GeniEvent.ACTION_REMOVED);
 		}
 		
 		public function search(s:String, matchAll:Boolean):Array

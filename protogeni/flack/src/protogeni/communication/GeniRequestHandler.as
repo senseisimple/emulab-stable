@@ -65,7 +65,7 @@ package protogeni.communication
 				|| Main.geniHandler.CurrentUser.authority == null) {
 				DisplayUtil.viewInitialUserWindow();
 			} else {
-				startAuthenticatedInitiationSequence();
+				startAuthenticatedInitiationSequence(true);
 			}
 		}
 		
@@ -79,10 +79,13 @@ package protogeni.communication
 				DisplayUtil.viewInitialUserWindow();
 				return;
 			}
+			this.isPaused = false;
+			this.forceStop = false;
 			if(Main.geniHandler.CurrentUser.Credential.length == 0) {
 				pushRequest(new RequestGetCredential());
 				pushRequest(new RequestGetKeys());
 			}
+			
 			loadListAndComponentManagers(getSlices);
 			Main.Application().hideAuthenticate();
 		}
@@ -102,11 +105,28 @@ package protogeni.communication
 			newCm.Status = GeniManager.STATUS_INPROGRESS;
 			this.pushRequest(new RequestGetVersionAm(newCm));*/
 			
-			if(Main.geniHandler.unauthenticatedMode)
-				pushRequest(new RequestListComponentsPublic());
-			else
-				pushRequest(new RequestListComponents(true, getSlices));
-			
+			if(!Main.useCache) {
+				if(Main.geniHandler.unauthenticatedMode)
+					pushRequest(new RequestListComponentsPublic());
+				else
+					pushRequest(new RequestListComponents(true, getSlices));
+			} else {
+				FlackCache.applyOffline(false, loadUserAndSlices);
+			}
+		}
+		
+		public function loadUserAndSlices():void
+		{
+			if(Main.geniHandler.CurrentUser.userCredential.length > 0)
+				this.pushRequest(new RequestUserResolve());
+			else if(Main.geniHandler.CurrentUser.sliceCredential.length > 0) {
+				for each(var slice:Slice in Main.geniHandler.CurrentUser.slices) {
+					if(slice.credential == Main.geniHandler.CurrentUser.sliceCredential) {
+						Main.geniHandler.requestHandler.discoverSliceAllocatedResources(slice);
+						break;
+					}
+				}
+			}
 		}
 		
 		/**
@@ -259,6 +279,33 @@ package protogeni.communication
 						pushRequest(new RequestSliverStatus(sliver));
 				}
 			}
+		}
+		
+		/**
+		 * Redownloads everything for a slice
+		 * 
+		 * @param slice Slice to redownload everything
+		 * 
+		 */
+		public function regetSlice(slice:Slice):void
+		{
+			if(slice.slivers.length > 0) {
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(var sliver:Sliver in slice.slivers.collection) {
+					sliver.removeOutsideReferences();
+				}
+			}
+			this.pushRequest(new RequestSliceCredential(slice, true));
+		}
+		
+		
+		/**
+		 * Re-loads all of the slices from scratch
+		 * 
+		 */
+		public function regetSlices():void
+		{
+			this.pushRequest(new RequestUserResolve());
 		}
 		
 		/**

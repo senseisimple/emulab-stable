@@ -169,14 +169,16 @@ package protogeni.resources
 					// Get location info
 					var lat:Number = -72.134678;
 					var lng:Number = 170.332031;
-					var locationXml:XML = nodeXml.defaultNamespace::location[0];
-					if(Number(locationXml.@latitude)
-						&& Number(locationXml.@latitude) != 0
-						&& Number(locationXml.@longitude)
-						&& Number(locationXml.@longitude) != 0)
-					{
-						lat = Number(locationXml.@latitude);
-						lng = Number(locationXml.@longitude);
+					if(nodeXml.defaultNamespace::location.length() == 1) {
+						var locationXml:XML = nodeXml.defaultNamespace::location[0];
+						if(Number(locationXml.@latitude)
+							&& Number(locationXml.@latitude) != 0
+							&& Number(locationXml.@longitude)
+							&& Number(locationXml.@longitude) != 0)
+						{
+							lat = Number(locationXml.@latitude);
+							lng = Number(locationXml.@longitude);
+						}
 					}
 					
 					// Assign to a group based on location
@@ -354,16 +356,35 @@ package protogeni.resources
 						}
 					}
 					
-					var lg:PhysicalLinkGroup = this.manager.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(),
-															l.interfaceRefs.collection[0].owner.GetLongitude(),
-															l.interfaceRefs.collection[1].owner.GetLatitude(),
-															l.interfaceRefs.collection[1].owner.GetLongitude());
+					var lg:PhysicalLinkGroup = null;
+					if(l.interfaceRefs.length > 1) {
+						lg = this.manager.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(),
+							l.interfaceRefs.collection[0].owner.GetLongitude(),
+							l.interfaceRefs.collection[1].owner.GetLatitude(),
+							l.interfaceRefs.collection[1].owner.GetLongitude());
+					} else if(l.interfaceRefs.length == 1) {
+						lg = this.manager.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(),
+							l.interfaceRefs.collection[0].owner.GetLongitude(),
+							l.interfaceRefs.collection[0].owner.GetLatitude(),
+							l.interfaceRefs.collection[0].owner.GetLongitude());
+					}
+					
 					if(lg == null) {
-						lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(),
-													l.interfaceRefs.collection[0].owner.GetLongitude(),
-													l.interfaceRefs.collection[1].owner.GetLatitude(),
-													l.interfaceRefs.collection[1].owner.GetLongitude(),
-													this.manager.Links);
+						if(l.interfaceRefs.length > 1) {
+							lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(),
+								l.interfaceRefs.collection[0].owner.GetLongitude(),
+								l.interfaceRefs.collection[1].owner.GetLatitude(),
+								l.interfaceRefs.collection[1].owner.GetLongitude(),
+								this.manager.Links);
+						} else if(l.interfaceRefs.length == 1) {
+							lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(),
+								l.interfaceRefs.collection[0].owner.GetLongitude(),
+								l.interfaceRefs.collection[0].owner.GetLatitude(),
+								l.interfaceRefs.collection[0].owner.GetLongitude(),
+								this.manager.Links);
+						} else {
+							lg = new PhysicalLinkGroup(0, 0, 0, 0, this.manager.Links);
+						}
 						this.manager.Links.Add(lg);
 					}
 					l.owner = lg;

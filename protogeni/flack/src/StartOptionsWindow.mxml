@@ -25,13 +25,17 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
 			   close="closeWindow()"
 			   defaultButton="{this.loginButton}"
-			   contentCreationComplete="this.closeButton = null; this.loginButton.setFocus();">
+			   contentCreationComplete="init();">
 	<s:layout>
 		<s:VerticalLayout horizontalAlign="center" />
 	</s:layout>
 	
 	<fx:Script>
 		<![CDATA[
+			import flash.globalization.DateTimeFormatter;
+			import flash.globalization.DateTimeStyle;
+			import flash.globalization.LocaleID;
+			
 			import mx.core.FlexGlobals;
 			import mx.core.IFlexDisplayObject;
 			import mx.managers.PopUpManager;
@@ -45,11 +49,24 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function showWindow():void
 			{
 				showOffline = FlackCache.offlineAvailable;
+				
 				if(!this.isPopUp)
 					PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, true);
 				else
 					PopUpManager.bringToFront(this);				
 				PopUpManager.centerPopUp(this);
+			}
+			
+			public function init():void {
+				this.closeButton = null;
+				this.loginButton.setFocus();
+				var lastChangeDate:Date = FlackCache.getOfflineLastChange();
+				if(lastChangeDate != null) {
+					useCachedAdvertisementsCheckbox.visible = true;
+					useCachedAdvertisementsCheckbox.includeInLayout = true;
+					var dateFormatter:DateTimeFormatter = new DateTimeFormatter(LocaleID.DEFAULT, DateTimeStyle.SHORT, DateTimeStyle.SHORT);
+					useCachedAdvertisementsCheckbox.toolTip = dateFormatter.format(lastChangeDate);
+				}
 			}
 			
 			public function closeWindow(event:Event = null):void
@@ -67,6 +84,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function doAuthenticate():void {
 				if(Main.useJavascript && Main.geniHandler.CurrentUser.hasSetupJavascript)
 					Main.geniHandler.unauthenticatedMode = false;
+				Main.useCache = this.useCachedAdvertisementsCheckbox.selected;
 				Main.geniHandler.requestHandler.startInitiationSequence(true);
 				this.closeWindow();
 			}
@@ -82,31 +100,33 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	</fx:Script>
 	
 	<s:BitmapImage source="{ImageUtil.logoIcon}" />
-	<s:VGroup width="50%" paddingTop="10" paddingBottom="10" horizontalAlign="center">
+	<s:VGroup width="100%" paddingTop="10" paddingBottom="10" horizontalAlign="center">
 		<s:Button label="Log in" id="loginButton"
-				  width="100%" height="28"
+				  width="50%" height="28"
 				  icon="{ImageUtil.authenticationIcon}"
 				  toolTip="Log in to view and be able to allocate resources"
 				  click="doAuthenticate()" />
+		<s:CheckBox id="useCachedAdvertisementsCheckbox" label="Use cache"
+					visible="{showOffline}" includeInLayout="{showOffline}"/>
 		<s:Button label="Tutorial" id="tutorialButton"
-				  width="100%" height="28"
+				  width="50%" height="28"
 				  icon="{ImageUtil.helpIcon}"
 				  toolTip="View a quick tutorial on how to use Flack"
 				  click="NetUtil.showTutorial();" />
 		<s:Label text="Not a user?" />
 		<s:Button label="View resources"
-				  width="100%" height="28"
+				  width="50%" height="28"
 				  toolTip="View resources available in GENI, but allocation of resources is not available"
 				  click="doPublic()" />
 		<s:Button label="Become a user"
-				  width="100%" height="28"
+				  width="50%" height="28"
 				  icon="{ImageUtil.userIcon}"
 				  toolTip="Follow a few simple steps to be able to allocate resources"
 				  click="NetUtil.showBecomingAUser();" />
-		<s:Label text="Want to use the cached data?"
+		<s:Label text="Offline?"
 				 visible="{showOffline}" includeInLayout="{showOffline}" />
 		<s:Button label="Load cached data"
-				  width="100%" height="28"
+				  width="50%" height="28"
 				  visible="{showOffline}" includeInLayout="{showOffline}"
 				  toolTip="Use the last saved offline data"
 				  click="doOffline();" />

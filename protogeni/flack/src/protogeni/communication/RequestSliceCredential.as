@@ -25,6 +25,7 @@ package protogeni.communication
 	public final class RequestSliceCredential extends Request
 	{
 		private var slice:Slice;
+		private var exploreAllManagers:Boolean;
 		
 		/**
 		 * Gets the slice credential from the user's slice authority using the ProtoGENI API
@@ -32,13 +33,14 @@ package protogeni.communication
 		 * @param s slice which we need the credential for
 		 * 
 		 */
-		public function RequestSliceCredential(newSlice:Slice):void
+		public function RequestSliceCredential(newSlice:Slice, shouldExploreAllManagers:Boolean = false):void
 		{
 			super("SliceCredential",
 				"Getting the slice credential for " + newSlice.hrn,
 				CommunicationUtil.getCredential,
 				true);
 			slice = newSlice;
+			exploreAllManagers = shouldExploreAllManagers;
 			
 			// Build up the args
 			op.addField("credential", Main.geniHandler.CurrentUser.Credential);
@@ -57,19 +59,32 @@ package protogeni.communication
 				var cred:XML = new XML(slice.credential);
 				slice.expires = Util.parseProtogeniDate(cred.credential.expires);
 				
-				for each(var s:Sliver in slice.slivers.collection) {
-					if(s.manager.isAm)
-						newCalls.push(new RequestSliverListResourcesAm(s));
-					else
-						newCalls.push(new RequestSliverGet(s));
-				}
-
-				for each(var manager:GeniManager in Main.geniHandler.GeniManagers) {
-					if(manager.isAm) {
-						var newSliver:Sliver = new Sliver(slice, manager);
-						Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
+				var manager:GeniManager;
+				var newSliver:Sliver;
+				if(!exploreAllManagers) {
+					for each(var s:Sliver in slice.slivers.collection) {
+						if(s.manager.isAm)
+							newCalls.push(new RequestSliverListResourcesAm(s));
+						else
+							newCalls.push(new RequestSliverGet(s));
+					}
+					
+					for each(manager in Main.geniHandler.GeniManagers) {
+						if(manager.isAm) {
+							newSliver = new Sliver(slice, manager);
+							Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
+						}
+					}
+				} else {
+					for each(manager in Main.geniHandler.GeniManagers) {
+						newSliver = new Sliver(slice, manager);
+						if(manager.isAm)
+							Main.geniHandler.requestHandler.pushRequest(new RequestSliverListResourcesAm(newSliver));
+						else
+							newCalls.push(new RequestSliverGet(newSliver));
 					}
 				}
+				
 			}
 			else
 			{

@@ -257,6 +257,12 @@ package protogeni.resources
 			return newSliver;
 		}
 		
+		public function removeOutsideReferences():void {
+			for each(var s:Sliver in this.slivers.collection) {
+				s.removeOutsideReferences();
+			}
+		}
+		
 		public function clone(addOutsideReferences:Boolean = true):Slice
 		{
 			var newSlice:Slice = new Slice();
