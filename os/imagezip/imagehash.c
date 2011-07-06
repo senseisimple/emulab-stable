@@ -52,11 +52,13 @@ static int doall = 1;
 static int detail = 0;
 static int create = 0;
 static int report = 0;
+static int fixedoffset = 0;
 static int regfile = 0;
 static int nothreads = 0;
 static int hashtype = HASH_TYPE_SHA1;
 static int hashlen = 20;
 static long hashblksize = HASHBLK_SIZE;
+static int hashblksizeinsec;
 static unsigned long long ndatabytes;
 static unsigned long nchunks, nregions, nhregions;
 static char *imagename;
@@ -102,7 +104,7 @@ main(int argc, char **argv)
 	extern char build_info[];
 	struct hashinfo *hashinfo = 0;
 
-	while ((ch = getopt(argc, argv, "cb:dvhno:rD:NVRF:")) != -1)
+	while ((ch = getopt(argc, argv, "cb:dvhno:rD:NVRfF:")) != -1)
 		switch(ch) {
 		case 'b':
 			hashblksize = atol(optarg);
@@ -115,6 +117,9 @@ main(int argc, char **argv)
 			break;
 		case 'F':
 			fileid = strdup(optarg);
+			break;
+		case 'f':
+			fixedoffset = 1;
 			break;
 		case 'R':
 			report++;
@@ -197,6 +202,8 @@ main(int argc, char **argv)
 #ifdef SIGINFO
 	signal(SIGINFO, dump_stats);
 #endif
+
+	hashblksizeinsec = bytestosec(hashblksize);
 
 	/*
 	 * Raw image comparison
@@ -936,20 +943,28 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	 * Loop through all regions, decompressing and hashing data
 	 * in hashblksize or smaller blocks.
 	 */
-	rbuf = alloc_readbuf(0, bytestosec(hashblksize), 0);
+	rbuf = alloc_readbuf(0, hashblksizeinsec, 0);
 	if (rbuf == NULL) {
 		fprintf(stderr, "no memory\n");
 		exit(1);
 	}
 	for (nreg = 0; nreg < blockhdr->regioncount; nreg++) {
 		uint32_t rstart, rsize, hsize;
+		int startoff = 0;
 
 		rstart = regp->start;
 		rsize = regp->size;
 		ndatabytes += sectobytes(rsize);
+		if (fixedoffset)
+			startoff = rstart % hashblksizeinsec;
 		while (rsize > 0) {
-			if (rsize > bytestosec(hashblksize))
-				hsize = bytestosec(hashblksize);
+			if (startoff) {
+				hsize = hashblksizeinsec - startoff;
+				if (hsize > rsize)
+					hsize = rsize;
+				startoff = 0;
+			} else if (rsize > hashblksizeinsec)
+				hsize = hashblksizeinsec;
 			else
 				hsize = rsize;
 
