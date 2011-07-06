@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
@@ -46,6 +46,7 @@ my $reversedir			= "$mapdir/reverse";
 my $restart_named		= 1;
 my $sortem			= 0; # set to 1 to generated IP-sorted file
 my $dbg	= 0;
+my $domx = 0;
 my @row;
 
 use strict;
@@ -433,13 +434,15 @@ sub make_forward_zonefile($$$) {
 	}
 
 	print MAP "$node_id\tIN\tA\t$node_rec->{IP}\n";
-	if (defined($node_rec->{inner_elab_role}) &&
-	    ($node_rec->{inner_elab_role} eq "ops" ||
-	     $node_rec->{inner_elab_role} eq "ops+fs")) {
-	    print MAP "\tIN\tMX 10\t$node_id\n";
-	}
-	else {
-	    print MAP "\tIN\tMX 10\t$USERS.\n";
+	if ($domx) {
+	    if (defined($node_rec->{inner_elab_role}) &&
+		($node_rec->{inner_elab_role} eq "ops" ||
+		 $node_rec->{inner_elab_role} eq "ops+fs")) {
+		print MAP "\tIN\tMX 10\t$node_id\n";
+	    }
+	    else {
+		print MAP "\tIN\tMX 10\t$USERS.\n";
+	    }
 	}
     }
 
