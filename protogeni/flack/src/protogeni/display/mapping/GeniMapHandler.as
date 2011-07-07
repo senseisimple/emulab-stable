@@ -59,11 +59,14 @@ package protogeni.display.mapping
 		}
 		
 		public function clearAll():void {
+			if(map.ready)
+				map.clearOverlays();
+			
 			if(drawing) {
 				drawing = false;
 				FlexGlobals.topLevelApplication.stage.removeEventListener(Event.ENTER_FRAME, drawNext);
 			}
-			map.clearOverlays();
+			
 			nodeGroupMarkers = new Vector.<GeniMapMarker>();
 			linkMarkers = new Vector.<GeniMapLink>();
 			nodeGroupClusterMarkers = new Vector.<GeniMapMarker>();

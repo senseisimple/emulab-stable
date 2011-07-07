@@ -15,6 +15,7 @@
 package protogeni.communication
 {
 	import protogeni.resources.IdnUrn;
+	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	

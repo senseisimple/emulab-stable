@@ -39,7 +39,6 @@ package protogeni.communication
 			super("SliverDeleteAM",
 				"Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.deleteSliverAm,
-				true,
 				true);
 			ignoreReturnCode = true;
 			sliver = s;

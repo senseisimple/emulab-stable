@@ -306,13 +306,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function startover():void {
 				reinit();
+				Main.useCache = false;
 				Main.geniHandler.requestHandler.startInitiationSequence(true);
 			}
 			
 			public function reinit():void
 			{
 				if(Main.geniHandler != null)
-					Main.geniHandler.destroy();
+					Main.geniHandler.clearAll();
 				ColorUtil.nextColorIdx = 0;
 				//Main.geniHandler = new GeniHandler();
 				//Main.geniHandler.mapHandler.map = map;
@@ -359,11 +360,15 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<components:ImageButton id="consoleButton"
 								icon="{ImageUtil.consoleIcon}"
 								click="LogHandler.viewConsole();" 
-								toolTip="Console"/>
+								toolTip="View the request logs and queue"/>
+		<components:ImageButton id="searchButton"
+								icon="{ImageUtil.findIcon}"
+								click="DisplayUtil.viewSearchWindow()"
+								toolTip="Search for a resource" />
 		<components:ImageButton id="refreshButton"
 								icon="{ImageUtil.refreshIcon}"
 								click="startover()"
-								toolTip="Reload all data" />
+								toolTip="Reload all data from scratch" />
 		<s:Button icon="{ImageUtil.noUserIcon}"
 				  click="loadUser()"
 				  visible="{allowAuthenticate}"
@@ -382,10 +387,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 							visible="false" />
 		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold" maxDisplayedLines="1" />
 		<s:Rect percentWidth="100" />
-		<components:ImageButton id="searchButton"
-								icon="{ImageUtil.findIcon}"
-								click="DisplayUtil.viewSearchWindow()"
-								toolTip="Search" />
 		<components:ImageButton id="resetZoomButton"
 								icon="@Embed('../images/zoom.png')"
 								click="map.resetZoom();"
@@ -397,7 +398,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<components:ImageButton id="helpButton"
 								icon="{ImageUtil.helpIcon}"
 								click="DisplayUtil.viewAboutWindow()"
-								toolTip="View more information about Flack" />
+								toolTip="View about info and get help" />
 	</s:controlBarContent>
 	
 	<mapping:GeniMap id="map" />

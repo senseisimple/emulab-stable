@@ -25,6 +25,8 @@ package protogeni.communication
 	 */
 	public final class CommunicationUtil
 	{
+		public static const TIMEOUT:uint = 4000;
+		
 		// ProtoGENI response codes
 		public static const GENIRESPONSE_SUCCESS:int = 0;
 		public static const GENIRESPONSE_BADARGS:int  = 1;
@@ -43,6 +45,9 @@ package protogeni.communication
 		public static const GENIRESPONSE_BUSY:int = 14;
 		public static const GENIRESPONSE_EXPIRED:int = 15;
 		public static const GENIRESPONSE_INPROGRESS:int = 16;
+		
+		//XML-RPC fault codes
+		public static const XMLRPC_CURRENTLYNOTAVAILABLE:int = 503;
 		
 		public static function GeniresponseToString(value:int):String
 		{

@@ -49,6 +49,7 @@ package protogeni.resources
 				if(existing.urn.full == s.urn.full)
 				{
 					existing = s;
+					Main.geniDispatcher.dispatchSlicesChanged();
 					return;
 				}
 			}

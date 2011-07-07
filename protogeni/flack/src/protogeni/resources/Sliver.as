@@ -36,7 +36,7 @@ package protogeni.resources
 		public static const STATUS_NA:String = "N/A";
 		
 		public var created:Boolean = false;
-		public var staged:Boolean = false;
+		public var staged:Boolean = true;
 		
 		public var credential:Object = null;
 		public var manager:GeniManager = null;

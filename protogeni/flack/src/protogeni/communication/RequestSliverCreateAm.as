@@ -41,7 +41,6 @@ package protogeni.communication
 			super("SliverCreateAM",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.createSliverAm,
-				true,
 				true);
 			ignoreReturnCode = true;
 			sliver = s;
@@ -93,8 +92,6 @@ package protogeni.communication
 						old.slivers.remove(old.slivers.getByUrn(sliver.urn.full));
 					old.slivers.add(sliver);
 				}
-				
-				Main.geniDispatcher.dispatchSlicesChanged();
 				
 				return new RequestSliverStatusAm(sliver);
 			}

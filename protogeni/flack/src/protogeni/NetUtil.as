@@ -25,6 +25,8 @@ package protogeni
 	import flash.system.Security;
 	import flash.utils.Dictionary;
 	
+	import mx.core.FlexGlobals;
+	
 	/**
 	 * Common functions used for web stuff
 	 * 
@@ -59,6 +61,10 @@ package protogeni
 			mailVariables.body = body;
 			mailRequest.data = mailVariables;
 			navigateToURL(mailRequest, "_blank");
+		}
+		
+		public static function runningFromWebsite():Boolean {
+			return FlexGlobals.topLevelApplication.url.toLowerCase().indexOf("http") == 0;
 		}
 		
 		public static function tryGetBaseUrl(url:String):String

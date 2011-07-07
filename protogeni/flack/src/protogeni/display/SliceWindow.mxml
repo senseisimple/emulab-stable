@@ -665,9 +665,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					getUrlWindow.onCancel = null;
 					getUrlWindow.onSuccess = tryImportUrl;
 				}
-					// Otherwise try to download
+				// Otherwise try to download
 				else
 				{
+					this.spinner.visible = true;
+					this.spinner.startSpin();
 					NetUtil.checkLoadCrossDomain(url);
 					var getRspecRequest:URLRequest = new URLRequest(url);
 					getRspec = new URLLoader();
@@ -684,10 +686,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 			
 			public function finishImport(e:Event):void {
+				this.spinner.visible = false;
+				this.spinner.stopSpin();
 				this.sliceCanvas.slice.tryImport(String(getRspec.data));
 			}
 			
 			public function importError(e:*):void {
+				this.spinner.visible = false;
+				this.spinner.stopSpin();
 				Alert.show("Problem downloading the RSPEC\n\n" + e.toString());
 			}
 			

@@ -19,6 +19,8 @@ package com.mattism.http.xmlrpc
   import flash.net.URLRequest;
   import flash.net.URLRequestMethod;
   import flash.utils.Timer;
+  
+  import protogeni.communication.CommunicationUtil;
 
   public class ConnectionImpl extends EventDispatcher implements Connection
   {
@@ -143,7 +145,11 @@ package com.mattism.http.xmlrpc
         {
                 _fault = null;
                 this._response.close();
-                dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "Operation timed out after " + observeTimer.delay/1000 + " seconds"));
+                dispatchEvent(new ErrorEvent(ErrorEvent.ERROR,
+					false,
+					false,
+					"Operation timed out after " + observeTimer.delay/1000 + " seconds",
+					CommunicationUtil.TIMEOUT));
                 //dispatchEvent(new IOErrorEvent(IOErrorEvent.IO_ERROR, false, false, 'request timeout'));
                 observeTimer = null;
         }
@@ -160,7 +166,10 @@ package com.mattism.http.xmlrpc
 		  if (this._response.bytesLoaded == 0)
 		  {
 			  trace("XMLRPC Fault: No data");
-			  dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "No data"));
+			  dispatchEvent(new ErrorEvent(ErrorEvent.ERROR,
+				  false,
+				  false,
+				  "No data"));
 		  }
 		  else if (responseXML.fault.length() > 0)
 	      {
@@ -170,7 +179,10 @@ package com.mattism.http.xmlrpc
 	        trace("XMLRPC Fault (" + _fault.getFaultCode() + "):\n"
 	              + _fault.getFaultString());
 	
-	        dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
+	        dispatchEvent(new ErrorEvent(ErrorEvent.ERROR,
+				false,
+				false,
+				_fault.toString()));
 	      }
 	      else if (responseXML.params)
 	      {

@@ -27,7 +27,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		  mapevent_mapready="onMapReady(event)"
 		  sensor="false"
 		  ssl="true"
-		  key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg">
+		  key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTJAI3wyjNM51iUcfoH5qR3p3QFHBQ_Ukk2jOVwrIST7TsKH0dxYswnyg">
 	
 	<fx:Script>
 		<![CDATA[
@@ -41,9 +41,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import com.google.maps.interfaces.IPane;
 			import com.google.maps.interfaces.IPaneManager;
 			
+			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			
-			public var ready:Boolean;
+			import protogeni.NetUtil;
+			
+			public var ready:Boolean = false;
 			public var linkPane:IPane;
 			
 			private function onMapPreinitialize(event:Event):void {
@@ -60,24 +63,30 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					key = Main.Application().forceMapKey;
 				}
 				// else detect a key from our default list
-				else
+				else if(NetUtil.runningFromWebsite())
 				{
 					var url:String = mx.core.FlexGlobals.topLevelApplication.url;
+					var domain:String = NetUtil.tryGetBaseUrl(url);
 					
-					if(url.indexOf("https://users.emulab.net") > -1)
-						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
-					else if(url.indexOf("http://users.emulab.net") > -1)
-						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRQhQD93Qa0bULV_1nZL9DPKN6w4xSZvcNEsTI1o7vjS_yayjPwrn1FOw";
-					else if(url.indexOf("http://boss.emulab.net") > -1)
-						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hT-JTA_kdlWCi1B9UqMb6PoH1IjshRNCq_RwaKn0XBDiQgigKEreNFnfw";
-					else if(url.indexOf("https://boss.emulab.net") > -1)
-						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTJAI3wyjNM51iUcfoH5qR3p3QFHBQ_Ukk2jOVwrIST7TsKH0dxYswnyg";
-					else if(url.indexOf("http://www.protogeni.net") > -1)
-						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTfdIoaYgi7tOvtC9dvhWwYlnAj4hTW5IpetuD9FvaEH3LDmTpL2Vs__w";
-					else if(url.indexOf("https://www.protogeni.net") > -1)
-						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRNcqKgyvlELbhgjE5kl-gFNsMkyxTLoim3vJsPX9zTdq5dy1yGCfLGqw";
-					else if(url.indexOf("https://www.emulab.net") > -1)
-						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTs-lXJm7muGCxX8DXwkteJsQ0kTxQBr46PQguVO7zD3fj3JMteHHpVDg";
+					switch(domain) {
+						case "https://users.emulab.net":
+							key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
+							break;
+						case "https://boss.emulab.net":
+							key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTJAI3wyjNM51iUcfoH5qR3p3QFHBQ_Ukk2jOVwrIST7TsKH0dxYswnyg";
+							break;
+						case "https://www.protogeni.net":
+							key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRNcqKgyvlELbhgjE5kl-gFNsMkyxTLoim3vJsPX9zTdq5dy1yGCfLGqw";
+							break;
+						case "https://www.emulab.net":
+							key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTs-lXJm7muGCxX8DXwkteJsQ0kTxQBr46PQguVO7zD3fj3JMteHHpVDg";
+							break;
+						case "https://www.uky.emulab.net":
+							key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hQ2ZMGWUBvfKOB0aFzbVnVtbMaqVhSmf6d5al1xSqOayWNOMqU861NJ8w";
+							break;
+						default:
+							Alert.show("It looks like the Google Maps key for the domain Flack is running on wasn't found.  Map functionality won't work until the correct key is added to the binary or as a HTML parameter (see help documentation).", "Google Maps key not found");
+					}
 				}
 			}
 			

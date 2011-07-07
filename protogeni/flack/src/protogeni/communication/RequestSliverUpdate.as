@@ -31,7 +31,8 @@ package protogeni.communication
 		{
 			super("SliverUpdate",
 				"Updating sliver on " + newSliver.manager.Hrn + " for slice named " + newSliver.slice.hrn,
-				CommunicationUtil.updateSliver);
+				CommunicationUtil.updateSliver,
+				true);
 			sliver = newSliver;
 			sliver.created = false;
 			sliver.staged = false;

@@ -74,7 +74,7 @@ package
 		
 		public function toString():String
 		{
-			return "-MSG-----------------\n" +
+			return "-MSG-" + Main.version + "---------------\n" +
 				"Name: " + name + "\n" +
 				"Group ID: " + groupId + "\n" +
 				"Time: " + DateUtil.toRFC3339(timeStamp) + "\n" +
