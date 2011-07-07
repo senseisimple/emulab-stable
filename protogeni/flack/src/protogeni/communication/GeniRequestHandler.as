@@ -556,9 +556,9 @@ package protogeni.communication
 			
 			var next:*;
 			
-			// timeout
+			// Timeout
 			if(event.errorID == CommunicationUtil.TIMEOUT) {
-				// exponential backoff using the first number as the basic unit of seconds
+				// backoff using the first number as the basic unit of seconds
 				request.op.delaySeconds = Util.randomNumberBetween(20, 40+request.numTries*10);
 				request.forceNext = true;
 				next = request;
@@ -567,8 +567,19 @@ package protogeni.communication
 					"Preparing to retry in " + request.op.delaySeconds  + " seconds",
 					true,
 					LogMessage.TYPE_END ));
+			// Server not currently working
+			} else if(fault != null && fault.getFaultCode() == CommunicationUtil.XMLRPC_CURRENTLYNOTAVAILABLE){
+				// backoff using the first number as the basic unit of seconds
+				request.op.delaySeconds = Util.randomNumberBetween(40, 60+request.numTries*20);
+				request.forceNext = true;
+				next = request;
+				LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
+					"Server currently not available",
+					"Preparing to retry in " + request.op.delaySeconds  + " seconds",
+					true,
+					LogMessage.TYPE_END ));
+			// Get and give general info for the failure
 			} else {
-				// Get and give general info for the failure
 				var failMessage:String = "";
 				var msg:String = "";
 				if (fault != null)

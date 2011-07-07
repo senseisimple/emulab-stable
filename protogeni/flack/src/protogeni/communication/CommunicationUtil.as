@@ -46,6 +46,9 @@ package protogeni.communication
 		public static const GENIRESPONSE_EXPIRED:int = 15;
 		public static const GENIRESPONSE_INPROGRESS:int = 16;
 		
+		//XML-RPC fault codes
+		public static const XMLRPC_CURRENTLYNOTAVAILABLE:int = 503;
+		
 		public static function GeniresponseToString(value:int):String
 		{
 			switch(value) {
