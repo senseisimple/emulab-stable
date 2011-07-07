@@ -87,6 +87,12 @@ package protogeni
 			this.mapHandler.destruct();
 		}
 		
+		public function clearAll():void {
+			this.requestHandler.stop();
+			this.clearComponents();
+			this.mapHandler.clearAll();
+		}
+		
 		public function clearComponents() : void
 		{
 			Main.geniDispatcher.dispatchGeniManagersChanged(GeniEvent.ACTION_REMOVING);
