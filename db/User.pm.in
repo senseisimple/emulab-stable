@@ -1448,8 +1448,8 @@ sub GList($$)
     # of the list Order matters here, or we won't pick up all the groups
     # we need.
     #
-    $glist =~ s/ ?\b$default\b ?//;
-    $glist = $default . " " . $default . " " . $glist;
+    my @glist = grep {$_ != $default} split(/\s/, $glist);
+    $glist = $default . " " . $default . " @glist";
 
     return $glist;
 }
