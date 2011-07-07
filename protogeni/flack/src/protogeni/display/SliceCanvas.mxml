@@ -235,12 +235,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				}
 				else if(event.dragSource.hasFormat("marker"))
 				{
-					var dragSource:GeniMapMarker = event.dragSource.dataForFormat('marker') as GeniMapMarker;
-					var vn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(dragSource.nodeGroups.collection[0].collection[0].manager));
-					vn.clientId = slice.getUniqueVirtualNodeId(vn);
-					this.addVirtualNode(vn,
-						SliceCanvas(event.currentTarget).mouseX,
-						SliceCanvas(event.currentTarget).mouseY);
+					var dragMarker:GeniMapMarker = event.dragSource.dataForFormat('marker') as GeniMapMarker;
+					this.hostWindow.setSidePane(SliceWindow.VIEW_COLLECTION, dragMarker.showGroups.GetAll());
 				} else if(event.dragSource.hasFormat("physicalnode")) {
 					addPhysicalNode(event.dragSource.dataForFormat('physicalnode') as PhysicalNode,
 						SliceCanvas(event.currentTarget).mouseX,

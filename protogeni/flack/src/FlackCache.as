@@ -585,7 +585,6 @@ package
 				Main.geniHandler.CurrentUser.slices.add(newSlice);
 			}
 			Main.geniDispatcher.dispatchUserChanged();
-			Main.geniDispatcher.dispatchSlicesChanged();
 		}
 	}
 }

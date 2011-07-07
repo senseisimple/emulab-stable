@@ -87,8 +87,6 @@ package protogeni.communication
 					old.slivers.add(sliver);
 				}
 				
-				Main.geniDispatcher.dispatchSlicesChanged();
-				
 				return new RequestSliverStatus(sliver);
 			}
 			else

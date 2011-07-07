@@ -67,35 +67,47 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function loadNode(n:VirtualNode):void {
 				node = n;
-
-				if(n.manager.type == GeniManager.TYPE_PROTOGENI) {
-					previewRspecButton.includeInLayout = true;
-					previewRspecButton.visible = true;
-				}
 				
-				if(node.rspec != null)
-					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
+				loadHierarchy();
+				
+				switch(node.status)
+				{
+					case VirtualNode.STATUS_READY:
+						this.statusImage.source = ImageUtil.flagGreenIcon;
+						break;
+					case VirtualNode.STATUS_FAILED:
+						this.statusImage.source = ImageUtil.flagRedIcon;
+						break;
+					case VirtualNode.STATUS_NOTREADY:
+					case VirtualNode.STATUS_CHANGING:
+					case VirtualNode.STATUS_UNKOWN:
+						this.statusImage.source = ImageUtil.flagYellowIcon;
+						break;
+					default:
+						this.statusImage.visible = false;
+						this.statusImage.includeInLayout = false;
+				}
 				if(node.error != null && node.error.length > 0)
 				{
 					errorButton.includeInLayout = true;
 					errorButton.visible = true;
 				}
-				switch(node.status)
-				{
-					case VirtualNode.STATUS_READY:
-						statusLabel.styleName = "validStyle";
-						break;
-					case VirtualNode.STATUS_FAILED:
-						statusLabel.styleName = "failedStyle";
-						break;
-					case VirtualNode.STATUS_NOTREADY:
-					case VirtualNode.STATUS_CHANGING:
-						statusLabel.styleName = "inprogressStyle";
-						break;
-					default:
-				}
 				
-				loadHierarchy();
+				if(n.manager.type == GeniManager.TYPE_PROTOGENI) {
+					previewRspecButton.includeInLayout = true;
+					previewRspecButton.visible = true;
+				}
+				if(node.rspec != null)
+					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
+				
+				this.bindingVirtualRadiobutton.enabled = node.manager.supportsExclusiveNodes || node.manager.supportsSharedNodes;
+				if(this.bindingVirtualRadiobutton.enabled) {
+					if(!node.manager.supportsExclusiveNodes || !node.manager.supportsSharedNodes) {
+						this.exclusiveCheckbox.selected = node.manager.supportsExclusiveNodes;
+						this.exclusiveCheckbox.enabled = false;
+					}
+				}
+				this.bindingDelayRadiobutton.enabled = node.manager.supportsDelayNodes;
 				
 				if(node.isDelayNode) {
 					this.bindingDelayRadiobutton.selected = true;
@@ -197,6 +209,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function loadHierarchy():void
 			{
 				hierarchyGroup.removeAllElements();
+				
+				hierarchyGroup.addElement(DisplayUtil.getSliceButton(node.sliver.slice));
+				hierarchyGroup.addElement(DisplayUtil.getLabel(">"));
 				hierarchyGroup.addElement(DisplayUtil.getGeniManagerButton(node.manager));
 				hierarchyGroup.addElement(DisplayUtil.getLabel(">"));
 				// Parent node info
@@ -358,14 +373,18 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 		]]>
 	</fx:Script>
-	
+	<s:HGroup width="100%" verticalAlign="middle" gap="2"
+			  id="hierarchyGroup" />
 	<s:HGroup width="100%" verticalAlign="middle" gap="2">
-		<s:HGroup id="hierarchyGroup" verticalAlign="middle" />
 		<display:KeyboardTextInput id="idLabel" Text="{node.clientId}" toolTip="{node.sliverId}" width="100%" />
+		<components:ImageButton id="errorButton" includeInLayout="false" visible="false" click="Alert.show(node.error,'Error Message')" />
 		<components:ImageButton id="rspecButton"
 							 icon="{ImageUtil.pageWhiteIcon}"
 							 click="viewRspec()"
 							 toolTip="View the most recent valid RSPEC" />
+		<s:Image id="statusImage"
+				 toolTip="Status: {node.status}, State: {node.state}" />
+		<components:DefaultLine height="16" visible="false" />
 		<components:ImageButton id="previewRspecButton"
 							 visible="false" includeInLayout="false"
 							 icon="{ImageUtil.pageCodeIcon}"
@@ -381,16 +400,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<mx:TabNavigator height="100%" width="100%">
 		<s:NavigatorContent label="Basic" height="100%" width="100%">
 			<s:VGroup height="100%" width="100%" paddingLeft="2" paddingBottom="2" paddingRight="2">
-				<s:HGroup>
-					<s:Label text="Status" fontWeight="bold" />
-					<s:Label id="statusLabel" text="{node.status}" />
-					<components:ImageButton id="errorButton" includeInLayout="false" visible="false" click="Alert.show(node.error,'Error Message')" />
-					<s:Label text="State" fontWeight="bold" />
-					<s:Label id="stateLabel" text="{node.state}" />
-					<s:Label text="Slice" fontWeight="bold"/>
-					<s:Label text="{node.sliver.slice.hrn}" />
-				</s:HGroup>
-				
+
 				<s:HGroup width="100%" id="hierarchyVbox" />
 				
 				<s:Label text="Binding" fontWeight="bold" />

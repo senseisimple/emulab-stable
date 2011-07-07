@@ -41,7 +41,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			public function init():void
 			{
-				memoryString = (System.totalMemoryNumber/1000000) + " MB";
+				memoryString =  (System.totalMemoryNumber/1048576).toFixed(2) + " MB";
 			}
 		]]>
 	</fx:Script>
@@ -50,7 +50,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			 source="{ImageUtil.logoIcon}"
 			 toolTip="Visit our website"
 			 click="NetUtil.openWebsite('http://www.protogeni.net');" />
-	<s:Label text="Displays resources from ProtoGENI and associated federations." />
+	<s:Label text="Work with ProtoGENI-federated resources" />
 	<s:HGroup horizontalAlign="center">
 		<s:Button label="Open the manual"
 				  icon="{ImageUtil.helpIcon}"
@@ -68,16 +68,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						<s:Label text="{Capabilities.version}" />
 					</s:HGroup>
 					<s:HGroup width="100%">
+						<s:Label text="with debug support?" fontWeight="bold" />
+						<s:Label text="{Capabilities.isDebugger}" />
+					</s:HGroup>
+					<s:HGroup width="100%">
 						<s:Label text="Memory Used" fontWeight="bold" />
 						<s:Label text="{memoryString}" />
 					</s:HGroup>
 					<s:HGroup width="100%">
-						<s:Label text="Environment" fontWeight="bold" />
+						<s:Label text="Running" fontWeight="bold" />
 						<s:Label text="{Capabilities.os} on {Capabilities.cpuArchitecture}" />
-					</s:HGroup>
-					<s:HGroup width="100%">
-						<s:Label text="SSL Available" fontWeight="bold" />
-						<s:Label text="{Capabilities.hasTLS}" />
 					</s:HGroup>
 					<s:HGroup width="100%">
 						<s:Label text="Screen" fontWeight="bold" />
