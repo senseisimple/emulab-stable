@@ -33,7 +33,7 @@ use GeniUtil;
 use GeniHRN;
 use GeniXML;
 use GeniUsage;
-use libtestbed qw(SENDMAIL);
+use libtestbed;
 use emutil;
 use EmulabConstants;
 use libEmulab;
@@ -298,6 +298,8 @@ sub GetAdvertisement($$$$)
 {
     my ($available, $pc, $version, $experiment) = @_;
     my $xml = undef;
+    my $gotlock = 0;
+    my $filename = "/var/tmp/protogeni_resources.xml";
 
     $version = "0.1"
 	if ($version eq "PG 0.1");
@@ -315,12 +317,72 @@ sub GetAdvertisement($$$$)
     if (defined($pc)) {
 	$invocation .= " -1 $pc";
     }
+    if (!defined($pc)) {
+      again:
+	#
+	# Grab a global script lock. This will ensure that only one ptopgen
+	# runs at a time, and everyone else who comes along while that first
+	# one is running, will share the same results file.
+	#
+	# Need to use a well known name, unless we want to share that name
+	# via the DB. Lets be simple about it for now.
+	#
+	if ((my $locked = TBScriptLock("discover", 1)) != TBSCRIPTLOCK_OKAY()) {
+	    if ($locked == TBSCRIPTLOCK_IGNORE) {
+		#
+		# Previous locker finished ptopgen.
+		# Grab the file if it exists (small race), otherwise
+		# try again from the top.
+		#
+		if (open(AVAIL, "$filename")) {
+		    $xml = "";
+		    while (<AVAIL>) {
+			$xml .= $_;
+		    }
+		    close(AVAIL);
+		    return $xml;
+		}
+		goto again;
+	    }
+	    else {
+		print STDERR "Could not get ptopgen lockfile\n";
+		return undef;
+	    }
+	}
+	else {
+	    #
+	    # We got the lock so we get to run ptopgen.
+	    #
+	    $gotlock = 1;
+	}
+    }
     if (open(AVAIL, "$invocation |")) {
 	$xml = "";
 	while (<AVAIL>) {
 	    $xml .= $_;
 	}
 	close(AVAIL);
+    }
+    #
+    # The lock holder has to create the new version of the file for
+    # anyone waiting. Need to do this atomically so that anyone still
+    # reading the previous version does not get inconsistent data.
+    #
+    if ($gotlock) {
+	my ($fh, $tempname) = tempfile(UNLINK => 0, DIR => "/var/tmp");
+	if (!defined($fh)) {
+	    print STDERR "Could not create temporary file: $!\n";
+	    $xml = undef;
+	}
+	else {
+	    print $fh $xml;
+	    close($fh);
+	    if (! rename($tempname, $filename)) {
+		print STDERR "Could not rename temporary file: $!\n";
+		$xml = undef;
+	    }
+	}
+	TBScriptUnlock();
     }
     return $xml;
 }
