@@ -19,6 +19,7 @@ use NodeType;
 use English;
 use OSinfo;
 use Getopt::Std;
+use EmulabFeatures;
 
 use strict;
 
@@ -39,6 +40,9 @@ my $dhcpd_makeconf = "$TB/sbin/dhcpd_makeconf";
 my $exports_setup = "$TB/sbin/exports_setup";
 
 my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
+
+my $feature = EmulabFeatures::Lookup("ScriptNewNodes");
+my $useScriptFeature = defined($feature) && $feature->enabled();
 
 #
 # MFS to boot the nodes into initially
@@ -211,7 +215,7 @@ NODE: foreach my $node_id (@node_ids) {
     # Grab the node's MACs from the new_interfaces table
     #
     $query_result = DBQueryFatal("SELECT card, MAC, interface_type, " .
-	"switch_id, switch_card, switch_port, cable, len, role " .
+	"switch_id, switch_card, switch_port, cable, len, role, port " .
 	"FROM new_interfaces WHERE new_node_id='$new_node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: Must have at least one interface!\n";
@@ -220,7 +224,7 @@ NODE: foreach my $node_id (@node_ids) {
 
     my %interfaces;
     while (my ($card, $MAC, $iface_type, $switch_id, $switch_card,
-	    $switch_port, $cable, $len, $ifrole) = $query_result->fetchrow()) {
+	    $switch_port, $cable, $len, $ifrole, $port) = $query_result->fetchrow()) {
 	#
 	# Get some more information about this interface type
 	#
@@ -252,7 +256,7 @@ NODE: foreach my $node_id (@node_ids) {
 	# Stash it away...
 	#
 	$interfaces{$card} = [$MAC, $iface_type, $max_speed, $full_duplex,
-		$switch_id, $switch_card, $switch_port, $cable, $len, $ifrole];
+		$switch_id, $switch_card, $switch_port, $cable, $len, $ifrole, $port];
 
     }
 
@@ -424,7 +428,7 @@ NODE: foreach my $node_id (@node_ids) {
 
     while (my ($card, $aref) = each %interfaces) {
 	my ($MAC, $iface_type, $max_speed, $duplex, $switch_id, $switch_card,
-	    $switch_port, $cable, $len, $ifrole) = @$aref;
+	    $switch_port, $cable, $len, $ifrole, $port) = @$aref;
 	my $iface = "eth$card";
 	my $iface_IP;
 	my $wire_type;
@@ -457,8 +461,12 @@ NODE: foreach my $node_id (@node_ids) {
 	    $wire_type = "Node";
 	}
 
+	if (! $useScriptFeature)
+	{
+	    $port = 1;
+	}
 	DBQueryFatal("INSERT INTO interfaces SET node_id='$node_id', " .
-	    "card=$card, port=1, mac='$MAC', IP='$iface_IP', " .
+	    "card=$card, port='$port', mac='$MAC', IP='$iface_IP', " .
 	    "interface_type='$iface_type', iface='$iface', uuid=UUID(), " .
 	    "current_speed='$max_speed', duplex=$duplex, role='$iface_role'");
 
@@ -477,15 +485,17 @@ NODE: foreach my $node_id (@node_ids) {
 	if ($len) {
 	    $cable_len .= ", len=$len";
 	}
-	DBQueryFatal("INSERT INTO wires SET type='$wire_type', " .
-	    "node_id1='$node_id', card1=$card, port1=1, " .
-	    "node_id2='$switch_id', card2='$switch_card', " .
-	    "port2='$switch_port' $cable_len");
+	if (! $useScriptFeature) {
+	    DBQueryFatal("INSERT INTO wires SET type='$wire_type', " .
+			 "node_id1='$node_id', card1=$card, port1=1, " .
+			 "node_id2='$switch_id', card2='$switch_card', " .
+			 "port2='$switch_port' $cable_len");
+	}
     }
 
     #
     # Put it into hwdown for now - I would put them in reloading, but I'm
-    # afriad the reload_daemon might do the wrong thing to them
+    # afraid the reload_daemon might do the wrong thing to them
     #
     system "$nalloc $pid $eid $node_id";
 
