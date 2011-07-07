@@ -243,7 +243,7 @@ if (!(defined($GENI_METHODS) && defined($EMULAB_PEMFILE))) {
 	     "Internal error loading module; missing definitions");
 }
 # Temporary while we are running Instools stuff in Utah.
-if ($MODULE eq "instools" && $MAINSITE) {
+if (0 && $MODULE eq "instools" && $MAINSITE) {
     $debug = 1;
 }
 
