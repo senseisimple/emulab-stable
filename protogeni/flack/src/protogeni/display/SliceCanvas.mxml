@@ -303,13 +303,28 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				while(sliceNode.links.length > 0)
 					sliceNode.links[0].removeLink();
 				
-				// Remove nodes and slivers
-				for each(var s:Sliver in sliceNode.node.slivers.collection)
+				// Remove nodes
+				var s:Sliver;
+				for each(s in sliceNode.node.slivers.collection)
 				{
 					if(s.nodes.contains(sliceNode.node))
 						s.nodes.remove(sliceNode.node);
-					if(s.nodes.length == 0 && slice.slivers.contains(s))
-						slice.slivers.remove(s);
+				}
+				
+				// Remove slivers which are empty or have no more nodes from their managers
+				for each(s in sliceNode.node.slivers.collection)
+				{
+					if(slice.slivers.contains(s)) {
+						var deleteSliver:Boolean = true;
+						for each(var n:VirtualNode in s.nodes.collection) {
+							if(n.manager == s.manager) {
+								deleteSliver = false;
+								break;
+							}
+						}
+						if(deleteSliver)
+							slice.slivers.remove(s);
+					}
 				}
 				
 				this.removeElement(sliceNode);

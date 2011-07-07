@@ -40,7 +40,8 @@ package protogeni.communication
 		{
 			super("SliverCreate",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
-				CommunicationUtil.createSliver);
+				CommunicationUtil.createSliver,
+				true);
 			sliver = s;
 			s.created = false;
 			s.staged = false;

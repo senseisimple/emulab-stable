@@ -41,7 +41,6 @@ package protogeni.communication
 			super("SliverCreateAM",
 				"Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
 				CommunicationUtil.createSliverAm,
-				true,
 				true);
 			ignoreReturnCode = true;
 			sliver = s;

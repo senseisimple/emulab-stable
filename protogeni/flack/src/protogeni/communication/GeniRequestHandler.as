@@ -44,7 +44,7 @@ package protogeni.communication
 		public var isPaused:Boolean = false;
 		
 		[Bindable]
-		public var maxRunning:int = 3;
+		public var maxRunning:int = 5;
 		
 		public function GeniRequestHandler()
 		{
@@ -203,6 +203,30 @@ package protogeni.communication
 				}
 				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 				
+				// Delete
+				for each(sliver in deleteSlivers.collection) {
+					if(sliver.manager.isAm)
+						pushRequest(new RequestSliverDeleteAm(sliver));
+					else if(sliver.manager is ProtogeniComponentManager)
+						pushRequest(new RequestSliverDelete(sliver));
+				}
+				
+				// Update
+				for each(sliver in updateSlivers.collection) {
+					sliver.created = false;
+					sliver.staged = false;
+					sliver.status = "";
+					sliver.state = "";
+				}
+				for each(sliver in updateSlivers.collection) {
+					if(sliver.manager.isAm) {
+						// Don't do for now
+						//pushRequest(new RequestSliverDeleteAm(sliver));
+						//pushRequest(new RequestSliverCreateAm(sliver));
+					} else
+						pushRequest(new RequestSliverUpdate(sliver));
+				}
+				
 				// Create
 				var addDelay:Boolean = false;
 				for each(var sliver:Sliver in newSlivers.collection) {
@@ -219,25 +243,6 @@ package protogeni.communication
 						addDelay = true;
 					
 					pushRequest(request);
-				}
-				
-				// Update
-				for each(sliver in updateSlivers.collection) {
-					sliver.created = false;
-					sliver.staged = false;
-					sliver.status = "";
-					sliver.state = "";
-				}
-				for each(sliver in updateSlivers.collection) {
-					pushRequest(new RequestSliverUpdate(sliver));
-				}
-				
-				// Delete
-				for each(sliver in deleteSlivers.collection) {
-					if(sliver.manager.isAm)
-						pushRequest(new RequestSliverDeleteAm(sliver));
-					else if(sliver.manager is ProtogeniComponentManager)
-						pushRequest(new RequestSliverDelete(sliver));
 				}
 			} else {
 				// Create
@@ -295,6 +300,8 @@ package protogeni.communication
 					sliver.removeOutsideReferences();
 				}
 			}
+			this.isPaused = false;
+			this.forceStop = false;
 			this.pushRequest(new RequestSliceCredential(slice, true));
 		}
 		
@@ -305,6 +312,8 @@ package protogeni.communication
 		 */
 		public function regetSlices():void
 		{
+			this.isPaused = false;
+			this.forceStop = false;
 			this.pushRequest(new RequestUserResolve());
 		}
 		
@@ -545,47 +554,63 @@ package protogeni.communication
 			request.running = false;
 			remove(request, false);
 			
-			// Get and give general info for the failure
-			var failMessage:String = "";
-			var msg:String = "";
-			if (fault != null)
-			{
-				msg = fault.getFaultString();
-				failMessage += "\nFAILURE fault: " + request.name + ": " + msg;
-			}
-			else
-			{
-				msg = event.toString();
-				failMessage += "\nFAILURE event: " + request.name + ": " + msg;
-				if(msg.search("#2048") > -1)
-					failMessage += "\nStream error, possibly due to server error\n\n****Very possible that this server has not added a Flash socket security policy server****";
-				else if(msg.search("#2032") > -1) {
-					if(Main.geniHandler.unauthenticatedMode)
-						failMessage += "\nIO Error, possibly due to server problems";
-					else
-						failMessage += "\nIO Error, possibly due to server problems or you have no SSL certificate";
-				}
-				
-			}
-			failMessage += "\nURL: " + request.op.getUrl();
-			LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
-													request.name,
-													failMessage,
-													true,
-													LogMessage.TYPE_END));
-			Main.Application().setStatus(request.name + " failed!", true);
-			if(!request.continueOnError)
-			{
-				LogHandler.viewConsole();
+			var next:*;
+			
+			// timeout
+			if(event.errorID == CommunicationUtil.TIMEOUT) {
+				// exponential backoff using the first number as the basic unit of seconds
+				request.op.delaySeconds = Util.randomNumberBetween(20, 40+request.numTries*10);
+				request.forceNext = true;
+				next = request;
+				LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
+					request.name + " timeout",
+					"Preparing to retry in " + request.op.delaySeconds  + " seconds",
+					true,
+					LogMessage.TYPE_END ));
 			} else {
-				// Find out what to do next
-				var next:* = request.fail(event, fault);
-				request.cleanup();
-				if (next != null)
-					queue.push(next);
+				// Get and give general info for the failure
+				var failMessage:String = "";
+				var msg:String = "";
+				if (fault != null)
+				{
+					msg = fault.toString();
+					failMessage += "\nFAILURE fault: " + request.name + ": " + msg;
+				}
+				else
+				{
+					msg = event.toString();
+					failMessage += "\nFAILURE event: " + request.name + ": " + msg;
+					if(msg.search("#2048") > -1)
+						failMessage += "\nStream error, possibly due to server error\n\n****Very possible that this server has not added a Flash socket security policy server****";
+					else if(msg.search("#2032") > -1) {
+						if(Main.geniHandler.unauthenticatedMode)
+							failMessage += "\nIO Error, possibly due to server problems";
+						else
+							failMessage += "\nIO Error, possibly due to server problems or you have no SSL certificate";
+					}
+					
+				}
+				failMessage += "\nURL: " + request.op.getUrl();
+				LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
+					request.name,
+					failMessage,
+					true,
+					LogMessage.TYPE_END));
+				Main.Application().setStatus(request.name + " failed!", true);
 				
-				tryNext();
+				if(!request.continueOnError) {
+					this.pause();
+					LogHandler.viewConsole();
+				} else
+					next = request.fail(event, fault);
 			}
+			
+			// Find out what to do next
+			request.cleanup();
+			if (next != null)
+				queue.push(next);
+			
+			tryNext();
 			
 			/*if(msg.search("#2048") > -1 || msg.search("#2032") > -1)
 			{
@@ -625,24 +650,15 @@ package protogeni.communication
 			{
 				if(code == CommunicationUtil.GENIRESPONSE_BUSY) {
 					Main.Application().setStatus(request.name + " busy", true);
-					if(request.numTries == 10) {
-						LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
-																request.name + " busy",
-																"Reach limit of retries",
-																true,
-																LogMessage.TYPE_END ));
-					} else {
-						// exponential backoff using the first number as the basic unit of seconds
-						
-						request.op.delaySeconds = Util.randomNumberBetween(10, 10 + Math.pow(2,request.numTries));
-						request.forceNext = true;
-						next = request;
-						LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
-																request.name + " busy",
-																"Preparing to retry in " + request.op.delaySeconds  + " seconds",
-																true,
-																LogMessage.TYPE_END ));
-					}
+					// exponential backoff using the first number as the basic unit of seconds
+					request.op.delaySeconds = Util.randomNumberBetween(10, 10 + Math.pow(2,request.numTries));
+					request.forceNext = true;
+					next = request;
+					LogHandler.appendMessage(new LogMessage(request.op.getUrl(),
+						request.name + " busy",
+						"Preparing to retry in " + request.op.delaySeconds  + " seconds",
+						true,
+						LogMessage.TYPE_END ));
 				} else {
 					if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !request.ignoreReturnCode)
 					{
@@ -684,8 +700,8 @@ package protogeni.communication
 			{
 				if (next != null)
 					queue.push(next);
-				if(next != request)
-					request.cleanup();
+				//if(next != request)
+				request.cleanup();
 			}
 			
 			tryNext();

@@ -25,6 +25,8 @@ package protogeni.communication
 	 */
 	public final class CommunicationUtil
 	{
+		public static const TIMEOUT:uint = 4000;
+		
 		// ProtoGENI response codes
 		public static const GENIRESPONSE_SUCCESS:int = 0;
 		public static const GENIRESPONSE_BADARGS:int  = 1;

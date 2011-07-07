@@ -38,7 +38,8 @@ package protogeni.communication
 		{
 			super("SliverDelete",
 				"Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn,
-				CommunicationUtil.deleteSlice);
+				CommunicationUtil.deleteSlice,
+				true);
 			sliver = s;
 			
 			// Build up the args
