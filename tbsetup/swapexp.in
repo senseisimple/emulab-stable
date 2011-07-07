@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -316,9 +316,15 @@ if (my $instance = Template::Instance->LookupByExptidx($experiment->idx())) {
 }
 
 # Sanity check.
-if (! (-e $workdir && -e $userdir)) {
+if (! -e $workdir) {
     die("*** $0:\n".
-	"    $pid/$eid is missing a critical directory! Stopping now ...\n");
+	"    $pid/$eid is missing a critical directory!\n" .
+	"    $workdir\n");
+}
+if (! -e $userdir) {
+    die("*** $0:\n".
+	"    $pid/$eid is missing a critical directory!\n" .
+	"    $userdir\n");
 }
 if (! -e $infodir) {
     if (! -e "$TB/expinfo/$pid") {
