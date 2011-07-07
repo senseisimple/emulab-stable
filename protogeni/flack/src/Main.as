@@ -55,6 +55,6 @@
 	
 	public static var allowCaching:Boolean = true;
 	
-	public static const version:String = "v2011-7-7.9:11AM";
+	public static const version:String = "v2011-7-7.9:26AM";
   }
 }
