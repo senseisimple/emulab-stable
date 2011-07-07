@@ -1,13 +1,12 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-SRCDIR          = @srcdir@
-TESTBED_SRCDIR  = @top_srcdir@
-OBJDIR          = ../..
-SUBDIR          = tools/pcapper
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
@@ -38,8 +37,8 @@ endif
 
 ELVINFLAGS    = -I/usr/local/include
 ELVINLIBS     = -L/usr/local/lib -lpubsub -lm
-EVENTFLAGS    = -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib $(ELVINFLAGS)
-EVENTOBJS     = $(OBJDIR)/event/lib/event.o $(OBJDIR)/event/lib/util.o
+EVENTFLAGS    = -DEVENTSYS -I$(TESTBED_SRCDIR)/lib/event $(ELVINFLAGS)
+EVENTOBJS     = $(OBJDIR)/lib/event/event.o $(OBJDIR)/lib/event/util.o
 EVENTLIBS     = $(ELVINLIBS) -lcrypto
 
 TBCFLAGS      = $(EVENTFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
@@ -48,7 +47,7 @@ TBLIBS        = $(EVENTOBJS) $(OBJDIR)/lib/libtb/libtb.a $(EVENTLIBS)
 PCAPLIBS=-lpcap
 
 CFLAGS  = -Wall $(PTHREADCFLAGS) \
-	  -DEMULAB -g -DDROPROOT -DBOSSNODE=\"@BOSSNODE@\" \
+	  -DEMULAB -g -DDROPROOT \
 	  -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 LDFLAGS = $(LDSTATIC)
 

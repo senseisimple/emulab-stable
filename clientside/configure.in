@@ -8,6 +8,7 @@ AC_PREREQ(2.62)
 AC_INIT(Makeconf.in)
 AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
 AC_CONFIG_HEADER(config.h)
+AC_CANONICAL_HOST
 
 AC_PROG_CPP
 AC_PROG_CXX
@@ -15,6 +16,10 @@ AC_PROG_LN_S
 AC_PROG_RANLIB
 AC_PROG_MKDIR_P
 AC_PROG_INSTALL
+AC_PATH_PROG(SUDO,sudo)
+if test -z "$SUDO" ; then
+    AC_MSG_ERROR([no acceptable sudo found in \$PATH])
+fi
 AC_PATH_PROG(AR, ar)
 if test -z "$AR" ; then
     AC_MSG_ERROR([no acceptable ar found in \$PATH])
@@ -43,15 +48,18 @@ AC_PATH_PROG(RPM, rpm, rpm)
 if test -z "$RPM" ; then
     AC_MSG_ERROR([no rpm found in \$PATH])
 fi
+AC_PATH_PROG(ELVIN_CONFIG,elvin-config)
 
 # Need this for Makeconf.
 AC_SUBST(PATH)
 
 #
-# Elvin compat option, which we	still need.
+# Elvin compat option, which we	still need. Always turn on event system.
 #
 AC_SUBST(ELVIN_COMPAT)
 ELVIN_COMPAT=0
+AC_SUBST(EVENTSYS)
+EVENTSYS=1
 
 AC_SUBST(CLIENT_ETCDIR)
 AC_SUBST(CLIENT_BINDIR)
@@ -145,7 +153,9 @@ AC_SUBST(PYTHON_INCLUDE)
 
 outfiles="Makeconf GNUmakefile \
 	  event/GNUmakefile \
-	  event/program-agent/GNUmakefile"
+	  event/program-agent/GNUmakefile \
+	  tools/GNUmakefile \
+	  tools/pcapper/GNUmakefile"
 
 #
 # When building as part of a full emulab build, a few things come

@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 all:	libtb.a
 
 client: libtb-nodb.a
-        cmp -s libtb-nodb.a libtb.a || cp -pf libtb-nodb.a libtb.a
+	cmp -s libtb-nodb.a libtb.a || cp -pf libtb-nodb.a libtb.a
 client-install: client
 
 # The point of this is to make sure a nodb version of the library is
@@ -31,8 +31,8 @@ libtb.a:	$(OBJS) tbdb.o
 	$(RANLIB) $@
 
 libtb-nodb.a:   $(OBJS)
-        $(AR) crv $@ $(OBJS)
-        $(RANLIB) $@
+	$(AR) crv $@ $(OBJS)
+	$(RANLIB) $@
 
 log.o:		log.h
 tbdb.o:		tbdb.h log.h tbdefs.h
