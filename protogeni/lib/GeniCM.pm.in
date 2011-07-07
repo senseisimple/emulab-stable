@@ -58,6 +58,7 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
+my $MAINSITE       = @TBMAINSITE@;
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $CREATEEXPT     = "$TB/bin/batchexp";
 my $ENDEXPT        = "$TB/bin/endexp";
@@ -655,6 +656,13 @@ sub GetTicketAuxAux($$$$$$$$$)
     # Turn off fixnode; we will control this on the commandline.
     $virtexperiment->allowfixnode(0);
     $virtexperiment->multiplex_factor(1);
+
+    if ($MAINSITE) {
+	$virtexperiment->NewTableRow("virt_vtypes",
+				     {"name"     => "pcfast",
+				      "members"  => "pc3000 d710",
+				      "weight"   => 0.5});
+    }
 
     #
     # An rspec is a structure that requests specific nodes. If those
