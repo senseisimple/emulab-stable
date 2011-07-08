@@ -7024,8 +7024,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
 	os/imagezip/hashmap/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
-        os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
-	os/genhostsfile/GNUmakefile os/zapdisk/GNUmakefile \
+        os/zapdisk/GNUmakefile \
 	pxe/GNUmakefile pxe/bootinfo.restart \
 	security/GNUmakefile security/lastlog_daemon \
         sensors/GNUmakefile sensors/slothd/GNUmakefile \
@@ -7228,7 +7227,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 outfiles="$outfiles clientside/GNUmakefile \
  clientside/GNUmakefile clientside/event/GNUmakefile \
  clientside/event/program-agent/GNUmakefile \
- clientside/tools/GNUmakefile clientside/tools/pcapper/GNUmakefile"
+ clientside/tools/GNUmakefile clientside/tools/pcapper/GNUmakefile \
+ clientside/os/GNUmakefile clientside/os/syncd/GNUmakefile \
+ clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
 
 #
 # Do this for easy distclean.

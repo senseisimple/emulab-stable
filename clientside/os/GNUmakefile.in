@@ -1,0 +1,66 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+SYSTEM	       := $(shell uname -s)
+LBINDIR		= $(DESTDIR)/usr/local/bin
+SYSTEM	       := $(shell uname -s)
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS	= syncd dijkstra genhostsfile
+
+all:	all-subdirs
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install:
+	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
+	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 \
+		$(INSTALL_DIR)/opsdir/man/man1/install-tarfile.1
+
+control-install: 
+
+client:
+	$(MAKE) -C syncd client
+	$(MAKE) -C dijkstra client
+	$(MAKE) -C genhostsfile client
+
+client-install: client
+	-mkdir -p $(LBINDIR)
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
+	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man1
+	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
+	$(MAKE) -C syncd client-install
+	$(MAKE) -C dijkstra client-install
+	$(MAKE) -C genhostsfile client-install
+
+subboss: client
+
+subboss-install: subboss client-install
+
+remote-install: 
+	-mkdir -p $(LBINDIR)
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
+
+clean:		clean-subdirs
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C imagezip distclean
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS)
+

@@ -4827,7 +4827,9 @@ outfiles="Makeconf GNUmakefile \
 	  event/GNUmakefile \
 	  event/program-agent/GNUmakefile \
 	  tools/GNUmakefile \
-	  tools/pcapper/GNUmakefile"
+	  tools/pcapper/GNUmakefile \
+	  os/GNUmakefile os/syncd/GNUmakefile \
+	  os/dijkstra/GNUmakefile os/genhostsfile/GNUmakefile"
 
 #
 # When building as part of a full emulab build, a few things come

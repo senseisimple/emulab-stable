@@ -17,15 +17,12 @@ all:	all-subdirs
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 client: client-subdirs
-
 install: install-subdirs
-
 control-install: control-install-subdirs
-
 client-install: client-install-subdirs
-
+subboss:
+subboss-install:
 clean:		clean-subdirs
-
 distclean:	distclean-subdirs
 
 # How to recursively descend into subdirectories to make general

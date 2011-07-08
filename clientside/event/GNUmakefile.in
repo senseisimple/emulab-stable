@@ -19,6 +19,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 client:		client-subdirs
 client-install: client client-install-subdirs
 control-install: control-install-subdirs
+subboss:
+subboss-install:
 post-install:	post-install-subdirs
 clean:		clean-subdirs
 distclean:	distclean-subdirs

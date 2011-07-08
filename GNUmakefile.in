@@ -207,9 +207,9 @@ endif
 
 client-install: client client-mkdirs
 	@$(MAKE) -C lib client-install
+	@$(MAKE) -C clientside client-install
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client-install
-	@$(MAKE) -C clientside client-install
 endif
 	@$(MAKE) -C os client-install
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
@@ -224,6 +224,7 @@ subboss: client
 	@$(MAKE) -C utils subboss
 
 subboss-install: subboss
+	@$(MAKE) -C clientside client-install
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client-install
 endif

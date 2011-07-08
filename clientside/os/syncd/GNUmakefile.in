@@ -1,13 +1,12 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ../..
-SUBDIR		= os/syncd
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 

@@ -20,7 +20,7 @@ ifeq ($(WITH_EMULAB),0)
 SUBDIRS	       += lib
 endif
 # These must be after lib.
-SUBDIRS	       += event tools
+SUBDIRS	       += event tools os
 
 ifeq ($(WITH_EMULAB),1)
 all:	all-subdirs
@@ -32,6 +32,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 client:		client-subdirs
 client-install: client client-install-subdirs
 control-install: control-install-subdirs
+subboss:	subboss-subdirs
+subboss-install: client subboss-install-subdirs
 post-install:	post-install-subdirs
 clean:		clean-subdirs
 distclean:	distclean-subdirs

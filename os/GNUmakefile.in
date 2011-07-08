@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,7 +14,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= imagezip frisbee.redux syncd dijkstra genhostsfile
+SUBDIRS	= imagezip frisbee.redux 
 ifeq ($(SYSTEM),FreeBSD)
 SUBDIRS += growdisk 
 endif
@@ -28,9 +28,6 @@ install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C frisbee.redux install
 	$(INSTALL_PROGRAM) $(SRCDIR)/template_record \
 		$(INSTALL_DIR)/opsdir/bin/template_record
-	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
-	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 \
-		$(INSTALL_DIR)/opsdir/man/man1/install-tarfile.1
 
 control-install: 
 	@$(MAKE) -C imagezip install
@@ -40,26 +37,15 @@ client:
 ifeq ($(SYSTEM),FreeBSD)
 	$(MAKE) -C growdisk client
 endif
-	$(MAKE) -C syncd client
-	$(MAKE) -C dijkstra client
-	$(MAKE) -C genhostsfile client
 	$(MAKE) -C frisbee.redux client
 
 client-install: client
-	-mkdir -p $(LBINDIR)
-	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
-	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man1
-	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
-	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 	$(INSTALL_PROGRAM) $(SRCDIR)/template_record $(LBINDIR)/template_record
 ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-swapimage $(LBINDIR)/
 	$(MAKE) -C growdisk client-install
 endif
-	$(MAKE) -C syncd client-install
-	$(MAKE) -C dijkstra client-install
-	$(MAKE) -C genhostsfile client-install
 	$(MAKE) -C frisbee.redux client-install
 
 subboss: client
@@ -100,9 +86,6 @@ cdboot-install: mfs-install frisbee-mfs
 	$(MAKE) -e -C growdisk client-install
 
 remote-install: 
-	-mkdir -p $(LBINDIR)
-	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
-	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 
 clean:		clean-subdirs
 distclean:	subdir-distclean
