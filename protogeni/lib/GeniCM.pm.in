@@ -522,6 +522,12 @@ sub GetTicketAuxAux($$$$$$$$$)
 				    "Error Parsing rspec XML");
     }
 
+    my $rspecVersion = GeniXML::GetXmlVersion($rspec);
+    if (! defined($rspecVersion)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Unknown RSpec Version");
+    }
+
     #
     # A sitevar controls whether external users can get any nodes.
     #

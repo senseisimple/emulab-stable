@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA = "Exporter";
-@EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
+@EXPORT = qw(Parse ParseFile GetXmlVersion IsVersion0 FindNodes FindNodesNS
 FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
 IsLanNode IsLocalNode IsTunnel GetExpires GetBandwidth GetIp GetVnodeId
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
@@ -82,10 +82,10 @@ sub ParseFile($)
 }
 
 # Determines the rspec version of a node by examining is namespace URI
-sub GetVersion($)
+sub GetXmlVersion($)
 {
     my ($node) = @_;
-    my $result = $RSPEC_0_1;
+    my $result = undef;
     my $ns = $node->namespaceURI();
     if (defined($ns)) {
 	if ($ns =~ /protogeni.net\/resources\/rspec\/0.1$/) {
@@ -104,8 +104,9 @@ sub GetVersion($)
 
 sub IsVersion0($)
 {
-    my $version = GetVersion($_[0]);
-    return $version eq $RSPEC_0_1 || $version eq $RSPEC_0_2;
+    my $version = GetXmlVersion($_[0]);
+    return defined($version)
+	&& ($version eq $RSPEC_0_1 || $version eq $RSPEC_0_2);
 }
 
 # Returns a NodeList for a given XPath using a given node as

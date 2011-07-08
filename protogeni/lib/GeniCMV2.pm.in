@@ -1715,6 +1715,13 @@ sub ReserveVlanTags($)
 	goto done;
     }
 
+    my $rspecVersion = GeniXML::GetXmlVersion($rspec);
+    if (! defined($rspecVersion)) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "Unknown RSpec Version");
+	goto done;
+    }
+
     #
     # Find the linkref for the one link we care about. 
     #
