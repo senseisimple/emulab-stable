@@ -1640,7 +1640,7 @@ sub SetupBossNode()
     # See: http://www.freebsd.org/cgi/query-pr.cgi?pr=121257
     #
     my $tso = "";
-    if ($FBSD_VERSION > 6) {
+    if ($FBSD_VERSION >= 7) {
 	$tso = "-tso";
     }
 

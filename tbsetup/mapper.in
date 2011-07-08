@@ -88,6 +88,7 @@ my $WRAPPER2    = "$TB/libexec/assign_wrapper2";
 my $PTOPGEN     = "$TB/libexec/ptopgen";
 my $VTOPGEN     = "$TB/bin/vtopgen";
 my $NFREE       = "$TB/bin/nfree";
+my $XERCES	= "@HAVE_XERCES@";
 
 #
 # Load the Testbed support stuff. 
@@ -194,7 +195,11 @@ if (defined($options{"c"})) {
     $clear = 1;
 }
 if (defined($options{"l"})) {
-    $userspec = 1;
+    if ($XERCES) {
+	$userspec = 1;
+    } else {
+	fatal("Rspec v2 support requires that Xerces be installed");
+    }
 }
 if (defined($options{"z"})) {
     $randomize = 1;
@@ -575,10 +580,12 @@ sub RunAssign($$)
     $cmd .= "-new"
 	if ($newassign);
     my $args = "";
-    $args .= "-f rspec " 
-	if ($userspec == 1);
-    $args .= "-f text "
-	if ($userspec == 0);
+    if ($XERCES) {
+	$args .= "-f rspec " 
+	    if ($userspec == 1);
+	$args .= "-f text "
+	    if ($userspec == 0);
+    }
     $args .= "$ptopfile $vtopfile";
     $args = "-P $args"
 	if (!$vtop->sharednodecount());
