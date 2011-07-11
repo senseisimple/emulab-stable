@@ -1820,9 +1820,11 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    my $virtual_port_id   = GeniXML::GetInterfaceId($iface_ref);
 	    my $virtual_node_id   = GeniXML::GetInterfaceNodeId($iface_ref);
 
-	    if (! GeniXML::IsVersion0($rspec)
-		&& defined($virtual_port_id)) {
-		$virtual_node_id = $iface2node{$virtual_port_id};
+	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Virtual node ID or virtual interface ".
+						 "ID missing on interface");
+		goto bad;
 	    }
 	    #
 	    # If this was an external node we placed into the topo, skip
@@ -1834,12 +1836,6 @@ sub GetTicketAuxAux($$$$$$$$$)
 		next;
 	    }
 	    my $component_id = GeniXML::GetText("component_id", $iface_ref);
-	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
-		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Virtual node ID or virtual interface ".
-						 "ID missing on interface");
-		goto bad;
-	    }
 	    my $vportp      = $vportmap{"$virtual_node_id:$virtual_port_id"};
 	    my $linkref     = $vportp->{'rspec'};
 	    my $virtlan     = $vportp->{'virtlan'};
