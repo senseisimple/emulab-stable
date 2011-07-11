@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rspec xmlns="http://www.protogeni.net/resources/rspec/2"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/2
+http://www.protogeni.net/resources/rspec/2/request.xsd"
+       type="request">
+  <node client_id="left"
+        exclusive="true">
+    <sliver_type name="raw-pc" />
+    <interface client_id="left:if0" />
+  </node>
+  <node client_id="right"
+        exclusive="true">
+    <sliver_type name="raw-pc" />
+    <interface client_id="right:if0" />
+  </node>
+  <link client_id="center">
+    <interface_ref client_id="left:if0" />
+    <interface_ref client_id="right:if0" />
+    <!-- capacity is in kbps -->
+    <!-- latency is in ms -->
+    <!-- packet_loss is a proportion between 0 and 1 -->
+    <property source_id="left:if0" dest_id="right:if0" capacity="10000"
+	      latency="20" packet_loss="0.01" />
+    <property source_id="right:if0" dest_id="left:if0" capacity="2000"
+	      latency="50" packet_loss="0.0" />
+  </link>
+</rspec>
