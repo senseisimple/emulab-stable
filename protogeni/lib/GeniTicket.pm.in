@@ -676,7 +676,6 @@ sub Sign($)
     #
     # Every ticket/credential gets its own uuid.
     #
-    my $ticket_uuid = NewUUID();
     $self->{'ticket_uuid'} = GeniUtil::NewUUID();
 
     $self->RunSigner() == 0
