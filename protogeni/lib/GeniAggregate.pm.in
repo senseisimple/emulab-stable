@@ -1354,6 +1354,25 @@ sub ComputeState($)
     return 0;
 }
 
+#
+# Find a sliver in an aggregate
+#
+sub FindSliverByNickname($$)
+{
+    my ($self, $nickname) = @_;
+    my $safe_nick = DBQuoteSpecial($nickname);
+    my $uuid = $self->uuid();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_slivers ".
+		    "where aggregate_uuid='$uuid' and nickname=$safe_nick");
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($idx) = $query_result->fetchrow_array();
+    return GeniSliver->Lookup($idx);
+}
+
 ############################################################################
 #
 # Link aggregates need special handling.

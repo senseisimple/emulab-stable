@@ -2677,6 +2677,8 @@ sub SliverWorkAux($$$$$$$)
 	my $vnode_id      = GeniXML::GetVnodeId($ref);
 	my $virtual_id    = GeniXML::GetVirtualId($ref);
 	my $manager_id    = GeniXML::GetManagerId($ref);
+	my $inaggregate   = 0;
+	my $sliver;
 
 	$rspecmap{$virtual_id} = $ref;
 
@@ -2703,24 +2705,6 @@ sub SliverWorkAux($$$$$$$)
 	    $ifacemap{$virtual_id}->{$virtual_iface_id} = $component_id;
 	}
 
-	# Already in the aggregate?
-	if (grep {$_ eq $virtual_id} keys(%nodemap)) {
-	    #
-	    # Need to find the old manifest entry and make sure it
-	    # gets into the new manifest.
-	    #
-	    if (defined($oldmanifest)) {
-		my $oldnode = GeniXML::GetNodeByVirtualId($virtual_id,
-							  $oldmanifest);
-		my $curnode = GeniXML::GetNodeByVirtualId($virtual_id,
-							  $manifest);
-		if (defined($oldnode) && defined($curnode)) {
-		    GeniXML::ReplaceNode($curnode, $oldnode);
-		}
-	    }
-	    next;
-	}
-	
 	my $node = GeniUtil::LookupNode($vnode_id);
 	if (!defined($node)) {
 	    $message = "Unknown vnode_id in ticket: $resource_id";
@@ -2728,14 +2712,29 @@ sub SliverWorkAux($$$$$$$)
 	}
 	# Must do this after mapper has run
 	$node->Refresh();
-	
-	my $sliver = GeniSliver::Node->Create($slice, $owner, $node, $ref);
-	if (!defined($sliver)) {
-	    $message = "Could not create GeniSliver object for $virtual_id";
-	    goto bad;
+
+	if (grep {$_ eq $virtual_id} keys(%nodemap)) {
+	    #
+	    # Already in the aggregate, so reuse sliver.
+	    #
+	    $inaggregate = 1;
+	    $sliver = $nodemap{$virtual_id};
 	}
-	$slivers{$sliver->uuid()} = $sliver;
-	$nodemap{$virtual_id} = $sliver;
+	else {
+	    $sliver = GeniSliver::Node->Create($slice, $owner, $node, $ref);
+	    if (!defined($sliver)) {
+		$message = "Could not create GeniSliver object for $virtual_id";
+		goto bad;
+	    }
+	    $slivers{$sliver->uuid()} = $sliver;
+	    $nodemap{$virtual_id} = $sliver;
+
+	    # Add to the aggregate.
+	    if ($sliver->SetAggregate($aggregate) != 0) {
+		$message = "Could not set aggregate for $sliver to $aggregate";
+		goto bad;
+	    }
+	}
 
 	# For the manifest.
 	if (GeniXML::IsVersion0($ref)) {
@@ -2746,21 +2745,6 @@ sub SliverWorkAux($$$$$$$)
 	    GeniXML::SetText("component_id", $ref, $sliver->component_urn());
 	}
 
-	# Add to the aggregate.
-	if ($sliver->SetAggregate($aggregate) != 0) {
-	    $message = "Could not set aggregate for $sliver to $aggregate";
-	    goto bad;
-	}
-
-	# See below; setup all plab nodes at once.
-	if ($node->isplabphysnode()) {
-	    my $vnode = GeniUtil::LookupNode($sliver->resource_id());
-	    if (!defined($vnode)) {
-		print STDERR "Could not locate vnode $sliver\n";
-		goto bad;
-	    }
-	    push(@plabnodes, $vnode);
-	}
 	# Store the updated rspec for later.
 	goto bad
 	    if ($sliver->UpdateRspec($ref));
@@ -2791,6 +2775,7 @@ sub SliverWorkAux($$$$$$$)
     foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
 	my @linkslivers  = ();
+	my $inaggregate  = 0;
 	my %managers     = ();
 	my $linkname     = GeniXML::GetVirtualId($linkref);
 	my @interfaces   = GeniXML::FindNodes("n:linkendpoints | ".
@@ -2821,29 +2806,19 @@ sub SliverWorkAux($$$$$$$)
 
 	my $is_tunnel = GeniXML::IsTunnel($linkref);
 
-	# Do not worry about modifying a link that is setup.
+	#
+	# If the link is already in the aggregate, we need to regenerate
+	# manifest info only.
+	#
 	if (grep {$_ eq $linkname} keys(%linkmap)) {
-	    #
-	    # Need to find the old manifest entry and make sure it
-	    # gets into the new manifest.
-	    #
-	    if (defined($oldmanifest)) {
-		my $oldlink = GeniXML::GetLinkByVirtualId($linkname,
-							  $oldmanifest);
-		my $curlink = GeniXML::GetLinkByVirtualId($linkname,
-							  $manifest);
-		if (defined($oldlink) && defined($curlink)) {
-		    GeniXML::ReplaceNode($curlink, $oldlink);
-		}
-	    }
-	    next;
+	    $inaggregate = 1;
 	}
 
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
 	if ($is_tunnel) {
-
+	    my $tunnel;
 	    my $iface1ref   = $interfaces[0];
 	    my $iface2ref   = $interfaces[1];
 	    my $node1_id    = GeniXML::GetText("virtual_node_id",
@@ -2885,21 +2860,25 @@ sub SliverWorkAux($$$$$$$)
 				 Serialize($node1rspec, 1),
 				 Serialize($node2rspec, 1)])
 		if (0);
-	    
-	    my $tunnel = GeniAggregate::Tunnel->Create($slice,
-						       $owner,
-						       $node1sliver,
-						       $node2sliver,
-						       $linkref,
-						       $node1rspec,
-						       $node2rspec);
 
-	    if (!defined($tunnel)) {
-		$message = "Could not create tunnel aggregate for $linkname";
-		goto bad;
+	    if ($inaggregate) {
+		$tunnel = $linkmap{$linkname};
 	    }
-	    $slivers{$tunnel->uuid()} = $tunnel;
-	    $linkmap{$linkname} = $tunnel;
+	    else {
+		$tunnel = GeniAggregate::Tunnel->Create($slice,
+							$owner,
+							$node1sliver,
+							$node2sliver,
+							$linkref,
+							$node1rspec,
+							$node2rspec);
+		if (!defined($tunnel)) {
+		    $message = "Could not create aggregate for $linkname";
+		    goto bad;
+		}
+		$slivers{$tunnel->uuid()} = $tunnel;
+		$linkmap{$linkname} = $tunnel;
+	    }
 	    
 	    # Manifest goes back to the user.
 	    if (GeniXML::IsVersion0($linkref)) {
@@ -2923,21 +2902,28 @@ sub SliverWorkAux($$$$$$$)
 	    }
 
 	    # Add to the aggregate.
-	    if ($tunnel->SetAggregate($aggregate) != 0) {
+	    if (!$inaggregate &&
+		$tunnel->SetAggregate($aggregate) != 0) {
 		$message = "Could not set aggregate for $tunnel to $aggregate";
 		goto bad;
 	    }
 	    goto manifest;
 	}
+	my $linkaggregate;
 
-	my $linkaggregate = GeniAggregate::Link->Create($slice, $owner,
-							$linkname);
-	if (!defined($linkaggregate)) {
-	    $message = "Could not create link aggregate for $linkname";
-	    goto bad;
+	if ($inaggregate) {
+	    $linkaggregate = $linkmap{$linkname};
 	}
-	$slivers{$linkaggregate->uuid()} = $linkaggregate;
-	$linkmap{$linkname} = $linkaggregate;
+	else {
+	    $linkaggregate = GeniAggregate::Link->Create($slice, $owner,
+							 $linkname);
+	    if (!defined($linkaggregate)) {
+		$message = "Could not create link aggregate for $linkname";
+		goto bad;
+	    }
+	    $slivers{$linkaggregate->uuid()} = $linkaggregate;
+	    $linkmap{$linkname} = $linkaggregate;
+	}
 
 	# Manifest goes back to the user.
 	if (GeniXML::IsVersion0($linkref)) {
@@ -2948,7 +2934,8 @@ sub SliverWorkAux($$$$$$$)
 	}
 
 	# Add to the aggregate.
-	if ($linkaggregate->SetAggregate($aggregate) != 0) {
+	if (!$inaggregate &&
+	    $linkaggregate->SetAggregate($aggregate) != 0) {
 	    $message = "Could not set aggregate for $linkaggregate ".
 		"to $aggregate";
 	    goto bad;
@@ -3038,16 +3025,30 @@ sub SliverWorkAux($$$$$$$)
 		    goto bad;
 		}
 	    }
-	    my $sliver = GeniSliver::Interface->Create($slice,
-						       $owner,
-						       $node->node_id(),
-						       $iface_name,
-						       $linkname,
-						       $ifaceref);
-	    if (!defined($sliver)) {
-		$message = "Could not create GeniSliver for ".
-		    "$iface_name in $linkname";
-		goto bad;
+	    my $sliver;
+
+	    if ($inaggregate) {
+		my $nickname = "$linkname." . $node->node_id() . ".$iface_name";
+		$sliver = $linkaggregate->FindSliverByNickname($nickname);
+
+		if (!defined($sliver)) {
+		    $message = "Could not find existing sliver for ".
+			"$nickname in $linkname";
+		    goto bad;
+		}
+	    }
+	    else {
+		$sliver = GeniSliver::Interface->Create($slice,
+							$owner,
+							$node->node_id(),
+							$iface_name,
+							$linkname,
+							$ifaceref);
+		if (!defined($sliver)) {
+		    $message = "Could not create GeniSliver for ".
+			"$iface_name in $linkname";
+		    goto bad;
+		}
 	    }
 	    my $outref;
 	    my $sliverName = "sliver_urn";
@@ -3066,7 +3067,10 @@ sub SliverWorkAux($$$$$$$)
 		if (defined($ipAddress) && $ipAddress ne "") {
 		    GeniXML::SetText("IP", $outref, $ipAddress);
 		}
-	    } elsif (exists($ifacexml{$iface_id})) {
+		GeniXML::SetText("component_urn", $ifaceref,
+				 $sliver->component_urn());
+	    }
+	    elsif (exists($ifacexml{$iface_id})) {
 		$outref = $ifacexml{$iface_id};
 		$sliverName = "sliver_id";
 		$macName = "mac_address";
@@ -3080,8 +3084,9 @@ sub SliverWorkAux($$$$$$$)
 		}
 		GeniXML::SetText($sliverName, $ifaceref,
 				 $sliver->sliver_urn());
+		GeniXML::SetText("component_id", $ifaceref,
+				 $sliver->component_urn());
 	    }
-
 	    if (defined($outref)) {
 		GeniXML::SetText($sliverName, $outref,
 				 $sliver->sliver_urn());
@@ -3089,7 +3094,8 @@ sub SliverWorkAux($$$$$$$)
 		    if (defined($interface));
 	    }
 	    
-	    if ($sliver->SetAggregate($linkaggregate) != 0) {
+	    if (!$inaggregate &&
+		$sliver->SetAggregate($linkaggregate) != 0) {
 		$message = "Could not add link sliver $sliver to $aggregate";
 		goto bad;
 	    }
