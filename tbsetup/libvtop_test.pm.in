@@ -3436,13 +3436,14 @@ sub CreateVtop($)
     };
 
     # Initialize counters.
-    $self->{'COUNTERS'}->{'simcount'}    = 0;
-    $self->{'COUNTERS'}->{'remotecount'} = 0;
-    $self->{'COUNTERS'}->{'virtcount'}   = 0;
+    $self->{'COUNTERS'}->{'nodecount'}   = 0;
     $self->{'COUNTERS'}->{'plabcount'}   = 0;
     $self->{'COUNTERS'}->{'genicount'}   = 0;
-    $self->{'COUNTERS'}->{'physcount'}   = 0;
+    $self->{'COUNTERS'}->{'virtcount'}   = 0;
+    $self->{'COUNTERS'}->{'simcount'}    = 0;
+    $self->{'COUNTERS'}->{'remotecount'} = 0;
     $self->{'COUNTERS'}->{'sharedcount'} = 0;
+    $self->{'COUNTERS'}->{'physcount'}   = 0;
 
     #
     # Experiment wide options.
