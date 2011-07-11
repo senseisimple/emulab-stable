@@ -1820,7 +1820,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    my $virtual_port_id   = GeniXML::GetInterfaceId($iface_ref);
 	    my $virtual_node_id   = GeniXML::GetInterfaceNodeId($iface_ref);
 
-	    if (! GeniXML::IsVersion0($iface_ref)
+	    if (! GeniXML::IsVersion0($rspec)
 		&& defined($virtual_port_id)) {
 		$virtual_node_id = $iface2node{$virtual_port_id};
 	    }
