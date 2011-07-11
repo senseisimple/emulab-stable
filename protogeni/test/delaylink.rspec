@@ -1,12 +1,11 @@
 <rspec xmlns="http://www.protogeni.net/resources/rspec/2"
        xmlns:delay="http://www.protogeni.net/resources/rspec/ext/delay/1"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/2 http://\
-www.protogeni.net/resources/rspec/2/request.xsd http://www.protogeni.net/resources/rspec/ext/delay/1 http://www.protogeni.net/resources/rspec/ext/delay/1/request-delay.xsd" type="request">
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd http://www.protogeni.net/resources/rspec/ext/delay/1 http://www.protogeni.net/resources/rspec/ext/delay/1/request.xsd" type="request">
   <!-- This rspec implements the following topology:
   
                  left-link          right-link
-           left <---------> bridge <---------> right
+           left <=========> bridge <==========> right
 
        The "bridge" is a special node type (sliver_type="delay") that
        tells the CM to insert an Emulab delay node instead of a plain
@@ -35,14 +34,14 @@ www.protogeni.net/resources/rspec/2/request.xsd http://www.protogeni.net/resourc
         exclusive="true">
     <sliver_type name="raw-pc" />
     <interface client_id="left:if0">
-        <ip address="10.10.10.1" mask="255.255.255.0" type="ipv4"/>
+        <ip address="10.10.10.1" netmask="255.255.255.0" type="ipv4"/>
     </interface>
   </node>
   <node client_id="right"
         exclusive="true">
     <sliver_type name="raw-pc" />
     <interface client_id="right:if0">
-        <ip address="10.10.10.2" mask="255.255.255.0" type="ipv4"/>
+        <ip address="10.10.10.2" netmask="255.255.255.0" type="ipv4"/>
     </interface>
   </node>
   <node client_id="bridge"
