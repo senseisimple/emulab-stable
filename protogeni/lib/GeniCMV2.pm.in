@@ -688,6 +688,7 @@ sub SliverAction($$$$$)
 {
     my ($action, $slice_urn, $sliver_urns, $credentials, $manifest) = @_;
     my $response;
+    my $isasync = 0;
 
     if (! (defined($credentials) &&
 	   (defined($slice_urn) || defined($sliver_urns)))) {
@@ -818,24 +819,36 @@ sub SliverAction($$$$$)
 	goto bad
 	    if (GeniResponse::IsResponse($response));
 	    
-	if ($action eq "start" && defined($manifest)) {
-	    if ($aggregate->ProcessManifest($manifest)) {
+	if ($action eq "start" || $action eq "restart") {
+	    if (defined($manifest) &&
+		$aggregate->ProcessManifest($manifest)) {
 		$response = GeniResponse->Create(GENIRESPONSE_ERROR,
 						 undef,
 						 "Error processing manifest");
 		goto bad;
 	    }
+	    #
+	    # At this point we want to return and let the startsliver proceed
+	    # in the background
+	    #
+	    my $mypid = fork();
+	    if ($mypid) {
+		# Let the child get going.
+		sleep(1);
+		return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+	    }
+	    $isasync = 1;
+	    
+	    # This switches the file that we are writing to. 
+	    libaudit::AuditFork();
 	}
-	
 	$response = &$PerformAction($aggregate, $action);
 	goto bad
 	    if (GeniResponse::IsResponse($response));
 
-	if ($action eq "start" || $action eq "restart") {
-	    # GeniCM::UpdateManifest($slice);
-	}
 	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+	return ($isasync ? GENIRESPONSE_SUCCESS :
+		GeniResponse->Create(GENIRESPONSE_SUCCESS));
     }
     else {
 	my @slivers = ();
@@ -876,7 +889,7 @@ sub SliverAction($$$$$)
     }
   bad:
     $slice->UnLock();
-    return $response;
+    return ($isasync ? $response->code() : $response);
 }
 
 #
@@ -941,14 +954,18 @@ sub SliverStatus($)
     my $blob = {
 	"state"   => $aggregate->state(),
 	"status"  => $aggregate->status(),
+	"error"   => $aggregate->ErrorLog(),
 	"details" => {},
     };
-    
     foreach my $sliver (@slivers) {
-	next
-	    if ($sliver->isa("GeniAggregate"));
-	next
-	    if ($sliver->resource_type() ne "Node");
+	if ($sliver->isa("GeniAggregate")) {
+	    next
+		if (! (ref($sliver) eq "GeniAggregate::Link" ||
+		       ref($sliver) eq "GeniAggregate::Tunnel"));
+	}
+	elsif ($sliver->resource_type() ne "Node") {
+	    next;
+	}
 
 	my $sliver_urn    = $sliver->sliver_urn();
 	my $component_urn = $sliver->component_urn();

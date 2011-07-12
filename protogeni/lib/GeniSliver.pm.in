@@ -260,6 +260,7 @@ sub aggregate_uuid($)	{ return field($_[0], "aggregate_uuid"); }
 sub rspec_string($)     { return field($_[0], "rspec_string"); }
 sub status($)		{ return field($_[0], "status"); }
 sub state($)		{ return field($_[0], "state"); }
+sub ErrorLog($)		{ return field($_[0], "errorlog"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 sub rspec($)            { return $_[0]->{'RSPEC'}; }
@@ -459,6 +460,28 @@ sub SetState($$)
 }
 
 #
+# And the ErrorLog. These are intended to be short ...
+#
+sub SetErrorLog($$)
+{
+    my ($self, $log) = @_;
+    my $safe_log = DBQuoteSpecial($log);
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  errorlog=$safe_log ".
+			 "where idx='$idx'"));
+    
+    $self->{'SLIVER'}->{'errorlog'} = $log;
+    return 0;
+}
+
+#
 # Get the experiment for the slice this sliver belongs to.
 #
 sub GetExperiment($)
@@ -595,7 +618,8 @@ use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
 	     TBResolveNextOSID TBDB_NODESTATE_ISUP TBDB_NODESTATE_TBFAILED
 	     TBDB_NODESTATE_PXEWAIT);
 
-# Error log for local physical node.
+# Error log for local physical node. This overrides the default method above,
+# since it is stored in the node.
 sub ErrorLog($)
 {
     my ($self)  = @_;
@@ -1147,7 +1171,6 @@ use GeniCredential;
 use GeniCertificate;
 use GeniUtil;
 
-# Return the component URN. This is how a resource is resolved.
 # Return the component URN. This is how a resource is resolved.
 sub component_urn($)
 {
