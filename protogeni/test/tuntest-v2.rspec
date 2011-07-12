@@ -8,14 +8,14 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
         exclusive="true">
     <sliver_type name="raw-pc" />
     <interface client_id="left:if0">
-      <ip address="192.168.44.3" mask="255.255.255.0" type="ipv4"/>
+      <ip address="192.168.44.3" netmask="255.255.255.0" type="ipv4"/>
     </interface>
   </node>
   <node client_id="right"
         exclusive="true">
     <sliver_type name="raw-pc" />
     <interface client_id="right:if0">
-      <ip address="192.168.44.7" mask="255.255.255.0" type="ipv4"/>
+      <ip address="192.168.44.7" netmask="255.255.255.0" type="ipv4"/>
     </interface>
   </node>
   <link client_id="center">
