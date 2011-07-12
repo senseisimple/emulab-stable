@@ -59,7 +59,7 @@
     <xs:attribute name="component_name"/>
     <xs:attribute name="exclusive" type="xs:boolean"/>
     <xs:attribute name="colocate"/>
-    <xs:attribute name="sliver_id" use="required"/>
+    <xs:attribute name="sliver_id"/>
   </xs:complexType>
   <xs:element name="relation" type="rspec:RelationContents"/>
   <xs:element name="location" type="rspec:LocationContents"/>
@@ -127,6 +127,7 @@
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="component_id"/>
     <xs:attribute name="client_id" use="required"/>
+    <xs:attribute name="sliver_id"/>
     <xs:attribute name="mac_address"/>
   </xs:complexType>
   <xs:element name="ip" type="rspec:IpContents"/>
@@ -152,7 +153,7 @@
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="client_id" use="required"/>
-    <xs:attribute name="sliver_id" use="required"/>
+    <xs:attribute name="sliver_id"/>
     <xs:attribute name="vlantag" use="required"/>
   </xs:complexType>
   <xs:element name="property" type="rspec:LinkPropertyContents"/>
@@ -161,6 +162,8 @@
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="client_id" use="required"/>
+    <xs:attribute name="sliver_id"/>
+    <xs:attribute name="component_id"/>
   </xs:complexType>
   <!-- The unidirectional network properties of a link. -->
   <xs:complexType name="LinkPropertyContents">

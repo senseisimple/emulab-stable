@@ -11,23 +11,28 @@
 include "request.rnc"
 
 NodeContents &=
-  attribute sliver_id { text } &
+  attribute sliver_id { text }? &
   # List of all hostnames that can be used to access the node on the
   # control network. These may be accessible only by other nodes local
   # to the same CM.
   element host { attribute name { text } }*
 
 LinkContents &=
-  attribute sliver_id { text } &
+  attribute sliver_id { text }? &
   # vlan tag number used for stitching
   attribute vlantag { text }
 
 InterfaceContents &=
+  attribute sliver_id { text }? &
   attribute mac_address { text } ? &
   # List of all hostnames associated with a particular
   # interface. These may be names associated with an experimental
   # interface that can be used to transit experimental traffic.
   element host { attribute name { text } }*
+
+InterfaceRefContents &=
+  attribute sliver_id { text }? &
+  attribute component_id { text }?
 
 LoginServiceContents &=
   # Default username. Used when there is only one username or one
