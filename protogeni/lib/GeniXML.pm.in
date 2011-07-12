@@ -340,7 +340,7 @@ sub GetMask($$)
 	    if (defined($id) && defined($testid) && $testid eq $id) {
 		my $ip = FindFirst("n:ip", $iface);
 		if (defined($ip)) {
-		    $result = GetText("netmask", $ip);
+		    $result = GetFirstText($ip, "netmask", "mask");
 		}
 		last;
 	    }
