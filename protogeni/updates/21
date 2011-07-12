@@ -1,0 +1,25 @@
+#
+# Beef up the geni_resources table for use in cooked mode.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_aggregates", "errorlog")) {
+	DBQueryFatal("alter table geni_aggregates add ".
+		     " `errorlog` text ".
+		     "after state");
+    }
+    if (!DBSlotExists("geni_slivers", "errorlog")) {
+	DBQueryFatal("alter table geni_slivers add ".
+		     " `errorlog` text ".
+		     "after state");
+    }
+    return 0;
+}
+1;

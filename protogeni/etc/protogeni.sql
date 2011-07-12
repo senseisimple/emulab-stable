@@ -87,6 +87,7 @@ CREATE TABLE `geni_slivers` (
   `aggregate_uuid` varchar(40) default NULL,
   `status` varchar(16) NOT NULL default 'created',
   `state` varchar(16) NOT NULL default 'stopped',
+  `errorlog` text,
   `rspec_string` text,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
@@ -111,6 +112,7 @@ CREATE TABLE `geni_aggregates` (
   `aggregate_idx` int(10) unsigned default NULL,
   `status` varchar(16) NOT NULL default 'created',
   `state` varchar(16) NOT NULL default 'stopped',
+  `errorlog` text,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
