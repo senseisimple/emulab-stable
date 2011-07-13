@@ -773,16 +773,21 @@ sub stateTransition($$) {
 		# This could come from any state as it just indicates that
 		# a machine with a gPXE dongle has rebooted.
 		#
-		# To differentiate BOOT from LOAD we check next_op_mode.
-		# It will be set to SECURELOAD when we need to go there,
-		# otherwise we force it to SECUREBOOT.
+		# To differentiate BOOT from LOAD:
+		# if next_op_mode is SECURELOAD, goto SECURELOAD
+		# else if mode/state is SECURELOAD/SHUTDOWN, goto SECURELOAD
+		# else goto SECUREBOOT.
 		#
 		debug("Running $SECUREBOOT trigger\n");
 		my $query_result =
 		    DBQueryWarn("select next_op_mode from nodes ".
 				"where node_id='$node'");
 		my ($nextmode) = $query_result->fetchrow();
-		if (!$nextmode || $nextmode ne TBDB_NODEOPMODE_SECURELOAD) {
+		if (!$nextmode) {
+		    $nextmode = $mode;
+		}
+		if ($nextmode ne TBDB_NODEOPMODE_SECURELOAD ||
+		    $oldstate ne TBDB_NODESTATE_SHUTDOWN) {
 		    $nextmode = TBDB_NODEOPMODE_SECUREBOOT;
 		}
 		if ($mode ne $nextmode) {
