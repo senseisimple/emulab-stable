@@ -485,8 +485,6 @@ sub SliverStatus()
     my $details = $pgstatus->{'details'};
     my @children = ();
     while ( my ($pgurn, $pgrstat) = each(%$details) ) {
-        # Look up the sliver so we can extract info from the manifest.
-        my $sliver = GeniSliver->Lookup($pgurn);
         my $child = {
             'geni_urn' => $pgurn,
             # XXX Need to massage status to one of the AM status values
@@ -494,6 +492,14 @@ sub SliverStatus()
             'geni_error' => $pgrstat->{'error'},
             'pg_status' => $pgrstat->{'status'},
         };
+        # Look up the sliver so we can extract info from the manifest.
+        my $sliver = GeniSliver->Lookup($pgurn);
+	if (!defined($sliver)) {
+	    $sliver = GeniAggregate->Lookup($pgurn);
+	}
+	# Signal an error?
+	next
+	    if (!defined($sliver));
 
         # Put manifest info in...
         my $manifest = $sliver->GetManifest(0);
