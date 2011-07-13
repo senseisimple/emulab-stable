@@ -52,6 +52,10 @@ remote-install:
 
 clean:		clean-subdirs
 distclean:	subdir-distclean
+mfs:
+mfs-install:
+frisbee-mfs:
+frisbee-mfs-install:
 
 subdir-distclean:
 	@$(MAKE) -C imagezip distclean

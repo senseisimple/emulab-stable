@@ -10,7 +10,7 @@ SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= program-agent
+SUBDIRS		= slothd
 
 all:	all-subdirs
 

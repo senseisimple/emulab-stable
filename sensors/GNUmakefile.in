@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2009 University of Utah and the Flux Group.
+# Copyright (c) 2002-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -12,7 +12,7 @@ ISMAINSITE	= @TBMAINSITE@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= slothd powermon
+SUBDIRS	= powermon
 ifeq ($(ISMAINSITE),1)
 SUBDIRS += nfstrace
 endif
@@ -87,8 +87,7 @@ $(SUBDIRS): %: %.all
 fs-install:
 	@$(MAKE) -C nfstrace fs-install
 
-mfs: slothd.client
-
-mfs-install: mfs slothd.client-install
+mfs:
+mfs-install:
 
 .PHONY: mfs mfs-install

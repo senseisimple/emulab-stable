@@ -281,41 +281,49 @@ mfs: mfsoscheck
 	@$(MAKE) -C os mfs
 	@$(MAKE) -C sensors mfs
 	@$(MAKE) -C tmcd mfs
+	@$(MAKE) -C clientside mfs
 
 mfs-nostatic: mfsoscheck
 	@NOSTATIC=1 $(MAKE) -C os mfs
 	@NOSTATIC=1 $(MAKE) -C sensors mfs
 	@NOSTATIC=1 $(MAKE) -C tmcd mfs
+	@NOSTATIC=1 $(MAKE) -C clientside mfs
 
 mfs-install: destdircheck mfs client-mkdirs
 	@$(MAKE) -C os mfs-install
 	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install
+	@$(MAKE) -C clientside mfs-install
 
 mfs-nostatic-install: destdircheck mfs-nostatic client-mkdirs
 	@$(MAKE) -C os mfs-install
 	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install
+	@$(MAKE) -C clientside mfs-install
 
 frisbee-mfs: mfsoscheck
 	@$(MAKE) -C cdrom/groklilo client
 	@$(MAKE) -C os frisbee-mfs
 	@$(MAKE) -C tmcd frisbee-mfs
+	@$(MAKE) -C clientside frisbee-mfs
 
 frisbee-mfs-nostatic: mfsoscheck
 	@NOSTATIC=1 $(MAKE) -C cdrom/groklilo client
 	@NOSTATIC=1 $(MAKE) -C os frisbee-mfs
 	@NOSTATIC=1 $(MAKE) -C tmcd frisbee-mfs
+	@NOSTATIC=1 $(MAKE) -C clientside frisbee-mfs
 
 frisbee-mfs-install: destdircheck frisbee-mfs
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
 	@$(MAKE) -C tmcd frisbee-mfs-install
+	@$(MAKE) -C clientside frisbee-mfs-install
 
 frisbee-mfs-nostatic-install: destdircheck frisbee-mfs-nostatic
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
 	@$(MAKE) -C tmcd frisbee-mfs-install
+	@$(MAKE) -C clientside frisbee-mfs-install
 
 cdboot: mfsoscheck client
 	@echo "CD/Dongle files built"
@@ -331,6 +339,7 @@ flashboot-install: destdircheck flashboot
 	@$(MAKE) -C tmcd/freebsd6 cdboot-install
 	@$(MAKE) -C os frisbee-mfs-install
 	@$(MAKE) -C flash client-install
+	@$(MAKE) -C clientside frisbee-mfs-install
 
 #
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can
