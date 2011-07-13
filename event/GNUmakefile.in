@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 
 SYSTEM	       := $(shell uname -s)
 
-SUBDIRS		= tbgen proxy example linktest link-agent
+SUBDIRS		= tbgen proxy example linktest
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif
