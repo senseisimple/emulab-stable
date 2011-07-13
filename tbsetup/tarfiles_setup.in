@@ -1,11 +1,9 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2008 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 use Socket;
@@ -25,10 +23,12 @@ use Socket;
 
 sub usage()
 {
-    print "Usage: $0 pid eid\n";
+    print "Usage: $0 [-q] pid eid\n";
  
     exit(-1);
 }
+my $optlist = "q";
+my $quiet   = 0;
 
 #
 # Functions
@@ -84,6 +84,13 @@ use libArchive;
 use Experiment;
 use User;
 
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
+}
 if (@ARGV != 2) {
     usage();
 }
@@ -286,12 +293,15 @@ if ($TESTMODE) {
 # Actually fetch the tarballs
 #
 while (my ($URL, $localfile) = each %tofetch) {
-    print "Fetching $URL to $localfile\n";
+    print "Fetching $URL to $localfile\n"
+	if (!$quiet);
 
     #
     # Build up a new command line to do the fetch on ops
     #
     my $cmdargs = "$TB/bin/fetchtar.proxy ";
+    $cmdargs .= " -q "
+	if ($quiet);
     $cmdargs .= " -u $user_uid $URL $localfile ";
 
     #
@@ -302,7 +312,7 @@ while (my ($URL, $localfile) = each %tofetch) {
     $EUID = $UID = $SAVEUID;
 
     if ($?) {
-	tbdie("Fetch of Tarball/RPM failed!");
+	tbdie("Fetch of Tarball/RPM failed: $URL");
     }
 }
 

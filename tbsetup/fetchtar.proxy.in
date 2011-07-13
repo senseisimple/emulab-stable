@@ -1,11 +1,9 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 use BSD::Resource;
@@ -17,10 +15,13 @@ use POSIX qw(:signal_h);
 #
 sub usage()
 {
-    print "Usage: $0 -u user URL localfile\n";
+    print "Usage: $0 [-q] -u user URL localfile\n";
  
     exit(-1);
 }
+my $optlist = "qu:";
+my $quiet   = 0;
+my $user;
 
 #
 # Configure variables
@@ -62,16 +63,19 @@ if ($UID != 0) {
 	"    Must be root to run this script!");
 }
 
-if (@ARGV != 4) {
+my %options = ();
+if (! getopts($optlist, \%options)) {
     usage();
 }
-
-if ((shift @ARGV) ne '-u') {
-    die("*** $0:\n".
-	"    Improper first argument. Must be the user name!\n");
+if (defined($options{"q"})) {
+    $quiet = 1;
 }
-
-my $user = shift @ARGV;
+if (defined($options{"u"})) {
+    $user = $options{"u"};
+}
+if (@ARGV != 2 || !defined($user)) {
+    usage();
+}
 my $URL = shift @ARGV;
 my $localfile = shift @ARGV;
 
@@ -160,7 +164,7 @@ if (! $pid) {
     # Give parent a chance to react.
     sleep(1);
 
-    exec("nice -15 $WGET --timestamping --no-verbose -O $localfile $URL");
+    exec("nice -15 $WGET -q -O $localfile $URL");
     die("Could not exec wget!\n");
 }
 
@@ -182,7 +186,8 @@ if (($exit_status & 0xff) == SIGKILL) {
     print STDERR "*** $msg\n";
     exit(15);
 } elsif ($exit_status) {
-    print STDERR "*** wget exited with status $exit_status\n";
+    print STDERR "*** wget exited with status $exit_status\n"
+	if (!$quiet);
 } else {
     #
     # Change the permissions on the file so that other group members can
