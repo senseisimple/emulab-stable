@@ -943,6 +943,9 @@ ImageUnzipInitKeys(char *uuidstr, char *sig_keyfile, char *enc_keyfile)
 		if (!encrypt_readkey(enc_keyfile,
 				     encryption_key, sizeof(encryption_key)))
 			exit(1);
+		/* XXX can you intuit the cipher from the key? */
+		if (cipher == ENC_NONE)
+			cipher = ENC_BLOWFISH_CBC;
 		do_decrypt = 1;
 	}
 #else
