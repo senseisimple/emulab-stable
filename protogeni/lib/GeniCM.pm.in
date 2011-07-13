@@ -2654,8 +2654,10 @@ sub SliverWorkAux($$$$$$$)
     #
     # Must do this after the mapper runs.
     #
-    if (system("$TARFILES_SETUP $pid $eid")) {
-	print STDERR "Could not setup tarfiles\n";
+    $output = GeniUtil::ExecQuiet("$TARFILES_SETUP -q $pid $eid");
+    if ($?) {
+	$message = "Could not setup tarfiles:\n$output";
+	print STDERR $message;
 	goto bad;
     }
 
