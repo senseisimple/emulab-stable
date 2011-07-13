@@ -7028,7 +7028,6 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	pxe/GNUmakefile pxe/bootinfo.restart \
 	security/GNUmakefile security/lastlog_daemon \
         sensors/GNUmakefile \
-        sensors/canaryd/GNUmakefile sensors/canaryd/feedbacklogs \
 	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	sensors/powermon/GNUmakefile sensors/powermon/powermon \
 	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
@@ -7229,6 +7228,7 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/tools/GNUmakefile clientside/tools/pcapper/GNUmakefile \
  clientside/sensors/GNUmakefile clientside/sensors/slothd/GNUmakefile \
  clientside/sensors/slothd/sdisrunning clientside/sensors/slothd/sddeploy \
+ clientside/sensors/canaryd/GNUmakefile clientside/sensors/canaryd/feedbacklogs \
  clientside/os/GNUmakefile clientside/os/syncd/GNUmakefile \
  clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
 

@@ -1,13 +1,12 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-SRCDIR          = @srcdir@
-TESTBED_SRCDIR  = @top_srcdir@
-OBJDIR          = ../..
-SUBDIR          = sensors/canaryd
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 TBLIB		= $(OBJDIR)/lib/libtb/libtb.a
 
 SBIN_SCRIPTS    = 
@@ -18,11 +17,11 @@ include $(OBJDIR)/Makeconf
 CC?=gcc
 CFLAGS+= -Wall -g -I${OBJDIR} -I/usr/local/include \
 		-I$(TESTBED_SRCDIR)/lib/libtb \
-		-I$(TESTBED_SRCDIR)/event/lib \
+		-I$(TESTBED_SRCDIR)/lib/event \
 		-DCLIENT_BINDIR='"$(CLIENT_BINDIR)"' \
 		-DLOG_TESTBED=$(LOG_TESTBED) \
 		-I/usr/local/include
-LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql -L${OBJDIR}/event/lib
+LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql -L${OBJDIR}/lib/event
 LDFLAGS+= $(LDSTATIC)
 LIBS+= -ltb -levent -lcrypto -L/usr/local/lib -lpubsub -lm
 CP= cp -pf
@@ -54,6 +53,8 @@ client-install: client
 	$(INSTALL_PROGRAM) -s canaryd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)$(EXE)
 
 control-install:
+mfs:
+mfs-install:
 
 clean:
 	rm -f *.o $(CDPROGS) *~ core *.core version.c

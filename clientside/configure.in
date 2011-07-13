@@ -158,6 +158,7 @@ outfiles="Makeconf GNUmakefile \
 	  tools/pcapper/GNUmakefile \
 	  sensors/GNUmakefile \
 	  sensors/slothd/GNUmakefile \
+	  sensors/canaryd/GNUmakefile \
 	  os/GNUmakefile os/syncd/GNUmakefile \
 	  os/dijkstra/GNUmakefile os/genhostsfile/GNUmakefile"
 
