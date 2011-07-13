@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005, 2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -199,7 +199,7 @@ int parse_args(int argc, char **argv) {
   opts->agg_interval = DEF_AINTVL;
   opts->debug = 0;
   opts->port = SLOTHD_DEF_PORT;
-  opts->servname = BOSSNODE;
+  opts->servname = (char *)0;
   opts->load_thresh = DEF_LTHRSH;
   opts->pkt_thresh = DEF_CTHRSH;
   opts->cif_thresh = DEF_CTHRSH;
@@ -325,6 +325,10 @@ int init_slothd(void) {
   /* prepare UDP connection to server */
   if ((parms->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
     lerror("Could not alloc socket");
+    return -1;
+  }
+  if (opts->servname == (char *) 0) {
+    lerror("Need to specify the server hostname");
     return -1;
   }
   if (!(hent = gethostbyname(opts->servname))) {

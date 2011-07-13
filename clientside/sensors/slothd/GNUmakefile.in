@@ -1,20 +1,18 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-SRCDIR          = @srcdir@
-TESTBED_SRCDIR  = @top_srcdir@
-OBJDIR          = ../..
-SUBDIR          = sensors/slothd
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+SYSTEM	       := $(shell uname -s)
 SLOTHD_DIR	= unknownclient
 TBLIB		= $(OBJDIR)/lib/libtb/libtb.a
 
 SBIN_SCRIPTS    = sdisrunning sddeploy
 SDPROGS		= sdcollectd$(EXE) slothd$(EXE)
-
-SYSTEM          := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
@@ -85,6 +83,8 @@ ifeq ($(SYSTEM),CYGWIN_NT-5.1)
 endif
 
 control-install:
+mfs:	client
+mfs-install: client-install
 
 clean:
 	rm -f *.o $(SDPROGS) $(WINPROGS) slothd-debug *~ core *.core version.c

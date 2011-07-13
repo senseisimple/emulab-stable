@@ -202,7 +202,6 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client
 	@$(MAKE) -C tip client
 endif
-	@$(MAKE) -C sensors client
 	@$(MAKE) -C tmcd client
 
 client-install: client client-mkdirs
@@ -216,7 +215,6 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
 endif
-	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
 
 subboss: client
@@ -232,7 +230,6 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
 endif
-	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C utils subboss-install
 	@$(MAKE) -C os subboss-install
 	@$(MAKE) -C db subboss-install
@@ -279,25 +276,21 @@ mfsoscheck:
 
 mfs: mfsoscheck
 	@$(MAKE) -C os mfs
-	@$(MAKE) -C sensors mfs
 	@$(MAKE) -C tmcd mfs
 	@$(MAKE) -C clientside mfs
 
 mfs-nostatic: mfsoscheck
 	@NOSTATIC=1 $(MAKE) -C os mfs
-	@NOSTATIC=1 $(MAKE) -C sensors mfs
 	@NOSTATIC=1 $(MAKE) -C tmcd mfs
 	@NOSTATIC=1 $(MAKE) -C clientside mfs
 
 mfs-install: destdircheck mfs client-mkdirs
 	@$(MAKE) -C os mfs-install
-	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install
 	@$(MAKE) -C clientside mfs-install
 
 mfs-nostatic-install: destdircheck mfs-nostatic client-mkdirs
 	@$(MAKE) -C os mfs-install
-	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install
 	@$(MAKE) -C clientside mfs-install
 

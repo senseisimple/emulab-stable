@@ -20,7 +20,7 @@ ifeq ($(WITH_EMULAB),0)
 SUBDIRS	       += lib
 endif
 # These must be after lib.
-SUBDIRS	       += event tools os
+SUBDIRS	       += event tools os sensors
 
 ifeq ($(WITH_EMULAB),1)
 all:	all-subdirs

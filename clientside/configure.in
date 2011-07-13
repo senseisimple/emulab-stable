@@ -156,6 +156,8 @@ outfiles="Makeconf GNUmakefile \
 	  event/program-agent/GNUmakefile \
 	  tools/GNUmakefile \
 	  tools/pcapper/GNUmakefile \
+	  sensors/GNUmakefile \
+	  sensors/slothd/GNUmakefile \
 	  os/GNUmakefile os/syncd/GNUmakefile \
 	  os/dijkstra/GNUmakefile os/genhostsfile/GNUmakefile"
 
