@@ -813,8 +813,12 @@ sub Release($$)
 	    if (defined($restable) &&
 		(!defined($restable->{'genisliver_idx'}) ||
 		 $restable->{'genisliver_idx'} == 0)) {
-		push(@nodeids, $node->node_id());
-		push(@nodes, $node);
+		# Bridge nodes could be listed twice, and nfree does not like
+		# it when a node is in the list twice.
+		if (! grep {$_ eq $node->node_id()} @nodeids) {
+		    push(@nodeids, $node->node_id());
+		    push(@nodes, $node);
+		}
 
 		# So we can tell if we need to deallocate a physical
 		# host once all the VMs on it are gone. 
