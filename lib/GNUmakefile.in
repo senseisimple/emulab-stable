@@ -24,6 +24,10 @@ subboss:
 subboss-install:
 clean:		clean-subdirs
 distclean:	distclean-subdirs
+mfs:
+mfs-install:
+frisbee-mfs:
+frisbee-mfs-install:
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
