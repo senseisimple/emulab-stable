@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 
 SYSTEM	       := $(shell uname -s)
 
-SUBDIRS		= tbgen proxy example linktest
+SUBDIRS		= proxy example linktest
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif
@@ -50,7 +50,6 @@ install:
 ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched install
 endif
-	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
 	@$(MAKE) -C proxy install
@@ -59,7 +58,6 @@ client:		trafgen-fetch client-subdirs
 client-install: client client-install-subdirs
 
 control-install: 
-	@$(MAKE) -C tbgen control-install
 	@$(MAKE) -C sched control-install
 ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched control-install
