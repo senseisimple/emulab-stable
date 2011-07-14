@@ -1214,27 +1214,26 @@ sub GetTicketAuxAux($$$$$$$$$)
     # Look for a stitching section. The paths are indexed by the id, which
     # will match the client_id in the link.
     #
-    if (defined(GeniXML::FindFirst("n:stitching", $rspec))) {
-	foreach my $ref (GeniXML::FindNodes("n:stitching",
-					    $rspec)->get_nodelist()) {
-	    foreach my $path (GeniXML::FindNodes("n:path",
-						 $ref)->get_nodelist()) {
-		my $path_id = GeniXML::GetText("id", $path);
-		
-		#
-		# Get the hop list and create and create a hash too.
-		#
-		my @hoplist = GeniXML::FindNodes("n:hop",
-						 $path)->get_nodelist();
-		my %hophash = ();
-		foreach my $hop (@hoplist) {
-		    my $hop_id = GeniXML::GetText("id", $hop);
-		    $hophash{$hop_id} = $hop;
-		}
-		$stitching_paths{$path_id} = { "path"    => $path,
-					       "hophash" => \%hophash,
-					       "hoplist" => \@hoplist };
+    foreach my $ref (GeniXML::FindNodesNS("n:stitching",
+					  $rspec,
+					  $GeniXML::STITCH_NS)->get_nodelist()) {
+	foreach my $path (GeniXML::FindNodes("n:path",
+					     $ref)->get_nodelist()) {
+	    my $path_id = GeniXML::GetText("id", $path);
+	    
+	    #
+	    # Get the hop list and create and create a hash too.
+	    #
+	    my @hoplist = GeniXML::FindNodes("n:hop",
+					     $path)->get_nodelist();
+	    my %hophash = ();
+	    foreach my $hop (@hoplist) {
+		my $hop_id = GeniXML::GetText("id", $hop);
+		$hophash{$hop_id} = $hop;
 	    }
+	    $stitching_paths{$path_id} = { "path"    => $path,
+					   "hophash" => \%hophash,
+					   "hoplist" => \@hoplist };
 	}
     }
     #

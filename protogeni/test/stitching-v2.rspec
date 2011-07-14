@@ -34,7 +34,8 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
       component_id="urn:publicid:IDN+dragon.maxgigapop.net+interface+planetlab2:eth1"/>
   </link>
 
-<stitching lastUpdateTime="20110220:09:30:21">
+<stitching xmlns="http://hpn.east.isi.edu/rspec/ext/stitch/0.1/"
+	   lastUpdateTime="20110220:09:30:21">
 
 <path id="mylink" >
   <hop id="1" type="strict">

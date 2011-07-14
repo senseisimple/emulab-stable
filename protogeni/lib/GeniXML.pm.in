@@ -29,13 +29,15 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS $XSI_NS $REQUEST_URL $MANIFEST_URL);
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS $XSI_NS $STITCH_NS
+            $REQUEST_URL $MANIFEST_URL);
 $RSPEC_0_1 = "0.1";
 $RSPEC_0_2 = "0.2";
 $RSPEC_2 = "2";
 
 $EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
 $XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
+$STITCH_NS = "http://hpn.east.isi.edu/rspec/ext/stitch/0.1/";
 
 $REQUEST_URL = "http://www.protogeni.net/resources/rspec/2/request.xsd";
 $MANIFEST_URL = "http://www.protogeni.net/resources/rspec/2/manifest.xsd";
