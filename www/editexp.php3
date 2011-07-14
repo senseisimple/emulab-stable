@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -42,7 +42,7 @@ if (! $experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
 function SPITFORM($experiment, $formfields, $errors)
 {
     global $isadmin, $TBDOCBASE, $linktest_levels, $EXPOSELINKTEST;
-    global $WIKIDOCURL;
+    global $WIKIDOCURL, $TBMAILADDR;
 
     #
     # Standard Testbed Header
@@ -193,7 +193,7 @@ function SPITFORM($experiment, $formfields, $errors)
                   </td>
 	          <td>
                       <a href='${swaplink}#autoswap'>
-	                 <b>Max. Duration:</b></a>
+	                 <b>Max. Duration [1]:</b></a>
                       Swap out after
                         <input type='text'
                                name='formfields[autoswap_timeout]'
@@ -306,6 +306,16 @@ function SPITFORM($experiment, $formfields, $errors)
 
     echo "</form>
           </table>\n";
+    echo "<blockquote>
+            <ol type=1 start=1>
+	     <li> You may not turn off Maximum Duration, but you are allowed
+                  to change the
+                  the number of hours, up to five days (5 * 24 hours).
+                  Contact " . $TBMAILADDR . " if you need more time.
+             </li>
+            </ol>
+          </blockquote>\n";
+
 }
 
 #
