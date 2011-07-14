@@ -154,6 +154,7 @@ AC_SUBST(PYTHON_INCLUDE)
 outfiles="Makeconf GNUmakefile \
 	  event/GNUmakefile \
 	  event/program-agent/GNUmakefile \
+	  event/link-agent/GNUmakefile \
 	  tools/GNUmakefile \
 	  tools/pcapper/GNUmakefile \
 	  sensors/GNUmakefile \

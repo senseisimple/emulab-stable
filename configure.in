@@ -713,7 +713,6 @@ else
 		    event/nsetrafgen/nseinput.tcl \
 		    event/nsetrafgen/nse-makepatch \
                     event/delay-agent/GNUmakefile \
-		    event/link-agent/GNUmakefile \
 		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated \
 		    event/linktest/GNUmakefile \
@@ -1095,6 +1094,7 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/sensors/slothd/sdisrunning clientside/sensors/slothd/sddeploy \
  clientside/sensors/canaryd/GNUmakefile clientside/sensors/canaryd/feedbacklogs \
  clientside/os/GNUmakefile clientside/os/syncd/GNUmakefile \
+ clientside/event/link-agent/GNUmakefile \
  clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
 
 #
