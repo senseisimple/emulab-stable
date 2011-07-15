@@ -1450,6 +1450,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "$lanname: unknown network for $edgenodeid");
 			goto bad;
 		    }
+		    # Stash for later. We need to allocate a vlan tag, and
+		    # this stores the min/max vlan numbers we have to use.
+		    $stitching_paths{$lanname}->{'network'} = $network;
 		    
 		    #
 		    # Stick in a reference to the fake node.
@@ -1483,6 +1486,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    }
 		    $iface_vport = $external_vportmap{$node_nickname};
 		    $external_vportmap{$node_nickname} += 1;
+		    $external_linkmap{$lanname} = $linkref;
 		    goto stitch;
 		}
 		else {
@@ -1827,17 +1831,16 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	    #
 	    # If this was an external node we placed into the topo, skip
-	    # it here, but we have to remember it cause we have to contact
-	    # the other CM to coordinate the vlan reservation.
+	    # it here. Below we contact the other CM to coordinate the
+	    # vlan reservation.
 	    #
-	    if (exists($external_nodemap{$virtual_node_id})) {
-		$external_linkmap{$nickname} = [$ref, $iface_ref];
-		next;
-	    }
-	    my $component_id = GeniXML::GetText("component_id", $iface_ref);
+	    next
+		if (exists($external_nodemap{$virtual_node_id}));
+
 	    my $vportp      = $vportmap{"$virtual_node_id:$virtual_port_id"};
 	    my $linkref     = $vportp->{'rspec'};
 	    my $virtlan     = $vportp->{'virtlan'};
+	    my $component_id = GeniXML::GetText("component_id", $iface_ref);
 	    $virtlan->fixed_iface($component_id)
 		if (defined($component_id));
 	    $component_id = "lo0"
@@ -1861,7 +1864,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     # Now contact external CMs to coordinate vlans. 
     #
     foreach my $linkname (keys(%external_linkmap)) {
-	my ($linkref, $ifaceref) = @{ $external_linkmap{$linkname} };
+	my $linkref   = $external_linkmap{$linkname};
 	my $slice_urn = $slice->urn();
 	my $retries   = 10;
 	my $chainmode = 0;
@@ -1888,23 +1891,51 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    }
 		}
 		my $lanid = $vlan->lanid();
-		system("$SNMPIT -A $pid $eid $lanid");
+		#
+		# Look in the network object to get the limits. This is not an
+		# efficient way to do this; should put some of this into snmpit.
+		#
+		my $network = $stitching_paths{$linkname}->{'network'};
+		my $mintag  = $network->min_vlan();
+		my $maxtag  = $network->max_vlan();
+		my @tags    = ();
+		while (scalar(@tags) < 20 && $mintag < $maxtag) {
+		    my $t = $mintag++;
+		    push(@tags, $t)		
+			if (VLan->VlanTagAvailable($t));
+		}
+		if (!@tags) {
+		    $vlan->Destroy();
+		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not find a free vlan tag for $linkname");
+		    goto bad;
+		}
+		#
+		# Do this in "blockmode" so that snmpit does not throw an error
+		# if one of the tags is not available.
+		#
+		print STDERR
+		    "Trying to allocate vlan tags for $linkname: @tags\n";
+		system("$SNMPIT --blockmode -A ".
+		       "$pid $eid $lanid," . join(",", @tags));
 		if ($?) {
 		    $vlan->Destroy();
 		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Could not reserve vlan tag for $linkname");
+			"Error trying to reserve a vlan tag for $linkname");
 		    goto bad;
 		}
 		$vlan->Destroy();
 	    }
 	    $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
 	    if (!defined($tag)) {
-		# This should not happen. 
 		print STDERR "Did not find the reserved tag for $linkname\n";
 		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "Internal Error reserving vlan tag");
+				 "Could not reserve a vlan tag for $linkname");
 		goto bad;
 	    }
+	    print STDERR "Got tag $tag for $linkname\n";
+	    print STDERR "$linkref\n";
+	    
 	    GeniXML::SetText("vlantag", $linkref, $tag);
 
 	    my @hoplist = @{ $stitching_paths{$linkname}->{'hoplist'} };
@@ -1918,10 +1949,16 @@ sub GetTicketAuxAux($$$$$$$$$)
 		# Need to change a couple of fields buried down inside. Ick.
 		#
 		my $tmp = FindFirst("n:link", $hop);
-		$tmp = FindFirst("n:SwitchingCapabilityDescriptors", $tmp)
+		$tmp = (FindFirst("n:switchingCapabilityDescriptor", $tmp) ||
+			FindFirst("n:switchingCapabilityDescriptors", $tmp))
 		    if (defined($tmp));
 		$tmp = FindFirst("n:switchingCapabilitySpecificInfo", $tmp)
 		    if (defined($tmp));
+		if (defined($tmp) &&
+		    FindFirst("n:switchingCapabilitySpecificInfo_L2sc", $tmp)) {
+		    $tmp = FindFirst("n:switchingCapabilitySpecificInfo_L2sc",
+				     $tmp)
+		}
 		if (defined($tmp)) {
 		    SetText("vlanRangeAvailability", $tmp, "$tag");
 		    SetText("suggestedVLANRange", $tmp, "$tag");
