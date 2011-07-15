@@ -23,15 +23,14 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
       <disk_image
 	  name="urn:publicid:IDN+uky.emulab.net+image+emulab-ops//FEDORA10-STD" />
     </sliver_type>
-    <interface client_id="right:if0">
-      <ip address="192.168.44.2" netmask="255.255.255.0" type="ipv4"
-	  component_id="eth1"/>
+    <interface client_id="right:if0"
+               component_id="urn:publicid:IDN+dragon.maxgigapop.net+interface+planetlab2:eth1">
+      <ip address="192.168.44.2" netmask="255.255.255.0" type="ipv4"/>
     </interface>
   </node>
   <link client_id="mylink">
     <interface_ref client_id="left:if0" />
-    <interface_ref client_id="right:if0"
-      component_id="urn:publicid:IDN+dragon.maxgigapop.net+interface+planetlab2:eth1"/>
+    <interface_ref client_id="right:if0" />
   </link>
 
 <stitching xmlns="http://hpn.east.isi.edu/rspec/ext/stitch/0.1/"
@@ -41,15 +40,17 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
   <hop id="1" type="strict">
     <link id="urn:publicid:IDN+emulab.net+interface+*:*">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>2</nextHop>
   </hop>
@@ -58,16 +59,18 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
     <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-salt:*">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
       <capacity>10000000000</capacity>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
-           <vlanTranslation>false</vlanTranslation>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+            <vlanTranslation>false</vlanTranslation>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>3</nextHop>
   </hop>
@@ -76,16 +79,18 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
     <link id="urn:publicid:IDN+emulab.net+interface+procurve-pgeni-salt:eth0:ion">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
       <capacity>10000000000</capacity>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
-           <vlanTranslation>false</vlanTranslation>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+            <vlanTranslation>false</vlanTranslation>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>4</nextHop>
   </hop>
@@ -94,16 +99,18 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
     <link id="urn:publicid:IDN+ion.internet2.edu+interface+rtr.salt:ge-7/1/2:protogeni">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
       <capacity>10000000000</capacity>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
-           <vlanTranslation>true</vlanTranslation>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+            <vlanTranslation>true</vlanTranslation>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>5</nextHop>
   </hop>
@@ -112,16 +119,18 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
     <link id="urn:publicid:IDN+ion.internet2.edu+interface+rtr.newy:xe-0/0/3:*">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
       <capacity>10000000000</capacity>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>3020-3030,3100-3109,3200-3219</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
-           <vlanTranslation>true</vlanTranslation>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>3020-3030,3100-3109,3200-3219</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+            <vlanTranslation>true</vlanTranslation>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>6</nextHop>
   </hop>
@@ -130,16 +139,18 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
     <link id="urn:publicid:IDN+dragon.maxgigapop.net+interface+clpk:1/2/3:*">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
       <capacity>10000000000</capacity>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>3020-3030,3100-3109,3200-3219</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
-           <vlanTranslation>false</vlanTranslation>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>3020-3030,3100-3109,3200-3219</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+            <vlanTranslation>false</vlanTranslation>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>7</nextHop>
   </hop>
@@ -148,16 +159,18 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
     <link id="urn:publicid:IDN+dragon.maxgigapop.net+interface+clpk:(null):*">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
       <capacity>1000000000</capacity>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
-           <vlanTranslation>false</vlanTranslation>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+            <vlanTranslation>false</vlanTranslation>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>8</nextHop>
   </hop>
@@ -166,16 +179,18 @@ http://www.protogeni.net/resources/rspec/2/request.xsd"
     <link id="urn:publicid:IDN+dragon.maxgigapop.net+interface+planetlab2:eth1">
       <trafficEngineeringMetric>10</trafficEngineeringMetric>
       <capacity>1000000000</capacity>
-      <SwitchingCapabilityDescriptors>
+      <switchingCapabilityDescriptor>
         <switchingcapType>l2sc</switchingcapType>
         <encodingType>ethernet</encodingType>
         <switchingCapabilitySpecificInfo>
-           <interfaceMTU>9000</interfaceMTU>
-           <vlanRangeAvailability>2-4094</vlanRangeAvailability>
-           <suggestedVLANRange>null</suggestedVLANRange>
-           <vlanTranslation>false</vlanTranslation>
+          <switchingCapabilitySpecificInfo_L2sc>
+            <interfaceMTU>9000</interfaceMTU>
+            <vlanRangeAvailability>2-4094</vlanRangeAvailability>
+            <suggestedVLANRange>null</suggestedVLANRange>
+            <vlanTranslation>false</vlanTranslation>
+          </switchingCapabilitySpecificInfo_L2sc>
         </switchingCapabilitySpecificInfo>
-      </SwitchingCapabilityDescriptors>
+      </switchingCapabilityDescriptor>
     </link>
     <nextHop>null</nextHop>
   </hop>
