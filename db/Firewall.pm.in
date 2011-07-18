@@ -71,7 +71,9 @@ sub doFWlans($$$) {
     }
 
     if ($action == FWSETUP) {
-	$fwvid = TBGetUniqueIndex("cnet_vlanid");
+	# Allow redo.
+	$fwvid = TBGetUniqueIndex("cnet_vlanid")
+	    if (!defined($fwvid));
 
 	print "Setting up control net firewall.\n";
     }
