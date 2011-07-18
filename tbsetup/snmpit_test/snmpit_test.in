@@ -968,9 +968,9 @@ COMMAND: foreach my $command (@commands) {
     # Order the vlans using the dependency information in the link field.
     #
     if (@vlans) {
-	my %vlans    = map { $_ => VLan->Lookup($_) } @vlans;
  	my @newvlans = ();
  	my %newvlans = ();
+	
  	#
  	# The "link" field in the vlan points to the vlan it is dependent
  	# on. So, we actually build up the list in reverse order, and then
@@ -979,11 +979,21 @@ COMMAND: foreach my $command (@commands) {
  	while (@vlans) {
  	    my @tmp = ();
  	    foreach my $vlanid (@vlans) {
- 		my $vlan = $vlans{$vlanid};
-
+		#
+		# Lookup the vlan, but only numeric ones. Named vlans are
+		# special and not something we need to worry about here. 
+		#
+		if (! ($vlanid =~ /^\d*$/)) {
+		    push(@newvlans, $vlanid);
+		    next;
+		}
+		my $vlan = VLan->Lookup($vlanid);
+		if (!defined($vlan)) {
+		    # Bad.
+		    die("Cannot lookup vlan $vlanid\n");
+		}
  		if (!$vlan->link() ||
-		    exists($newvlans{$vlan->link()}) ||
-		    !exists($vlans{$vlan->link()})) {
+		    exists($newvlans{$vlan->link()})) {
  		    push(@newvlans, $vlanid);
  		    $newvlans{$vlanid} = $vlanid;
  		}
@@ -2921,6 +2931,7 @@ sub doMakeVlan($$@) {
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
+    my $stackid = ($ELABINELAB ? $stack : $stack->{STACKID});	    
 
     #
     # We require a target VLan object for all vlans related to experiments,
@@ -2945,7 +2956,22 @@ sub doMakeVlan($$@) {
 	#
 	# Allow lookup by integer id.
 	#
-	if ($vlan_name =~ /^\d*$/) {
+	if (defined($stack) &&
+	    $stackid eq "Control" && $vlan_name eq "Control") {
+	    #
+	    # XXX Backwards compatability with older snmpit; allow "Control"
+	    # which is really in the holding experiment. 
+	    #
+	    my $exp = Experiment->Lookup(VLAN_PID(), VLAN_EID());
+	    if (!defined($exp)) {
+		die("Could not lookup vlan holding experiment\n");
+	    }
+	    $target_vlan = VLan->Lookup($exp, $vlan_name);
+	    if (!defined($target_vlan)) {
+		die("Could not lookup the control network vlan\n");
+	    }
+	}
+	elsif ($vlan_name =~ /^\d*$/) {
 	    $target_vlan = VLan->Lookup($vlan_name);
 	}
 	else {
@@ -2966,7 +2992,6 @@ sub doMakeVlan($$@) {
 	    $target_vlan->MarkManual();
 	    # XXX: Need a better way to figure out whether class is
 	    # Experimental or Control
-	    my $stackid = ($ELABINELAB ? $stack : $stack->{STACKID});	    
 	    if ($stackid eq "Control") {
 		$target_vlan->SetClass("Control");
 	    } else {
