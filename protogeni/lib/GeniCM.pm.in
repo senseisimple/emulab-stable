@@ -2770,22 +2770,15 @@ sub SliverWorkAux($$$$$$$)
 	    }
 	}
 
-	# For the manifest.
-	if (GeniXML::IsVersion0($ref)) {
-	    GeniXML::SetText("sliver_urn", $ref, $sliver->sliver_urn());
-	    GeniXML::SetText("component_urn", $ref, $sliver->component_urn());
-	} else {
-	    GeniXML::SetText("sliver_id", $ref, $sliver->sliver_urn());
-	    GeniXML::SetText("component_id", $ref, $sliver->component_urn());
+	my $node_manifest = $sliver->AnnotateManifest();
+	if (! defined($node_manifest)) {
+	    $message = "Could not annotate sliver for $virtual_id";
+	    goto bad;
 	}
-
-	# Store the updated rspec for later.
-	goto bad
-	    if ($sliver->UpdateRspec($ref));
 
 	# And store into the new manifest.
 	my $oldnode = GeniXML::GetNodeByVirtualId($virtual_id, $manifest);
-	my $newnode = GeniXML::ReplaceNode($oldnode, $ref);
+	my $newnode = GeniXML::ReplaceNode($oldnode, $node_manifest);
 
 	# If using rspec v2, save the interface xml node for later
 	# annotation when iterating through links.

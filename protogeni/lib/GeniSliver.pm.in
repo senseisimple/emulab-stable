@@ -304,6 +304,15 @@ sub Delete($$)
 }
 
 #
+# Annotate the rspec with the proper information to become
+# a manifest. Returns undef because type is unknown
+#
+sub AnnotateManifest($)
+{
+    return undef;
+}
+
+#
 # Get the manifest for an aggregate. Returns the XML string.
 #
 sub GetManifest($$)
@@ -339,6 +348,7 @@ sub UpdateRspec($$)
 			 "where idx='$idx'"));
     
     $self->{'RSPEC'} = $rspec;
+    $self->{'SLIVER'}->{'rspec_string'} = $rspec_string;
     return 0;
 }
 
@@ -686,10 +696,42 @@ sub Create($$$$$$)
     my $resource_uuid = $node->uuid();
     my $resource_id   = $node->node_id();
     my $hrn           = "${PGENIDOMAIN}." . $node->node_id();
+
+    my $sliver = GeniSliver->Create($slice, $user, $resource_uuid, "Node",
+				    $resource_id, $hrn, $nickname, $rspec);
+    return undef
+	if (!defined($sliver));
+
+    return $sliver;
+}
+
+#
+# Annotate the rspec of this node with the proper information to become
+# a manifest. Returns LibXML tree or undef on failure.
+#
+sub AnnotateManifest($)
+{
+    my ($self) = @_;
+    my $rspec = GeniXML::Parse($self->rspec_string());
+    if (! defined($rspec)) {
+	print STDERR "Could not parse manifest rspec for node $self\n";
+	return undef;
+    }
+    my $node = Node->Lookup($self->resource_id());
+    if (!defined($node)) {
+	print STDERR "Could not map node $self to its object\n";
+	return undef;
+    }
+    my $user = GeniUser->Lookup($self->creator_uuid(), 1);
+    if (!defined($user)) {
+	print STDERR "Could not map sliver $self to its creator\n";
+	return undef;
+    }
+
     my $sshdport      = 22;
     my $hostname      = GeniUtil::FindHostname($node->node_id());
     my $phostname     = $hostname;
-
+    
     if ($node->isvirtnode()) {
 	$sshdport  = $node->sshdport();
 	$phostname = GeniUtil::FindHostname($node->phys_nodeid());
@@ -702,8 +744,14 @@ sub Create($$$$$$)
 	GeniXML::SetText("hostname", $rspec, $hostname);
 	GeniXML::SetText("sshdport", $rspec, $sshdport)
 	    if (defined($sshdport));
+	GeniXML::SetText("sliver_uuid", $rspec, $self->uuid());
+	GeniXML::SetText("sliver_urn", $rspec, $self->sliver_urn());
+	GeniXML::SetText("component_urn", $rspec, $self->component_urn());
+    } else {
+	GeniXML::SetText("sliver_id", $rspec, $self->sliver_urn());
+	GeniXML::SetText("component_id", $rspec, $self->component_urn());
     }
-
+    
     my $services = GeniXML::FindFirst("n:services", $rspec);
     if (! defined($services)) {
 	$services = GeniXML::AddElement("services", $rspec);
@@ -717,17 +765,13 @@ sub Create($$$$$$)
     GeniXML::SetText("port", $login, $sshdport);
     GeniXML::SetText("username", $login, $user->uid());
 
-    my $sliver = GeniSliver->Create($slice, $user, $resource_uuid, "Node",
-				    $resource_id, $hrn, $nickname, $rspec);
-    return undef
-	if (!defined($sliver));
-
-    if (GeniXML::IsVersion0($rspec)) {
-	GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
-    } else {
-	GeniXML::SetText("sliver_id", $rspec, $sliver->sliver_urn());
+    if ($self->UpdateRspec($rspec)) {
+	print STDERR "Could not insert annotated manifest for node $self ".
+	    "into database";
+	return undef;
     }
-    return $sliver;
+
+    return $rspec;
 }
 
 #
@@ -1210,6 +1254,15 @@ sub Create()
 	GeniXML::SetText("sliver_id", $rspec, $sliver->sliver_urn());
     }
     return $sliver;
+}
+
+#
+# Annotate the rspec of this interface with the proper information to become
+# a manifest. Returns LibXML tree or undef on error.
+#
+sub AnnotateManifest($)
+{
+    return undef;
 }
 
 sub Provision($)
