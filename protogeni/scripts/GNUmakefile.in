@@ -22,7 +22,7 @@ PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  reservevlans delgeniuser delegatecredential
 
 ifeq ($(ISMAINSITE),1)
-PSBIN_STUFF     += ch_daemon
+PSBIN_STUFF     += ch_daemon gencabundle
 endif
 
 # These scripts installed setuid, with sudo. 

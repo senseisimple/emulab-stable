@@ -1,0 +1,98 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Generate the CA bundle and store in the www directly. This is done on
+# the clearinghouse only, where all the bundles are kept.
+# 
+sub usage()
+{
+    print "Usage: gencabundle\n";
+    exit(1);
+}
+my $optlist = "";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $WWWBUNDLE	  = "$TB/www/genica.bundle";
+my $BUNDLE	  = "$TB/etc/genica.bundle";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+use lib '@prefix@/lib';
+use libaudit;
+
+# For error log.
+my $errors = 0;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+# Record output in case of error.
+LogStart(0);
+
+system( "cat $TB/etc/genicacerts/*.pem > /tmp/cabundle.$$ && " .
+	"cp /tmp/cabundle.$$ /tmp/wwwbundle.$$" );
+fatal( "Could not create new CA bundle file" ) if( $? );
+
+-r "$TB/etc/extracerts.bundle" and
+    system( "cat $TB/etc/extracerts.bundle >> /tmp/cabundle.$$" );
+
+# Don't bother if no change (don't worry about $WWWBUNDLE)
+system("/usr/bin/diff -q $BUNDLE /tmp/cabundle.$$");
+if ($?) {
+    system("/bin/mv /tmp/cabundle.$$ $BUNDLE") == 0
+	or fatal("Could not copy to $BUNDLE!");
+
+    system("/usr/local/etc/rc.d/apache.sh restart") == 0
+	or fatal("Could not restart apache!");
+}
+
+system("/bin/mv /tmp/wwwbundle.$$ $WWWBUNDLE") == 0
+    or fatal("Could not copy to $WWWBUNDLE!");
+
+# Apache spits out stuff. No errors at this point, nothing to report.
+AuditEnd()
+    if (!$errors);
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
