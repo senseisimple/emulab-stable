@@ -48,6 +48,7 @@ use Lan;
 use strict;
 use SNMP;
 use Port;
+use Carp qw(cluck);
 
 my $TBOPS = libtestbed::TB_OPSEMAIL;
 
@@ -147,10 +148,10 @@ sub convertPortFromString($;$)
     return undef;			      
 }
 
-sub convertPortsFromStrings(@;$)
+sub convertPortsFromStrings($@)
 {
-    my (@strs, $dev) = @_; 
-    
+    my ($dev, @strs) = @_;
+
     return grep(defined($_), map(convertPortFromString($_, $dev), @strs)); 
 }
 

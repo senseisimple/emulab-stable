@@ -461,7 +461,7 @@ if ($opt{B}) {
             tbdie "No port given in status string";
         }
         if ($args{port}) {
-            push @ports, convertPortsFromStrings($args{port}, $optdev);            
+            push @ports, convertPortsFromStrings($optdev, $args{port});
         }
     }
 }
@@ -638,7 +638,7 @@ if ($opt{y}) {
 #
 # Convert ports into the correct format
 if (@ports) {	
-    @ports = convertPortsFromStrings(@ports, $optdev);    
+    @ports = convertPortsFromStrings($optdev, @ports);
     if (scalar(@optports) != scalar(@ports)) {
 	die "Bad format for ports: ".join(" ", @optports)."\n";
     }
@@ -3097,7 +3097,8 @@ sub doMakeVlan($$@) {
 
     }
     if (!$errors) {
-	if (defined($source_vlan) && $source_vlan->KeepInSync()) {
+	if (defined($source_vlan) && !$source_vlan->SameVlan($target_vlan) &&
+	    $source_vlan->KeepInSync()) {
 	    # Yank the ports out of the old vlan.
 	    foreach my $port (@ports) {
 		if ($source_vlan->DelPort($port)) {
@@ -3106,7 +3107,7 @@ sub doMakeVlan($$@) {
 		}
 	    }
 	    my @tports = map {$_->toIfaceString()} @ports;
-	    VLan->RecordVLanModification($source_vlan->id(), undef, \@ports);
+	    VLan->RecordVLanModification($source_vlan->id(), undef, \@tports);
 	}
 	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
 	    # This updates the port list, so always call it.

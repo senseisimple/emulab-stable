@@ -3061,7 +3061,8 @@ sub doMakeVlan($$@) {
 
     }
     if (!$errors) {
-	if (defined($source_vlan) && $source_vlan->KeepInSync()) {
+	if (defined($source_vlan) && !$source_vlan->SameVlan($target_vlan) &&
+	    $source_vlan->KeepInSync()) {
 	    # Yank the ports out of the old vlan.
 	    foreach my $port (@ports) {
 		if ($source_vlan->DelPort($port)) {
@@ -3071,7 +3072,7 @@ sub doMakeVlan($$@) {
 	    }
 	    VLan->RecordVLanModification($source_vlan->id(), undef, \@ports);
 	}
-	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
+	if ($target_vlan->KeepInSync()) {
 	    # This updates the port list, so always call it.
 	    VLan->RecordVlanInsertion($target_vlan->id(), $stack->{STACKID});
 	}
