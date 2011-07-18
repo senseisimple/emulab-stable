@@ -2493,8 +2493,6 @@ sub doMakeVlan($$@) {
 	if (!$vlan_number) {
 	    $errors++;
 	}
-	$target_vlan->SetTag($vlan_number)
-	    if (!$errors && defined($target_vlan));
     }
     if (!$errors) {
 	if (defined($source_vlan)) {
