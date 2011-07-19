@@ -1,0 +1,61 @@
+#
+# Additional state for secure boot/load path.
+# Also set SECURE* timeouts to reasonable values.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    my @mode_transitions = (
+	["NORMALv2","SHUTDOWN","SECURELOAD","SHUTDOWN","SecureLoadStart"]
+    );
+    my @timeouts = (
+	["SECUREBOOT","BOOTING",300,"STATE:SECVIOLATION"],
+	["SECUREBOOT","GPXEBOOTING",60,"STATE:SECVIOLATION"],
+	["SECUREBOOT","PXEBOOTING",60,"STATE:SECVIOLATION"],
+	["SECUREBOOT","SHUTDOWN",300,"STATE:SECVIOLATION"],
+	["SECUREBOOT","TPMSIGNOFF",60,"STATE:SECVIOLATION"],
+	["SECURELOAD","BOOTING",300,"STATE:SECVIOLATION"],
+	["SECURELOAD","GPXEBOOTING",60,"STATE:SECVIOLATION"],
+	["SECURELOAD","PXEBOOTING",60,"STATE:SECVIOLATION"],
+	["SECURELOAD","RELOADDONE",300,"STATE:SECVIOLATION"],
+	["SECURELOAD","RELOADING",3600,"STATE:SECVIOLATION"],
+	["SECURELOAD","RELOADSETUP",60,"STATE:SECVIOLATION"],
+	["SECURELOAD","SHUTDOWN",300,"STATE:SECVIOLATION"],
+	["SECURELOAD","TPMSIGNOFF",300,"STATE:SECVIOLATION"]
+    );
+    my @transitions = (
+	["SECURELOAD","SHUTDOWN","SHUTDOWN","Retry"]
+    );
+    my @triggers = (
+	["*","SECURELOAD","BOOTING","BOOTING"]
+    );
+
+    foreach my $row (@mode_transitions) {
+	my ($opm1,$s1,$opm2,$s2,$lab) = @$row;
+	DBQueryFatal("REPLACE INTO mode_transitions VALUES ".
+		     "('$opm1','$s1','$opm2', '$s2','$lab')");
+    }
+
+    foreach my $row (@timeouts) {
+	my ($opm,$s,$to,$act) = @$row;
+	DBQueryFatal("REPLACE INTO state_timeouts VALUES ".
+		     "('$opm','$s','$to', '$act')");
+    }
+
+    foreach my $row (@transitions) {
+	my ($opm,$s1,$s2,$lab) = @$row;
+	DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		     "('$opm','$s1','$s2','$lab')");
+    }
+
+    foreach my $row (@triggers) {
+	my ($node,$opm,$s,$trig) = @$row;
+	DBQueryFatal("REPLACE INTO state_triggers VALUES ".
+		     "('$node','$opm','$s','$trig')");
+    }
+    return 0;
+}
+1;
