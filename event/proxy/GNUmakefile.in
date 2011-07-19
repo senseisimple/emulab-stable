@@ -3,14 +3,13 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/proxy
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= evproxy proxytest eventping evproxyplab
+PROGRAMS	= eventping 
 ifneq ($(SYSTEM),Linux)
 PROGRAMS       += version0_gateway
 endif
@@ -79,21 +78,6 @@ LIBS     += -ldl -lz
 PLIBS    += -ldl -lz
 endif
 
-evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
-ifneq ($(SYSTEM),CYGWIN_NT-5.1)
-	$(CC) $(PLDFLAGS) -o $@ -pthread evproxy.o $(PLIBS)
-else
-	$(CC) $(LDFLAGS) -o $@ evproxy.o $(LIBS)
-endif
-
-# Dave swears we use this on plab nodes. Hand installed into the rootball.
-evproxyplab.o: evproxyplab.cc
-	$(CPPC) $(CFLAGS)  -c $<
-
-evproxyplab-debug:    evproxyplab.o \
-		${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
-	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
-
 version0_gateway:    version0_gateway.c
 	$(CC) $(CFLAGS) $(PLDFLAGS) -pthread -o $@ $< -L/usr/local/lib \
 		-lpubsub_r -ltb -lm
@@ -107,10 +91,8 @@ control-install:	$(INSTALL_SBINDIR)/version0_gateway
 
 install:		$(INSTALL_DIR)/opsdir/sbin/version0_gateway
 
-client: evproxy evproxyplab
-client-install: client
-	$(INSTALL_PROGRAM) evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
-	$(INSTALL_PROGRAM) evproxyplab$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy_shared$(EXE)
+client:
+client-install:
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS) *-debug

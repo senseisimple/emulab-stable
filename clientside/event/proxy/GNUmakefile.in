@@ -3,17 +3,13 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ../..
-SUBDIR		= event/proxy
-
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= evproxy proxytest eventping evproxyplab
-ifneq ($(SYSTEM),Linux)
-PROGRAMS       += version0_gateway
-endif
+
+PROGRAMS	= evproxy proxytest evproxyplab
 
 include $(OBJDIR)/Makeconf
 
@@ -94,18 +90,14 @@ evproxyplab-debug:    evproxyplab.o \
 		${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
 
-version0_gateway:    version0_gateway.c
-	$(CC) $(CFLAGS) $(PLDFLAGS) -pthread -o $@ $< -L/usr/local/lib \
-		-lpubsub_r -ltb -lm
-
 eventping-debug: eventping.o
 	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)
 
 $(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 
-control-install:	$(INSTALL_SBINDIR)/version0_gateway
+control-install:
 
-install:		$(INSTALL_DIR)/opsdir/sbin/version0_gateway
+boss-install:		$(INSTALL_DIR)/opsdir/sbin/version0_gateway
 
 client: evproxy evproxyplab
 client-install: client

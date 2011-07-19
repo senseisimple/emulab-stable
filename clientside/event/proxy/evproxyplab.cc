@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -172,9 +172,8 @@ main(int argc, char **argv)
 	 * or on a client node. 
 	 */
 	if (!server)
-	  server = EVENTSERVER;
+		server = "event-server";
 	
-
 	/*
 	 * Convert server/port to elvin thing.
 	 *

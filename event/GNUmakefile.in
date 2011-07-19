@@ -15,9 +15,6 @@ include $(OBJDIR)/Makeconf
 SYSTEM	       := $(shell uname -s)
 
 SUBDIRS		= proxy example linktest
-ifneq ($(SYSTEM),CYGWIN_NT-5.1)
-SUBDIRS	       += trafgen
-endif
 ifeq ($(SYSTEM),FreeBSD)
 FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
 FBSDMAJ := $(basename $(FBSDREL))

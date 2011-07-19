@@ -155,6 +155,8 @@ outfiles="Makeconf GNUmakefile \
 	  event/GNUmakefile \
 	  event/program-agent/GNUmakefile \
 	  event/link-agent/GNUmakefile \
+	  event/proxy/GNUmakefile \
+	  event/tevc/GNUmakefile \
 	  tools/GNUmakefile \
 	  tools/pcapper/GNUmakefile \
 	  sensors/GNUmakefile \

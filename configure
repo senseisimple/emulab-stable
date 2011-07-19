@@ -5613,7 +5613,6 @@ else
 		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
 		    event/sched/GNUmakefile \
 		    event/new_sched/GNUmakefile \
-                    event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
                     event/example/tbsend.py event/example/tbrecv.py \
@@ -7230,6 +7229,8 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/sensors/canaryd/GNUmakefile clientside/sensors/canaryd/feedbacklogs \
  clientside/os/GNUmakefile clientside/os/syncd/GNUmakefile \
  clientside/event/link-agent/GNUmakefile \
+ clientside/event/proxy/GNUmakefile \
+ clientside/event/tevc/GNUmakefile \
  clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
 
 #

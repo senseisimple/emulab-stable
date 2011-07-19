@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -132,7 +132,7 @@ main(int argc, char **argv)
 	 * or on a client node. 
 	 */
 	if (!server)
-		server = EVENTSERVER;
+		server = "event-server";
 
 	/*
 	 * XXX Need to daemonize earlier or the threads go away.

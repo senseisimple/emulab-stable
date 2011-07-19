@@ -10,7 +10,7 @@ SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= program-agent link-agent tbgen
+SUBDIRS		= program-agent link-agent tevc proxy
 
 all:	all-subdirs
 
