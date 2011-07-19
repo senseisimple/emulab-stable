@@ -9,6 +9,7 @@ OBJDIR		= ..
 SUBDIR		= assign
 MAKEFILE_IN	= @srcdir@/GNUmakefile.in
 HAVE_XERCES	= @HAVE_XERCES@
+NEWER_BOOST	= @NEWER_BOOST@
 
 include $(OBJDIR)/Makeconf
 
@@ -39,6 +40,10 @@ ifeq ($(HAVE_XERCES),yes)
 CXXFLAGS += -DWITH_XML
 LIBS += -L/usr/local/lib -lxerces-c
 OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec_v2.o annotate_rspec.o annotate_vtop.o annotate.o rspec_parser_helper.o rspec_parser.o rspec_parser_v1.o rspec_parser_v2.o emulab_extensions_parser.o
+endif
+
+ifeq ($(NEWER_BOOST),yes)
+CXXFLAGS += -DNEWER_BOOST
 endif
 
 # Pick either this

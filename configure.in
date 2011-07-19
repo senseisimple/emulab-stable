@@ -55,7 +55,7 @@ fi
 
 AC_SUBST(PATH)
 
-CPPFLAGS="-I/usr/local/include"
+CPPFLAGS = "$CPPFLAGS -I/usr/local/include"
 
 # BEGIN Python detection.
 AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
@@ -793,13 +793,24 @@ fi
 AC_SUBST(HAVE_MEZZANINE)
 
 #
-# Check for Xerces (required for XML support in assign).
+# Check for a few things used by assign
 #
 AC_LANG_SAVE
 AC_LANG_CPLUSPLUS
+
+#
+# Check for Xerces (required for XML support in assign).
+#
 AC_CHECK_HEADER([xercesc/dom/DOM.hpp],[HAVE_XERCES=yes])
+
+#
+# Check for newer versions of boost, which have moved some headers
+#
+AC_CHECK_HEADER([boost/property_map/property_map.hpp],[NEWER_BOOST=yes])
+
 AC_LANG_RESTORE
 AC_SUBST(HAVE_XERCES)
+AC_SUBST(NEWER_BOOST)
 
 #
 # Testing mode.  In testing mode scripts should not effect hardware state.
