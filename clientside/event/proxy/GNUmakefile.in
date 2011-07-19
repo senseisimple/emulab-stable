@@ -1,0 +1,121 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/proxy
+
+SYSTEM	       := $(shell uname -s)
+PROGRAMS	= evproxy proxytest eventping evproxyplab
+ifneq ($(SYSTEM),Linux)
+PROGRAMS       += version0_gateway
+endif
+
+include $(OBJDIR)/Makeconf
+
+all:	$(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+LIBTBDIR    = $(OBJDIR)/lib/libtb
+LIBEVENTDIR = $(OBJDIR)/lib/event
+CPPC        = g++
+
+# Rules to make sure that some libraries we need from other directories get
+# built first
+$(LIBTBDIR)/%.o:
+	@$(MAKE) -C $(LIBTBDIR) $(@F)
+
+$(LIBEVENTDIR)/%.a:
+	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
+
+CFLAGS   += -DDEBUG
+CFLAGS	 += -O2 -g -Wall
+CFLAGS   += -I. -I${OBJDIR}
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I/usr/local/include
+
+PFLAGS    = -pthread
+PFLAGS   += -DDEBUG
+PFLAGS	 += -O2 -g -Wall
+PFLAGS   += -I. -I${OBJDIR}
+PFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+PFLAGS   += -L/usr/local/lib -lpubsub_r -ltb -lm
+
+PLDFLAGS += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L$(OBJDIR)/lib/event
+PLIBS     = -levent_r -ltb -lcrypto
+PLIBS    += -L/usr/local/lib -lpubsub_r -ltb -lm
+PLDFLAGS += $(LDSTATIC)
+
+LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L$(OBJDIR)/lib/event
+LIBS      = -levent -ltb -lcrypto
+LIBS     += -L/usr/local/lib -lpubsub -ltb -lm
+LDFLAGS  += $(LDSTATIC)
+
+# Deal with the presence/absence of kerberos in the linux ssl library
+ifeq ($(SYSTEM),Linux)
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NOKERB := 1
+endif
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+PLIBS    += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
+PLIBS    += -lkrb5support
+endif
+endif
+endif
+
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl -lz
+PLIBS    += -ldl -lz
+endif
+
+evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
+	$(CC) $(PLDFLAGS) -o $@ -pthread evproxy.o $(PLIBS)
+else
+	$(CC) $(LDFLAGS) -o $@ evproxy.o $(LIBS)
+endif
+
+# Dave swears we use this on plab nodes. Hand installed into the rootball.
+evproxyplab.o: evproxyplab.cc
+	$(CPPC) $(CFLAGS)  -c $<
+
+evproxyplab-debug:    evproxyplab.o \
+		${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
+	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
+
+version0_gateway:    version0_gateway.c
+	$(CC) $(CFLAGS) $(PLDFLAGS) -pthread -o $@ $< -L/usr/local/lib \
+		-lpubsub_r -ltb -lm
+
+eventping-debug: eventping.o
+	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)
+
+$(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
+
+control-install:	$(INSTALL_SBINDIR)/version0_gateway
+
+install:		$(INSTALL_DIR)/opsdir/sbin/version0_gateway
+
+client: evproxy evproxyplab
+client-install: client
+	$(INSTALL_PROGRAM) evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
+	$(INSTALL_PROGRAM) evproxyplab$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy_shared$(EXE)
+
+clean:
+	/bin/rm -f *.o $(PROGRAMS) *-debug
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
