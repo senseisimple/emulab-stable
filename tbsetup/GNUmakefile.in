@@ -137,12 +137,16 @@ wanlinksolve: wanlinksolve.cc
 routecalc: routecalc.cc
 	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
-.PHONY:	checkpass ns2ir nsverify plab ipassign checkup template_cvsroot
+.PHONY:	${SUBDIRS}
+
 checkpass:
 	@$(MAKE) -C checkpass all
 
 ns2ir:
 	@$(MAKE) -C ns2ir all
+
+snmpit_test:
+	@$(MAKE) -C snmpit_test all
 
 nsverify:
 	@$(MAKE) -C nsverify all
@@ -198,6 +202,7 @@ ifeq ($(IPASSIGN),Yes)
 	@$(MAKE) -C ipassign install
 endif
 	@$(MAKE) -C checkup install
+	@$(MAKE) -C snmpit_test install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -307,6 +312,7 @@ subdir-clean:
 	@$(MAKE) -C plab clean
 	@$(MAKE) -C ipassign clean
 	@$(MAKE) -C checkup clean
+	@$(MAKE) -C snmpit_test clean
 
 distclean:	subdir-distclean
 
@@ -318,6 +324,7 @@ subdir-distclean:
 	@$(MAKE) -C plab distclean
 	@$(MAKE) -C ipassign distclean
 	@$(MAKE) -C checkup distclean
+	@$(MAKE) -C snmpit_test distclean
 #
 # XXX Create non .tcl files.
 #
