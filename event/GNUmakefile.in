@@ -29,15 +29,9 @@ endif
 
 endif
 
-all:	etc-subdir trafgen-fetch all-subdirs
+all:	etc-subdir all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
-
-# XXX Yeah, this doesn't belong here but I can't make the trafgen
-# makefile work if it unpacks the tarball itself
-#
-trafgen-fetch:
-	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen "@OUTERBOSS_NODENAME@"
 
 etc-subdir:
 	@$(MAKE) -C etc all
@@ -51,7 +45,7 @@ endif
 	@$(MAKE) -C linktest install
 	@$(MAKE) -C proxy install
 
-client:		trafgen-fetch client-subdirs
+client:		client-subdirs
 client-install: client client-install-subdirs
 
 control-install: 
@@ -74,4 +68,4 @@ distclean:	distclean-subdirs
 	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
-.PHONY:	$(SUBDIRS) trafgen-fetch
+.PHONY:	$(SUBDIRS)

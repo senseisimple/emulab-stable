@@ -706,7 +706,6 @@ else
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
                     event/example/tbsend.py event/example/tbrecv.py \
 		    event/example/eventdebug.pl \
-		    event/trafgen/GNUmakefile \
 		    event/proxy/GNUmakefile \
 		    event/nsetrafgen/GNUmakefile \
 		    event/nsetrafgen/nseinput.tcl \
@@ -1096,6 +1095,7 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/event/link-agent/GNUmakefile \
  clientside/event/proxy/GNUmakefile \
  clientside/event/tevc/GNUmakefile \
+ clientside/event/trafgen/GNUmakefile \
  clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
 
 #

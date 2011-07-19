@@ -11,13 +11,22 @@ SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 include $(OBJDIR)/Makeconf
 
 SUBDIRS		= program-agent link-agent tevc proxy
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
+SUBDIRS	       += trafgen
+endif
 
-all:	all-subdirs
+all:	trafgen-fetch all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+# XXX Yeah, this doesn't belong here but I can't make the trafgen
+# makefile work if it unpacks the tarball itself
+#
+trafgen-fetch:
+	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
+
 boss-install:   boss-install-subdirs
-client:		client-subdirs
+client:		trafgen-fetch client-subdirs
 client-install: client client-install-subdirs
 control-install: control-install-subdirs
 subboss:
@@ -36,4 +45,4 @@ frisbee-mfs-install:
 	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
-.PHONY:	$(SUBDIRS)
+.PHONY:	$(SUBDIRS) trafgen-fetch

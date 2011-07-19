@@ -3,11 +3,10 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ../..
-SUBDIR		= event/trafgen
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 TGSRCDIR	= $(SRCDIR)/tg2.0/src/tg
 PROGRAMS	= trafgen
 
@@ -111,6 +110,7 @@ trafgen-debug:	$(OBJS)
 $(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ../../lib/event/event.h
 
 install:
+boss-install:
 
 client: $(PROGRAMS)
 client-install: client
