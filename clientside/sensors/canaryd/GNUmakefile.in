@@ -46,7 +46,8 @@ version.c: canaryd.c childProcess.h childProcess.c networkInterface.h networkInt
 
 client: canaryd
 
-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) alertlistener) feedbacklogs
+boss-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) alertlistener) \
+	feedbacklogs
 	$(INSTALL_PROGRAM) feedbacklogs $(INSTALL_DIR)/opsdir/sbin/feedbacklogs
 
 client-install: client

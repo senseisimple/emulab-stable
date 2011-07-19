@@ -52,7 +52,7 @@ link-agent-debug:	link-agent.o
 
 $(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 
-install:
+boss-install:
 
 client: $(PROGRAMS)
 client-install: client

@@ -22,7 +22,7 @@ genhostsfile-debug:	genhostsfile.o
 
 wgraph.o:	wgraph.cc wgraph.h
 
-install:	$(INSTALL_LIBEXECDIR)/genhostsfile
+boss-install:	$(INSTALL_LIBEXECDIR)/genhostsfile
 
 client: genhostsfile
 client-install: client

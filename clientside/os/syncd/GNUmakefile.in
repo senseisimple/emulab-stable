@@ -31,7 +31,7 @@ emulab-sync-debug:	emulab-sync.o version.o decls.h
 version.c: emulab-syncd.c 
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-install:
+boss-install:
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
 	$(INSTALL) -m 644 $(SRCDIR)/emulab-syncd.1 \
 		$(INSTALL_DIR)/opsdir/man/man1/emulab-syncd.1

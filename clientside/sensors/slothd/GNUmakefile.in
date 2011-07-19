@@ -62,7 +62,7 @@ version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h $(WINCLIENTSRC)
 
 client: slothd $(WINCLIENT)
 
-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd) webfeedback
+boss-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd) webfeedback
 	$(INSTALL_PROGRAM) $(SRCDIR)/digest-slothd $(INSTALL_LIBEXECDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/digest-slothd $(INSTALL_DIR)/opsdir/sbin/digest-slothd
 	$(INSTALL_PROGRAM) webfeedback $(INSTALL_LIBEXECDIR)

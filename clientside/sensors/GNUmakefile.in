@@ -19,6 +19,7 @@ all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+boss-install:	all boss-install-subdirs
 client:		client-subdirs
 client-install: client client-install-subdirs
 control-install: control-install-subdirs

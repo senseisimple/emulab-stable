@@ -55,7 +55,7 @@ program-agent-debug: program-agent.o version.o
 
 $(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 
-install:	$(INSTALL_DIR)/opsdir/sbin/program-agent
+boss-install:	$(INSTALL_DIR)/opsdir/sbin/program-agent
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/program-agent.8 \
 		$(INSTALL_DIR)/opsdir/man/man8/program-agent.8

@@ -10,12 +10,13 @@ SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= program-agent link-agent
+SUBDIRS		= program-agent link-agent tbgen
 
 all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+boss-install:   boss-install-subdirs
 client:		client-subdirs
 client-install: client client-install-subdirs
 control-install: control-install-subdirs

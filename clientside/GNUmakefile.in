@@ -24,6 +24,7 @@ SUBDIRS	       += event tools os sensors
 
 ifeq ($(WITH_EMULAB),1)
 all:	all-subdirs
+install:all boss-install-subdirs
 else
 all:	client-subdirs
 endif

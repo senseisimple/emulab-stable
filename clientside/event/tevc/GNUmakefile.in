@@ -67,7 +67,7 @@ tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o \
 	$(CC) $(LDFLAGS) -o $@ tevc.o $(LIBTBDIR)/log.o \
 		$(LIBTBDIR)/tbdefs.o $(LIBS)
 
-install:	$(INSTALL_BINDIR)/tevc \
+boss-install:	$(INSTALL_BINDIR)/tevc \
 		$(INSTALL_DIR)/opsdir/bin/tevc
 
 control-install:	all $(INSTALL_BINDIR)/tevc
