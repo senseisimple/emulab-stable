@@ -874,7 +874,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/idletimes db/idlemail db/xmlconvert \
 	db/libdb.py db/elabinelab_bossinit \
 	ipod/GNUmakefile \
-	lib/GNUmakefile lib/libtb/GNUmakefile \
+	lib/GNUmakefile lib/libtb/GNUmakefile lib/tmcd/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
 	os/imagezip/hashmap/GNUmakefile \

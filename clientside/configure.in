@@ -131,6 +131,16 @@ if test $ELVIN_COMPAT -eq 1; then
     AC_DEFINE_UNQUOTED(ELVIN_COMPAT, 1)
 fi
 
+AC_ARG_ENABLE(TPM,
+[  --enable-TPM[[=yes/no]]           Include TPM support [[default=no]]])
+
+if test "$enable_TPM" = "yes"; then
+    TPM=1
+fi
+if test $TPM -eq 1; then
+    AC_DEFINE_UNQUOTED(TPM, 1)
+fi
+
 # BEGIN Python detection. For the event library.
 AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
 
@@ -181,6 +191,7 @@ outfiles="Makeconf GNUmakefile \
 if test $WITH_EMULAB -eq 0; then
    outfiles="$outfiles lib/GNUmakefile \
              lib/libtb/GNUmakefile \
+             lib/tmcd/GNUmakefile \
              lib/event/GNUmakefile"
 else
    AC_CONFIG_COMMANDS([lib], [rm -f lib; ln -s ../lib .])

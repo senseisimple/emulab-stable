@@ -4853,6 +4853,7 @@ outfiles="Makeconf GNUmakefile \
 if test $WITH_EMULAB -eq 0; then
    outfiles="$outfiles lib/GNUmakefile \
              lib/libtb/GNUmakefile \
+             lib/tmcd/GNUmakefile \
              lib/event/GNUmakefile"
 else
    ac_config_commands="$ac_config_commands lib"
