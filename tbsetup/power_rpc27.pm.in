@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -377,6 +377,12 @@ sub tipconnect($) {
     $portnum = $powerid_row{'portnum'};
     $keylen  = $powerid_row{'keylen'};
     $keydata = $powerid_row{'keydata'};
+    $disabled= $powerid_row{'disabled'};
+
+    if ($disabled) {
+	print STDERR "*** $controller tipline is disabled\n";
+	return 0;
+    }
 
     if ($debug) {
 	print "tipconnect: $server $portnum $keylen $keydata\n";

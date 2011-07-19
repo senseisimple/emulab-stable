@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2010 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include_once("osinfo_defs.php");
@@ -295,7 +295,7 @@ class Node
 	
 	$query_result =
 	    DBQueryFatal("select tipname from tiplines ".
-			 "where node_id='$node_id'");
+			 "where node_id='$node_id' and disabled=0");
 	
 	return mysql_num_rows($query_result);
     }

@@ -3675,6 +3675,7 @@ CREATE TABLE `tiplines` (
   `tipname` varchar(32) NOT NULL default '',
   `node_id` varchar(32) NOT NULL default '',
   `server` varchar(64) NOT NULL default '',
+  `disabled` tinyint(1) NOT NULL default '0',
   `portnum` int(11) NOT NULL default '0',
   `keylen` smallint(6) NOT NULL default '0',
   `keydata` text,

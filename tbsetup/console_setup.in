@@ -1,12 +1,11 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
+use strict;
 
 #
 # usage: console_setup node [node node ...]
@@ -67,6 +66,7 @@ if ($EUID != 0) {
 # 
 foreach my $node (@nodes) {
     my($db_result);
+    my $pid;
     
     #
     # Untaint the argument. 
@@ -84,8 +84,8 @@ foreach my $node (@nodes) {
     # case we are done. This query could probably be rolled into the
     # next query, but that would be confusing.
     #
-    $tiplines_result =
-	DBQueryFatal("select tipname,server from tiplines ".
+    my $tiplines_result =
+	DBQueryFatal("select tipname,server,disabled from tiplines ".
 		     "where node_id='$node' and ".
 		     "server!='' and keydata is not null");
 
@@ -121,6 +121,16 @@ foreach my $node (@nodes) {
     while (@row = $tiplines_result->fetchrow_array()) {
 	my $tipname = $row[0];
 	my $server  = $row[1];
+	my $disabled= $row[2];
+
+	#
+	# Let people know that a console line is disabled cause
+	# otherwise we will all forgot about it.
+	#
+	if ($disabled) {
+	    print "Skipping disabled tipline: $tipname on $server ...\n";
+	    next;
+	}
 
 	if (defined($cmdargs{$server})) {
 	    $cmdargs{$server} = $cmdargs{$server} . " $tipname $pid";

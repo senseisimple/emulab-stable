@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -61,8 +61,9 @@ if ($ELABINELAB) {
 }
 else {
 
-    $query_result = DBQueryFatal("SELECT server, portnum, keylen, keydata " . 
-				 "FROM tiplines WHERE node_id='$node_id'" );
+    $query_result =
+	DBQueryFatal("SELECT server, portnum, keylen, keydata, disabled " . 
+		     "FROM tiplines WHERE node_id='$node_id'" );
 
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("The node $node_id does not exist, ".
@@ -73,6 +74,11 @@ else {
     $portnum = $row["portnum"];
     $keylen  = $row["keylen"];
     $keydata = $row["keydata"];
+    $disabled= $row["disabled"];
+
+    if ($disabled) {
+	USERERROR("The tipline for $node_id is currently disabled", 1);
+    }
 
     #
     # Read in the fingerprint of the capture certificate

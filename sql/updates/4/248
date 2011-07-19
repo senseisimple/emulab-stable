@@ -1,0 +1,18 @@
+#
+# Add a disabled slot to tiplines table.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    
+    if (! DBSlotExists("tiplines", "disabled")) {
+	DBQueryFatal("alter table tiplines add ".
+		     "  `disabled` tinyint(1) NOT NULL default '0' ".
+		     "   after server");
+    }
+    return 0;
+}
+1;
