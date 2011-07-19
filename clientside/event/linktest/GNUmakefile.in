@@ -3,14 +3,13 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ../..
-SUBDIR		= event/linktest
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+
 LIBTBDIR        = $(OBJDIR)/lib/libtb
 LIBEVENTDIR     = ${OBJDIR}/lib/event
-NSTOIRDIR	= $(TESTBED_SRCDIR)/tbsetup/ns2ir
 DAEMON	        = linktest
 LTEVENT		= ltevent
 SCRIPT		= linktest.pl
@@ -18,8 +17,6 @@ SCRIPT_ELAB	= elab_linktest.pl
 SCRIPT_RUN	= run_linktest.pl
 SCRIPT_PROXY	= linktest.proxy
 SCRIPT_CONTROL  = linktest_control
-SCRIPT_TBCOMPAT = tb_compat.tcl
-SCRIPT_NSTB_COMPAT = nstb_compat.tcl
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
@@ -95,7 +92,7 @@ $(DAEMON_OBJS): ${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 $(LTEVENT_OBJS): ${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
 
 # We install just enough to fire off the test from boss and wait. 
-install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \
+boss-install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \
 		$(INSTALL_SBINDIR)/$(SCRIPT_CONTROL) 
 	$(INSTALL_PROGRAM) weblinktest $(INSTALL_LIBEXECDIR)
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
@@ -107,11 +104,6 @@ install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \
 			$(INSTALL_DIR)/opsdir/sbin/$(SCRIPT_PROXY)
 	$(INSTALL_PROGRAM) $(LTEVENT) \
 			$(INSTALL_DIR)/opsdir/libexec/$(LTEVENT)
-	@echo "Don't forget to do a post-install as root"
-
-post-install: 
-	chown root $(INSTALL_SBINDIR)/$(SCRIPT_CONTROL)
-	chmod u+s $(INSTALL_SBINDIR)/$(SCRIPT_CONTROL)
 
 control-install:	binaries $(SCRIPT_RUN) $(SCRIPT_PROXY)
 	$(INSTALL_PROGRAM) $(LTEVENT) $(INSTALL_LIBEXECDIR)

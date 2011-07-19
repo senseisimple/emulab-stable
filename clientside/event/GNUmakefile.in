@@ -10,7 +10,7 @@ SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= program-agent link-agent tevc proxy
+SUBDIRS		= program-agent link-agent tevc proxy linktest
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif

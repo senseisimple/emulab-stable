@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 
 SYSTEM	       := $(shell uname -s)
 
-SUBDIRS		= proxy example linktest
+SUBDIRS		= proxy example
 ifeq ($(SYSTEM),FreeBSD)
 FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
 FBSDMAJ := $(basename $(FBSDREL))
@@ -42,7 +42,6 @@ ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched install
 endif
 	@$(MAKE) -C stated install
-	@$(MAKE) -C linktest install
 	@$(MAKE) -C proxy install
 
 client:		client-subdirs
@@ -53,7 +52,6 @@ control-install:
 ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched control-install
 endif
-	@$(MAKE) -C linktest control-install
 	@$(MAKE) -C proxy control-install
 
 post-install: 

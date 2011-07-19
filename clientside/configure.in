@@ -158,6 +158,12 @@ outfiles="Makeconf GNUmakefile \
 	  event/proxy/GNUmakefile \
 	  event/tevc/GNUmakefile \
 	  event/trafgen/GNUmakefile \
+	  event/linktest/GNUmakefile \
+	  event/linktest/iperf/GNUmakefile \
+	  event/linktest/rude/GNUmakefile \
+	  event/linktest/weblinktest event/linktest/linktest.proxy \
+	  event/linktest/linktest_control \
+	  event/linktest/run_linktest.pl \
 	  tools/GNUmakefile \
 	  tools/pcapper/GNUmakefile \
 	  sensors/GNUmakefile \
