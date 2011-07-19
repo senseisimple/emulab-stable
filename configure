@@ -5621,7 +5621,6 @@ else
 		    event/nsetrafgen/GNUmakefile \
 		    event/nsetrafgen/nseinput.tcl \
 		    event/nsetrafgen/nse-makepatch \
-                    event/delay-agent/GNUmakefile \
 		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated"
 
@@ -7232,6 +7231,7 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/event/linktest/linktest.proxy \
  clientside/event/linktest/linktest_control \
  clientside/event/linktest/run_linktest.pl \
+ clientside/event/delay-agent/GNUmakefile \
  clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
 
 #

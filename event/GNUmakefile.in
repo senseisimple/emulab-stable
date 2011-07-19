@@ -22,11 +22,6 @@ SUBDIRS	       += sched stated
 ifeq ($(ISMAINSITE),1)
 SUBDIRS        += new_sched
 endif
-ifneq ($(FBSDMAJ),8)
-# doesn't build right now due to API changes
-SUBDIRS	       += delay-agent
-endif
-
 endif
 
 all:	etc-subdir all-subdirs

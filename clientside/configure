@@ -4836,6 +4836,7 @@ outfiles="Makeconf GNUmakefile \
 	  event/linktest/weblinktest event/linktest/linktest.proxy \
 	  event/linktest/linktest_control \
 	  event/linktest/run_linktest.pl \
+ 	  event/delay-agent/GNUmakefile \
 	  tools/GNUmakefile \
 	  tools/pcapper/GNUmakefile \
 	  sensors/GNUmakefile \
