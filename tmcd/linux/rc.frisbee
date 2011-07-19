@@ -9,9 +9,15 @@
 
 MBR_PATH=/etc/emulab
 
+secure=0
 reboot=1
-if [ $# -eq 1 -a "$1" = "-noreboot" ]; then
-    reboot=0
+if [ $# -eq 1 ]; then
+	if [ "$1" = "-noreboot" ]; then
+		reboot=0
+	elif [ "$1" = "-secure" ]; then
+	    secure=1
+	    reboot=0
+	fi
 fi
 
 #
@@ -402,7 +408,8 @@ get_loadinfo()
 	while [ $time -gt 0 ]; do
 		# Just write it out to a tempfile to avoid extra nasty
 		# shell script hacks.
-		$BINDIR/tmcc loadinfo > /tmp/loadinfo.out
+	        # XXX -v 33 is temporary til we update the tmcc binary
+		$BINDIR/tmcc -v 33 loadinfo > /tmp/loadinfo.out
 		[ -s /tmp/loadinfo.out ] && break
 		sleep 1
 		time=$(( $time - 1 ))
@@ -424,23 +431,27 @@ fi
 IS_REMOTE=0
 [ -e $ETCDIR/isrem ] && IS_REMOTE=1
 
-$BINDIR/tmcc state RELOADSETUP
-
 BOSSINFO=`$BINDIR/tmcc bossinfo`
 BOSSIP=${BOSSINFO##* }
 STATUS=`$BINDIR/tmcc status`
 
-echo "Trying to get loadinfo data... "
+if [ $secure -eq 1 ]; then
+	echo "Requesting secure load info data..."
+	# -v 33 is temporary until tmcc binary is updated
+	if ! $BINDIR/tmcc -v 33 -T imagekey > /tmp/secureloadinfo.out; then
+		echo "*** Failed to get secure loadinfo data" 1>&2
+		exit 2
+	fi
+else
+	$BINDIR/tmcc state RELOADSETUP
+fi
+
+echo "Requesting loadinfo data... "
 if ! get_loadinfo; then
 	echo "*** Failed to get loadinfo data" 1>&2
 	exit 2
 fi
-
 echo "Got loadinfo data"
-
-# For testing purposes.
-#BOSSINFO='boss.emulab.net 155.101.128.70'
-#LOADINFO='ADDR=234.5.6.69:4444'
 
 # FIXME shouldn't hardcode path
 if [ -x /usr/sbin/ntpdate ]; then
