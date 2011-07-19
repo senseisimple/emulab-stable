@@ -55,7 +55,7 @@ fi
 
 AC_SUBST(PATH)
 
-CPPFLAGS = "$CPPFLAGS -I/usr/local/include"
+CPPFLAGS = "-I/usr/local/include"
 
 # BEGIN Python detection.
 AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
