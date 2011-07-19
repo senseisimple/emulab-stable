@@ -957,33 +957,40 @@ COMMAND: foreach my $command (@commands) {
     #
     # Order the vlans using the dependency information in the link field.
     #
-    if (@vlans) {
-	my @newvlans = ();
-	my %newvlans = ();
+    if (@vlans && ($opt{m} || $opt{t})) {
+	my %vlans    = ();
+ 	my @newvlans = ();
+ 	my %newvlans = ();
 
-	#
-	# The "link" field in the vlan points to the vlan it is dependent
-	# on. So, we actually build up the list in reverse order, and then
-	# flip it around at the end. 
-	#
+	foreach my $vlanid (@vlans) {
+	    #
+	    # Lookup the vlan, but only numeric ones. Named vlans are
+	    # special and not something we need to worry about here. 
+	    #
+	    if (! ($vlanid =~ /^\d*$/)) {
+		push(@newvlans, $vlanid);
+		next;
+	    }
+	    my $vlan = VLan->Lookup($vlanid);
+	    if (!defined($vlan)) {
+		# Bad.
+		die("Cannot lookup vlan $vlanid\n");
+	    }
+	    $vlans{$vlanid} = $vlan;
+	}
+ 	#
+ 	# The "link" field in the vlan points to the vlan it is dependent
+ 	# on. So, we actually build up the list in reverse order, and then
+ 	# flip it around at the end. 
+ 	#
 	while (@vlans) {
 	    my @tmp = ();
 	    foreach my $vlanid (@vlans) {
-		#
-		# Lookup the vlan, but only numeric ones. Named vlans are
-		# special and not something we need to worry about here. 
-		#
-		if (! ($vlanid =~ /^\d*$/)) {
-		    push(@newvlans, $vlanid);
-		    next;
-		}
-		my $vlan = VLan->Lookup($vlanid);
-		if (!defined($vlan)) {
-		    # Bad.
-		    die("Cannot lookup vlan $vlanid\n");
-		}
+		my $vlan = $vlans{$vlanid};
+
 		if (!$vlan->link() ||
-		    exists($newvlans{$vlan->link()})) {
+		    exists($newvlans{$vlan->link()}) ||
+		    !exists($vlans{$vlan->link()})) {
 		    push(@newvlans, $vlanid);
 		    $newvlans{$vlanid} = $vlanid;
 		}
@@ -991,12 +998,12 @@ COMMAND: foreach my $command (@commands) {
 		    push(@tmp, $vlanid);
 		}
 	    }
-	    @vlans = @tmp
+	    @vlans = @tmp;
 	}
-	@vlans = reverse(@newvlans);
-	debug("VLANs: " . join(",",@vlans) . "\n");
+ 	@vlans = reverse(@newvlans);
+ 	debug("VLANs: " . join(",",@vlans) . "\n");
     }
-    
+
     my %stacks = ();
     if (! $ELABINELAB) {
 	#

@@ -967,42 +967,49 @@ COMMAND: foreach my $command (@commands) {
     #
     # Order the vlans using the dependency information in the link field.
     #
-    if (@vlans) {
+    if (@vlans && ($opt{m} || $opt{t})) {
+	my %vlans    = ();
  	my @newvlans = ();
  	my %newvlans = ();
-	
+
+	foreach my $vlanid (@vlans) {
+	    #
+	    # Lookup the vlan, but only numeric ones. Named vlans are
+	    # special and not something we need to worry about here. 
+	    #
+	    if (! ($vlanid =~ /^\d*$/)) {
+		push(@newvlans, $vlanid);
+		next;
+	    }
+	    my $vlan = VLan->Lookup($vlanid);
+	    if (!defined($vlan)) {
+		# Bad.
+		die("Cannot lookup vlan $vlanid\n");
+	    }
+	    $vlans{$vlanid} = $vlan;
+	}
  	#
  	# The "link" field in the vlan points to the vlan it is dependent
  	# on. So, we actually build up the list in reverse order, and then
  	# flip it around at the end. 
  	#
- 	while (@vlans) {
- 	    my @tmp = ();
- 	    foreach my $vlanid (@vlans) {
-		#
-		# Lookup the vlan, but only numeric ones. Named vlans are
-		# special and not something we need to worry about here. 
-		#
-		if (! ($vlanid =~ /^\d*$/)) {
+	while (@vlans) {
+	    my @tmp = ();
+	    foreach my $vlanid (@vlans) {
+		my $vlan = $vlans{$vlanid};
+
+		if (!$vlan->link() ||
+		    exists($newvlans{$vlan->link()}) ||
+		    !exists($vlans{$vlan->link()})) {
 		    push(@newvlans, $vlanid);
-		    next;
+		    $newvlans{$vlanid} = $vlanid;
 		}
-		my $vlan = VLan->Lookup($vlanid);
-		if (!defined($vlan)) {
-		    # Bad.
-		    die("Cannot lookup vlan $vlanid\n");
+		else {
+		    push(@tmp, $vlanid);
 		}
- 		if (!$vlan->link() ||
-		    exists($newvlans{$vlan->link()})) {
- 		    push(@newvlans, $vlanid);
- 		    $newvlans{$vlanid} = $vlanid;
- 		}
- 		else {
- 		    push(@tmp, $vlanid);
- 		}
- 	    }
- 	    @vlans = @tmp
- 	}
+	    }
+	    @vlans = @tmp;
+	}
  	@vlans = reverse(@newvlans);
  	debug("VLANs: " . join(",",@vlans) . "\n");
     }
