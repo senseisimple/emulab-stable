@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -43,7 +43,7 @@ typedef int socklen_t;
 #  include <arpa/inet.h>
 #  include <netdb.h>
 #endif
-#include "decls.h"
+#include "tmcd.h"
 #include "ssl.h"
 #ifndef STANDALONE
 #  include "config.h"

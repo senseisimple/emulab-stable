@@ -18,11 +18,16 @@ fullclient: tmcc
 client: tmcc-nossl findif dostype
 server: tmcd tmcd.restart
 
+# For VPATH.
+MOSTLY_SRCDIRS = ${TESTBED_SRCDIR}/lib/libtb ${TESTBED_SRCDIR}/pxe \
+		 ${TESTBED_SRCDIR}/lib/tmcd
+
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -Wall -DUDP \
 		-I${OBJDIR} -I/usr/local/include \
 		-I${TESTBED_SRCDIR}/lib/libtb -I${TESTBED_SRCDIR}/pxe \
+		-I${TESTBED_SRCDIR}/lib/tmcd \
 		-L/usr/local/lib
 TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
 BOOTINFO = ${OBJDIR}/pxe/bootinfo.o ${OBJDIR}/pxe/bootinfo_mysql.o
@@ -35,8 +40,8 @@ CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
 SSLFLAGS = -DWITHSSL 
 TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
-TPMOBJ   = tpm.o
-NOTPM	 = notpm
+TPMLIB   = ${OBJDIR}/lib/tmcd/libtmcc.a
+NOTPMLIB = ${OBJDIR}/lib/tmcd/libtmcd.a
 
 ifeq ($(SYSTEM),Linux)
 ifneq ($(LDSTATIC),)
@@ -106,42 +111,41 @@ ifeq ($(EVENTSYS),1)
 	ELVINFLAGS  = -lm -L/usr/local/lib -lpubsub 
 endif
 
-tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO) $(NOTPM)
+tmcd: tmcd.c ${TMCDLIBS} tmcd.h version.o $(SSLOBJ) $(BOOTINFO) $(NOTPMLIB)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		version.o $(SSLOBJ) $(TPMOBJ) $(BOOTINFO) \
+		version.o $(NOTPMLIB) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
 mod_tmcd.so: libtmcd.o
 	apxs -c mod_tmcd.c -L/usr/local/lib/mysqlclient -lmysqlclient \
-		-L /usr/local/lib -lxml2 $(SSLOBJ) \
-		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) $<
+		-L /usr/local/lib -lxml2 \
+		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(NOTPMLIB) $(TMLIBS) $<
 
-newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} decls.h version.o $(SSLOBJ) \
-	$(NOTPMOBJ) $(BOOTINFO)
+newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} tmcd.h version.o \
+	$(NOTPMLIB) $(BOOTINFO)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		libtmcd.o version.o $(SSLOBJ) $(TPMOBJ) $(BOOTINFO) \
+		libtmcd.o version.o $(NOTPMLIB) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient  -lxml2 \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
-libtmcd.o: libtmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
+libtmcd.o: libtmcd.c ${TMCDLIBS} tmcd.h version.o $(BOOTINFO)
 	$(CC) $(CFLAGS) -I/usr/local/include/libxml2 $(SSLFLAGS) \
-		$(TMCDCFLAGS) -c -o libtmcd.o $<
+		$(TMCDCFLAGS) -c -o libtmcd.o $< 
 
-libtmcd.so: libtmcd.o ${TMCDLIBS} decls.h $(BOOTINFO)
+libtmcd.so: libtmcd.o ${TMCDLIBS} tmcd.h $(BOOTINFO)
 	$(LD) -shared $^ -L/usr/local/lib/mysql -lxml2 -lmysqlclient \
 		$(TMCDLIBS) $(ELVINFLAGS) ../lib/libtb/libtb.a \
 		-o $@
 
-tmcc: tmcc.c decls.h $(SSLOBJ) $(TPMOBJ) 
+tmcc: tmcc.c tmcd.h $(SSLOBJ) $(TPMLIB) 
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc \
-		$< $(SSLOBJ) $(TPMOBJ) $(LFLAGS) $(TMLIBS)
+		$< $(TPMLIB) $(LFLAGS) $(TMLIBS)
 
-tmcc-shared: tmcc.c decls.h $(SSLOBJ) $(TPMOBJ) 
-	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(SSLOBJ) \
-		$(TPMOBJ) $(LFLAGS) $(TMLIBS)
+tmcc-shared: tmcc.c tmcd.h $(SSLOBJ) $(TPMLIB) 
+	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(TPMLIB) $(LFLAGS) $(TMLIBS)
 
-tmcc-nossl-debug: tmcc.c decls.h
+tmcc-nossl-debug: tmcc.c tmcd.h
 	$(CC) $(CFLAGS) $(LDSTATIC) -g -o $@ $< $(LFLAGS) $(TMSLIBS)
 
 findif-debug: findif.o
@@ -149,16 +153,6 @@ findif-debug: findif.o
 
 dostype-debug: dostype.o
 	$(CC) $(CFLAGS) -g -o $@ dostype.o $(LFLAGS)
-
-ssl.o:	ssl.c ssl.h decls.h
-
-tpm.o:	tpm.c tpm.h ssl.h
-	$(CC) -c $(CFLAGS) $(SSLFLAGS) $(TESTBED_SRCDIR)/tmcd/tpm.c \
-		-I$(TESTBED_SRCDIR)/tmcd/
-
-notpm: tpm.c tpm.h ssl.h
-	$(CC) -c $(CFLAGS) $(SSLFLAGS) -DTPMOVERRIDE \
-	    $(TESTBED_SRCDIR)/tmcd/tpm.c -I$(TESTBED_SRCDIR)/tmcd/
 
 version.c: tmcd.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"

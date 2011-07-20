@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2008-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,7 +19,7 @@
 #include <sys/fcntl.h>
 #include <sys/stat.h>
 #include <sys/param.h>
-#include "decls.h"
+#include "tmcd.h"
 #include "log.h"
 #include "config.h"
 #include "bootwhat.h"

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -32,7 +32,7 @@
 #include <openssl/ssl.h>
 #include <openssl/sha.h>
 #include <openssl/err.h>
-#include "decls.h"
+#include "tmcd.h"
 #include "ssl.h"
 #include "tpm.h"
 #ifndef STANDALONE
@@ -443,6 +443,8 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 /*
  * Verify the certificate of the client.
  */
+#ifdef BOSSNODE
+/* Do not need this if no BOSSNODE; its a clientside build */
 int
 tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 {
@@ -506,6 +508,7 @@ tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 #endif
 	return 0;
 }
+#endif
 
 /*
  * Write stuff out. According to docs, the write call will not

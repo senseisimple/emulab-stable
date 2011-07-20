@@ -29,7 +29,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <mysql/mysql.h>
-#include "decls.h"
+#include "tmcd.h"
 #include "config.h"
 #include "ssl.h"
 #include "log.h"
