@@ -289,6 +289,13 @@ closedir(DIR);
 
 my $certarg = " " . join(" ", map("--trusted-pem $GENICERTS/$_", @pemfiles));
 
+if( opendir( DIR, "$GENICERTS/local" ) ) {
+    my @pemfiles = grep {/^.*\.pem$/} readdir(DIR);
+    closedir(DIR);
+    $certarg .= " " . join(" ", map("--trusted-pem $GENICERTS/local/$_",
+				    @pemfiles));
+}
+
 #
 # Lets first make sure that the data has not been messed with; for each
 # credential in the hierarchy check the signature. Remember, the signature

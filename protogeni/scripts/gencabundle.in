@@ -84,6 +84,63 @@ if ($?) {
 system("/bin/mv /tmp/wwwbundle.$$ $WWWBUNDLE") == 0
     or fatal("Could not copy to $WWWBUNDLE!");
 
+#
+# Split up the extra certs.
+#
+my @certs = ();
+my $certstr;
+
+if( open( BUNDLE, "$TB/etc/extracerts.bundle" ) ) {
+    while (<BUNDLE>) {
+	if ($_ =~ /^-----BEGIN CERT/) {
+	    $certstr = $_;
+	    next;
+	}
+	if ($_ =~ /^-----END CERT/) {
+	    $certstr .= $_;
+	    push(@certs, $certstr);
+	    $certstr = undef;
+	    next;
+	}
+	if ($certstr) {
+	    $certstr .= $_;
+	    next;
+	}
+    }
+    # If the file is properly terminated, there should be no certificate in
+    # progress. Hopefully the file is not trashed at a boundry.
+    fatal("Trashed bundle file")
+	if ($certstr);
+    close(BUNDLE);
+}
+
+mkdir("/tmp/extracerts.$$", 0755) or
+    fatal("Could not mkdir extracerts tmp dir");
+
+my $idx = 0;
+while (@certs) {
+    my $cert = pop(@certs);
+
+    open(CERT, ">/tmp/extracerts.$$/$idx.pem")
+	or fatal("Could not open pem file in /tmp/extracerts.$$");
+    print CERT $cert;
+    close(CERT);
+    $idx++;
+}
+
+if (-e "$TB/etc/genicacerts/local.old") {
+    system("/bin/rm -rf $TB/etc/genicacerts/local.old") == 0
+	or fatal("Could not remove old genicacerts/local directory");
+}
+if (-e "$TB/etc/genicacerts/local") {
+    system("/bin/mv $TB/etc/genicacerts/local " .
+	   "$TB/etc/genicacerts/local.old") == 0
+	   or fatal("Could not save genicacerts/local directory");
+}
+system("/bin/mv /tmp/extracerts.$$ $TB/etc/genicacerts/local") == 0
+    or fatal("Could not mv /tmp/extracerts.$$ to genicacerts/local");
+
+
 # Apache spits out stuff. No errors at this point, nothing to report.
 AuditEnd()
     if (!$errors);
