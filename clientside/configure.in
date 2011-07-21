@@ -180,6 +180,29 @@ outfiles="Makeconf GNUmakefile \
 	  sensors/GNUmakefile \
 	  sensors/slothd/GNUmakefile \
 	  sensors/canaryd/GNUmakefile \
+	  tmcc/GNUmakefile \
+	  tmcc/common/GNUmakefile tmcc/common/config/GNUmakefile \
+	  tmcc/freebsd/GNUmakefile tmcc/freebsd/init/GNUmakefile \
+	  tmcc/freebsd/init/4/GNUmakefile \
+	  tmcc/freebsd/init/5/GNUmakefile \
+	  tmcc/freebsd/init/6/GNUmakefile \
+	  tmcc/freebsd/init/7/GNUmakefile \
+	  tmcc/freebsd/init/8/GNUmakefile \
+	  tmcc/freebsd/supfile tmcc/freebsd/sethostname \
+	  tmcc/linux/GNUmakefile tmcc/linux/supfile \
+	  tmcc/linux/sethostname.dhclient \
+	  tmcc/linux/xen/emulab-cnet \
+	  tmcc/linux9/GNUmakefile tmcc/linux9/supfile \
+	  tmcc/fedora/GNUmakefile tmcc/fedora/supfile \
+	  tmcc/linux-sg/GNUmakefile tmcc/ubuntu7/GNUmakefile \
+	  tmcc/ubuntu10/GNUmakefile \
+	  tmcc/freebsd5/GNUmakefile tmcc/freebsd5/supfile \
+	  tmcc/freebsd6/GNUmakefile tmcc/freebsd6/supfile \
+	  tmcc/freebsd6/netif-emulab tmcc/freebsd7/GNUmakefile \
+	  tmcc/freebsd7/supfile tmcc/freebsd7/netif-emulab \
+	  tmcc/cygwinxp/GNUmakefile tmcc/dp/GNUmakefile \
+	  tmcc/openbsd/GNUmakefile tmcc/ron/GNUmakefile \
+	  tmcc/plab/GNUmakefile \
 	  os/GNUmakefile os/syncd/GNUmakefile \
 	  os/dijkstra/GNUmakefile os/genhostsfile/GNUmakefile"
 

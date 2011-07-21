@@ -729,6 +729,7 @@ enable_option_checking
 with_TBDEFS
 with_emulab
 enable_elvin_compat
+enable_TPM
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1366,6 +1367,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-elvin_compat[=yes/no]  Include Elvin Hash compat [default=no]
+  --enable-TPM[=yes/no]           Include TPM support [default=no]
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4226,6 +4228,22 @@ _ACEOF
 
 fi
 
+# Check whether --enable-TPM was given.
+if test "${enable_TPM+set}" = set; then
+  enableval=$enable_TPM;
+fi
+
+
+if test "$enable_TPM" = "yes"; then
+    TPM=1
+fi
+if test $TPM -eq 1; then
+    cat >>confdefs.h <<_ACEOF
+#define TPM 1
+_ACEOF
+
+fi
+
 # BEGIN Python detection. For the event library.
 for ac_prog in python python2.6 python2.5 python2.4 python2.3 python2.2
 do
@@ -4842,6 +4860,29 @@ outfiles="Makeconf GNUmakefile \
 	  sensors/GNUmakefile \
 	  sensors/slothd/GNUmakefile \
 	  sensors/canaryd/GNUmakefile \
+	  tmcc/GNUmakefile \
+	  tmcc/common/GNUmakefile tmcc/common/config/GNUmakefile \
+	  tmcc/freebsd/GNUmakefile tmcc/freebsd/init/GNUmakefile \
+	  tmcc/freebsd/init/4/GNUmakefile \
+	  tmcc/freebsd/init/5/GNUmakefile \
+	  tmcc/freebsd/init/6/GNUmakefile \
+	  tmcc/freebsd/init/7/GNUmakefile \
+	  tmcc/freebsd/init/8/GNUmakefile \
+	  tmcc/freebsd/supfile tmcc/freebsd/sethostname \
+	  tmcc/linux/GNUmakefile tmcc/linux/supfile \
+	  tmcc/linux/sethostname.dhclient \
+	  tmcc/linux/xen/emulab-cnet \
+	  tmcc/linux9/GNUmakefile tmcc/linux9/supfile \
+	  tmcc/fedora/GNUmakefile tmcc/fedora/supfile \
+	  tmcc/linux-sg/GNUmakefile tmcc/ubuntu7/GNUmakefile \
+	  tmcc/ubuntu10/GNUmakefile \
+	  tmcc/freebsd5/GNUmakefile tmcc/freebsd5/supfile \
+	  tmcc/freebsd6/GNUmakefile tmcc/freebsd6/supfile \
+	  tmcc/freebsd6/netif-emulab tmcc/freebsd7/GNUmakefile \
+	  tmcc/freebsd7/supfile tmcc/freebsd7/netif-emulab \
+	  tmcc/cygwinxp/GNUmakefile tmcc/dp/GNUmakefile \
+	  tmcc/openbsd/GNUmakefile tmcc/ron/GNUmakefile \
+	  tmcc/plab/GNUmakefile \
 	  os/GNUmakefile os/syncd/GNUmakefile \
 	  os/dijkstra/GNUmakefile os/genhostsfile/GNUmakefile"
 

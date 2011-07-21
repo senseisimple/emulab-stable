@@ -8,14 +8,11 @@ TESTBED_SRCDIR	= @top_srcdir@
 EVENTSYS	= @EVENTSYS@
 OBJDIR		= ..
 SUBDIR		= tmcd
-
 SYSTEM	       := $(shell $(TESTBED_SRCDIR)/utils/osstuff.sh -o)
 
 include $(OBJDIR)/Makeconf
 
-all:	server fullclient client
-fullclient: tmcc
-client: tmcc-nossl findif dostype
+all:	server
 server: tmcd tmcd.restart
 
 # For VPATH.
@@ -39,8 +36,6 @@ LDFLAGS += $(LDSTATIC)
 CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
 SSLFLAGS = -DWITHSSL 
 TMLIBS	+= -lssl -lcrypto
-SSLOBJ   = ssl.o
-TPMLIB   = ${OBJDIR}/lib/tmcd/libtmcc.a
 NOTPMLIB = ${OBJDIR}/lib/tmcd/libtmcd.a
 
 ifeq ($(SYSTEM),Linux)
@@ -59,59 +54,13 @@ endif
 TMLIBS  += -ldl
 endif
 
-#
-# Take care of historic naming fubars:
-#	Redhat 7.x ->  linux
-#	Redhat 9.0 ->  linux9
-#	Fedora 4/6 ->  fedora
-#	Stargate 1  -> linux-sg
-#	FreeBSD 4.x -> freebsd
-#	Windows XP  -> cygwinxp
-#
-MDSUBDIR  := $(shell $(TESTBED_SRCDIR)/utils/osstuff.sh -t)
-
-ifeq ($(SYSTEM),Linux)
-ifeq ($(MDSUBDIR),redhat7)
-MDSUBDIR  = linux
-endif
-ifeq ($(MDSUBDIR),redhat9)
-MDSUBDIR  = linux9
-endif
-ifeq ($(findstring fedora,$(MDSUBDIR)),fedora)
-MDSUBDIR  = fedora
-endif
-ifeq ($(findstring centos,$(MDSUBDIR)),centos)
-MDSUBDIR  = fedora
-endif
-ifeq ($(MDSUBDIR),stargate1)
-MDSUBDIR  = linux-sg
-endif
-endif
-
-ifeq ($(SYSTEM),FreeBSD)
-ifeq ($(MDSUBDIR),freebsd4)
-MDSUBDIR  = freebsd
-endif
-ifeq ($(MDSUBDIR),freebsd8)
-MDSUBDIR  = freebsd7
-endif
-endif
-
-ifeq ($(SYSTEM),Cygwin)
-# Cygwin on  Windows XP (a.k.a. NT 5.1) - resembles the Linux case.
-ifeq ($(MDSUBDIR),CYGWIN_NT-5.1)
-MDSUBDIR  = cygwinxp
-TMSLIBS   += -lminires
-endif
-endif
-
 ifeq ($(EVENTSYS),1)
 	TMCDCFLAGS  = -I$(TESTBED_SRCDIR)/lib/event -DEVENTSYS
 	TMCDLIBS    = ${OBJDIR}/lib/event/libevent.a
 	ELVINFLAGS  = -lm -L/usr/local/lib -lpubsub 
 endif
 
-tmcd: tmcd.c ${TMCDLIBS} tmcd.h version.o $(SSLOBJ) $(BOOTINFO) $(NOTPMLIB)
+tmcd: tmcd.c ${TMCDLIBS} tmcd.h version.o $(BOOTINFO) $(NOTPMLIB)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
 		version.o $(NOTPMLIB) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
@@ -138,59 +87,18 @@ libtmcd.so: libtmcd.o ${TMCDLIBS} tmcd.h $(BOOTINFO)
 		$(TMCDLIBS) $(ELVINFLAGS) ../lib/libtb/libtb.a \
 		-o $@
 
-tmcc: tmcc.c tmcd.h $(SSLOBJ) $(TPMLIB) 
-	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc \
-		$< $(TPMLIB) $(LFLAGS) $(TMLIBS)
-
-tmcc-shared: tmcc.c tmcd.h $(SSLOBJ) $(TPMLIB) 
-	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(TPMLIB) $(LFLAGS) $(TMLIBS)
-
-tmcc-nossl-debug: tmcc.c tmcd.h
-	$(CC) $(CFLAGS) $(LDSTATIC) -g -o $@ $< $(LFLAGS) $(TMSLIBS)
-
-findif-debug: findif.o
-	$(CC) $(CFLAGS) -g -o $@ findif.o $(LFLAGS) $(LDSTATIC)
-
-dostype-debug: dostype.o
-	$(CC) $(CFLAGS) -g -o $@ dostype.o $(LFLAGS)
-
 version.c: tmcd.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 install:	all
 
 install:	$(INSTALL_SBINDIR)/tmcd \
-		$(INSTALL_SBINDIR)/tmcd.restart \
-		$(INSTALL_SBINDIR)/findif \
-		elabinelabfiles
+		$(INSTALL_SBINDIR)/tmcd.restart
 
-control-install: tmcc
-	@$(MAKE) -C freebsd control-install
-
-subboss-install: client
-	@$(MAKE) -C $(MDSUBDIR) subboss-install
-
-client-install: client
-	@$(MAKE) -C $(MDSUBDIR) install
-
-#
-# XXX argh!  assumes FreeBSD inner boss
-#
-elabinelabfiles:
-	$(INSTALL_PROGRAM) $(SRCDIR)/common/config/rc.mkelab \
-			   $(INSTALL_ETCDIR)/rc.mkelab
-	$(INSTALL_PROGRAM) $(SRCDIR)/freebsd/mkextrafs.pl \
-			   $(INSTALL_ETCDIR)/mkextrafs.pl
-
-mfs: client
-
-mfs-install: mfs
-	@$(MAKE) -C $(MDSUBDIR) mfs-install
-
-frisbee-mfs: client
-
-frisbee-mfs-install: frisbee-mfs
-	@$(MAKE) -C $(MDSUBDIR) frisbee-mfs-install
+control-install:
+boss-install: install
+subboss-install:
+client-install:
 
 $(INSTALL_BINDIR)/tmcd/%: %
 	@echo "Installing $<"
@@ -205,9 +113,11 @@ ${OBJDIR}/lib/event/%:
 	cd ${OBJDIR}/lib/event && gmake $<
 ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
+${OBJDIR}/lib/tmcd/%:
+	cd ${OBJDIR}/lib/tmcd && gmake $<
 
 clean:	subdir-clean
-	rm -f *.o core tmcd tmcc tmcc-nossl findif dostype *-debug version.c
+	rm -f *.o core tmcd *-debug version.c
 
 subdir-clean:
 	@$(MAKE) -C $(MDSUBDIR) clean

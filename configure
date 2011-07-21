@@ -7094,24 +7094,6 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/libtblog.pm tbsetup/template_cvsroot/GNUmakefile \
 	tip/GNUmakefile tip/console \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
-	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
-	tmcd/freebsd/GNUmakefile tmcd/freebsd/init/GNUmakefile \
-	tmcd/freebsd/init/4/GNUmakefile tmcd/freebsd/init/5/GNUmakefile \
-	tmcd/freebsd/init/6/GNUmakefile tmcd/freebsd/init/7/GNUmakefile \
-	tmcd/freebsd/init/8/GNUmakefile \
-	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
-	tmcd/linux/GNUmakefile tmcd/linux/supfile \
-	tmcd/linux/sethostname.dhclient \
-	tmcd/linux/xen/emulab-cnet \
-	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
-	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
-        tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
-	tmcd/ubuntu10/GNUmakefile \
-	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
-	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
-	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \
-	tmcd/cygwinxp/GNUmakefile tmcd/dp/GNUmakefile \
-	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin \
 	utils/firstuser utils/export_tables utils/eventping \
@@ -7232,6 +7214,29 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/event/linktest/linktest_control \
  clientside/event/linktest/run_linktest.pl \
  clientside/event/delay-agent/GNUmakefile \
+ clientside/tmcc/GNUmakefile \
+ clientside/tmcc/common/GNUmakefile clientside/tmcc/common/config/GNUmakefile \
+ clientside/tmcc/freebsd/GNUmakefile clientside/tmcc/freebsd/init/GNUmakefile \
+ clientside/tmcc/freebsd/init/4/GNUmakefile \
+ clientside/tmcc/freebsd/init/5/GNUmakefile \
+ clientside/tmcc/freebsd/init/6/GNUmakefile \
+ clientside/tmcc/freebsd/init/7/GNUmakefile \
+ clientside/tmcc/freebsd/init/8/GNUmakefile \
+ clientside/tmcc/freebsd/supfile clientside/tmcc/freebsd/sethostname \
+ clientside/tmcc/linux/GNUmakefile clientside/tmcc/linux/supfile \
+ clientside/tmcc/linux/sethostname.dhclient \
+ clientside/tmcc/linux/xen/emulab-cnet \
+ clientside/tmcc/linux9/GNUmakefile clientside/tmcc/linux9/supfile \
+ clientside/tmcc/fedora/GNUmakefile clientside/tmcc/fedora/supfile \
+ clientside/tmcc/linux-sg/GNUmakefile clientside/tmcc/ubuntu7/GNUmakefile \
+ clientside/tmcc/ubuntu10/GNUmakefile \
+ clientside/tmcc/freebsd5/GNUmakefile clientside/tmcc/freebsd5/supfile \
+ clientside/tmcc/freebsd6/GNUmakefile clientside/tmcc/freebsd6/supfile \
+ clientside/tmcc/freebsd6/netif-emulab clientside/tmcc/freebsd7/GNUmakefile \
+ clientside/tmcc/freebsd7/supfile clientside/tmcc/freebsd7/netif-emulab \
+ clientside/tmcc/cygwinxp/GNUmakefile clientside/tmcc/dp/GNUmakefile \
+ clientside/tmcc/openbsd/GNUmakefile clientside/tmcc/ron/GNUmakefile \
+ clientside/tmcc/plab/GNUmakefile \
  clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
 
 #

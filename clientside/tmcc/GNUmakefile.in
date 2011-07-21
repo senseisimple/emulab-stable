@@ -1,0 +1,163 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+SYSTEM	       := $(shell $(SRCDIR)/osstuff.sh -o)
+
+include $(OBJDIR)/Makeconf
+
+all:	fullclient client
+fullclient: tmcc
+client: tmcc-nossl findif dostype
+
+# For VPATH.
+MOSTLY_SRCDIRS = ${TESTBED_SRCDIR}/lib/libtb \
+		 ${TESTBED_SRCDIR}/lib/tmcd
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	+= -O -g -Wall -DUDP \
+		-I${OBJDIR} -I/usr/local/include \
+		-I${TESTBED_SRCDIR}/lib/libtb \
+		-I${TESTBED_SRCDIR}/lib/tmcd \
+		-L/usr/local/lib
+TMLIBS	 = ${OBJDIR}/lib/tmcd/libtmcc.a ${OBJDIR}/lib/libtb/libtb.a
+LDFLAGS += $(LDSTATIC)
+
+#
+# For SSL enabled tmcd/tmcc
+#
+CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
+SSLFLAGS = -DWITHSSL 
+TMLIBS	+= -lssl -lcrypto
+
+ifeq ($(SYSTEM),Linux)
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NOKERB := 1
+endif
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+TMLIBS   += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+TMLIBS     += -lkrb5support
+endif
+endif
+TMLIBS  += -ldl
+endif
+
+#
+# Take care of historic naming fubars:
+#	Redhat 7.x ->  linux
+#	Redhat 9.0 ->  linux9
+#	Fedora 4/6 ->  fedora
+#	Stargate 1  -> linux-sg
+#	FreeBSD 4.x -> freebsd
+#	Windows XP  -> cygwinxp
+#
+MDSUBDIR  := $(shell $(SRCDIR)/osstuff.sh -t)
+
+ifeq ($(SYSTEM),Linux)
+ifeq ($(MDSUBDIR),redhat7)
+MDSUBDIR  = linux
+endif
+ifeq ($(MDSUBDIR),redhat9)
+MDSUBDIR  = linux9
+endif
+ifeq ($(findstring fedora,$(MDSUBDIR)),fedora)
+MDSUBDIR  = fedora
+endif
+ifeq ($(findstring centos,$(MDSUBDIR)),centos)
+MDSUBDIR  = fedora
+endif
+ifeq ($(MDSUBDIR),stargate1)
+MDSUBDIR  = linux-sg
+endif
+endif
+
+ifeq ($(SYSTEM),FreeBSD)
+ifeq ($(MDSUBDIR),freebsd4)
+MDSUBDIR  = freebsd
+endif
+ifeq ($(MDSUBDIR),freebsd8)
+MDSUBDIR  = freebsd7
+endif
+endif
+
+ifeq ($(SYSTEM),Cygwin)
+# Cygwin on  Windows XP (a.k.a. NT 5.1) - resembles the Linux case.
+ifeq ($(MDSUBDIR),CYGWIN_NT-5.1)
+MDSUBDIR  = cygwinxp
+TMSLIBS   += -lminires
+endif
+endif
+
+tmcc: tmcc.c tmcd.h $(TPMLIB) 
+	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc \
+		$< $(LFLAGS) $(TMLIBS)
+
+tmcc-shared: tmcc.c tmcd.h $(TPMLIB) 
+	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(LFLAGS) $(TMLIBS)
+
+tmcc-nossl-debug: tmcc.c tmcd.h
+	$(CC) $(CFLAGS) $(LDSTATIC) -g -o $@ $< $(LFLAGS) $(TMSLIBS)
+
+findif-debug: findif.o
+	$(CC) $(CFLAGS) -g -o $@ findif.o $(LFLAGS) $(LDSTATIC)
+
+dostype-debug: dostype.o
+	$(CC) $(CFLAGS) -g -o $@ dostype.o $(LFLAGS)
+
+post-install:
+install:
+boss-install:	$(INSTALL_SBINDIR)/findif \
+		elabinelabfiles
+
+control-install: tmcc
+	@$(MAKE) -C freebsd control-install
+
+subboss-install: client
+	@$(MAKE) -C $(MDSUBDIR) subboss-install
+
+client-install: client
+	@$(MAKE) -C $(MDSUBDIR) install
+
+mfs: client
+
+mfs-install: mfs
+	@$(MAKE) -C $(MDSUBDIR) mfs-install
+
+frisbee-mfs: client
+
+frisbee-mfs-install: frisbee-mfs
+	@$(MAKE) -C $(MDSUBDIR) frisbee-mfs-install
+
+#
+# XXX argh!  assumes FreeBSD inner boss
+#
+elabinelabfiles:
+	$(INSTALL_PROGRAM) $(SRCDIR)/common/config/rc.mkelab \
+			   $(INSTALL_ETCDIR)/rc.mkelab
+	$(INSTALL_PROGRAM) $(SRCDIR)/freebsd/mkextrafs.pl \
+			   $(INSTALL_ETCDIR)/mkextrafs.pl
+
+#
+# Here so that the event system libraries, and libraries they depend upon,
+# can get made.
+#
+${OBJDIR}/lib/tmcd/%:
+	cd ${OBJDIR}/lib/tmcd && gmake $<
+${OBJDIR}/lib/libtb/%:
+	cd ${OBJDIR}/lib/tbdb && gmake $<
+
+clean:	subdir-clean
+	rm -f *.o core tmcd tmcc tmcc-nossl findif dostype *-debug
+
+subdir-clean:
+	@$(MAKE) -C $(MDSUBDIR) clean
