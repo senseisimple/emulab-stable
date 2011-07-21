@@ -150,7 +150,8 @@ sub email($)
 {
     my ($self) = @_;
 
-    if ($self->DN() =~ /\/emailAddress=(.*)/) {
+    if ($self->DN() =~ /\/emailAddress=(.*)/ ||
+	$self->DN() =~ /^emailAddress=(.*),/) {
 	return $1
 	    if ($1 ne "");
     }
