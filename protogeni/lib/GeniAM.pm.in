@@ -285,6 +285,9 @@ sub auto_add_sa($)
     #
     # We want the URL! 
     #
+    goto goturl
+	if (defined($url));
+    
     # First get the list of registries from PLC.
     my $registry = GeniRegistry::PLC->Create();
     if (!defined($registry)) {
@@ -304,7 +307,8 @@ sub auto_add_sa($)
     my $authcertstr = @$signers[scalar(@$signers) - 1];
     my $authcert = GeniCertificate->LoadFromString($authcertstr);
     if (!defined($authcert)) {
-        print STDERR "auto_add_sa: could not get certificate from $authcertstr\n";
+        print STDERR
+	    "auto_add_sa: could not get certificate from $authcertstr\n";
         return;
     }
     my $authurn = $authcert->urn();
@@ -330,6 +334,7 @@ sub auto_add_sa($)
     # Gack. Replace the URL with a modified URL which says https.
     # Why does PLC set the scheme to http?
     #
+  goturl:
     my $uri = URI->new($url);
     $uri->scheme("https");
     $url = "$uri";
