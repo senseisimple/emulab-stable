@@ -1833,7 +1833,7 @@ sub UnProvision($)
     my $experiment = Experiment->Lookup($self->slice_uuid());
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
-	return -1;
+	return 0;
     }
 
     my $tunnel = Tunnel->Lookup($experiment, $self->uuid());
