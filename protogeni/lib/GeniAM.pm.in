@@ -87,7 +87,7 @@ sub GetVersion()
 
     my $default_ad = {
 	"type" => "ProtoGENI",
-	"version" => $coder->string("0.1") };
+	"version" => $coder->string("0.2") };
     my $request_0_1 = {
 	"type" => "ProtoGENI",
 	"version" => $coder->string("0.1"),
