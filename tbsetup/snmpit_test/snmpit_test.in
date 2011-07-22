@@ -2539,6 +2539,7 @@ sub doReserveVlanTags($$@) {
 	my $tag = $stack->newVlanNumber($vlanid, $vlanid);
 	if ($tag) {
 	    push(@assigned, [$vlan,$tag]);
+	    next;
 	}
 	elsif (!$opt{'blockmode'}) {
 	    #
