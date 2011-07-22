@@ -1868,6 +1868,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $slice_urn = $slice->urn();
 	my $retries   = 10;
 	my $chainmode = 0;
+	my $madevlan  = 0;
 
 	#
 	# Treemode; just reserve a local tag. Eventually has to deal with
@@ -1889,6 +1890,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "Internal Error creating vlan object");
 			goto bad;
 		    }
+		    $madevlan = 1;
 		}
 		my $lanid = $vlan->lanid();
 		#
@@ -1905,7 +1907,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 			if (VLan->VlanTagAvailable($t));
 		}
 		if (!@tags) {
-		    $vlan->Destroy();
+		    $vlan->Destroy()
+			if ($madevlan);
 		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Could not find a free vlan tag for $linkname");
 		    goto bad;
@@ -1919,12 +1922,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 		system("$SNMPIT --blockmode -A ".
 		       "$pid $eid $lanid," . join(",", @tags));
 		if ($?) {
-		    $vlan->Destroy();
+		    $vlan->Destroy()
+			if ($madevlan);
 		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 			"Error trying to reserve a vlan tag for $linkname");
 		    goto bad;
 		}
-		$vlan->Destroy();
+		$vlan->Destroy()
+		    if ($madevlan);
 	    }
 	    $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
 	    if (!defined($tag)) {
