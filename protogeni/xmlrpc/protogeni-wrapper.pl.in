@@ -332,7 +332,9 @@ if ($MODULE eq "cm" || $MODULE eq $AM_MODULE) {
 	$debug = 0;
     }
     # Happens too often and not interesting
-    if ($method eq "Resolve" || $method eq "GetVersion") {
+    if ($method eq "Resolve" ||
+	$method eq "SliverStatus" ||
+	$method eq "GetVersion") {
 	$debug = 0;
     }
     # We always want as much data as possible for these.
