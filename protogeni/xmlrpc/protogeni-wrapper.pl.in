@@ -168,6 +168,25 @@ if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
 }
 
 #
+# The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
+# If it actually looks like a UUID, then this correponds to an actual user,
+# and the supplied credentials/tickets must match. At present, if there is
+# no UUID, it is another emulab making a request directly, with no user
+# context, and we just let that pass for now.
+#
+if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
+    $ENV{'SSL_CLIENT_S_DN_CN'} =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+    $ENV{'GENIUSER'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+    $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+}
+elsif (defined($MODULE) && ($MODULE eq $AM_MODULE)) {
+    # Do not expect a UUID if calling to the AM.
+}
+else {
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid certificate; no UUID");
+}
+
+#
 # The CERT data from apache holds the URN of the caller. 
 #
 if (exists($ENV{'SSL_CLIENT_CERT'})) {
@@ -222,10 +241,6 @@ if (!(defined($GENI_METHODS) && defined($EMULAB_PEMFILE))) {
 	     "No definition for GENI_METHODS or EMULAB_PEMFILE");
     XMLError(XMLRPC_APPLICATION_ERROR(),
 	     "Internal error loading module; missing definitions");
-}
-# Temporary while we are running Instools stuff in Utah.
-if (0 && $MODULE eq "instools" && $MAINSITE) {
-    $debug = 1;
 }
 
 #
@@ -307,6 +322,27 @@ $message .=
 $message .=
     "Start:   " . TBTimeStamp() . "\n";
 
+# Debug the CM and AM modules
+if ($MODULE eq "cm" || $MODULE eq $AM_MODULE) {
+    $debug = 1;
+
+    # Too much output.
+    if ($method eq "ListResources" ||
+	$method eq "DiscoverResources") {
+	$debug = 0;
+    }
+    # Happens too often and not interesting
+    if ($method eq "Resolve" || $method eq "GetVersion") {
+	$debug = 0;
+    }
+    # We always want as much data as possible for these.
+    if ($method eq "CreateSliver" ||
+	$method eq "RedeemTicket" ||
+	$method eq "GetTicket") {
+	$debug = 2;
+    }
+}
+
 my $starttime = [gettimeofday()];
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {
@@ -337,12 +373,15 @@ else {
 	    $message .= "Code:    " . $result->{'code'} . "\n";
 	}
 	$message .= "Output:  " . $result->{'output'} . "\n"
-	    if (defined($result->{'output'}));
+	    if (defined($result->{'output'}) && $result->{'output'} ne "");
 
-	$message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
+	if (GeniResponse::IsError($result) || $debug > 1) {
+	    $message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
+	}
     }
-    $message .= "Request:\n" . $request . "\n";
-    
+    if (GeniResponse::IsError($result) || $debug > 1) {
+	$message .= "Request:\n" . $request . "\n";
+    }
     AddAuditInfo("message", $message);
 
     if (! ref($result)) {
@@ -366,9 +405,15 @@ else {
 	    $result->{'output'} = `cat $ENV{'TBAUDITLOG'}`;
 	}
 	# Do this after above so that silly comment is not sent to user.
-	if (GeniResponse::IsError($result) && $mailerrors &&
-	    $result->{'code'} != GENIRESPONSE_SEARCHFAILED()) {
-	    print STDERR "Mail Errors is on.\n";
+	if (GeniResponse::IsError($result)) {
+	    if ($result->{'code'} == GENIRESPONSE_SEARCHFAILED() ||
+		$result->{'code'} == GENIRESPONSE_BUSY) {
+		# Do not send debugging mail for these two errors.
+		$debug = 0;
+	    }
+	    elsif ($mailerrors) {
+		print STDERR "Mail Errors is on.\n";
+	    }
 	}
 
 	#
