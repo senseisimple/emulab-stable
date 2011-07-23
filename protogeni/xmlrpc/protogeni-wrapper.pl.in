@@ -168,25 +168,6 @@ if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
 }
 
 #
-# The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
-# If it actually looks like a UUID, then this correponds to an actual user,
-# and the supplied credentials/tickets must match. At present, if there is
-# no UUID, it is another emulab making a request directly, with no user
-# context, and we just let that pass for now.
-#
-if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
-    $ENV{'SSL_CLIENT_S_DN_CN'} =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
-    $ENV{'GENIUSER'} = $ENV{'SSL_CLIENT_S_DN_CN'};
-    $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
-}
-elsif (defined($MODULE) && ($MODULE eq $AM_MODULE)) {
-    # Do not expect a UUID if calling to the AM.
-}
-else {
-    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid certificate; no UUID");
-}
-
-#
 # The CERT data from apache holds the URN of the caller. 
 #
 if (exists($ENV{'SSL_CLIENT_CERT'})) {
