@@ -194,28 +194,20 @@ client-mkdirs:
 client:
 	@$(MAKE) -C lib client
 	@$(MAKE) -C clientside client
-ifeq ($(EVENTSYS),1)
-	@$(MAKE) -C event client
-endif
 	@$(MAKE) -C os client
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client
 	@$(MAKE) -C tip client
 endif
-	@$(MAKE) -C tmcd client
 
 client-install: client client-mkdirs
 	@$(MAKE) -C lib client-install
 	@$(MAKE) -C clientside client-install
-ifeq ($(EVENTSYS),1)
-	@$(MAKE) -C event client-install
-endif
 	@$(MAKE) -C os client-install
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
 endif
-	@$(MAKE) -C tmcd client-install
 
 subboss: client
 	@$(MAKE) -C os subboss
@@ -223,9 +215,6 @@ subboss: client
 
 subboss-install: subboss
 	@$(MAKE) -C clientside client-install
-ifeq ($(EVENTSYS),1)
-	@$(MAKE) -C event client-install
-endif
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
@@ -233,7 +222,7 @@ endif
 	@$(MAKE) -C utils subboss-install
 	@$(MAKE) -C os subboss-install
 	@$(MAKE) -C db subboss-install
-	@$(MAKE) -C tmcd subboss-install
+	@$(MAKE) -C clientside/tmcc subboss-install
 	@$(MAKE) -C rc.d subboss-install
 	@$(MAKE) -C dhcpd subboss-install
 	# Hack: this should probably be done by a subboss-install
@@ -275,46 +264,38 @@ mfsoscheck:
 
 mfs: mfsoscheck
 	@$(MAKE) -C os mfs
-	@$(MAKE) -C tmcd mfs
 	@$(MAKE) -C clientside mfs
 
 mfs-nostatic: mfsoscheck
 	@NOSTATIC=1 $(MAKE) -C os mfs
-	@NOSTATIC=1 $(MAKE) -C tmcd mfs
 	@NOSTATIC=1 $(MAKE) -C clientside mfs
 
 mfs-install: destdircheck mfs client-mkdirs
 	@$(MAKE) -C os mfs-install
-	@$(MAKE) -C tmcd mfs-install
 	@$(MAKE) -C clientside mfs-install
 
 mfs-nostatic-install: destdircheck mfs-nostatic client-mkdirs
 	@$(MAKE) -C os mfs-install
-	@$(MAKE) -C tmcd mfs-install
 	@$(MAKE) -C clientside mfs-install
 
 frisbee-mfs: mfsoscheck
 	@$(MAKE) -C cdrom/groklilo client
 	@$(MAKE) -C os frisbee-mfs
-	@$(MAKE) -C tmcd frisbee-mfs
 	@$(MAKE) -C clientside frisbee-mfs
 
 frisbee-mfs-nostatic: mfsoscheck
 	@NOSTATIC=1 $(MAKE) -C cdrom/groklilo client
 	@NOSTATIC=1 $(MAKE) -C os frisbee-mfs
-	@NOSTATIC=1 $(MAKE) -C tmcd frisbee-mfs
 	@NOSTATIC=1 $(MAKE) -C clientside frisbee-mfs
 
 frisbee-mfs-install: destdircheck frisbee-mfs
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
-	@$(MAKE) -C tmcd frisbee-mfs-install
 	@$(MAKE) -C clientside frisbee-mfs-install
 
 frisbee-mfs-nostatic-install: destdircheck frisbee-mfs-nostatic
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
-	@$(MAKE) -C tmcd frisbee-mfs-install
 	@$(MAKE) -C clientside frisbee-mfs-install
 
 cdboot: mfsoscheck client
@@ -322,13 +303,13 @@ cdboot: mfsoscheck client
 
 cdboot-install: destdircheck cdboot
 	@$(MAKE) -C cdrom client-install
-	@$(MAKE) -C tmcd/freebsd6 cdboot-install
+	@$(MAKE) -C clientside/tmcc/freebsd6 cdboot-install
 
 flashboot: mfsoscheck client
 	@echo "Flash dongle files built"
 
 flashboot-install: destdircheck flashboot
-	@$(MAKE) -C tmcd/freebsd6 cdboot-install
+	@$(MAKE) -C clientside/tmcc/freebsd6 cdboot-install
 	@$(MAKE) -C os frisbee-mfs-install
 	@$(MAKE) -C flash client-install
 	@$(MAKE) -C clientside frisbee-mfs-install

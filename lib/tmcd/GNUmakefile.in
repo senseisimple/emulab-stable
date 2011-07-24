@@ -1,3 +1,4 @@
+
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
@@ -46,6 +47,8 @@ ssl.o:	ssl.c ssl.h tmcd.h
 tpm.o: tpm.h ssl.h tmcd.h
 notpm.o: tpm.h ssl.h tmcd.h
 
+client: all
+client-install:
 boss-install:
 control-install:
 subboss-install:

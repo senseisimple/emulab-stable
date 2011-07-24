@@ -851,6 +851,7 @@ TBUSERSARCHIVE
 TBUSERSARCHIVE_NOSLASH
 TBERRORSEMAIL
 TBERRORSEMAIL_NOSLASH
+WITH_EMULAB
 LOG_TESTBED
 LEDA
 ASSIGN
@@ -5053,6 +5054,12 @@ SHAREROOT_DIR="/share"
 SCRATCHROOT_DIR=""
 
 #
+# Flag as full Emulab build (for clientside).
+#
+WITH_EMULAB=1
+
+
+#
 # Okay, I know this is improper usage of --with. Too bad.
 #
 
@@ -7200,7 +7207,8 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/tools/GNUmakefile clientside/tools/pcapper/GNUmakefile \
  clientside/sensors/GNUmakefile clientside/sensors/slothd/GNUmakefile \
  clientside/sensors/slothd/sdisrunning clientside/sensors/slothd/sddeploy \
- clientside/sensors/canaryd/GNUmakefile clientside/sensors/canaryd/feedbacklogs \
+ clientside/sensors/canaryd/GNUmakefile \
+ clientside/sensors/canaryd/feedbacklogs \
  clientside/os/GNUmakefile clientside/os/syncd/GNUmakefile \
  clientside/event/link-agent/GNUmakefile \
  clientside/event/proxy/GNUmakefile \

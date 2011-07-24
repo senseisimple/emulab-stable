@@ -54,6 +54,12 @@ AC_PATH_PROG(ELVIN_CONFIG,elvin-config)
 AC_SUBST(PATH)
 
 #
+# Flag build as clientside only, not withing full Emulab build
+#
+WITH_EMULAB=0
+AC_SUBST(WITH_EMULAB)
+
+#
 # Elvin compat option, which we	still need. Always turn on event system.
 #
 AC_SUBST(ELVIN_COMPAT)
@@ -100,23 +106,6 @@ AC_ARG_WITH(TBDEFS,
         AC_MSG_ERROR([Definitions file $TBDEFS was not found.])
     fi
 ])
-
-#
-# Internal option; supplied when building as part of full Emulab.
-#
-WITH_EMULAB=0
-
-AC_ARG_WITH(emulab,
-[  --with-emulab	Internal option; build with Emulab (default no)],
-[
-    if test "$withval" = "yes"; then
-	AC_MSG_ERROR([Invalid with-emulab directive - Must specify the value])
-    fi
-    WITH_EMULAB=1
-    EMULAB_SRCDIR=$withval
-    
-])
-AC_SUBST(WITH_EMULAB)
 
 #
 # Allow command line option, since might not have a defs file.

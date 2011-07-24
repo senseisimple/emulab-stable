@@ -10,7 +10,7 @@ SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= libtb event
+SUBDIRS	= libtb event tmcd
 
 all:	all-subdirs
 

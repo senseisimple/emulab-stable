@@ -20,6 +20,8 @@ all:	all-subdirs
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 boss-install:
+	$(MAKE) -C genhostsfile boss-install
+	$(MAKE) -C syncd boss-install
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 \
 		$(INSTALL_DIR)/opsdir/man/man1/install-tarfile.1

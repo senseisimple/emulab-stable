@@ -707,6 +707,7 @@ TAR
 RPM
 ELVIN_CONFIG
 PATH
+WITH_EMULAB
 ELVIN_COMPAT
 EVENTSYS
 CLIENT_ETCDIR
@@ -715,7 +716,6 @@ CLIENT_VARDIR
 CLIENT_MANDIR
 LOG_TESTBED
 TBLOGFACIL
-WITH_EMULAB
 PYTHON
 GREP
 EGREP
@@ -727,7 +727,6 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_TBDEFS
-with_emulab
 enable_elvin_compat
 enable_TPM
 '
@@ -1373,7 +1372,6 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-TBDEFS=name	Specify definitions file (defs-default default)
-  --with-emulab	Internal option; build with Emulab (default no)
 
 Some influential environment variables:
   CC          C compiler command
@@ -4130,6 +4128,12 @@ fi
 
 
 #
+# Flag build as clientside only, not withing full Emulab build
+#
+WITH_EMULAB=0
+
+
+#
 # Elvin compat option, which we	still need. Always turn on event system.
 #
 
@@ -4185,28 +4189,6 @@ $as_echo "$as_me: error: Definitions file $TBDEFS was not found." >&2;}
     fi
 
 fi
-
-
-#
-# Internal option; supplied when building as part of full Emulab.
-#
-WITH_EMULAB=0
-
-
-# Check whether --with-emulab was given.
-if test "${with_emulab+set}" = set; then
-  withval=$with_emulab;
-    if test "$withval" = "yes"; then
-	{ { $as_echo "$as_me:$LINENO: error: Invalid with-emulab directive - Must specify the value" >&5
-$as_echo "$as_me: error: Invalid with-emulab directive - Must specify the value" >&2;}
-   { (exit 1); exit 1; }; }
-    fi
-    WITH_EMULAB=1
-    EMULAB_SRCDIR=$withval
-
-
-fi
-
 
 
 #
