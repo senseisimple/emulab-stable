@@ -246,6 +246,18 @@ client-tarball:
 	echo "Creating tarball..."
 	tar czf emulab-client.tar.gz -C $(TARBALLDESTDIR) .
 
+client-src-tarball:
+	@rm -f emulab-client-src.tar.gz
+	tar clzf emulab-client-src.tar.gz -C clientside
+
+# This is not finished yet.
+client-shadow-rpm:
+	-$(RM) -rf rpmbuild
+	$(MKDIR_P) rpmbuild/SOURCES rpmbuild/SRPMS
+	$(CP) emulab-client-src.tar.gz rpmbuild/SOURCES
+	$(RPM) -v -bs --nodeps --define='_topdir $(TOPDIR)/rpmbuild' \
+		clientside/shadow.spec
+
 destdircheck:
 	@if [ -z "$(DESTDIR)" ]; then \
 	    echo "You must define DESTDIR for this target!"; \
