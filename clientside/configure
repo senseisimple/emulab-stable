@@ -708,6 +708,7 @@ RPM
 ELVIN_CONFIG
 PATH
 WITH_EMULAB
+TPM
 ELVIN_COMPAT
 EVENTSYS
 CLIENT_ETCDIR
@@ -4131,6 +4132,10 @@ fi
 # Flag build as clientside only, not withing full Emulab build
 #
 WITH_EMULAB=0
+
+
+# TPM stuff. See option below.
+TPM=0
 
 
 #

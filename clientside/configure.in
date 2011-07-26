@@ -59,6 +59,10 @@ AC_SUBST(PATH)
 WITH_EMULAB=0
 AC_SUBST(WITH_EMULAB)
 
+# TPM stuff. See option below.
+TPM=0
+AC_SUBST(TPM)
+
 #
 # Elvin compat option, which we	still need. Always turn on event system.
 #

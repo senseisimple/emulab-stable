@@ -116,8 +116,5 @@ ${OBJDIR}/lib/libtb/%:
 ${OBJDIR}/lib/tmcd/%:
 	cd ${OBJDIR}/lib/tmcd && gmake $<
 
-clean:	subdir-clean
+clean:
 	rm -f *.o core tmcd *-debug version.c
-
-subdir-clean:
-	@$(MAKE) -C $(MDSUBDIR) clean
