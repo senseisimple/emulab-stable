@@ -2174,7 +2174,7 @@ fi
 
 
 
-CPPFLAGS = "-I/usr/local/include"
+CPPFLAGS="-I/usr/local/include"
 
 # BEGIN Python detection. For the event library.
 for ac_prog in python python2.6 python2.5 python2.4 python2.3 python2.2
