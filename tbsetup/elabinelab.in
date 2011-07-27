@@ -678,6 +678,11 @@ sub DumpDBGoo()
 	    }
 	}
 
+	# filter out community strings
+	if ($table eq "switch_stacks" || $table eq "switch_stack_types") {
+	    DBQueryFatal("update temp_${table} set snmp_community=NULL");
+	}
+
 	DBQueryWarn("select * from temp_$table ".
 		    "into outfile '$statedir/$table'")
 	    or die("*** $0:\n".
