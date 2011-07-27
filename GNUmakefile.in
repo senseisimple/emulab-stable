@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Testbed Makefile
@@ -30,7 +30,7 @@ include Makeconf
 # Then things that depend on stuff we just did:
 #
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
-SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
+SUBDIRS = lib db assign www @optional_subdirs@ clientside ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
 		tools/svn wiki bugdb collab protogeni node_usage install
@@ -192,53 +192,39 @@ client-mkdirs:
 	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)
 
 client:
-	@$(MAKE) -C lib/libtb client
-ifeq ($(EVENTSYS),1)
-	@$(MAKE) -C event client
-endif
+	@$(MAKE) -C lib client
+	@$(MAKE) -C clientside client
 	@$(MAKE) -C os client
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client
 	@$(MAKE) -C tip client
-	@$(MAKE) -C tools client
 endif
-	@$(MAKE) -C sensors client
-	@$(MAKE) -C tmcd client
 
 client-install: client client-mkdirs
-ifeq ($(EVENTSYS),1)
-	@$(MAKE) -C event client-install
-endif
+	@$(MAKE) -C lib client-install
+	@$(MAKE) -C clientside client-install
 	@$(MAKE) -C os client-install
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
-	@$(MAKE) -C tools client-install
 endif
-	@$(MAKE) -C sensors client-install
-	@$(MAKE) -C tmcd client-install
 
 subboss: client
 	@$(MAKE) -C os subboss
 	@$(MAKE) -C utils subboss
 
 subboss-install: subboss
-ifeq ($(EVENTSYS),1)
-	@$(MAKE) -C event client-install
-endif
+	@$(MAKE) -C clientside client-install
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
-	@$(MAKE) -C tools client-install
 endif
-	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C utils subboss-install
 	@$(MAKE) -C os subboss-install
 	@$(MAKE) -C db subboss-install
-	@$(MAKE) -C tmcd subboss-install
+	@$(MAKE) -C clientside/tmcc subboss-install
 	@$(MAKE) -C rc.d subboss-install
 	@$(MAKE) -C dhcpd subboss-install
-	@$(MAKE) -C tbsetup client-install
 	# Hack: this should probably be done by a subboss-install
 	# script, but there isn't a huge need for that yet
 	@rm -f $(INSTALL_RCDIR)/isc-dhcpd
@@ -260,6 +246,18 @@ client-tarball:
 	echo "Creating tarball..."
 	tar czf emulab-client.tar.gz -C $(TARBALLDESTDIR) .
 
+client-src-tarball:
+	@rm -f emulab-client-src.tar.gz
+	tar clzf emulab-client-src.tar.gz -C clientside
+
+# This is not finished yet.
+client-shadow-rpm:
+	-$(RM) -rf rpmbuild
+	$(MKDIR_P) rpmbuild/SOURCES rpmbuild/SRPMS
+	$(CP) emulab-client-src.tar.gz rpmbuild/SOURCES
+	$(RPM) -v -bs --nodeps --define='_topdir $(TOPDIR)/rpmbuild' \
+		clientside/shadow.spec
+
 destdircheck:
 	@if [ -z "$(DESTDIR)" ]; then \
 	    echo "You must define DESTDIR for this target!"; \
@@ -278,58 +276,55 @@ mfsoscheck:
 
 mfs: mfsoscheck
 	@$(MAKE) -C os mfs
-	@$(MAKE) -C sensors mfs
-	@$(MAKE) -C tmcd mfs
+	@$(MAKE) -C clientside mfs
 
 mfs-nostatic: mfsoscheck
 	@NOSTATIC=1 $(MAKE) -C os mfs
-	@NOSTATIC=1 $(MAKE) -C sensors mfs
-	@NOSTATIC=1 $(MAKE) -C tmcd mfs
+	@NOSTATIC=1 $(MAKE) -C clientside mfs
 
 mfs-install: destdircheck mfs client-mkdirs
 	@$(MAKE) -C os mfs-install
-	@$(MAKE) -C sensors mfs-install
-	@$(MAKE) -C tmcd mfs-install
+	@$(MAKE) -C clientside mfs-install
 
 mfs-nostatic-install: destdircheck mfs-nostatic client-mkdirs
 	@$(MAKE) -C os mfs-install
-	@$(MAKE) -C sensors mfs-install
-	@$(MAKE) -C tmcd mfs-install
+	@$(MAKE) -C clientside mfs-install
 
 frisbee-mfs: mfsoscheck
 	@$(MAKE) -C cdrom/groklilo client
 	@$(MAKE) -C os frisbee-mfs
-	@$(MAKE) -C tmcd frisbee-mfs
+	@$(MAKE) -C clientside frisbee-mfs
 
 frisbee-mfs-nostatic: mfsoscheck
 	@NOSTATIC=1 $(MAKE) -C cdrom/groklilo client
 	@NOSTATIC=1 $(MAKE) -C os frisbee-mfs
-	@NOSTATIC=1 $(MAKE) -C tmcd frisbee-mfs
+	@NOSTATIC=1 $(MAKE) -C clientside frisbee-mfs
 
 frisbee-mfs-install: destdircheck frisbee-mfs
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
-	@$(MAKE) -C tmcd frisbee-mfs-install
+	@$(MAKE) -C clientside frisbee-mfs-install
 
 frisbee-mfs-nostatic-install: destdircheck frisbee-mfs-nostatic
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
-	@$(MAKE) -C tmcd frisbee-mfs-install
+	@$(MAKE) -C clientside frisbee-mfs-install
 
 cdboot: mfsoscheck client
 	@echo "CD/Dongle files built"
 
 cdboot-install: destdircheck cdboot
 	@$(MAKE) -C cdrom client-install
-	@$(MAKE) -C tmcd/freebsd6 cdboot-install
+	@$(MAKE) -C clientside/tmcc/freebsd6 cdboot-install
 
 flashboot: mfsoscheck client
 	@echo "Flash dongle files built"
 
 flashboot-install: destdircheck flashboot
-	@$(MAKE) -C tmcd/freebsd6 cdboot-install
+	@$(MAKE) -C clientside/tmcc/freebsd6 cdboot-install
 	@$(MAKE) -C os frisbee-mfs-install
 	@$(MAKE) -C flash client-install
+	@$(MAKE) -C clientside frisbee-mfs-install
 
 #
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can

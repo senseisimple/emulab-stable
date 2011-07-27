@@ -1,0 +1,84 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+SYSTEM	       := $(shell uname -s)
+
+PROGRAMS	= tevc
+
+include $(OBJDIR)/Makeconf
+
+all:	$(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+LIBTBDIR    = $(OBJDIR)/lib/libtb
+LIBEVENTDIR = $(OBJDIR)/lib/event
+
+# Rules to make sure that some libraries we need from other directories get
+# built first
+$(LIBTBDIR)/%.o:
+	@$(MAKE) -C $(LIBTBDIR) $(@F)
+
+$(LIBEVENTDIR)/%.a:
+	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
+
+CFLAGS   += -DDEBUG
+CFLAGS	 += -O -g -Wall
+CFLAGS   += -I. -I${OBJDIR}
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I/usr/local/include
+
+LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L$(OBJDIR)/lib/event
+LIBS     += -levent -lcrypto
+LIBS     += -lm -L/usr/local/lib -lpubsub 
+LDFLAGS  += $(LDSTATIC)
+
+# Deal with the presence/absence of kerberos in the linux ssl library
+ifeq ($(SYSTEM),Linux)
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NOKERB := 1
+endif
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
+endif
+endif
+endif
+
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl -lz
+endif
+
+# Link against some of the object files from libtb, instead of the
+# whole library, since the latter cannot be built on clients (without mysql)
+tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o \
+			$(LIBEVENTDIR)/libevent.a ../../lib/event/event.h
+	$(CC) $(LDFLAGS) -o $@ tevc.o $(LIBTBDIR)/log.o \
+		$(LIBTBDIR)/tbdefs.o $(LIBS)
+
+boss-install:	$(INSTALL_BINDIR)/tevc \
+		$(INSTALL_DIR)/opsdir/bin/tevc
+
+control-install:	all $(INSTALL_BINDIR)/tevc
+
+client: tevc
+client-install: client
+	$(INSTALL_PROGRAM) tevc$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/tevc$(EXE)
+
+clean:
+	rm -f *.o $(PROGRAMS) *-debug
+
+$(INSTALL_DIR)/opsdir/bin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	$(INSTALL) $< $@

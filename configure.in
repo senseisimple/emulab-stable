@@ -3,12 +3,13 @@
 # Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-AC_PREREQ(2.13)
+AC_PREREQ(2.62)
 
 AC_INIT(Makeconf.in)
 AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
 AC_PREFIX_DEFAULT(/usr/testbed)
 AC_CONFIG_HEADER(config.h)
+AC_CANONICAL_HOST
 
 # We use separate source and obj trees in Emulab.  Configuring in a source
 # tree messes it up, so throw an error.
@@ -57,7 +58,7 @@ AC_SUBST(PATH)
 
 CPPFLAGS = "-I/usr/local/include"
 
-# BEGIN Python detection.
+# BEGIN Python detection. For the event library.
 AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
 
 if test x"$PYTHON" = x""; then
@@ -328,6 +329,12 @@ PROJROOT_DIR="/proj"
 GROUPSROOT_DIR="/groups"
 SHAREROOT_DIR="/share"
 SCRATCHROOT_DIR=""
+
+#
+# Flag as full Emulab build (for clientside). 
+#
+WITH_EMULAB=1
+AC_SUBST(WITH_EMULAB)
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -696,32 +703,21 @@ if test "$enable_events" = "no"; then
 	eventfiles="";
         EVENTSYS=0;
 else
-	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
+	eventfiles="event/GNUmakefile lib/event/GNUmakefile \
 		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
 		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
 		    event/sched/GNUmakefile \
 		    event/new_sched/GNUmakefile \
-                    event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
                     event/example/tbsend.py event/example/tbrecv.py \
 		    event/example/eventdebug.pl \
-		    event/trafgen/GNUmakefile \
 		    event/proxy/GNUmakefile \
 		    event/nsetrafgen/GNUmakefile \
 		    event/nsetrafgen/nseinput.tcl \
 		    event/nsetrafgen/nse-makepatch \
-                    event/delay-agent/GNUmakefile \
-		    event/program-agent/GNUmakefile \
-		    event/link-agent/GNUmakefile \
 		    event/stated/waitForState \
-		    event/stated/GNUmakefile event/stated/stated \
-		    event/linktest/GNUmakefile \
-		    event/linktest/iperf/GNUmakefile \
-		    event/linktest/rude/GNUmakefile \
-		    event/linktest/weblinktest event/linktest/linktest.proxy \
-		    event/linktest/linktest_control \
-		    event/linktest/run_linktest.pl";
+		    event/stated/GNUmakefile event/stated/stated"
 
 	optional_subdirs="$optional_subdirs event";
         EVENTSYS=1;
@@ -895,18 +891,15 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/idletimes db/idlemail db/xmlconvert \
 	db/libdb.py db/elabinelab_bossinit \
 	ipod/GNUmakefile \
-	lib/GNUmakefile lib/libtb/GNUmakefile \
+	lib/GNUmakefile lib/libtb/GNUmakefile lib/tmcd/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
 	os/imagezip/hashmap/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
-        os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
-	os/genhostsfile/GNUmakefile os/zapdisk/GNUmakefile \
+        os/zapdisk/GNUmakefile \
 	pxe/GNUmakefile pxe/bootinfo.restart \
 	security/GNUmakefile security/lastlog_daemon \
-        sensors/GNUmakefile sensors/slothd/GNUmakefile \
-	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
-        sensors/canaryd/GNUmakefile sensors/canaryd/feedbacklogs \
+        sensors/GNUmakefile \
 	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	sensors/powermon/GNUmakefile sensors/powermon/powermon \
 	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
@@ -983,24 +976,6 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/libtblog.pm tbsetup/template_cvsroot/GNUmakefile \
 	tip/GNUmakefile tip/console \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
-	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
-	tmcd/freebsd/GNUmakefile tmcd/freebsd/init/GNUmakefile \
-	tmcd/freebsd/init/4/GNUmakefile tmcd/freebsd/init/5/GNUmakefile \
-	tmcd/freebsd/init/6/GNUmakefile tmcd/freebsd/init/7/GNUmakefile \
-	tmcd/freebsd/init/8/GNUmakefile \
-	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
-	tmcd/linux/GNUmakefile tmcd/linux/supfile \
-	tmcd/linux/sethostname.dhclient \
-	tmcd/linux/xen/emulab-cnet \
-	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
-	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
-        tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
-	tmcd/ubuntu10/GNUmakefile \
-	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
-	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
-	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \
-	tmcd/cygwinxp/GNUmakefile tmcd/dp/GNUmakefile \
-	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin \
 	utils/firstuser utils/export_tables utils/eventping \
@@ -1027,7 +1002,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	rc.d/3.elvin_gateway.sh rc.d/pelab.sh rc.d/capture.sh \
 	rc.d/3.mfrisbeed.sh rc.d/3.mfrisbeed-subboss.sh \
 	tools/GNUmakefile rc.d/1.mysql-server.sh tools/svn/GNUmakefile \
-	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
+	tools/teachswitch/GNUmakefile \
         tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \
         tools/selectapplet/GNUmakefile tools/rmanage/GNUmakefile \
 	$eventfiles \
@@ -1097,9 +1072,61 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	node_usage/get-start-date"
 
 #
+# While it would be nice to use the configure setup in the clientside subdir,
+# this turned out to be a major headache. Instead, just duplicate the file
+# lists here and in clientside.
+#
+outfiles="$outfiles clientside/GNUmakefile \
+ clientside/GNUmakefile clientside/event/GNUmakefile \
+ clientside/event/program-agent/GNUmakefile \
+ clientside/tools/GNUmakefile clientside/tools/pcapper/GNUmakefile \
+ clientside/sensors/GNUmakefile clientside/sensors/slothd/GNUmakefile \
+ clientside/sensors/slothd/sdisrunning clientside/sensors/slothd/sddeploy \
+ clientside/sensors/canaryd/GNUmakefile \
+ clientside/sensors/canaryd/feedbacklogs \
+ clientside/os/GNUmakefile clientside/os/syncd/GNUmakefile \
+ clientside/event/link-agent/GNUmakefile \
+ clientside/event/proxy/GNUmakefile \
+ clientside/event/tevc/GNUmakefile \
+ clientside/event/trafgen/GNUmakefile \
+ clientside/event/linktest/GNUmakefile \
+ clientside/event/linktest/iperf/GNUmakefile \
+ clientside/event/linktest/rude/GNUmakefile \
+ clientside/event/linktest/weblinktest \
+ clientside/event/linktest/linktest.proxy \
+ clientside/event/linktest/linktest_control \
+ clientside/event/linktest/run_linktest.pl \
+ clientside/event/delay-agent/GNUmakefile \
+ clientside/tmcc/GNUmakefile \
+ clientside/tmcc/common/GNUmakefile clientside/tmcc/common/config/GNUmakefile \
+ clientside/tmcc/freebsd/GNUmakefile clientside/tmcc/freebsd/init/GNUmakefile \
+ clientside/tmcc/freebsd/init/4/GNUmakefile \
+ clientside/tmcc/freebsd/init/5/GNUmakefile \
+ clientside/tmcc/freebsd/init/6/GNUmakefile \
+ clientside/tmcc/freebsd/init/7/GNUmakefile \
+ clientside/tmcc/freebsd/init/8/GNUmakefile \
+ clientside/tmcc/freebsd/supfile clientside/tmcc/freebsd/sethostname \
+ clientside/tmcc/linux/GNUmakefile clientside/tmcc/linux/supfile \
+ clientside/tmcc/linux/sethostname.dhclient \
+ clientside/tmcc/linux/xen/emulab-cnet \
+ clientside/tmcc/linux9/GNUmakefile clientside/tmcc/linux9/supfile \
+ clientside/tmcc/fedora/GNUmakefile clientside/tmcc/fedora/supfile \
+ clientside/tmcc/linux-sg/GNUmakefile clientside/tmcc/ubuntu7/GNUmakefile \
+ clientside/tmcc/ubuntu10/GNUmakefile \
+ clientside/tmcc/freebsd5/GNUmakefile clientside/tmcc/freebsd5/supfile \
+ clientside/tmcc/freebsd6/GNUmakefile clientside/tmcc/freebsd6/supfile \
+ clientside/tmcc/freebsd6/netif-emulab clientside/tmcc/freebsd7/GNUmakefile \
+ clientside/tmcc/freebsd7/supfile clientside/tmcc/freebsd7/netif-emulab \
+ clientside/tmcc/cygwinxp/GNUmakefile clientside/tmcc/dp/GNUmakefile \
+ clientside/tmcc/openbsd/GNUmakefile clientside/tmcc/ron/GNUmakefile \
+ clientside/tmcc/plab/GNUmakefile \
+ clientside/os/dijkstra/GNUmakefile clientside/os/genhostsfile/GNUmakefile"
+
+#
 # Do this for easy distclean.
 #
 DISTCLEAN_FILES="$outfiles"
 AC_SUBST(DISTCLEAN_FILES)
 
 AC_OUTPUT($outfiles)
+

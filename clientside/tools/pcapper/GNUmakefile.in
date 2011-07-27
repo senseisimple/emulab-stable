@@ -1,0 +1,119 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+SYSTEM	       := $(shell uname -s)
+
+include $(OBJDIR)/Makeconf
+
+all: pcapper
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+WITH_LTHREADS = 0
+
+ifeq ($(SYSTEM),FreeBSD)
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+FBSDMAJ := $(basename $(FBSDREL))
+ifneq ($(FBSDMAJ),7)
+ifneq ($(FBSDMAJ),8)
+WITH_LTHREADS = 1
+endif
+endif
+endif
+
+ifeq ($(WITH_LTHREADS),1)
+PTHREADCFLAGS += -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
+PTHREADLIBS   = -L/usr/local/lib -llthread -llgcc_r
+else
+PTHREADCFLAGS = -D_THREAD_SAFE
+PTHREADLIBS   = -lpthread
+endif
+
+ELVINFLAGS    = -I/usr/local/include
+ELVINLIBS     = -L/usr/local/lib -lpubsub -lm
+EVENTFLAGS    = -DEVENTSYS -I$(TESTBED_SRCDIR)/lib/event $(ELVINFLAGS)
+EVENTOBJS     = $(OBJDIR)/lib/event/event.o $(OBJDIR)/lib/event/util.o
+EVENTLIBS     = $(ELVINLIBS) -lcrypto
+
+TBCFLAGS      = $(EVENTFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
+TBLIBS        = $(EVENTOBJS) $(OBJDIR)/lib/libtb/libtb.a $(EVENTLIBS)
+
+PCAPLIBS=-lpcap
+
+CFLAGS  = -Wall $(PTHREADCFLAGS) \
+	  -DEMULAB -g -DDROPROOT \
+	  -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
+LDFLAGS = $(LDSTATIC)
+
+CFLAGS_FBSD    = $(CFLAGS) $(TBCFLAGS)
+CFLAGS_FBSD_NE = $(CFLAGS)
+CFLAGS_LINUX   = $(CFLAGS) -I/usr/include/pcap $(TBCFLAGS)
+
+LIBS_FBSD      = $(PTHREADLIBS) $(TBLIBS) $(PCAPLIBS)
+LIBS_FBSD_NE   = $(PTHREADLIBS) $(PCAPLIBS)
+LIBS_LINUX     = -L/usr/lib -lpthread -lpcap $(TBLIBS) -ldl -lz
+
+#
+# XXX dynamically-determined Linux stuff, only do on Linux
+#
+ifeq ($(SYSTEM),Linux)
+ifneq ($(wildcard /usr/lib/libpcap.a),)
+NOPBL := $(shell nm /usr/lib/libpcap.a | grep -q pcap_breakloop; echo $$?)
+else
+NOPBL := 1
+endif
+ifeq ($(NOPBL),0)
+CFLAGS_LINUX  += -DHAVE_PCAP_BREAKLOOP
+endif
+ifneq ($(wildcard /usr/kerberos/bin/krb5-config),)
+LIBS_LINUX     = -L/usr/lib -lpthread -lpcap $(TBLIBS) \
+		 `/usr/kerberos/bin/krb5-config --libs krb5` -ldl -lz
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS_LINUX    += -lkrb5support
+endif
+endif
+endif
+
+# virtual (encapsulated) ethernet
+#CFLAGS_FBSD   += -DVETH
+
+clean:
+	-rm -f pcapper*.o pcapper pcapper.noevents pcapper.linux *.debug
+
+ifeq ($(SYSTEM),Linux)
+#
+# Note: Building on Linux with the event system is mighty tricky
+#
+pcapper: pcapper.c GNUmakefile
+	$(CC) $(CFLAGS_LINUX) $(CPPFLAGS_LINUX) $< -o pcapper $(LIBS_LINUX)
+else
+pcapper: GNUmakefile pcapper.o
+	$(CC) $(LDFLAGS) $(CFLAGS_FBSD) pcapper.o $(LIBS_FBSD) -o pcapper
+		cp pcapper pcapper.debug
+		strip pcapper
+endif
+
+pcapper.o: pcapper.c
+	$(CC) -c -o pcapper.o $(CFLAGS_FBSD) $<
+
+pcapper.noevents: GNUmakefile pcapper-noevents.o
+	$(CC) $(LDFLAGS) $(CFLAGS_FBSD_NE) pcapper-noevents.o $(LIBS_FBSD_NE) \
+		-o pcapper.noevents
+		cp pcapper.noevents pcapper.noevents.debug
+		strip pcapper.noevents
+
+pcapper-noevents.o: pcapper.c
+	$(CC) -c -o pcapper-noevents.o $(CFLAGS_FBSD_NE) $<
+
+client:	pcapper
+
+boss-install:
+
+client-install: client
+	$(INSTALL_PROGRAM) -s pcapper $(DESTDIR)$(CLIENT_BINDIR)/pcapper

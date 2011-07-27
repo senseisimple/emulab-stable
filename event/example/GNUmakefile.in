@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2007 University of Utah and the Flux Group.
+# Copyright (c) 2002-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,10 +20,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
-CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I. -I${OBJDIR}
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += $(LDSTATIC) -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += $(LDSTATIC) -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 LIBS     +=  -L/usr/local/lib -lpubsub -lm
 ifeq ($(SYSTEM),Linux)
@@ -39,7 +40,7 @@ tbsend:		tbsend.o
 dumpevsubs:	dumpevsubs.o
 	$(CC) $(LDFLAGS) -o $@ dumpevsubs.o $(LIBS)
 
-$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+$(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ../../lib/event/event.h
 
 install:	$(addprefix $(INSTALL_SBINDIR)/, eventdebug.pl)
 

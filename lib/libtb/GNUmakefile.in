@@ -1,19 +1,18 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ../..
-SUBDIR		= lib/libtb
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
 all:	libtb.a
 
-client:	libtb-nodb.a
+client: libtb-nodb.a
 	cmp -s libtb-nodb.a libtb.a || cp -pf libtb-nodb.a libtb.a
 client-install: client
 
@@ -31,7 +30,7 @@ libtb.a:	$(OBJS) tbdb.o
 	$(AR) crv $@ $(OBJS) tbdb.o
 	$(RANLIB) $@
 
-libtb-nodb.a:	$(OBJS)
+libtb-nodb.a:   $(OBJS)
 	$(AR) crv $@ $(OBJS)
 	$(RANLIB) $@
 
@@ -47,3 +46,5 @@ install: all
 
 clean:
 	/bin/rm -f *.o *.a
+
+distclean: clean

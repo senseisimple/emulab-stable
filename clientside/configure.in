@@ -1,0 +1,224 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+AC_PREREQ(2.62)
+
+AC_INIT(Makeconf.in)
+AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
+AC_CONFIG_HEADER(config.h)
+AC_CANONICAL_HOST
+
+AC_PROG_CPP
+AC_PROG_CXX
+AC_PROG_LN_S
+AC_PROG_RANLIB
+AC_PROG_MKDIR_P
+AC_PROG_INSTALL
+AC_PATH_PROG(SUDO,sudo)
+if test -z "$SUDO" ; then
+    AC_MSG_ERROR([no acceptable sudo found in \$PATH])
+fi
+AC_PATH_PROG(AR, ar)
+if test -z "$AR" ; then
+    AC_MSG_ERROR([no acceptable ar found in \$PATH])
+fi
+AC_PATH_PROG(STRIP, strip)
+if test -z "$STRIP" ; then
+    AC_MSG_ERROR([no acceptable strip found in \$PATH])
+fi
+AC_PATH_PROG(RM, rm)
+if test -z "$RM" ; then
+    AC_MSG_ERROR([no acceptable rm found in \$PATH])
+fi
+AC_PATH_PROG(CP, cp)
+if test -z "$CP" ; then
+    AC_MSG_ERROR([no acceptable cp found in \$PATH])
+fi
+AC_PATH_PROG(YACC, byacc)
+if test -z "$YACC" ; then
+    AC_MSG_ERROR([no byacc found in \$PATH])
+fi
+AC_PATH_PROG(TAR, tar)
+if test -z "$TAR" ; then
+    AC_MSG_ERROR([no tar found in \$PATH])
+fi
+AC_PATH_PROG(RPM, rpm, rpm)
+if test -z "$RPM" ; then
+    AC_MSG_ERROR([no rpm found in \$PATH])
+fi
+AC_PATH_PROG(ELVIN_CONFIG,elvin-config)
+
+# Need this for Makeconf.
+AC_SUBST(PATH)
+
+#
+# Flag build as clientside only, not withing full Emulab build
+#
+WITH_EMULAB=0
+AC_SUBST(WITH_EMULAB)
+
+# TPM stuff. See option below.
+TPM=0
+AC_SUBST(TPM)
+
+#
+# Elvin compat option, which we	still need. Always turn on event system.
+#
+AC_SUBST(ELVIN_COMPAT)
+ELVIN_COMPAT=0
+AC_SUBST(EVENTSYS)
+EVENTSYS=1
+
+AC_SUBST(CLIENT_ETCDIR)
+AC_SUBST(CLIENT_BINDIR)
+AC_SUBST(CLIENT_VARDIR)
+AC_SUBST(CLIENT_MANDIR)
+CLIENT_ETCDIR="/etc/emulab"
+CLIENT_BINDIR="/usr/local/etc/emulab"
+CLIENT_VARDIR="/var/emulab"
+CLIENT_MANDIR="/usr/local/man"
+
+TBLOGFACIL="local5"
+LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
+AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
+AC_SUBST(LOG_TESTBED)
+AC_SUBST(TBLOGFACIL)
+
+#
+# Allow tbdefs file that is supplied to full emulab build
+#
+AC_ARG_WITH(TBDEFS,
+[  --with-TBDEFS=name	Specify definitions file (defs-default default)],
+[
+    if test "$withval" = "yes"; then
+	AC_MSG_ERROR([Invalid TBDEFS - Must specify the value])
+    fi
+    TBDEFS="$withval"
+    TBPATH=`dirname $withval`
+
+    if test -f $TBDEFS; then
+        #
+        # Remove the comments and newlines.  Really, that's what it does.
+        #
+        OLDPATH=$PATH
+        PATH="$TBPATH:$PATH"
+        . $TBDEFS
+        PATH=$OLDPATH
+    else
+        AC_MSG_ERROR([Definitions file $TBDEFS was not found.])
+    fi
+])
+
+#
+# Allow command line option, since might not have a defs file.
+#
+AC_ARG_ENABLE(elvin_compat,
+[  --enable-elvin_compat[[=yes/no]]  Include Elvin Hash compat [[default=no]]])
+
+if test "$enable_elvin_compat" = "yes"; then
+    ELVIN_COMPAT=1
+fi
+if test $ELVIN_COMPAT -eq 1; then
+    AC_DEFINE_UNQUOTED(ELVIN_COMPAT, 1)
+fi
+
+AC_ARG_ENABLE(TPM,
+[  --enable-TPM[[=yes/no]]           Include TPM support [[default=no]]])
+
+if test "$enable_TPM" = "yes"; then
+    TPM=1
+fi
+if test $TPM -eq 1; then
+    AC_DEFINE_UNQUOTED(TPM, 1)
+fi
+
+# BEGIN Python detection. For the event library.
+AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
+
+if test x"$PYTHON" = x""; then
+    AC_MSG_ERROR([python not detected])
+fi
+
+PYTHON_VERSION=`${PYTHON} -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2`
+PYTHON_PATH=`dirname ${PYTHON}`
+if test ! -d "$PYTHON_PATH/include"; then
+    PYTHON_PATH=`dirname ${PYTHON_PATH}`
+fi
+PYTHON_INCLUDE="${PYTHON_PATH}/include/python${PYTHON_VERSION}"
+CPPFLAGS="${CPPFLAGS} -I${PYTHON_INCLUDE}"
+AC_CHECK_HEADERS([Python.h],
+		 [],
+		 [AC_MSG_WARN("Cannot find Python.h in ${PYTHON_INCLUDE}")])
+AC_SUBST(PYTHON_INCLUDE)
+# END Python detection.
+
+outfiles="Makeconf GNUmakefile \
+	  event/GNUmakefile \
+	  event/program-agent/GNUmakefile \
+	  event/link-agent/GNUmakefile \
+	  event/proxy/GNUmakefile \
+	  event/tevc/GNUmakefile \
+	  event/trafgen/GNUmakefile \
+	  event/linktest/GNUmakefile \
+	  event/linktest/iperf/GNUmakefile \
+	  event/linktest/rude/GNUmakefile \
+	  event/linktest/weblinktest event/linktest/linktest.proxy \
+	  event/linktest/linktest_control \
+	  event/linktest/run_linktest.pl \
+ 	  event/delay-agent/GNUmakefile \
+	  tools/GNUmakefile \
+	  tools/pcapper/GNUmakefile \
+	  sensors/GNUmakefile \
+	  sensors/slothd/GNUmakefile \
+	  sensors/canaryd/GNUmakefile \
+	  tmcc/GNUmakefile \
+	  tmcc/common/GNUmakefile tmcc/common/config/GNUmakefile \
+	  tmcc/freebsd/GNUmakefile tmcc/freebsd/init/GNUmakefile \
+	  tmcc/freebsd/init/4/GNUmakefile \
+	  tmcc/freebsd/init/5/GNUmakefile \
+	  tmcc/freebsd/init/6/GNUmakefile \
+	  tmcc/freebsd/init/7/GNUmakefile \
+	  tmcc/freebsd/init/8/GNUmakefile \
+	  tmcc/freebsd/supfile tmcc/freebsd/sethostname \
+	  tmcc/linux/GNUmakefile tmcc/linux/supfile \
+	  tmcc/linux/sethostname.dhclient \
+	  tmcc/linux/xen/emulab-cnet \
+	  tmcc/linux9/GNUmakefile tmcc/linux9/supfile \
+	  tmcc/fedora/GNUmakefile tmcc/fedora/supfile \
+	  tmcc/linux-sg/GNUmakefile tmcc/ubuntu7/GNUmakefile \
+	  tmcc/ubuntu10/GNUmakefile \
+	  tmcc/freebsd5/GNUmakefile tmcc/freebsd5/supfile \
+	  tmcc/freebsd6/GNUmakefile tmcc/freebsd6/supfile \
+	  tmcc/freebsd6/netif-emulab tmcc/freebsd7/GNUmakefile \
+	  tmcc/freebsd7/supfile tmcc/freebsd7/netif-emulab \
+	  tmcc/cygwinxp/GNUmakefile tmcc/dp/GNUmakefile \
+	  tmcc/openbsd/GNUmakefile tmcc/ron/GNUmakefile \
+	  tmcc/plab/GNUmakefile \
+	  os/GNUmakefile os/syncd/GNUmakefile \
+	  os/dijkstra/GNUmakefile os/genhostsfile/GNUmakefile"
+
+#
+# When building as part of a full emulab build, a few things come
+# from the outer (upper?) build. Otherwise, we have to add them
+# to the files list.
+#
+if test $WITH_EMULAB -eq 0; then
+   outfiles="$outfiles lib/GNUmakefile \
+             lib/libtb/GNUmakefile \
+             lib/tmcd/GNUmakefile \
+             lib/event/GNUmakefile"
+else
+   AC_CONFIG_COMMANDS([lib], [rm -f lib; ln -s ../lib .])
+fi
+
+#
+# Do this for easy distclean.
+#
+DISTCLEAN_FILES="$outfiles"
+AC_SUBST(DISTCLEAN_FILES)
+
+AC_OUTPUT($outfiles)
+
+

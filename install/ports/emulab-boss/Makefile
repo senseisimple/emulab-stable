@@ -157,7 +157,7 @@ RUN_DEPENDS+=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/MD5.pm:${PORTSDIR}/security/p5-MD5 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Digest/SHA1.pm:${PORTSDIR}/security/p5-Digest-SHA1 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/IO/Pty.pm:${PORTSDIR}/devel/p5-IO-Tty \
-	rpm:${PORTSDIR}/archivers/rpm \
+	rpm:${PORTSDIR}/archivers/rpm4 \
 	xvcg:${PORTSDIR}/graphics/vcg \
 	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
 	sudo:${PORTSDIR}/security/sudo \

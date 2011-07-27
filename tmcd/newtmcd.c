@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -28,7 +28,7 @@
 #include <setjmp.h>
 #include <pwd.h>
 #include <grp.h>
-#include "decls.h"
+#include "tmcd.h"
 #include "config.h"
 #include "ssl.h"
 #include "log.h"

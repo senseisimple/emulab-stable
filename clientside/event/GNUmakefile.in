@@ -1,0 +1,56 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+SYSTEM	       := $(shell uname -s)
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS		= program-agent link-agent tevc proxy linktest
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
+SUBDIRS	       += trafgen
+endif
+ifeq ($(WITH_EMULAB),1)
+# only in a full build for now.
+ifneq ($(FBSDMAJ),8)
+# doesn't build right now due to API changes
+SUBDIRS	       += delay-agent
+endif
+endif
+
+all:	trafgen-fetch all-subdirs
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+# XXX Yeah, this doesn't belong here but I can't make the trafgen
+# makefile work if it unpacks the tarball itself
+#
+trafgen-fetch:
+	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
+
+boss-install:   boss-install-subdirs
+client:		trafgen-fetch client-subdirs
+client-install: client client-install-subdirs
+control-install: control-install-subdirs
+subboss:
+subboss-install:
+post-install:	post-install-subdirs
+clean:		clean-subdirs
+distclean:	distclean-subdirs
+mfs:
+mfs-install:
+frisbee-mfs:
+frisbee-mfs-install:
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS) trafgen-fetch

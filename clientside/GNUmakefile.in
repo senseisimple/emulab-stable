@@ -1,0 +1,60 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+SYSTEM	       := $(shell uname -s)
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS         =
+ifeq ($(WITH_EMULAB),0)
+#
+# lib is a common directory, and is added to the clientside tarball.
+# So not do not build it when building full emulab tree; already done.
+#
+SUBDIRS	       += lib
+endif
+# These must be after lib.
+SUBDIRS	       += event tools os sensors tmcc
+
+ifeq ($(WITH_EMULAB),1)
+all:	all-subdirs
+install:all boss-install-subdirs
+else
+all:	client-subdirs
+install:
+	@echo "Choose an appropriate install target, and make sure you "
+	@echo "you are on a node of that type. Basically, do not do a "
+	@echo "client-install on boss, cause you will be hating life!"
+endif
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+client:		client-subdirs
+client-install: client client-mkdirs client-install-subdirs
+control-install: control-install-subdirs
+subboss:	subboss-subdirs
+subboss-install: client subboss-install-subdirs
+post-install:	post-install-subdirs
+clean:		clean-subdirs
+distclean:	distclean-subdirs
+mfs:		mfs-subdirs
+mfs-install:	client-mkdirs mfs-install-subdirs
+frisbee-mfs:	frisbee-mfs-subdirs
+frisbee-mfs-install:	client-mkdirs frisbee-mfs-install-subdirs
+
+client-mkdirs:
+	-mkdir -p $(DESTDIR)$(CLIENT_BINDIR)
+	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS)

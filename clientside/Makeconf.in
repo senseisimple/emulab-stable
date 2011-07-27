@@ -1,0 +1,55 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+# 
+# Most of the configure-substitution magic is done here.
+# All the other makefiles in the NodeOS include
+# this fragment
+#
+
+# Need the PATH because the older autoconf does not support
+# AC_PATH_TOOL which is needed for cross-compilation to work.
+export PATH	= @PATH@
+
+export CC       = @CC@
+export CXX	= @CXX@
+export LD	= @CC@ ${CFLAGS}
+export STRIP    = @STRIP@
+export RANLIB	= @RANLIB@
+export AR	= @AR@
+
+export ELVIN_CONFIG = @ELVIN_CONFIG@
+
+prefix		= @prefix@
+exec_prefix	= @exec_prefix@
+host_cpu	= @host_cpu@
+
+TBROOT		= @prefix@
+
+INSTALL_TOPDIR	= @exec_prefix@
+INSTALL_DIR     = @exec_prefix@
+INSTALL_LIBDIR  = @libdir@
+INSTALL_BINDIR	= @bindir@
+INSTALL_SBINDIR	= @sbindir@
+INSTALL_LIBEXECDIR = @libexecdir@
+INSTALL_ETCDIR  = @sysconfdir@
+INSTALL_INCDIR  = @includedir@
+INSTALL_WWWDIR	= @exec_prefix@/www
+
+INSTALL		= @INSTALL@
+INSTALL_PROGRAM	= @INSTALL@ -m 755
+EXE = @EXEEXT@
+INSTALL_DATA	= @INSTALL@ -m 444
+SUDO		= @SUDO@
+
+CLIENT_ETCDIR	= @CLIENT_ETCDIR@
+CLIENT_BINDIR	= @CLIENT_BINDIR@
+CLIENT_VARDIR	= @CLIENT_VARDIR@
+CLIENT_MANDIR	= @CLIENT_MANDIR@
+
+LOG_TESTBED	= @LOG_TESTBED@
+
+EVENTSYS	= @EVENTSYS@
+ELVIN_COMPAT    = @ELVIN_COMPAT@
+WITH_EMULAB     = @WITH_EMULAB@

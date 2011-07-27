@@ -1,0 +1,63 @@
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+EVENTSYS	= @EVENTSYS@
+SYSTEM	       := $(shell uname -s)
+
+include $(OBJDIR)/Makeconf
+
+all:	libtmcc.a libtmcd.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	+= -O -g -Wall -DUDP \
+		-I${OBJDIR} -I/usr/local/include \
+		-I${TESTBED_SRCDIR}/lib/libtb \
+		-L/usr/local/lib
+LDFLAGS += $(LDSTATIC)
+
+#
+# For SSL enabled tmcd/tmcc
+#
+CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
+SSLFLAGS = -DWITHSSL
+
+libtmcc.a:	ssl.o tpm.o 
+	$(AR) crv $@ ssl.o tpm.o
+	$(RANLIB) $@
+
+libtmcd.a:	ssl.o notpm.o
+	$(AR) crv $@ ssl.o notpm.o
+	$(RANLIB) $@
+
+tpm.o:	tpm.c
+	$(CC) -c $(CFLAGS) $(SSLFLAGS) $<
+
+notpm.o: tpm.c
+	$(CC) -c -o notpm.o $(CFLAGS) $(SSLFLAGS) -DTPMOVERRIDE $<
+
+ssl.o:	ssl.c ssl.h tmcd.h
+tpm.o: tpm.h ssl.h tmcd.h
+notpm.o: tpm.h ssl.h tmcd.h
+
+client: all
+client-install:
+boss-install:
+control-install:
+subboss-install:
+client-install:
+mfs:
+mfs-install:
+frisbee-mfs:
+frisbee-mfs-install:
+
+clean:
+	rm -f *.o libtmcd.a libtmcc.a
+

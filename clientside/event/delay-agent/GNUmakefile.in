@@ -1,0 +1,43 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+
+include $(OBJDIR)/Makeconf
+
+all:	delay-agent
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+#CFLAGS  += -DDEBUG
+CFLAGS	 += -O -g -Wall
+CFLAGS   += -I. -I${OBJDIR} -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event
+CFLAGS   += -I/usr/local/include
+
+LDFLAGS  += $(LDSTATIC)
+LDFLAGS  += -L${OBJDIR}/lib/libtb -L${OBJDIR}/lib/event
+LIBS     += -levent -ltb -lcrypto
+LIBS     += -L/usr/local/lib -lpubsub -lm
+
+OBJS	  = main.o callback.o
+
+delay-agent:	$(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+
+$(OBJS):	main.h $(OBJDIR)/lib/event/libevent.a
+
+install:
+boss-install:
+
+client: delay-agent
+client-install: client
+	$(INSTALL_PROGRAM) -s delay-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/delay-agent$(EXE)
+
+clean:
+	/bin/rm -f *.o delay-agent

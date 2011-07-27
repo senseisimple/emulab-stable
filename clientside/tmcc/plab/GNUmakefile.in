@@ -1,0 +1,109 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
+
+#
+# The scripts the tarball depends on
+#
+COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
+		    paths.sh paths.pm runstartup vnodesetup update watchdog \
+                    libtmcc.pm libsetup.pm libtestbed.pm startcmddone)
+LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
+PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
+                    rc.inplab plabrusage runevents)
+OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
+		    install-tarfile install-rpm)
+EVSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/event/lib/, \
+                    event.pm)
+EESCRIPTS	= $(TESTBED_SRCDIR)/tmcd/plab/rc.vinit
+ULEESCRIPTS	= $(COMSCRIPTS) $(LINSCRIPTS) $(PLABSCRIPTS) $(EVSCRIPTS)
+ALLSCRIPTS	= $(ULEESCRIPTS) $(OSSCRIPTS) $(EESCRIPTS)
+THISDIR         = $(PWD)
+
+#
+# Root of tree containing stock package stuff that is needed
+# in the plab vserver environment to support Emulab (e.g. sshd)
+#
+PKGSRCTREE	= /share/plab/pkgroot
+
+#
+# Configuration, or other files necessary for tarball
+#
+ETCCONFS	= $(TESTBED_SRCDIR)/tmcd/plab/sudoers
+ALLCONFS	= $(ETCCONFS)
+
+#
+# Emulab certs for tmcc communication
+#
+CERTS		= $(addprefix /usr/testbed/etc/, emulab.pem pcplab.pem)
+ALLCERTS	= $(CERTS)
+
+#
+# Name and rootball revision
+#
+ROOTBALLNAME	= @PLAB_ROOTBALL@
+
+include $(OBJDIR)/Makeconf
+
+all:	rootball
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+rootball:	$(ROOTBALLNAME)
+
+$(ROOTBALLNAME): copyfiles mkhosts
+	chown -R 0:0 plabroot
+	gtar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
+
+copyfiles: $(ALLSCRIPTS) $(ALLCONFS) $(ALLCERTS) $(PKGSRCTREE) mkdirtree
+	(cd ../common/config; $(MAKE) script-install DESTDIR=$(THISDIR)/plabroot)
+	$(INSTALL_PROGRAM) $(ULEESCRIPTS) plabroot/usr/local/etc/emulab
+	chmod u+s plabroot/usr/local/etc/emulab/vnodesetup
+	chmod u+s plabroot/usr/local/etc/emulab/update
+	$(INSTALL_PROGRAM) $(OSSCRIPTS)   plabroot/usr/local/bin
+	$(INSTALL_PROGRAM) $(TESTBED_SRCDIR)/tmcd/common/tmcc.pl \
+					  plabroot/usr/local/etc/emulab/tmcc
+	$(INSTALL_PROGRAM) $(EESCRIPTS)   plabroot/etc
+	$(INSTALL) -m 440  $(TESTBED_SRCDIR)/tmcd/plab/sudoers \
+					  plabroot/etc/sudoers
+	$(INSTALL_DATA) /usr/testbed/etc/pcplab.pem \
+	                plabroot/usr/local/etc/emulab/client.pem
+	$(INSTALL_DATA) /usr/testbed/etc/emulab.pem \
+			plabroot/usr/local/etc/emulab
+	cp -pR $(PKGSRCTREE)/ plabroot
+	chmod 4555 plabroot/usr/local/etc/emulab/program-agent
+	echo "@BOSSNODE@" > plabroot/usr/local/etc/emulab/bossnode
+	cp /dev/null plabroot/usr/local/etc/emulab/isrem
+
+mkdirtree:
+	mkdir -p plabroot/usr/local/etc/emulab/rc
+	mkdir -p plabroot/usr/local/bin
+	mkdir -p plabroot/usr/bin
+	mkdir -p plabroot/etc
+	mkdir -p plabroot/bin
+	ln -fs ../usr/local/etc/emulab plabroot/etc/emulab
+
+mkhosts:
+	echo "127.0.0.1 localhost"               >  plabroot/etc/hosts
+	echo "@EXTERNAL_BOSSNODE_IP@ @BOSSNODE@" >> plabroot/etc/hosts
+	echo "@EXTERNAL_USERNODE_IP@ @USERNODE@" >> plabroot/etc/hosts
+
+tmcc:
+	@echo "*** Error:"
+	@echo "You must copy the tmcc linux binary into this dir"
+	@echo "prior to building the tarball."
+	@false
+
+install client-install:
+
+rootball-install: 
+	$(INSTALL_DATA) $(ROOTBALLNAME) $(INSTALL_ETCDIR)/plab
+
+clean: 
+	rm -rf plabroot $(ROOTBALLNAME)

@@ -1,39 +1,38 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ..
-SUBDIR		= lib
+OBJDIR		= @top_builddir@
+SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= libtb
+SUBDIRS	= libtb event tmcd
 
-all:	$(SUBDIRS)
+all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-libtb:
-	@$(MAKE) -C libtb all
+client: client-subdirs
+install: install-subdirs
+control-install: control-install-subdirs
+client-install: client-install-subdirs
+subboss:
+subboss-install:
+clean:		clean-subdirs
+distclean:	distclean-subdirs
+mfs:
+mfs-install:
+frisbee-mfs:
+frisbee-mfs-install:
 
-install: 
-	@$(MAKE) -C libtb install
-
-control-install: 
-	@$(MAKE) -C libtb control-install
-
-clean:		subdir-clean
-
-subdir-clean:
-	@$(MAKE) -C libtb clean
-
-distclean:	subdir-distclean
-
-subdir-distclean:
-	@$(MAKE) -C libtb distclean
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
 .PHONY:	$(SUBDIRS)

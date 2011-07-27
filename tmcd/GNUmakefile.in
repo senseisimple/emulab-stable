@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -8,21 +8,23 @@ TESTBED_SRCDIR	= @top_srcdir@
 EVENTSYS	= @EVENTSYS@
 OBJDIR		= ..
 SUBDIR		= tmcd
-
 SYSTEM	       := $(shell $(TESTBED_SRCDIR)/utils/osstuff.sh -o)
 
 include $(OBJDIR)/Makeconf
 
-all:	server fullclient client
-fullclient: tmcc
-client: tmcc-nossl findif dostype
+all:	server
 server: tmcd tmcd.restart
+
+# For VPATH.
+MOSTLY_SRCDIRS = ${TESTBED_SRCDIR}/lib/libtb ${TESTBED_SRCDIR}/pxe \
+		 ${TESTBED_SRCDIR}/lib/tmcd
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -Wall -DUDP \
 		-I${OBJDIR} -I/usr/local/include \
 		-I${TESTBED_SRCDIR}/lib/libtb -I${TESTBED_SRCDIR}/pxe \
+		-I${TESTBED_SRCDIR}/lib/tmcd \
 		-L/usr/local/lib
 TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
 BOOTINFO = ${OBJDIR}/pxe/bootinfo.o ${OBJDIR}/pxe/bootinfo_mysql.o
@@ -34,9 +36,7 @@ LDFLAGS += $(LDSTATIC)
 CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
 SSLFLAGS = -DWITHSSL 
 TMLIBS	+= -lssl -lcrypto
-SSLOBJ   = ssl.o
-TPMOBJ   = tpm.o
-NOTPM	 = notpm
+NOTPMLIB = ${OBJDIR}/lib/tmcd/libtmcd.a
 
 ifeq ($(SYSTEM),Linux)
 ifneq ($(LDSTATIC),)
@@ -54,111 +54,38 @@ endif
 TMLIBS  += -ldl
 endif
 
-#
-# Take care of historic naming fubars:
-#	Redhat 7.x ->  linux
-#	Redhat 9.0 ->  linux9
-#	Fedora 4/6 ->  fedora
-#	Stargate 1  -> linux-sg
-#	FreeBSD 4.x -> freebsd
-#	Windows XP  -> cygwinxp
-#
-MDSUBDIR  := $(shell $(TESTBED_SRCDIR)/utils/osstuff.sh -t)
-
-ifeq ($(SYSTEM),Linux)
-ifeq ($(MDSUBDIR),redhat7)
-MDSUBDIR  = linux
-endif
-ifeq ($(MDSUBDIR),redhat9)
-MDSUBDIR  = linux9
-endif
-ifeq ($(findstring fedora,$(MDSUBDIR)),fedora)
-MDSUBDIR  = fedora
-endif
-ifeq ($(findstring centos,$(MDSUBDIR)),centos)
-MDSUBDIR  = fedora
-endif
-ifeq ($(MDSUBDIR),stargate1)
-MDSUBDIR  = linux-sg
-endif
-endif
-
-ifeq ($(SYSTEM),FreeBSD)
-ifeq ($(MDSUBDIR),freebsd4)
-MDSUBDIR  = freebsd
-endif
-ifeq ($(MDSUBDIR),freebsd8)
-MDSUBDIR  = freebsd7
-endif
-endif
-
-ifeq ($(SYSTEM),Cygwin)
-# Cygwin on  Windows XP (a.k.a. NT 5.1) - resembles the Linux case.
-ifeq ($(MDSUBDIR),CYGWIN_NT-5.1)
-MDSUBDIR  = cygwinxp
-TMSLIBS   += -lminires
-endif
-endif
-
 ifeq ($(EVENTSYS),1)
-	TMCDCFLAGS  = -I$(TESTBED_SRCDIR)/event/lib -DEVENTSYS
-	TMCDLIBS    = ${OBJDIR}/event/lib/libevent.a
+	TMCDCFLAGS  = -I$(TESTBED_SRCDIR)/lib/event -DEVENTSYS
+	TMCDLIBS    = ${OBJDIR}/lib/event/libevent.a
 	ELVINFLAGS  = -lm -L/usr/local/lib -lpubsub 
 endif
 
-tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO) $(NOTPM)
+tmcd: tmcd.c ${TMCDLIBS} tmcd.h version.o $(BOOTINFO) $(NOTPMLIB)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		version.o $(SSLOBJ) $(TPMOBJ) $(BOOTINFO) \
+		version.o $(NOTPMLIB) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
 mod_tmcd.so: libtmcd.o
 	apxs -c mod_tmcd.c -L/usr/local/lib/mysqlclient -lmysqlclient \
-		-L /usr/local/lib -lxml2 $(SSLOBJ) \
-		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) $<
+		-L /usr/local/lib -lxml2 \
+		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(NOTPMLIB) $(TMLIBS) $<
 
-newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} decls.h version.o $(SSLOBJ) \
-	$(NOTPMOBJ) $(BOOTINFO)
+newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} tmcd.h version.o \
+	$(NOTPMLIB) $(BOOTINFO)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		libtmcd.o version.o $(SSLOBJ) $(TPMOBJ) $(BOOTINFO) \
+		libtmcd.o version.o $(NOTPMLIB) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient  -lxml2 \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
-libtmcd.o: libtmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
+libtmcd.o: libtmcd.c ${TMCDLIBS} tmcd.h version.o $(BOOTINFO)
 	$(CC) $(CFLAGS) -I/usr/local/include/libxml2 $(SSLFLAGS) \
-		$(TMCDCFLAGS) -c -o libtmcd.o $<
+		$(TMCDCFLAGS) -c -o libtmcd.o $< 
 
-libtmcd.so: libtmcd.o ${TMCDLIBS} decls.h $(BOOTINFO)
+libtmcd.so: libtmcd.o ${TMCDLIBS} tmcd.h $(BOOTINFO)
 	$(LD) -shared $^ -L/usr/local/lib/mysql -lxml2 -lmysqlclient \
 		$(TMCDLIBS) $(ELVINFLAGS) ../lib/libtb/libtb.a \
 		-o $@
-
-tmcc: tmcc.c decls.h $(SSLOBJ) $(TPMOBJ) 
-	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc \
-		$< $(SSLOBJ) $(TPMOBJ) $(LFLAGS) $(TMLIBS)
-
-tmcc-shared: tmcc.c decls.h $(SSLOBJ) $(TPMOBJ) 
-	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(SSLOBJ) \
-		$(TPMOBJ) $(LFLAGS) $(TMLIBS)
-
-tmcc-nossl-debug: tmcc.c decls.h
-	$(CC) $(CFLAGS) $(LDSTATIC) -g -o $@ $< $(LFLAGS) $(TMSLIBS)
-
-findif-debug: findif.o
-	$(CC) $(CFLAGS) -g -o $@ findif.o $(LFLAGS) $(LDSTATIC)
-
-dostype-debug: dostype.o
-	$(CC) $(CFLAGS) -g -o $@ dostype.o $(LFLAGS)
-
-ssl.o:	ssl.c ssl.h decls.h
-
-tpm.o:	tpm.c tpm.h ssl.h
-	$(CC) -c $(CFLAGS) $(SSLFLAGS) $(TESTBED_SRCDIR)/tmcd/tpm.c \
-		-I$(TESTBED_SRCDIR)/tmcd/
-
-notpm: tpm.c tpm.h ssl.h
-	$(CC) -c $(CFLAGS) $(SSLFLAGS) -DTPMOVERRIDE \
-	    $(TESTBED_SRCDIR)/tmcd/tpm.c -I$(TESTBED_SRCDIR)/tmcd/
 
 version.c: tmcd.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
@@ -166,37 +93,12 @@ version.c: tmcd.c
 install:	all
 
 install:	$(INSTALL_SBINDIR)/tmcd \
-		$(INSTALL_SBINDIR)/tmcd.restart \
-		$(INSTALL_SBINDIR)/findif \
-		elabinelabfiles
+		$(INSTALL_SBINDIR)/tmcd.restart
 
-control-install: tmcc
-	@$(MAKE) -C freebsd control-install
-
-subboss-install: client
-	@$(MAKE) -C $(MDSUBDIR) subboss-install
-
-client-install: client
-	@$(MAKE) -C $(MDSUBDIR) install
-
-#
-# XXX argh!  assumes FreeBSD inner boss
-#
-elabinelabfiles:
-	$(INSTALL_PROGRAM) $(SRCDIR)/common/config/rc.mkelab \
-			   $(INSTALL_ETCDIR)/rc.mkelab
-	$(INSTALL_PROGRAM) $(SRCDIR)/freebsd/mkextrafs.pl \
-			   $(INSTALL_ETCDIR)/mkextrafs.pl
-
-mfs: client
-
-mfs-install: mfs
-	@$(MAKE) -C $(MDSUBDIR) mfs-install
-
-frisbee-mfs: client
-
-frisbee-mfs-install: frisbee-mfs
-	@$(MAKE) -C $(MDSUBDIR) frisbee-mfs-install
+control-install:
+boss-install: install
+subboss-install:
+client-install:
 
 $(INSTALL_BINDIR)/tmcd/%: %
 	@echo "Installing $<"
@@ -207,13 +109,12 @@ $(INSTALL_BINDIR)/tmcd/%: %
 # Here so that the event system libraries, and libraries they depend upon,
 # can get made.
 #
-${OBJDIR}/event/lib/%:
-	cd ${OBJDIR}/event/lib && gmake $<
+${OBJDIR}/lib/event/%:
+	cd ${OBJDIR}/lib/event && gmake $<
 ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
+${OBJDIR}/lib/tmcd/%:
+	cd ${OBJDIR}/lib/tmcd && gmake $<
 
-clean:	subdir-clean
-	rm -f *.o core tmcd tmcc tmcc-nossl findif dostype *-debug version.c
-
-subdir-clean:
-	@$(MAKE) -C $(MDSUBDIR) clean
+clean:
+	rm -f *.o core tmcd *-debug version.c
