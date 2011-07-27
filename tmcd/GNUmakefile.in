@@ -16,17 +16,17 @@ all:	server
 server: tmcd tmcd.restart
 
 # For VPATH.
-MOSTLY_SRCDIRS = ${TESTBED_SRCDIR}/lib/libtb ${TESTBED_SRCDIR}/pxe \
-		 ${TESTBED_SRCDIR}/lib/tmcd
+MOSTLY_SRCDIRS = ${TESTBED_LIBSRCDIR}/libtb ${TESTBED_SRCDIR}/pxe \
+		 ${TESTBED_LIBSRCDIR}/tmcd
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -Wall -DUDP \
 		-I${OBJDIR} -I/usr/local/include \
-		-I${TESTBED_SRCDIR}/lib/libtb -I${TESTBED_SRCDIR}/pxe \
-		-I${TESTBED_SRCDIR}/lib/tmcd \
+		-I${TESTBED_LIBSRCDIR}/libtb -I${TESTBED_SRCDIR}/pxe \
+		-I${TESTBED_LIBSRCDIR}/tmcd \
 		-L/usr/local/lib
-TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
+TMLIBS	 = ${TESTBED_LIBOBJDIR}/libtb/libtb.a
 BOOTINFO = ${OBJDIR}/pxe/bootinfo.o ${OBJDIR}/pxe/bootinfo_mysql.o
 LDFLAGS += $(LDSTATIC)
 
@@ -36,7 +36,7 @@ LDFLAGS += $(LDSTATIC)
 CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
 SSLFLAGS = -DWITHSSL 
 TMLIBS	+= -lssl -lcrypto
-NOTPMLIB = ${OBJDIR}/lib/tmcd/libtmcd.a
+NOTPMLIB = ${TESTBED_LIBOBJDIR}/tmcd/libtmcd.a
 
 ifeq ($(SYSTEM),Linux)
 ifneq ($(LDSTATIC),)
@@ -55,8 +55,8 @@ TMLIBS  += -ldl
 endif
 
 ifeq ($(EVENTSYS),1)
-	TMCDCFLAGS  = -I$(TESTBED_SRCDIR)/lib/event -DEVENTSYS
-	TMCDLIBS    = ${OBJDIR}/lib/event/libevent.a
+	TMCDCFLAGS  = -I$(TESTBED_LIBSRCDIR)/event -DEVENTSYS
+	TMCDLIBS    = ${TESTBED_LIBOBJDIR}/event/libevent.a
 	ELVINFLAGS  = -lm -L/usr/local/lib -lpubsub 
 endif
 
@@ -84,7 +84,7 @@ libtmcd.o: libtmcd.c ${TMCDLIBS} tmcd.h version.o $(BOOTINFO)
 
 libtmcd.so: libtmcd.o ${TMCDLIBS} tmcd.h $(BOOTINFO)
 	$(LD) -shared $^ -L/usr/local/lib/mysql -lxml2 -lmysqlclient \
-		$(TMCDLIBS) $(ELVINFLAGS) ../lib/libtb/libtb.a \
+		$(TMCDLIBS) $(ELVINFLAGS) $(TESTBED_LIBOBJDIR)/libtb/libtb.a \
 		-o $@
 
 version.c: tmcd.c
@@ -109,12 +109,12 @@ $(INSTALL_BINDIR)/tmcd/%: %
 # Here so that the event system libraries, and libraries they depend upon,
 # can get made.
 #
-${OBJDIR}/lib/event/%:
-	cd ${OBJDIR}/lib/event && gmake $<
-${OBJDIR}/lib/libtb/%:
-	cd ${OBJDIR}/lib/tbdb && gmake $<
-${OBJDIR}/lib/tmcd/%:
-	cd ${OBJDIR}/lib/tmcd && gmake $<
+${TESTBED_LIBOBJDIR}/event/%:
+	cd ${TESTBED_LIBOBJDIR}/event && gmake $<
+${TESTBED_LIBOBJDIR}/libtb/%:
+	cd ${TESTBED_LIBOBJDIR}/tbdb && gmake $<
+${TESTBED_LIBOBJDIR}/tmcd/%:
+	cd ${TESTBED_LIBOBJDIR}/tmcd && gmake $<
 
 clean:
 	rm -f *.o core tmcd *-debug version.c

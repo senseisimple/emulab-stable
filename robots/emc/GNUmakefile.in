@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,10 +26,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 OBJS		= emcd.o robot_list.o
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
-CFLAGS	       += -I${SRCDIR}/../mtp -I../mtp -I${SRCDIR}/../../event/lib
-CFLAGS	       += -I${SRCDIR}/../../lib/libtb
+CFLAGS	       += -I${SRCDIR}/../mtp -I../mtp -I${TESTNED_LIBSRCDIR}/event
+CFLAGS	       += -I${TESTBED_LIBSRCDIR}/libtb
 CFLAGS	       += `$(ELVIN_CONFIG) --cflags vin4c`
-LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib
+LDFLAGS		= -L../mtp
+LDFLAGS        += -L${TESTBED_LIBOBJDIR}/libtb -L${TESTBED_LIBOBJDIR}/event
 
 LIBS	 += -levent -lcrypto -lmtp -ltb
 LIBS     += `$(ELVIN_CONFIG) --libs vin4c`

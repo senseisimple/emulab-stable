@@ -35,9 +35,9 @@ buildnse:
 	ln -sf $(SRCDIR)/tbnexthop.h .
 	ln -sf $(SRCDIR)/tbnexthop.cc .
 	ln -sf $(SRCDIR)/ip_fw.h .
-	ln -sf $(SRCDIR)/../../lib/libtb/log.h .
-	ln -sf $(SRCDIR)/../../lib/libtb/tbdefs.h .
-	ln -sf $(SRCDIR)/../../lib/event/event.h .
+	ln -sf $(TESTBED_LIBSRCDIR)/libtb/log.h .
+	ln -sf $(TESTBED_LIBSRCDIR)/libtb/tbdefs.h .
+	ln -sf $(TESTBED_LIBSRCDIR)/event/event.h .
 	$(SRCDIR)/nse-install $(SRCDIR)/nse.patch
 
 makepatch:

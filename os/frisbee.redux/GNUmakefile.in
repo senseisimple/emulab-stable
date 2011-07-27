@@ -95,9 +95,10 @@ ifeq ($(WITH_MSERVER_EMULAB),1)
 # Emulab master server config
 MYSQLCFLAGS	= -I/usr/local/include
 MYSQLLIBS	= -L/usr/local/lib/mysql -lmysqlclient
-MSERVERFLAGS	+= -DUSE_EMULAB_CONFIG -DUSE_LOCALHOST_PROXY $(MYSQLCFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
+MSERVERFLAGS	+= -DUSE_EMULAB_CONFIG -DUSE_LOCALHOST_PROXY $(MYSQLCFLAGS) \
+		   -I$(TESTBED_LIBSRCDIR)/libtb
 MSERVEROBJS	+= config_emulab.o
-MSERVERLIBS	+= $(OBJDIR)/lib/libtb/libtb.a $(MYSQLLIBS)
+MSERVERLIBS	+= $(TESTBED_LIBOBJDIR)/libtb/libtb.a $(MYSQLLIBS)
 endif
 
 CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS -DMASTER_SERVER

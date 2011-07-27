@@ -17,8 +17,8 @@ all:	$(PROGRAMS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-LIBTBDIR    = $(OBJDIR)/lib/libtb
-LIBEVENTDIR = $(OBJDIR)/lib/event
+LIBTBDIR    = $(TESTBED_LIBOBJDIR)/libtb
+LIBEVENTDIR = $(TESTBED_LIBOBJDIR)/event
 
 # Rules to make sure that some libraries we need from other directories get
 # built first
@@ -31,10 +31,11 @@ $(LIBEVENTDIR)/%.a:
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR}
-CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L$(OBJDIR)/lib/event
+LDFLAGS  += -L$(TESTBED_LIBOBJDIR)
+LDFLAGS  += -L$(TESTBED_LIBOBJDIR)/libtb -L$(TESTBED_LIBOBJDIR)/event
 LIBS     += -levent -lcrypto
 LIBS     += -lm -L/usr/local/lib -lpubsub 
 LDFLAGS  += $(LDSTATIC)

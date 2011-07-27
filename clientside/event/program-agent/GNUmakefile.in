@@ -20,12 +20,12 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR}
-CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 CFLAGS	 += -I/usr/local/include
 CFLAGS	 += -DHAVE_PUBSUB
 CFLAGS   += -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 
-LDFLAGS  += -g -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
+LDFLAGS  += -g -L${TESTBED_LIBOBJDIR}/event -L${TESTBED_LIBOBJDIR}/libtb
 LIBS     += -levent -ltb -lcrypto
 LIBS	 += -L/usr/local/lib -lpubsub
 LDFLAGS  += $(LDSTATIC)
@@ -53,7 +53,8 @@ version.c: program-agent.c
 program-agent-debug: program-agent.o version.o
 	$(CC) $(LDFLAGS) -o $@ program-agent.o version.o $(LIBS)
 
-$(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
+$(PROGRAMS):	${TESTBED_LIBOBJDIR}/event/libevent.a \
+		${TESTBED_LIBSRCDIR}/event/event.h
 
 boss-install:	$(INSTALL_DIR)/opsdir/sbin/program-agent
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8

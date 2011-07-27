@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,7 +20,7 @@ client: capture capquery caplog caplog.bin
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DBFLAGS	+= -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb
+DBFLAGS	+= -I/usr/local/include -I$(TESTBED_LIBSRCDIR)/libtb
 
 #
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
@@ -60,7 +60,7 @@ capture-tty: capture.c capdecls.h
 
 capserver:	capserver.c capdecls.h
 	$(CC) $(CFLAGS) $(DBFLAGS) -o capserver $< \
-		${OBJDIR}/lib/libtb/libtb.a \
+		${TESTBED_LIBOBJDIR}/libtb/libtb.a \
 		-L/usr/local/lib/mysql -lmysqlclient
 
 #

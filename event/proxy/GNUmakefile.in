@@ -20,8 +20,8 @@ all:	$(PROGRAMS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-LIBTBDIR    = $(OBJDIR)/lib/libtb
-LIBEVENTDIR = $(OBJDIR)/lib/event
+LIBTBDIR    = $(TESTBED_LIBOBJDIR)/libtb
+LIBEVENTDIR = $(TESTBED_LIBOBJDIR)/event
 CPPC        = g++
 
 # Rules to make sure that some libraries we need from other directories get
@@ -35,22 +35,24 @@ $(LIBEVENTDIR)/%.a:
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O2 -g -Wall
 CFLAGS   += -I. -I${OBJDIR}
-CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 CFLAGS   += -I/usr/local/include
 
 PFLAGS    = -pthread
 PFLAGS   += -DDEBUG
 PFLAGS	 += -O2 -g -Wall
 PFLAGS   += -I. -I${OBJDIR}
-PFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+PFLAGS   += -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 PFLAGS   += -L/usr/local/lib -lpubsub_r -ltb -lm
 
-PLDFLAGS += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L$(OBJDIR)/lib/event
+PLDFLAGS += -L$(TESTBED_LIBOBJDIR)
+PLDFLAGS += -L$(TESTBED_LIBOBJDIR)/libtb -L$(TESTBED_LIBOBJDIR)/event
 PLIBS     = -levent_r -ltb -lcrypto
 PLIBS    += -L/usr/local/lib -lpubsub_r -ltb -lm
 PLDFLAGS += $(LDSTATIC)
 
-LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L$(OBJDIR)/lib/event
+LDFLAGS  += -L$(TESTBED_LIBOBJDIR)
+LDFLAGS  += -L$(TESTBED_LIBOBJDIR)/libtb -L$(TESTBED_LIBOBJDIR)/event
 LIBS      = -levent -ltb -lcrypto
 LIBS     += -L/usr/local/lib -lpubsub -ltb -lm
 LDFLAGS  += $(LDSTATIC)
@@ -85,7 +87,8 @@ version0_gateway:    version0_gateway.c
 eventping-debug: eventping.o
 	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)
 
-$(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
+$(PROGRAMS):	${TESTBED_LIBOBJDIR}/event/libevent.a \
+		${TESTBED_LIBSRCDIR}/event/event.h
 
 control-install:	$(INSTALL_SBINDIR)/version0_gateway
 

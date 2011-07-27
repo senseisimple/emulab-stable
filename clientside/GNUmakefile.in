@@ -11,16 +11,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS         =
-ifeq ($(WITH_EMULAB),0)
-#
-# lib is a common directory, and is added to the clientside tarball.
-# So not do not build it when building full emulab tree; already done.
-#
-SUBDIRS	       += lib
-endif
-# These must be after lib.
-SUBDIRS	       += event tools os sensors tmcc
+SUBDIRS         = lib event tools os sensors tmcc
 
 ifeq ($(WITH_EMULAB),1)
 all:	all-subdirs

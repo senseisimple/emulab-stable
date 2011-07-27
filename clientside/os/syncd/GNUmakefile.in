@@ -10,9 +10,8 @@ SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
-CFLAGS	= -Wall -O2 -g \
-		  -I${OBJDIR} -I${TESTBED_SRCDIR}/lib/libtb
-LIBS	= ${OBJDIR}/lib/libtb/libtb.a
+CFLAGS	= -Wall -O2 -g -I${OBJDIR} -I${TESTBED_LIBSRCDIR}/libtb
+LIBS	= ${TESTBED_LIBOBJDIR}/libtb/libtb.a
 LDFLAGS =
 LDFLAGS  += $(LDSTATIC)
 

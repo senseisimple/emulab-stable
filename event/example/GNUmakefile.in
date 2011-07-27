@@ -21,10 +21,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR}
-CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += $(LDSTATIC) -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
+LDFLAGS  += $(LDSTATIC)
+LDFLAGS  += -L${TESTBED_LIBOBJDIR}/event -L${TESTBED_LIBOBJDIR}/libtb
 LIBS     += -levent -ltb -lcrypto
 LIBS     +=  -L/usr/local/lib -lpubsub -lm
 ifeq ($(SYSTEM),Linux)
@@ -40,7 +41,8 @@ tbsend:		tbsend.o
 dumpevsubs:	dumpevsubs.o
 	$(CC) $(LDFLAGS) -o $@ dumpevsubs.o $(LIBS)
 
-$(PROGRAMS):	${OBJDIR}/lib/event/libevent.a ../../lib/event/event.h
+$(PROGRAMS):	${TESTBED_LIBOBJDIR}/event/libevent.a \
+		${TESTBED_LIBSRCDIR}/event/event.h
 
 install:	$(addprefix $(INSTALL_SBINDIR)/, eventdebug.pl)
 

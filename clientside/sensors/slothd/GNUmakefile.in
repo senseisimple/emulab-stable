@@ -9,7 +9,7 @@ OBJDIR		= @top_builddir@
 SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 SYSTEM	       := $(shell uname -s)
 SLOTHD_DIR	= unknownclient
-TBLIB		= $(OBJDIR)/lib/libtb/libtb.a
+TBLIB		= $(TESTBED_LIBOBJDIR)/libtb/libtb.a
 
 SBIN_SCRIPTS    = sdisrunning sddeploy
 SDPROGS		= sdcollectd$(EXE) slothd$(EXE)
@@ -19,10 +19,10 @@ include $(OBJDIR)/Makeconf
 CC?=gcc
 ## For debug compilation
 ##CFLAGS+= -g
-CFLAGS+= -Wall -I${OBJDIR} -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb \
+CFLAGS+= -Wall -I${OBJDIR} -I/usr/local/include -I$(TESTBED_LIBSRCDIR)/libtb \
 		-DCLIENT_BINDIR='"$(CLIENT_BINDIR)"' \
 		-DLOG_TESTBED=$(LOG_TESTBED)
-LDFLAGS+= $(LDSTATIC) -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql
+LDFLAGS+= $(LDSTATIC) -L${TESTBED_LIBOBJDIR}/libtb -L/usr/local/lib/mysql
 SDLIBS+= -ltb -lmysqlclient
 LIBS= $(MLIBS)
 CP= cp -pf

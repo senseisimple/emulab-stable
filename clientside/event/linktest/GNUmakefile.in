@@ -8,8 +8,8 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= @top_builddir@
 SUBDIR		= $(subst $(TESTBED_SRCDIR)/,,$(SRCDIR))
 
-LIBTBDIR        = $(OBJDIR)/lib/libtb
-LIBEVENTDIR     = ${OBJDIR}/lib/event
+LIBTBDIR        = $(TESTBED_LIBOBJDIR)/libtb
+LIBEVENTDIR     = ${TESTBED_LIBOBJDIR}/event
 DAEMON	        = linktest
 LTEVENT		= ltevent
 SCRIPT		= linktest.pl
@@ -36,10 +36,10 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS   += -DDEBUG -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR}
-CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L${LIBEVENTDIR} -L${LIBTBDIR}
 LIBS     += -levent -lcrypto -lssl
 LIBS     += -L/usr/local/lib -lpubsub -lm
 LDFLAGS  += $(LDSTATIC)
@@ -87,9 +87,11 @@ $(LTEVENT)-debug: $(LTEVENT_OBJS) $(LIBTB_OBJS)
 version.c: linktest.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-$(DAEMON_OBJS): ${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
+$(DAEMON_OBJS): ${TESTBED_LIBOBJDIR}/event/libevent.a \
+		${TESTBED_LIBSRCDIR}/event/event.h
 
-$(LTEVENT_OBJS): ${OBJDIR}/lib/event/libevent.a ${OBJDIR}/lib/event/event.h
+$(LTEVENT_OBJS): ${TESTBED_LIBOBJDIR}/event/libevent.a \
+		${TESTBED_LIBSRCDIR}/event/event.h
 
 # We install just enough to fire off the test from boss and wait. 
 boss-install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \

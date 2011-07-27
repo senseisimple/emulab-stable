@@ -26,7 +26,7 @@ DBFLAG	= -DUSE_MYSQL_DB
 BI_DBSRC   = bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
 BI_DBOBJ   = bootinfo_null.o bootinfo_cfile.o bootinfo_mysql.o
 
-INCS    = -I${OBJDIR} -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb
+INCS    = -I${OBJDIR} -I/usr/local/include -I$(TESTBED_LIBSRCDIR)/libtb
 
 CFLAGS	+= -Wall \
 	$(INCS) $(DBFLAG) -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
@@ -35,14 +35,15 @@ CFLAGS	+= -Wall \
 	-DDEFAULT_PATH='"/tftpboot/pxeboot.newnode"' \
 	-DLOG_TESTBED=$(LOG_TESTBED)
 
-LFLAGS	=  ${OBJDIR}/lib/libtb/libtb.a
+LFLAGS	=  ${TESTBED_LIBOBJDIR}/libtb/libtb.a
 
 ifeq ($(EVENTSYS),1)
 BI_DBSRC += event-support.c
 BI_DBOBJ += event-support.o
 
-CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/lib/event -I/usr/local/include
-LFLAGS  += $(OBJDIR)/lib/event/libevent.a -L/usr/local/lib -lpubsub -lcrypto
+CFLAGS  += -DEVENTSYS -I$(TESTBED_LIBSRCDIR)/event -I/usr/local/include
+LFLAGS  += $(TESTBED_LIBOBJDIR)/event/libevent.a
+LFLAGS  += -L/usr/local/lib -lpubsub -lcrypto
 endif
 
 bootinfo: main.o bootinfo.o bootinfo.h bootinfo_version.o \

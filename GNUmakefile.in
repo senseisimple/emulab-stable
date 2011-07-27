@@ -30,10 +30,12 @@ include Makeconf
 # Then things that depend on stuff we just did:
 #
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
-SUBDIRS = lib db assign www @optional_subdirs@ clientside ipod security sensors \
-		pxe tbsetup account tmcd utils backend tip capture ipod vis \
-		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		tools/svn wiki bugdb collab protogeni node_usage install
+SUBDIRS = \
+	clientside/lib \
+	db assign www @optional_subdirs@ clientside ipod security sensors \
+	pxe tbsetup account tmcd utils backend tip capture ipod vis \
+	sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
+	tools/svn wiki bugdb collab protogeni node_usage install
 ifeq ($(ISMAINSITE),1)
 SUBDIRS += tools/rmanage
 endif
@@ -130,7 +132,6 @@ ops-install:
 	@$(MAKE) -C db control-install
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C utils control-install
-	@$(MAKE) -C lib control-install
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event control-install
 endif
@@ -192,7 +193,6 @@ client-mkdirs:
 	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)
 
 client:
-	@$(MAKE) -C lib client
 	@$(MAKE) -C clientside client
 	@$(MAKE) -C os client
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
@@ -201,7 +201,6 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 endif
 
 client-install: client client-mkdirs
-	@$(MAKE) -C lib client-install
 	@$(MAKE) -C clientside client-install
 	@$(MAKE) -C os client-install
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,9 +21,9 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 CFLAGS	       += -I${SRCDIR}/../mtp -I../mtp
-CFLAGS	       += -I${SRCDIR}/../../lib/libtb
+CFLAGS	       += -I${TESTBED_LIBSRCDIR}/libtb
 
-LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb
+LDFLAGS		= -L../mtp -L${TESTBED_LIBOBJDIR}/libtb
 
 LIBS	 += -lmtp -ltb -lm
 

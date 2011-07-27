@@ -16,17 +16,18 @@ fullclient: tmcc
 client: tmcc-nossl findif dostype
 
 # For VPATH.
-MOSTLY_SRCDIRS = ${TESTBED_SRCDIR}/lib/libtb \
-		 ${TESTBED_SRCDIR}/lib/tmcd
+MOSTLY_SRCDIRS = ${TESTBED_LIBSRCDIR}/libtb \
+		 ${TESTBED_LIBSRCDIR}/tmcd
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -Wall -DUDP \
 		-I${OBJDIR} -I/usr/local/include \
-		-I${TESTBED_SRCDIR}/lib/libtb \
-		-I${TESTBED_SRCDIR}/lib/tmcd \
+		-I${TESTBED_LIBSRCDIR}/libtb \
+		-I${TESTBED_LIBSRCDIR}/tmcd \
 		-L/usr/local/lib
-TMLIBS	 = ${OBJDIR}/lib/tmcd/libtmcc.a ${OBJDIR}/lib/libtb/libtb.a
+TMLIBS	 = ${TESTBED_LIBOBJDIR}/tmcd/libtmcc.a
+TMLIBS  += ${TESTBED_LIBOBJDIR}/libtb/libtb.a
 LDFLAGS += $(LDSTATIC)
 
 #
@@ -151,10 +152,10 @@ elabinelabfiles:
 # Here so that the event system libraries, and libraries they depend upon,
 # can get made.
 #
-${OBJDIR}/lib/tmcd/%:
-	cd ${OBJDIR}/lib/tmcd && gmake $<
-${OBJDIR}/lib/libtb/%:
-	cd ${OBJDIR}/lib/tbdb && gmake $<
+${TESTBED_LIBOBJDIR}/tmcd/%:
+	cd ${TESTBED_LIBOBJDIR}/tmcd && gmake $<
+${TESTBED_LIBOBJDIR}/libtb/%:
+	cd ${TESTBED_LIBOBJDIR}/tbdb && gmake $<
 
 clean:	subdir-clean
 	rm -f *.o core tmcd tmcc tmcc-nossl findif dostype *-debug

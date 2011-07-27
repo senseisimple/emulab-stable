@@ -37,12 +37,13 @@ endif
 
 ELVINFLAGS    = -I/usr/local/include
 ELVINLIBS     = -L/usr/local/lib -lpubsub -lm
-EVENTFLAGS    = -DEVENTSYS -I$(TESTBED_SRCDIR)/lib/event $(ELVINFLAGS)
-EVENTOBJS     = $(OBJDIR)/lib/event/event.o $(OBJDIR)/lib/event/util.o
+EVENTFLAGS    = -DEVENTSYS -I$(TESTBED_LIBSRCDIR)/event $(ELVINFLAGS)
+EVENTOBJS     = $(TESTBED_LIBOBJDIR)/event/event.o \
+		$(TESTBED_LIBOBJDIR)/event/util.o
 EVENTLIBS     = $(ELVINLIBS) -lcrypto
 
-TBCFLAGS      = $(EVENTFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
-TBLIBS        = $(EVENTOBJS) $(OBJDIR)/lib/libtb/libtb.a $(EVENTLIBS)
+TBCFLAGS      = $(EVENTFLAGS) -I$(TESTBED_LIBSRCDIR)/libtb
+TBLIBS        = $(EVENTOBJS) $(TESTBED_LIBOBJDIR)/libtb/libtb.a $(EVENTLIBS)
 
 PCAPLIBS=-lpcap
 

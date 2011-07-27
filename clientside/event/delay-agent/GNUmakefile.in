@@ -16,12 +16,12 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 #CFLAGS  += -DDEBUG
 CFLAGS	 += -O -g -Wall
-CFLAGS   += -I. -I${OBJDIR} -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event
+CFLAGS   += -I. -I$(TESTBED_LIBSRCDIR)/libtb
+CFLAGS   += -I$(TESTBED_LIBSRCDIR)/event
 CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += $(LDSTATIC)
-LDFLAGS  += -L${OBJDIR}/lib/libtb -L${OBJDIR}/lib/event
+LDFLAGS  += -L${TESTBED_LIBOBJDIR}/libtb -L${TESTBED_LIBOBJDIR}/event
 LIBS     += -levent -ltb -lcrypto
 LIBS     += -L/usr/local/lib -lpubsub -lm
 
@@ -30,7 +30,7 @@ OBJS	  = main.o callback.o
 delay-agent:	$(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-$(OBJS):	main.h $(OBJDIR)/lib/event/libevent.a
+$(OBJS):	main.h $(TESTBED_LIBOBJDIR)/event/libevent.a
 
 install:
 boss-install:

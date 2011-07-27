@@ -20,18 +20,18 @@ CFLAGS   += -DSBINDIR='"$(INSTALL_SBINDIR)"'
 #CFLAGS  += -DDEBUG
 CFLAGS	 += -O -Wall
 CFLAGS   += -I. -I${OBJDIR}
-CFLAGS   += -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -pthread
-LDFLAGS  += -L${OBJDIR}/lib/event -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L${TESTBED_LIBOBJDIR}/event -L${TESTBED_LIBOBJDIR}/libtb
 LDFLAGS  += $(LDSTATIC)
 DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
 LIBS     += -levent_r -ltb -lz
 
 XMLRPCINC = `xmlrpc-c-config c++2 client --cflags`
 CXXFLAGS += -pthread -O $(XMLRPCINC) -I$(OBJDIR)
-CXXFLAGS +=  -I$(TESTBED_SRCDIR)/lib/event -I$(TESTBED_SRCDIR)/lib/libtb
+CXXFLAGS +=  -I$(TESTBED_LIBSRCDIR)/event -I$(TESTBED_LIBSRCDIR)/libtb
 XMLRPCLIBS = `xmlrpc-c-config c++2 client --libs`
 
 #
@@ -62,13 +62,13 @@ OBJS = \
 	timeline-agent.o \
 	version.o
 
-event-sched_rrpc: $(OBJS) event-sched.h ${OBJDIR}/lib/event/libevent.a
+event-sched_rrpc: $(OBJS) event-sched.h ${TESTBED_LIBOBJDIR}/event/libevent.a
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(XMLRPCLIBS) $(LIBS)
 
 DEPS = \
 	console-agent.h error-record.h event-sched.h group-agent.h listNode.h \
 	local-agent.h node-agent.h rpc.h simulator-agent.h timeline-agent.h \
-	../../lib/event/event.h
+	${TESTBED_LIBSRCDIR}/event/event.h
 
 emulab_proxy.o:		emulab_proxy.cc $(DEPS)
 queue.o:		queue.c $(DEPS)

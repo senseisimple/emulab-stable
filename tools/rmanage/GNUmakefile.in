@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2008 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -57,22 +57,23 @@ rmcp_wrap.o: $(SRCDIR)/rmcp_wrap.c
 	$(CC) -fpic -c $(CFLAGS) $(SWIG_GCC_INCS) $(LDFLAGS) $(SRCDIR)/rmcp_wrap.c
 
 rmanage: GNUmakefile rmanage.o rmcp.o \
-		${OBJDIR}/lib/libtb/tbdb.o ${OBJDIR}/lib/libtb/log.o
+		${TESTBED_LIBOBJDIR}/libtb/tbdb.o \
+		${TESTBED_LIBOBJDIR}/libtb/log.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(MYSQL_LIBS) \
-		rmanage.o rmcp.o ${OBJDIR}/lib/libtb/tbdb.o \
-		${OBJDIR}/lib/libtb/log.o -o rmanage
+		rmanage.o rmcp.o ${TESTBED_LIBOBJDIR}/libtb/tbdb.o \
+		${TESTBED_LIBOBJDIR}/libtb/log.o -o rmanage
 		cp rmanage rmanage.debug
 		strip rmanage
 
 #
 # Here so that we get libtb tbdb stuff.
 #
-${OBJDIR}/lib/libtb/%:
-	cd ${OBJDIR}/lib/tbdb && gmake $<
+${TESTBED_LIBOBJDIR}/libtb/%:
+	cd ${TESTBED_LIBOBJDIR}/tbdb && gmake $<
 
 rmanage.o: rmanage.c rmcp.c
 	$(CC) -c -o rmanage.o $(CFLAGS) \
-		-I$(TESTBED_SRCDIR)/lib/libtb -I/usr/local/include $<
+		-I$(TESTBED_LIBSRCDIR)/libtb -I/usr/local/include $<
 
 rmcp.o: rmcp.c rmcp.h
 	$(CC) -c -o rmcp.o $(CFLAGS) $<

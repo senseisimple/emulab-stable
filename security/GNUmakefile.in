@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -37,13 +37,13 @@ suexec:		suexec.c suexec.h
 		-o suexec $<
 
 genlastlog:	genlastlog.c
-	$(CC) $(CFLAGS) -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb \
+	$(CC) $(CFLAGS) -I/usr/local/include -I$(TESTBED_LIBSRCDIR)/libtb \
 		-DTBDBNAME='"$(TBDBNAME)"' \
 		-DUSERSVAR='"$(prefix)/usersvar"' \
 		-DOURDOMAIN='"$(OURDOMAIN)"' \
                 -DUSERNODE='"$(USERNODE)"' \
 		-DLOG_TESTBED=$(LOG_TESTBED) \
-		-o genlastlog $< ${OBJDIR}/lib/libtb/libtb.a \
+		-o genlastlog $< ${TESTBED_LIBOBJDIR}/libtb/libtb.a \
 		-L/usr/local/lib/mysql -lmysqlclient
 
 install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) \
