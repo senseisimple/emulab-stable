@@ -38,7 +38,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  console_reset db2ns bwconfig frisbeehelper \
 		  rmgroup mkgroup setgroups mkproj modgroups \
 		  exports_setup.proxy vnode_setup eventsys_start \
-		  sfskey_update sfskey_update.proxy rmuser idleswap \
+		  sfskey_update sfskey_update.proxy rmuser idleswap idlepower \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
 		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \

@@ -100,6 +100,8 @@ INSERT INTO sitevariables VALUES ('images/create/maxsize',NULL,'6','Max size (GB
 INSERT INTO sitevariables VALUES ('general/testbed_shutdown',NULL,'0','Non-zero value indicates that the testbed is shutdown and scripts should not do anything when they run. DO NOT SET THIS BY HAND!',0);
 INSERT INTO sitevariables VALUES ('images/frisbee/maxrate_std',NULL,'72000000','Max bandwidth (Bytes/sec) at which to distribute standard images from the /usr/testbed/images directory.',0);
 INSERT INTO sitevariables VALUES ('images/frisbee/maxrate_usr',NULL,'54000000','Max bandwidth (Bytes/sec) at which to distribute user-defined images from the /proj/.../images directory.',0);
+INSERT INTO sitevariables VALUES ('general/idlepower_enable',NULL,'0','Enable idle power down to conserve electricity',0);
+INSERT INTO sitevariables VALUES ('general/idlepower_idletime',NULL,'3600','Maximum number of seconds idle before a node is powered down to conserve electricity',0);
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -151,7 +151,7 @@ function SHOWFREENODES()
 	    ($row[0] == TBDB_NODESTATE_PXEWAIT) ||
 	    ($row[0] == TBDB_NODESTATE_ALWAYSUP) ||
 	    ($row[0] == TBDB_NODESTATE_POWEROFF)) {
-	    $freecounts[$type] = $count;
+	    $freecounts[$type] += $count;
 	}
     }
     $output = "";

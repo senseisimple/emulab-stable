@@ -625,6 +625,14 @@ REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADSETUP','RELOADING','R
 REPLACE INTO state_transitions VALUES ('SECURELOAD','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('SECURELOAD','SHUTDOWN','GPXEBOOTING','QuoteOK');
 REPLACE INTO state_transitions VALUES ('SECURELOAD','SHUTDOWN','SECVIOLATION','QuoteFailed');
+REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','POWEROFF','Power Save');
+REPLACE INTO state_transitions VALUES ('PXEKERNEL','POWEROFF','SHUTDOWN','Power Recovery');
+REPLACE INTO state_transitions VALUES ('NORMAL','*','POWEROFF','Power Off');
+REPLACE INTO state_transitions VALUES ('NORMALv1','*','POWEROFF','Power Off');
+REPLACE INTO state_transitions VALUES ('NORMALv2','*','POWEROFF','Power Off');
+REPLACE INTO state_transitions VALUES ('NORMAL','POWEROFF','SHUTDOWN','Power On');
+REPLACE INTO state_transitions VALUES ('NORMALv1','POWEROFF','SHUTDOWN','Power On');
+REPLACE INTO state_transitions VALUES ('NORMALv2','POWEROFF','SHUTDOWN','Power On');
 
 --
 -- Dumping data for table `state_triggers`

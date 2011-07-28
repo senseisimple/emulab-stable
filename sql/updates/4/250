@@ -1,0 +1,41 @@
+#
+# Support for idle power down. Contributed by Barry Trent. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 " ('PXEKERNEL','PXEWAIT','POWEROFF','Power Save')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 " ('PXEKERNEL','POWEROFF','SHUTDOWN','Power Recovery')");
+
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 "('NORMAL','*','POWEROFF','Power Off')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 "('NORMALv1','*','POWEROFF','Power Off')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 "('NORMALv2','*','POWEROFF','Power Off')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 "('NORMAL','POWEROFF','SHUTDOWN','Power On')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 "('NORMALv1','POWEROFF','SHUTDOWN','Power On')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 "('NORMALv2','POWEROFF','SHUTDOWN','Power On')");
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 " ('general/idlepower_enable',NULL,'0', ".
+		 " 'Enable idle power down to conserve electricity',0)")
+	if (!TBSiteVarExists("general/idlepower_enable"));
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 " ('general/idlepower_idletime',NULL,'3600', ".
+		 " 'Maximum number of seconds idle before a node is ".
+		 "powered down to conserve electricity',0)")
+	if (!TBSiteVarExists("general/idlepower_idletime"));
+    
+    return 0;
+}
+1;

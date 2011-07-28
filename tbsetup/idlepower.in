@@ -1,0 +1,174 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use strict;
+
+#
+# This gets invoked from crontab.
+#
+sub usage()
+{
+    print STDOUT "Usage: idlepower [-n] [-s seconds-of-idle]\n";
+    exit(-1);
+}
+# Hidden switch: -r = root mode - used by idlemail
+my $optlist   = "nrs:d";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+my $TBOPS	= "@TBOPSEMAIL@";
+my $POWER	= "$TB/bin/power";
+
+# Testbed Support libraries
+use lib "@prefix@/lib";
+use libdb;
+use User;
+use emutil;
+use libtestbed;
+
+# Locals.
+my $no_action = 0;
+my $seconds_of_idle;
+my $rootokay  = 0;
+my $debug     = 0;
+
+# Untaint the path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+my %options = ();
+if (! getopts($optlist, \%options)) { usage(); }
+if (defined($options{"d"})) { $debug = 1; }
+if (defined($options{"n"})) { $no_action= 1; }
+if (defined($options{"r"})) { $rootokay = 1; }
+if (defined($options{"s"})) { 
+    if ($options{"s"} =~ /^\d+$/) {
+    	$seconds_of_idle = $options{'s'}; 
+    }
+}
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0 && (!defined($rootokay) || !$rootokay) ) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+if (@ARGV != 0) {
+    usage();
+}
+
+# Only admins can do this.
+if ($UID) {
+    my $this_user = User->ThisUser();
+    if (! defined($this_user)) {
+	die("You ($UID) do not exist!\n");
+    }
+    if (!$this_user->IsAdmin()) {
+	die("*** $0:\n".
+	    "    Only testbed administrators can issue an idlepower!\n");
+    }
+}
+
+# Global enable
+my $idlepower_enable;
+if (! TBGetSiteVar("general/idlepower_enable", \$idlepower_enable)) {
+    print "Error getting sitevar 'general/idlepower_enable'\n";
+    exit(-1);
+}
+if (!$idlepower_enable) {
+    print "Idle power saving is globally disabled. Exiting ...\n";
+    exit(0);
+}
+
+# Default value for seconds of idle is a sitevar.
+if (!defined($seconds_of_idle)) {
+    if (! TBGetSiteVar("general/idlepower_idletime", \$seconds_of_idle)) {
+	print "Error getting sitevar 'general/idlepower_idletime'\n";
+	exit(-1);
+    }
+}
+
+#
+# Based in query in ptopgen ... the idea is to find free nodes sitting
+# in PXEWAIT for longer then the idle threshold. We only look for nodes
+# in PXEWAIT cause we know the power off will not scrog the disk. A node
+# that is up and running from its disk might very well not reboot nicely.
+#
+# Note that we use the node_type_attributes "idlepower_enabled" to
+# determine if a node type should be considered for powerdown on idle.
+#
+my $result =
+    DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode,".
+		 "(unix_timestamp(now()) - a.state_timestamp)".
+		 " as idle_time, ".
+		 "(b.pid is not null and b.eid is not null), ".
+		 "  np.reserved_pid is not null,np.eventstate ".
+		 "from nodes as a ".
+		 "left join reserved as b on a.node_id=b.node_id ".
+		 "left join nodes as np on a.phys_nodeid=np.node_id ".
+		 "left join node_types as t on t.type=a.type ".
+		 "left outer join ". 
+		 "  (select type,attrvalue ".
+		 "   from node_type_attributes ".
+		 "   where attrkey='idlepower_enable' ".
+		 "   group by type) as idlepower_enabled ".
+		 "  on t.type=idlepower_enabled.type ".
+		 "where (b.node_id is null and t.class='pc' and ".
+		 "    (np.eventstate='" . TBDB_NODESTATE_PXEWAIT . "')) and ".
+		 "      (a.role='testnode' and t.isremotenode=0) and ".
+		 "      idlepower_enabled.attrvalue is not NULL");
+
+# Scan the results, checking permissions and adding to the list
+# You get to use a node type if no pid was specified (that is, you get
+# to use all nodes), or if there is no entry in the perms table for
+# the type/class of node.
+#
+my @nodes;
+
+while (my ($node,$type,$physnode,$class,$issubnode,$idle_time,$reserved,
+        $prereserved,$eventstate) = $result->fetchrow_array) {
+    next if ($issubnode || $reserved || $prereserved);
+    next if ($idle_time < $seconds_of_idle);
+    print "$node: $idle_time\n"
+	if ($debug);
+    push(@nodes, $node);
+    if ($type || $physnode || $class || $eventstate) {}
+}
+
+if ($#nodes > 0) {
+    print "Powering off @nodes\n";
+} else {
+    print "No nodes suitable for powering off.\n";
+    exit(0);
+}
+exit(0)
+    if ($no_action);
+
+my $output = emutil::ExecQuiet("$POWER off @nodes");
+if ($?) {
+    print $output;
+    
+    SENDMAIL($TBOPS,
+	     "idlepower failed",
+	     "Failed to power off: @nodes\n\n".
+	     "Power output:\n".
+	     "$output\n",
+	     $TBOPS);
+    exit(-1);
+}
+
+

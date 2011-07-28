@@ -408,6 +408,7 @@ sub nodereboot($$)
     # Wait for all the reboot children to exit before continuing.
     #
     my @needPowercycle = ();
+    my @needPowerOn = ();
     if (scalar(keys(%pids))) {
 	foreach my $node (sort(keys(%realnodes))) {
 	    my $mypid     = $pids{$node};
@@ -429,6 +430,10 @@ sub nodereboot($$)
 		# Child signaled to us that this node needs a power cycle
 		push(@needPowercycle, $node);
 	    }
+            elsif ($status == 3) {
+                # Child signaled to us that this node needs to be powered on
+                push(@needPowerOn, $node);
+            }
 	    elsif ($mypid != 0 && $?) {
 		$failed++;
 		$result->{$node} = -1;
@@ -455,6 +460,19 @@ sub nodereboot($$)
 	}
     }
 
+    #
+    # Power on nodes that were turned off
+    #
+    if (@needPowerOn) {
+	if (PowerOn(@needPowerOn)) {
+	    tberror "Power on failed for " . join(" ",@needPowerOn);
+	    foreach my $node (@needPowerOn) {
+		$result->{$node} = -1;
+		$failed++;
+	    }
+	}
+    }
+    
     #
     # Now do vnodes. Do these serially for now (simple).
     #
@@ -633,6 +651,11 @@ sub RebootNode {
     # power cycle the machine rather than wait for ssh to time out.
     #
     if (! DoesPing($pc, 0)) {
+        if ($nodestate eq TBDB_NODESTATE_POWEROFF) {
+            info("$pc powered off: will power on");
+            tbnotice "$pc powered off; will power on.";
+            exit(3);
+        }
 	info("$pc appears dead: power cycle");
 	tbnotice "$pc appears dead; will power cycle.";
 	
@@ -898,6 +921,18 @@ sub PowerCycle {
     my $pcstring = join(" ",@pcs);
 
     system("$power cycle $pcstring");
+    return $? >> 8;
+}
+
+#
+# Power on a PC using the testbed power program.
+#
+sub PowerOn {
+    my @pcs = @_;
+    
+    my $pcstring = join(" ",@pcs);
+
+    system("$power on $pcstring");
     return $? >> 8;
 }
 

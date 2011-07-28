@@ -71,6 +71,7 @@ my %OutletList = ();		#holds machine/outlet pairs
 my @wolnodes = ();
 my $exitval = 0;
 my $this_user;
+my %nodes = ();
 
 # Protos
 sub dostatus(@);
@@ -153,6 +154,17 @@ if ($op eq "status") {
 }
 
 #
+# This script can be run by root.
+#
+if ($UID) {
+    $this_user = User->ThisUser();
+    if (! defined($this_user)) {
+	die("*** $0:\n".
+	    "    You ($UID) do not exist!\n");
+    }
+}
+
+#
 # ElabinElab is special; Do local permission checks, build up a node list
 # and then contact the proxy to do the actual work. No perl bindings yet,
 # so have to use the python client program. 
@@ -160,13 +172,19 @@ if ($op eq "status") {
 if ($ELABINELAB) {
     my @nodelist = ();
     
-    foreach my $node (@machines) {
-	if (!(($UID == 0) ||
-	      TBNodeAccessCheck($UID, TB_NODEACCESS_POWERCYCLE, $node))) {
-	    warn "You are not authorized to control $node. Skipping...\n";
+    foreach my $nodeid (@machines) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    die("*** $0:\n".
+		"    No such node $nodeid\n");
+	}
+	if ($UID && !$node->AccessCheck($this_user,
+					TB_NODEACCESS_POWERCYCLE)) {
+	    warn "You are not authorized to control $nodeid. Skipping...\n";
 	    next;
 	}
-	push(@nodelist, $node);
+	$nodes{$nodeid} = $node;
+	push(@nodelist, $nodeid);
     }
 
     exit(0)
@@ -185,23 +203,39 @@ if ($ELABINELAB) {
     if (!defined($rval)) {
 	exit(-1);
     }
-    if ($sendevent && ($op eq "off" || $op eq "cycle")) {
-	foreach my $node (@nodelist) {
-	    TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
+    if ($sendevent) {
+	foreach my $node (values(%nodes)) {
+	    my $oldstate = $node->eventstate();
+	    my $newstate;
+
+	    # This should not happen.
+	    $oldstate = ""
+		if (!defined($oldstate));
+
+	    if ($op eq "off") {
+		$newstate = TBDB_NODESTATE_POWEROFF();
+	    }
+	    elsif ($op eq "cycle") {
+		$newstate = TBDB_NODESTATE_SHUTDOWN();
+	    }
+	    elsif ($op eq "on") {
+		#
+		# What if the node is on? Nothing is going to
+		# happen and changing the state is wrong.
+		#
+		$newstate = TBDB_NODESTATE_SHUTDOWN()
+		    if ($oldstate eq TBDB_NODESTATE_POWEROFF());
+	    }
+	    print "$node: $oldstate, $newstate\n";
+	    
+	    #
+	    # Avoid sending duplicate events; annoys stated.
+	    #
+	    $node->SetEventState($newstate)
+		if (defined($newstate) && $newstate ne $oldstate);
 	}
     }
     exit($rval);
-}
-
-#
-# This script can be run by root.
-#
-if ($UID) {
-    $this_user = User->ThisUser();
-    if (! defined($this_user)) {
-	die("*** $0:\n".
-	    "    You ($UID) do not exist!\n");
-    }
 }
 
 my %timelimited = ();
@@ -224,6 +258,7 @@ foreach my $nodeid (@machines) {
 	    warn "You are not authorized to control $nodeid. Skipping...\n";
 	    next;
 	}
+	$nodes{$nodeid} = $node;
     }
 
     #
@@ -419,8 +454,28 @@ foreach my $power_id (keys %outlets) {
 	foreach my $node (@nodes) {
 	    print "$node now ",($op eq "cycle" ? "rebooting" : $op),"\n";
 	    if ($sendevent) {
-		my $state = TBDB_NODESTATE_SHUTDOWN;
-		TBSetNodeEventState($node,$state);
+		my $oldstate = $node->eventstate();
+		my $newstate;
+
+		if ($op eq "off") {
+		    $newstate = TBDB_NODESTATE_POWEROFF();
+		}
+		elsif ($op eq "cycle") {
+		    $newstate = TBDB_NODESTATE_SHUTDOWN();
+		}
+		elsif ($op eq "on") {
+		    #
+		    # What if the node is on? Nothing is going to
+		    # happen and changing the state is wrong.
+		    #
+		    $newstate = TBDB_NODESTATE_SHUTDOWN()
+			if ($oldstate eq TBDB_NODESTATE_POWEROFF());
+		}
+		#
+		# Avoid sending duplicate events; annoys stated.
+		#
+		$node->SetEventState($newstate)
+		    if (defined($newstate) && $newstate ne $oldstate);
 	    }
 	    push(@wolnodes, $node)
 		if ($postwol{$node});
