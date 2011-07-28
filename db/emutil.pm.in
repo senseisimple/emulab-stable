@@ -479,5 +479,24 @@ sub VersionInfo($)
     return $value;
 }
 
+#
+# Run a command, being sure to capture all output. 
+#
+sub ExecQuiet($)
+{
+    #
+    # Use a pipe read, so that we save away the output
+    #
+    my ($command) = @_;
+    my $output    = "";
+    
+    open(PIPE,"$command 2>&1 |") or return -1;
+    while (<PIPE>) {
+	$output .= $_;
+    }
+    close(PIPE);
+    return $output;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
