@@ -46,6 +46,7 @@ ssl.o:	ssl.c ssl.h tmcd.h
 tpm.o: tpm.h ssl.h tmcd.h
 notpm.o: tpm.h ssl.h tmcd.h
 
+install: all
 client: all
 client-install:
 boss-install:
