@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Lets emulate register_globals=off for a while.
@@ -57,6 +57,7 @@ $EXPOSETEMPLATES= 0;
 $USERSELECTUIDS = 1;
 $REMOTEWIKIDOCS = @REMOTEWIKIDOCS@;
 $GMAP_API_KEY   = "@GMAP_API_KEY@";
+$NONAMEDSETUP	= @DISABLE_NAMED_SETUP@;
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";

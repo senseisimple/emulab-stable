@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -70,7 +70,11 @@ header("Content-Type: text/x-testbed-ssh");
 header("Content-Disposition: inline; filename=$filename;");
 header("Content-Description: SSH description file for a testbed node");
 
-echo "hostname: $vname.$eid.$pid.$OURDOMAIN\n";
+if ($NONAMEDSETUP) {
+    echo "hostname: $node_id.$OURDOMAIN\n";
+} else {
+    echo "hostname: $vname.$eid.$pid.$OURDOMAIN\n";
+}
 echo "login:    $uid\n";
 
 if ($isvirt) {
