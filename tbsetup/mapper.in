@@ -226,6 +226,8 @@ if (!TBAdmin() &&
 # multiplex_factor default.
 $mfactor = $experiment->multiplex_factor()
     if (!defined($mfactor) && defined($experiment->multiplex_factor()));
+# NS file can say to run the prepass.
+my $useprepass = $experiment->useprepass();
 
 my $newassign =
     EmulabFeatures->FeatureEnabled("NewAssign",
@@ -599,7 +601,7 @@ sub RunAssign($$)
 	if ($vtop->sharednodecount());
     
     # The prepass speeds up assign on big topos with virtual nodes.
-    if ($prepass) {
+    if ($prepass || $useprepass) {
     	$cmd = "assign_prepass";
     	$args = "-m $mfactor $args"
     	    if (defined($mfactor));
