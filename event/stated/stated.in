@@ -468,6 +468,24 @@ sub getValid() {
 }
 
 #
+# Check if a transition is valid. Actually, it is a check for an invalid
+# transition.
+#
+sub IsValidTransition($$$)
+{
+    my ($mode, $oldstate, $newstate) = @_;
+    my $isvalid = 1;
+
+    $isvalid = 0
+	if ($valid{$mode} &&
+	    ($valid{$mode}{$oldstate} || $valid{$mode}{"*"}) &&
+	    ! ($valid{$mode}{$oldstate}{$newstate} ||
+	       $valid{$mode}{"*"}{$newstate}));
+
+    return $isvalid;
+}
+
+#
 # Read the list of valid mode transitions from the database
 #
 sub getModeTrans() {
@@ -639,10 +657,10 @@ sub stateTransition($$) {
     $oldstate = $nodes{$node}{state};
     $mode     = $nodes{$node}{mode};
 
-    if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
-	!$valid{$mode}{$oldstate}{$newstate}) {
+    if ($oldstate && $mode && !IsValidTransition($mode,$oldstate,$newstate)) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
 	       "to $newstate\n");
+	
 	#
 	# Machines in the secure boot path are not allowed to jump
 	# willy-nilly into unknown states.
