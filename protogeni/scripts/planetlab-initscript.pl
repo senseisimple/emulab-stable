@@ -26,7 +26,13 @@ system("date > /tmp/emulab_boot.log");
 
 if (0) {
     Reflector();
+    exit(0);
 }
+
+#
+# All we have is our hostname and our slice name, so Emulab has to
+# figure out from that, what to do. 
+#
 exit(0);
 
 sub Reflector()
