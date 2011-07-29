@@ -454,7 +454,7 @@ sub Create($;$$)
     my ($class, $context, $credential) = @_;
     
     if (!defined($credential)) {
-	$credential = GeniRegistry::ClearingHouse->GetCredential();
+	$credential = GeniRegistry::ClearingHouse->GetCredential($context);
 	if (!defined($credential)) {
 	    print STDERR "Could not create clearinghouse credential\n";
 	    return undef;
