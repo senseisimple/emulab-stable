@@ -1,12 +1,13 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
 use English;
 use Getopt::Long;
+use POSIX qw(strftime);
 
 #
 # Load the Testbed support stuff.
@@ -264,9 +265,13 @@ if( defined( $oldkeyfile ) ) {
 
 #
 # Sign the client cert request, creating a client certificate.
+# We set the start date an hour in the past, to avoid clock skew
+# problems.
 #
+my $startdate = POSIX::strftime("%y%m%d%H%M%SZ", gmtime(time() - 3600));
+
 $UID = 0;
-system("$OPENSSL ca -batch -policy policy_sslxmlrpc ".
+system("$OPENSSL ca -batch -policy policy_sslxmlrpc -startdate $startdate ".
        " -name CA_syscerts -config $CACONFIG ".
        " -out syscert_cert.pem -cert $certfile -keyfile $keyfile ".
        " -infiles syscert_req.pem $outline") == 0
