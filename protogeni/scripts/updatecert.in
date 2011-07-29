@@ -1,0 +1,104 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+#
+#
+sub usage()
+{
+    print STDERR "Usage: $0 [-o output_file] <certfile>\n";
+    exit(-1);
+}
+my $optlist = "i:o:";
+my $ascm    = 0;
+my $outfile;
+my $tmpfile;
+
+# Configure ...
+my $TB		  = "@prefix@";
+my $PROTOUSER	  = "elabman";
+my $MKSYSCERT	  = "$TB/sbin/mksyscert";
+my $SUDO	  = "/usr/local/bin/sudo";
+my $CMCERT	  = "$TB/etc/genicm.pem";
+
+# Do this early so that we talk to the right DB. 
+use vars qw($GENI_DBNAME);
+BEGIN { $GENI_DBNAME = "geni"; }
+
+use lib '@prefix@/lib';
+use GeniCertificate;
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"o"})) {
+    $outfile = 1;
+}
+usage()
+    if (@ARGV != 1);
+my $infile = $ARGV[0];
+
+#
+# Load the input certificate.
+#
+my $certificate = GeniCertificate->LoadFromFile($infile);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $infile\n");
+}
+# Associate private key, to ensure its in the file.
+if ($certificate->LoadKeyFromFile($infile)) {
+    fatal("Could not load private key from $infile\n");
+}
+# Write key to a file by itself, for mksyscert.
+my $keyfile = $certificate->WriteKeyToFile() or
+    fatal("Could not write private key to new file");
+
+my $urn  = $certificate->urn();
+my $uuid = $certificate->uuid();
+my $url  = $certificate->URL();
+my $hrn  = $certificate->hrn();
+my $arg  = "-o ";
+
+if (defined($outfile)) {
+    $arg .= $outfile;
+}
+else {
+    #
+    # Temporary file, then rename to original.
+    #
+    $tmpfile = "/tmp/cert-$$.pem";
+    $arg .= $tmpfile;
+}
+system("$SUDO -u $PROTOUSER $MKSYSCERT $arg ".
+       "  -u $url -i $urn -k $keyfile $hrn $uuid" ) == 0
+    or fatal("Could not generate new certificate");
+
+if (defined($tmpfile)) {
+    system("/bin/mv -f $infile ${infile}.$$") == 0 or
+	fatal("Could not rename $infile");
+    system("/bin/cp -f $tmpfile $infile") == 0 or
+	fatal("Could not rename $tmpfile to $infile");
+}
+exit(0);
+
+

@@ -1,0 +1,124 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+#
+#
+sub usage()
+{
+    print STDERR "Usage: $0\n";
+    exit(-1);
+}
+my $optlist = "";
+
+# Configure ...
+my $TB		  = "@prefix@";
+my $PROTOUSER	  = "elabman";
+my $MKSYSCERT	  = "$TB/sbin/mksyscert";
+my $UPDATECERT	  = "$TB/sbin/protogeni/updatecert";
+my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
+my $REREGISTER    = "$TB/sbin/protogeni/reregister";
+my $REGRESOURCES  = "$TB/sbin/protogeni/register_resources";
+my $SUDO	  = "/usr/local/bin/sudo";
+my $FETCH	  = "/usr/bin/fetch";
+my $CMCERT	  = "$TB/etc/genicm.pem";
+my $SACERT	  = "$TB/etc/genisa.pem";
+my $CHCERT	  = "$TB/etc/genich.pem";
+my $SESCERT	  = "$TB/etc/genises.pem";
+
+use lib '@prefix@/lib';
+use GeniCertificate;
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV);
+
+my $stash = "$TB/etc/fixcerts.$$";
+print "Creating backup directory: $stash\n";
+system("/bin/mkdir $stash") == 0 or
+    fatal("Could not mkdir $stash");
+
+print "Copying current certificates to backup directory\n";
+system("/bin/cp -p $CMCERT $SACERT $stash");
+system("/bin/cp -p $SESCERT $stash") if (-e $SESCERT);
+
+#
+# Grab the CH certificate from Utah.
+#
+print "Fetching clearinghouse certificate from Utah ...\n";
+system("$FETCH -q -o $CHCERT http://boss.emulab.net/genich.pem") == 0
+    or fatal("Could not fetch clearinghouse certificate from Utah");
+
+#
+# Update our local certs. Certs are updated in place, old one saved. 
+#
+print "Updating $SESCERT\n";
+system("$UPDATECERT $SESCERT") == 0 or
+    fatal("Could not update $SESCERT");
+
+print "Updating $CMCERT\n";
+system("$UPDATECERT $CMCERT") == 0 or
+    fatal("Could not update $CMCERT");
+
+print "Updating $SACERT\n";
+system("$UPDATECERT $SACERT") == 0 or
+    fatal("Could not update $SACERT");
+
+#
+# Add certs to the local SA database.
+#
+print "Adding new certificates to SA database.\n";
+system("$ADDAUTHORITY $SACERT sa") == 0
+    or fatal("Could not add SA certificate to SA DB");
+system("$ADDAUTHORITY $CMCERT cm") == 0
+    or fatal("Could not add CM certificate to SA DB");
+system("$ADDAUTHORITY $SESCERT ses") == 0
+    or fatal("Could not add SES certificate to SA DB");
+
+#
+# Add certs to the local CM database.
+#
+print "Adding new certificates to CM database.\n";
+system("$ADDAUTHORITY -a $SACERT sa") == 0
+    or fatal("Could not add SA certificate to CM DB");
+system("$ADDAUTHORITY -a $CMCERT cm") == 0
+    or fatal("Could not add CM certificate to CM DB");
+
+#
+# ReRegister our certs at the CM.
+#
+system("$REREGISTER") == 0
+    or fatal("Could not reregister certificates at the Clearinghouse");
+
+#
+# ReRegister our resources.
+#
+print "Registering resources at Clearinghouse\n";
+system("$SUDO -u $PROTOUSER $REGRESOURCES -r") == 0
+    or fatal("Could not reregister resources at the Clearinghouse");
+
+exit(0);
+
+
