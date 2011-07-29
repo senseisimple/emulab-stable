@@ -817,6 +817,57 @@ sub DeleteCRL($$)
     return 0;
 }
 
+#
+# Load a key from a file and associate with the certificate object.
+#
+sub LoadKeyFromFile($$)
+{
+    my ($self, $filename) = @_;
+
+    if (!open(KEY, $filename)) {
+	print STDERR "Could not open file: $filename\n";
+	return -1;
+    }
+    
+    my $privkey;
+    my $string;
+    while (<KEY>) {
+	my $line = $_;
+	
+	if ($line =~ /^-----BEGIN RSA/) {
+	    $string = "";
+	    next;
+	}
+	if ($line =~ /^-----END RSA/) {
+	    $privkey = $string;
+	    $string = undef;
+	    next;
+	}
+	$string .= $line
+	    if (defined($string));
+    }
+    close(KEY);
+    if (!defined($privkey)) {
+	print STDERR "No private key found in $filename\n";
+	return -1;
+    }
+    $self->{'CERT'}->{'privkey'} = $privkey;
+    return 0;
+}
+
+sub WriteKeyToFile($)
+{
+    my ($self) = @_;
+
+    # We want this file to be passed back. 
+    my ($tempfile, $filename) = tempfile(UNLINK => 1);
+    print $tempfile "-----BEGIN RSA PRIVATE KEY-----\n";
+    print $tempfile $self->privkey();
+    print $tempfile "-----END RSA PRIVATE KEY-----\n";
+
+    return $filename;
+}
+
 ############################################################################
 #
 # Wrapper for local users.
