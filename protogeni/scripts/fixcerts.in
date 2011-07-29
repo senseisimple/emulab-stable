@@ -13,10 +13,11 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: $0\n";
+    print STDERR "Usage: $0 [-c]\n";
     exit(-1);
 }
-my $optlist = "";
+my $optlist = "c";
+my $asch    = 0;
 
 # Configure ...
 my $TB		  = "@prefix@";
@@ -52,6 +53,9 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"c"})) {
+    $asch  = 1;
+}
 usage()
     if (@ARGV);
 
@@ -61,15 +65,17 @@ system("/bin/mkdir $stash") == 0 or
     fatal("Could not mkdir $stash");
 
 print "Copying current certificates to backup directory\n";
-system("/bin/cp -p $CMCERT $SACERT $stash");
+system("/bin/cp -p $CMCERT $SACERT $CHCERT $stash");
 system("/bin/cp -p $SESCERT $stash") if (-e $SESCERT);
 
-#
-# Grab the CH certificate from Utah.
-#
-print "Fetching clearinghouse certificate from Utah ...\n";
-system("$FETCH -q -o $CHCERT http://boss.emulab.net/genich.pem") == 0
-    or fatal("Could not fetch clearinghouse certificate from Utah");
+if (!$asch) {
+    #
+    # Grab the CH certificate from Utah.
+    #
+    print "Fetching clearinghouse certificate from Utah ...\n";
+    system("$FETCH -q -o $CHCERT http://boss.emulab.net/genich.pem") == 0
+	or fatal("Could not fetch clearinghouse certificate from Utah");
+}
 
 #
 # Update our local certs. Certs are updated in place, old one saved. 
@@ -85,6 +91,15 @@ system("$UPDATECERT $CMCERT") == 0 or
 print "Updating $SACERT\n";
 system("$UPDATECERT $SACERT") == 0 or
     fatal("Could not update $SACERT");
+
+if ($asch) {
+    print "Updating $CHCERT\n";
+    system("$UPDATECERT $CHCERT") == 0 or
+	fatal("Could not update $CHCERT");
+
+    system("$ADDAUTHORITY -c $CHCERT ma") == 0
+	or fatal("Could not add CH certificate to CH DB");
+}
 
 #
 # Add certs to the local SA database.
@@ -107,13 +122,13 @@ system("$ADDAUTHORITY -a $CMCERT cm") == 0
     or fatal("Could not add CM certificate to CM DB");
 
 #
-# ReRegister our certs at the CM.
+# ReRegister our certs at the CH.
 #
 system("$REREGISTER") == 0
     or fatal("Could not reregister certificates at the Clearinghouse");
 
 #
-# ReRegister our resources.
+# ReRegister our resources at the CH.
 #
 print "Registering resources at Clearinghouse\n";
 system("$SUDO -u $PROTOUSER $REGRESOURCES -r") == 0
