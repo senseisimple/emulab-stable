@@ -71,12 +71,6 @@ else {
     @nodes = @ARGV;
 }
 
-my $this_user = User->LookupByUnixId($UID);
-if (! defined($this_user)) {
-    print STDERR "You ($UID) do not exist!\n";
-    exit(-1);
-}
-
 #
 # The RPC context for this script is as the CM.
 #
