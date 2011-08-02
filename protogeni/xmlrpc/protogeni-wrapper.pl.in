@@ -55,9 +55,11 @@ use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION
 use lib '@prefix@/lib';
 use Genixmlrpc;
 use GeniResponse;
+use GeniHRN;
 use libaudit;
 use libEmulab;
 use libtestbed;
+use User;
 
 # Geniuser.
 my $user  = "geniuser";
@@ -194,7 +196,27 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
 }
 XMLError(XMLRPC_APPLICATION_ERROR(),
 	 "Invalid authentication certificate; no URN. Please regenerate.")
-    if (!exists($ENV{'GENIURN'}));
+    if (! (defined($GENIURN) && GeniHRN::IsValid($GENIURN)));
+
+#
+# Lets make sure that local users do not get past here if their account
+# has been frozen. Their SSL certificate is still valid of course. We
+# probably want to also add a check for non-local users, but that needs
+# more thought.
+#
+my ($authority, $type, $id) = GeniHRN::Parse($GENIURN);
+if ($type eq "user" && GeniHRN::Authoritative($GENIURN, "@OURDOMAIN@")) {
+    #
+    # Check Emulab users table. 
+    #
+    my $user = User->Lookup($id);
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "Not a valid local user. Who are you really?")
+	if (!defined($user));
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "Your account is no longer active!")
+	if ($user->status() ne "active");
+}
 
 #
 # Reaching into the Frontier code so I can debug this crap.
