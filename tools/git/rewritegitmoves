@@ -1,0 +1,101 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Generate a script that moves all files in a given directory from any old
+# locations they may have been in into their current locations. For use with
+# git filter-branch --tree-filter - the idea is that you use this script on
+# a directrory that has had files moved into it, and it generates a script for
+# you that re-does the moves. You then pass the generated script to
+# --tree-filter, which will make the move happen in all of history, so that you
+# can pretend the files were always in their current locations.
+#
+# eg.
+# git-rewritemoves clientside > ~/mvscript
+# git filter-branch --tree-filter 'perl ~/mvscript' HEAD
+#
+
+use strict;
+sub get_filemoves($);
+
+if (@ARGV != 1) { 
+    die "Usage: $0 <dirname>\n";
+}
+my ($dirname) = @ARGV;
+
+my @moves;
+
+my @files = `find $dirname -type f`;
+my $count = 0;
+foreach my $file (@files) {
+    chomp $file;
+
+    $count++;
+    print STDERR "Checking file $file ($count / " . scalar(@files) . ")\n";
+
+    my @filemoves = get_filemoves($file);
+    push @moves, @filemoves;
+}
+
+#
+# Now, output a perl script that executes the moves
+#
+print << 'HEADER';
+#!/usr/bin/perl -w
+my $errors = 0;
+sub move($$) {
+    my ($src,$dst) = @_;
+    my $destdir = `dirname $dst`;
+    chomp $destdir;
+    if (!-d $destdir) {
+        system("mkdir -p $destdir") && $errors++;
+    }
+    system("mv $src $dst") && $errors++;
+}
+
+HEADER
+
+foreach my $move (@moves) {
+    my ($src, $dst) = @$move;
+    print "if (-e \"$src\") { move(\"$src\",\"$dst\"); }\n";
+}
+
+print << 'FOOTER';
+exit ($errors != 0);
+FOOTER
+
+#
+# Get a list of moves from old locations for the given file to
+# the current location. Return this as a list of array refs, each
+# of which is pair of filenames
+#
+sub get_filemoves($) {
+    my ($file) = @_;
+
+    # Use git log to find all filenames the file has had in the past
+    my @log_output = `git log --name-only --pretty="format:" --follow $file`;
+    chomp(@log_output);
+
+    # Remove blank lines
+    @log_output = grep {$_} @log_output;
+
+    my @moves;
+
+    # We always move files to their current location, not intermediate ones
+    my $current_loc = shift @log_output;
+    my $next_loc = $current_loc;
+    foreach my $loc (@log_output) {
+        if ($loc ne $next_loc) {
+            # A move happened
+            push @moves, [$loc,$current_loc];
+            print STDERR "   Move: $loc -> $current_loc\n";
+            $next_loc = $loc;
+        }
+    }
+
+    return @moves;
+}
