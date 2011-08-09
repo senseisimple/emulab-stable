@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,7 +28,6 @@ sub usage()
 my $TB		= "@prefix@";
 my $SSH	        = "@SSH@";
 my $SSH_ARGS	= '@SSH_ARGS@';
-my $UNIFIED     = "@UNIFIED_BOSS_AND_OPS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $USERNODE    = "@USERNODE@";
 my $FSNODE      = "@FSNODE@";
@@ -39,6 +38,8 @@ my $debug	= 0;
 my @args;
 my $hostname;
 my $chpid       = 0;
+# Run command on the local machine.
+my $runlocal    = 0;
 
 #
 # Testbed Support libraries
@@ -81,11 +82,14 @@ if (!defined($hostname)) {
 #
 # Different stuff for remote nodes.
 #
+# Special case: When asking to do something on the the FSNODE, and the
+# FSNODE is actually BOSSNODE, run it locally.
+#
 my @cmdargs;
 
-if ($UNIFIED && ($hostname eq $BOSSNODE || $hostname eq $USERNODE ||
-		 $hostname eq $FSNODE)) {
-    @cmdargs = "@ARGV";
+if ($hostname eq $FSNODE && $FSNODE eq $BOSSNODE) {
+    @cmdargs  = "@ARGV";
+    $runlocal = 1;
 }
 else {
     my $user;
@@ -159,10 +163,16 @@ sub sighandler {
 }
 
 #
+# Run command locally.
+#
+if ($runlocal) {
+    exec(@cmdargs);
+}
+#
 # Check for existing protocol specification args.
 # If they exist, don't set the protocol.
 #
-if (grep {/Protocol/ || /-[12]/} @args) {
+elsif (grep {/Protocol/ || /-[12]/} @args) {
     print "Protocol spec present on command line - not forcing it.\n" 
         if $debug;
     exec($SSH, @cmdargs);
