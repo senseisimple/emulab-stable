@@ -827,6 +827,8 @@ NOSHAREDFS
 SELFLOADER_DATA
 TBUSEDBI
 NEEDMROUTED
+OPSVM_ENABLE
+OPSVM_MOUNTPOINT
 TBOPSEMAIL
 TBOPSEMAIL_NOSLASH
 TBROBOCOPSEMAIL
@@ -4950,6 +4952,8 @@ done
 
 
 
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -5044,6 +5048,8 @@ NOSHAREDFS=0
 NFSRACY=1
 SELFLOADER_DATA="__DATA__"
 NEEDMROUTED=0
+OPSVM_ENABLE=0
+OPSVM_MOUNTPOINT="/ops"
 
 #
 # XXX You really don't want to change these!
@@ -5189,6 +5195,11 @@ elif test "$USERNODE" = "$FSNODE"; then
 #define FSNODE_IP "$USERNODE_IP"
 _ACEOF
 
+elif test "$BOSSNODE" = "$FSNODE"; then
+	cat >>confdefs.h <<_ACEOF
+#define FSNODE_IP "$BOSSNODE_IP"
+_ACEOF
+
 fi
 cat >>confdefs.h <<_ACEOF
 #define CONTROL_ROUTER_IP "$CONTROL_ROUTER_IP"
@@ -5311,6 +5322,16 @@ fi
 if test $NFSRACY -eq 1; then
     cat >>confdefs.h <<_ACEOF
 #define NFSRACY 1
+_ACEOF
+
+fi
+if test $OPSVM_ENABLE -eq 1; then
+    cat >>confdefs.h <<_ACEOF
+#define OPSVM_ENABLE 1
+_ACEOF
+
+    cat >>confdefs.h <<_ACEOF
+#define OPSVM_MOUNTPOINT $OPSVM_MOUNTPOINT
 _ACEOF
 
 fi
