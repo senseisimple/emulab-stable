@@ -10,7 +10,7 @@ sub DoUpdate($$$)
     my ($dbhandle, $dbname, $version) = @_;
     
     if (!DBKeyExists("vinterfaces", "vnode_id")) {
-	DBQueryFatal("ALTER TABLE vinterfaces "
+	DBQueryFatal("ALTER TABLE vinterfaces ".
 		     "ADD KEY `vnode_id` (`vnode_id`)");
     }
     return 0;
