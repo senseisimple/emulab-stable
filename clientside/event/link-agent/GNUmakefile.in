@@ -54,6 +54,7 @@ $(PROGRAMS):	${TESTBED_LIBOBJDIR}/event/libevent.a \
 		${TESTBED_LIBSRCDIR}/event/event.h
 
 boss-install:
+control-install:
 
 client: $(PROGRAMS)
 client-install: client

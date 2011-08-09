@@ -34,6 +34,7 @@ $(OBJS):	main.h $(TESTBED_LIBOBJDIR)/event/libevent.a
 
 install:
 boss-install:
+control-install:
 
 client: delay-agent
 client-install: client

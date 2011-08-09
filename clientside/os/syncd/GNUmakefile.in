@@ -37,6 +37,8 @@ boss-install:
 	$(INSTALL) -m 644 $(SRCDIR)/emulab-sync.1 \
 		$(INSTALL_DIR)/opsdir/man/man1/emulab-sync.1
 
+control-install:
+
 client: all
 client-install: client
 	$(INSTALL_PROGRAM) emulab-syncd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd$(EXE)

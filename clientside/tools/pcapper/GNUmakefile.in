@@ -115,6 +115,7 @@ pcapper-noevents.o: pcapper.c
 client:	pcapper
 
 boss-install:
+control-install:
 
 client-install: client
 	$(INSTALL_PROGRAM) -s pcapper $(DESTDIR)$(CLIENT_BINDIR)/pcapper

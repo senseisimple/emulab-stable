@@ -30,6 +30,7 @@ dijkstra-debug: Compressor.o TreeCompressor.o dijkstra.o \
                 OptimalIpTree.o bitmath.o $(LIBS) -o $@
 
 boss-install:
+control-install:
 client: all
 client-install: client
 	$(INSTALL_PROGRAM) dijkstra$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/dijkstra$(EXE)

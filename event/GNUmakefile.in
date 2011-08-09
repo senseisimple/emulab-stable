@@ -50,7 +50,6 @@ endif
 	@$(MAKE) -C proxy control-install
 
 post-install: 
-	@$(MAKE) -C linktest post-install
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs

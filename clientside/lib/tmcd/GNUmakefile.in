@@ -50,7 +50,7 @@ install: all
 client: all
 client-install:
 boss-install:
-control-install:
+control-install: all
 subboss-install:
 client-install:
 mfs:

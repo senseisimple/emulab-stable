@@ -112,6 +112,7 @@ $(PROGRAMS):	${TESTBED_LIBOBJDIR}/event/libevent.a \
 
 install:
 boss-install:
+control-install:
 
 client: $(PROGRAMS)
 client-install: client

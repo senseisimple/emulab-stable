@@ -128,16 +128,13 @@ ops-install:
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C security control-install
 	@$(MAKE) -C tip control-install
-#	@$(MAKE) -C os control-install
 	@$(MAKE) -C db control-install
-	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C utils control-install
+	@$(MAKE) -C clientside control-install
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event control-install
 endif
-	@$(MAKE) -C sensors control-install
 	@$(MAKE) -C xmlrpc control-install
-	@$(MAKE) -C tmcd control-install
 	@$(MAKE) -C account control-install
 ifeq ($(PELABSUPPORT),1)
 	@$(MAKE) -C pelab control-install
