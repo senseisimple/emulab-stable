@@ -1,0 +1,109 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# This file is intended to be included into another NS file. It is not
+# a stand alone file.
+# 
+set myboss [$ns node]
+
+tb-set-node-inner-elab-role $myboss boss+router
+tb-set-elabinelab-attribute CONFIG_OPSVM 1
+tb-set-elabinelab-attribute OPSNODE myops
+
+if {[info exists ::TBCOMPAT::elabinelab_hardware("boss")]} {
+    namespace eval TBCOMPAT {
+        tb-set-hardware $myboss $elabinelab_hardware("boss")
+    }
+} else {
+    tb-set-hardware $myboss pc850
+}
+
+if {[info exists ::TBCOMPAT::elabinelab_fixnodes("boss")]} {
+    namespace eval TBCOMPAT {
+        tb-fix-node $myboss $elabinelab_fixnodes("boss")
+    }
+}
+
+# Deal with tarfiles
+set myboss_tarfiles ""
+
+if {${::TBCOMPAT::elabinelab_source_tarfile} != ""} {
+    append myboss_tarfiles "/usr/src ${::TBCOMPAT::elabinelab_source_tarfile}"
+}
+
+if {[info exists ::TBCOMPAT::elabinelab_tarfiles("boss")]} {
+    if {$myboss_tarfiles != ""} {
+	append myboss_tarfiles " "
+    }
+    namespace eval TBCOMPAT {
+	append myboss_tarfiles $elabinelab_tarfiles("boss")
+    }
+}
+if {$myboss_tarfiles != ""} {
+    tb-set-node-tarfiles $myboss $myboss_tarfiles
+}
+
+tb-make-soft-vtype pcslow {pc600 pc850}
+
+#
+# This is passed in by the parser, when wrapping an existing experiment.
+# The parser wrapper gets info about the wrapped experiment and passes it
+# along in the TBCOMPAT namespace.
+#
+if { ${::TBCOMPAT::elabinelab_maxpcs} != 0 } {
+    set maxpcs ${::TBCOMPAT::elabinelab_maxpcs}
+} else {
+    set maxpcs 0
+}
+
+set lanstr "myboss "
+for {set i 1} {$i <= $maxpcs} {incr i} {
+	set name "mypc${i}"
+	set $name [$ns node]
+	append lanstr "[set $name] "
+	tb-set-node-inner-elab-role [set $name] node
+
+	if {[info exists ::TBCOMPAT::elabinelab_nodeos($name)]} {
+	    namespace eval TBCOMPAT {
+        	tb-set-node-os [set $name] $elabinelab_nodeos($name)
+	    }
+	}
+
+	if {[info exists ::TBCOMPAT::elabinelab_fixnodes($name)]} {
+	    namespace eval TBCOMPAT {
+        	tb-fix-node [set $name] $elabinelab_fixnodes($name)
+	    }
+        } elseif {[info exists ::TBCOMPAT::elabinelab_hardware($name)]} {
+	    namespace eval TBCOMPAT {
+		tb-set-hardware [set $name] $elabinelab_hardware($name)
+	    }
+	} else {
+	    tb-set-hardware [set $name] pcslow
+	}
+}
+
+if { ${::GLOBALS::elabinelab_singlenet} == 0 } {
+    set publiclan [$ns make-lan $lanstr 100Mb 0ms]
+
+    tb-set-ip-lan $myboss $publiclan 10.200.1.252
+    for {set i 1} {$i <= $maxpcs} {incr i} {
+	set name "mypc${i}"
+	tb-set-ip-lan [set $name] $publiclan 10.200.1.$i
+    }
+}
+
+if {[info exists ::TBCOMPAT::elabinelab_nodeos("boss")]} {
+    namespace eval TBCOMPAT {
+        tb-set-node-os $myboss $elabinelab_nodeos("boss")
+    }
+} elseif {[info exists ::TBCOMPAT::sitevariables(elabinelab/boss_osid)]} {
+    namespace eval TBCOMPAT {
+	tb-set-node-os $myboss $sitevariables(elabinelab/boss_osid)
+    }
+} else {
+    tb-set-node-os $myboss FBSD73-STD
+}
