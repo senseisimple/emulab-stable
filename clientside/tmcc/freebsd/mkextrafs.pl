@@ -173,7 +173,7 @@ if ($mounted =~ /^${fsdevice} on (\S*)/) {
 # See what the current type is for the partition
 #
 my $stype = -1;
-if (!open(FD, "fdisk -s $disk 2>&1|")) {
+if (!open(FD, "fdisk -s /dev/$disk 2>&1|")) {
     die("*** $0:\n".
         "    $disk: could not get partition info\n");
 }
@@ -199,6 +199,7 @@ while (<FD>) {
     if (/^\s*([1-4]):\s+\d+\s+\d+\s+(0x\S\S)\s+/) {
 	my $part = $1;
 	my $type = hex($2);
+
 	#
 	# If there is a valid partition on the disk and they are
 	# using the entire disk without forcing, stop them!
@@ -253,7 +254,7 @@ if ($usegeom && $slice != 0) {
 # partition 1 of the disk.
 #
 if ($slice == 0 && !$noinit) {
-    mysystem("fdisk -I $disk");
+    mysystem("fdisk -I /dev/$disk");
 }
 #
 # Otherwise set the partition type to BSD if not already set.
