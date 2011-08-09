@@ -727,10 +727,16 @@ sub AnnotateManifest($)
 	print STDERR "Could not map sliver $self to its creator\n";
 	return undef;
     }
+    my $experiment = $self->GetExperiment();
+    if (!defined($experiment)) {
+	print STDERR "Could not lookup experiment for sliver $self\n";
+	return undef;
+    }
 
     my $sshdport      = 22;
     my $hostname      = GeniUtil::FindHostname($node->node_id());
     my $phostname     = $hostname;
+    my $vhostname     = GeniUtil::FindVHostname($experiment, $node);
     
     if ($node->isvirtnode()) {
 	$sshdport  = $node->sshdport();
@@ -750,6 +756,11 @@ sub AnnotateManifest($)
     } else {
 	GeniXML::SetText("sliver_id", $rspec, $self->sliver_urn());
 	GeniXML::SetText("component_id", $rspec, $self->component_urn());
+	my $host = GeniXML::FindFirst("n:host", $rspec);
+	if (! defined($host)) {
+	    $host = GeniXML::AddElement("host", $rspec);
+	}
+	GeniXML::SetText("name", $host, $vhostname);
     }
     
     my $services = GeniXML::FindFirst("n:services", $rspec);

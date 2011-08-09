@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw(GENI_PURGEFLAG FindHostname);
+@EXPORT = qw(GENI_PURGEFLAG FindHostname FindVHostname);
 
 use English;
 use Data::Dumper;
@@ -155,6 +155,18 @@ sub FindHostname($)
 	$prefix = $1;
     }
     return $nodeid . "." . $prefix;    
+}
+
+sub FindVHostname($$)
+{
+    my ($exp, $node) = @_;
+    my $prefix = $OURDOMAIN;
+    if ($ELABINELAB == 1) {
+	$OUTERBOSS_NODENAME =~ /^[^.]+\.(.*)$/;
+	$prefix = $1;
+    }
+    return $node->vname() . "." . $exp->eid() . "." . $exp->pid() . "."
+	. $prefix;
 }
 
 #
