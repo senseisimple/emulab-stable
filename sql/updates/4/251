@@ -1,0 +1,18 @@
+#
+# Add an index to vinterfaces to help speed up nfree of virtual nodes.
+# Otherwise ReleaseSharedBandwith() query examines every row of vinterfaces.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    
+    if (!DBKeyExists("vinterfaces", "vnode_id")) {
+	DBQueryFatal("ALTER TABLE vinterfaces "
+		     "ADD KEY `vnode_id` (`vnode_id`)");
+    }
+    return 0;
+}
+1;

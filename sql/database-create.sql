@@ -4038,7 +4038,8 @@ CREATE TABLE `vinterfaces` (
   `bandwidth` int(10) NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`unit`),
   KEY `bynode` (`node_id`,`iface`),
-  KEY `type` (`type`)
+  KEY `type` (`type`),
+  KEY `vnode_id` (`vnode_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
