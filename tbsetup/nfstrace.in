@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,6 +15,7 @@ use IPC::Open2;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TESTMODE    = @TESTMODE@;
+my $BOSSNODE    = "@BOSSNODE@";
 my $FSNODE      = "@FSNODE@";
 my $NFSTRACESUPPORT= @NFSTRACESUPPORT@;
 
@@ -90,10 +91,14 @@ if ($EUID != 0) {
 }
 
 #
-# If no bugdb support, just exit. 
+# If no trace support, just exit. 
 #
 if (! $NFSTRACESUPPORT) {
-    print "NFS trace support is not enabled. Exit ...\n";
+    print "NFS trace support is not enabled. Exiting ...\n";
+    exit(0);
+}
+if ($BOSSNODE eq $FSNODE) {
+    print "NFS trace support disabled when FSNODE is boss. Exiting ...\n";
     exit(0);
 }
 
