@@ -2832,5 +2832,61 @@ sub IsOSLoaded($$)
     return $query_result->numrows;
 }
 
+#
+# Determine an IP address for a jail node. Lifted from CreateVnodes() above.
+#
+sub GetJailIP($;$)
+{
+    my ($self, $num) = @_;
+    my $ipbase;
+
+    $num = 2
+	if (!defined($num));
+    
+    #
+    # Need IP for jailed nodes.
+    # 
+    my $IPBASE = TBDB_JAILIPBASE();
+    my $IPBASE1;
+    my $IPBASE2;
+    if ($IPBASE =~ /^(\d+).(\d+).(\d+).(\d+)/) {
+	$IPBASE1 = $1;
+	$IPBASE2 = $2;
+    }
+    else {
+	print STDERR "*** GetJailIP: Bad IPBASE '$IPBASE'\n";
+	return undef;
+    }
+
+    #
+    # Determine ipbase from the control IP (jailed nodes).
+    #
+    my $interface = Interface->LookupControl($self);
+    if (!defined($interface)) {
+	print STDERR "*** GetJailIP: No control interface for $self\n";
+	return undef;
+    }
+    my $ctrlip = $interface->IP();
+    if (!defined($ctrlip) || $ctrlip eq "") {
+	print STDERR "*** GetJailIP: No control IP for $interface\n";
+	return undef;
+    }
+    my $tmp = ~inet_aton($CONTROL_NETMASK) & inet_aton($ctrlip);
+    $ipbase = unpack("N", $tmp);
+    if ($ipbase == 0 || $ipbase < 0 || $ipbase > 0x3fff) {
+	print STDERR "*** GetJailIP: Bad ipbase '$ipbase' for $interface\n";
+	return undef;
+    }
+    
+    my $nodenumlimit = $ISUTAH ? 200 : 254;
+    my $pnet = $IPBASE2;
+    my $pnode2 = int($ipbase);
+    while ($pnode2 > $nodenumlimit) {
+	$pnet++;
+	$pnode2 -= $nodenumlimit;
+    }
+    return "${IPBASE1}.${pnet}.${pnode2}.${num}";
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
