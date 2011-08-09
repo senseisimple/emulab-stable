@@ -161,10 +161,6 @@ sub FindVHostname($$)
 {
     my ($exp, $node) = @_;
     my $prefix = $OURDOMAIN;
-    if ($ELABINELAB == 1) {
-	$OUTERBOSS_NODENAME =~ /^[^.]+\.(.*)$/;
-	$prefix = $1;
-    }
     return $node->vname() . "." . $exp->eid() . "." . $exp->pid() . "."
 	. $prefix;
 }
