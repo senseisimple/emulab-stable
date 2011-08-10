@@ -8018,7 +8018,8 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 
-		if (!strcmp(row[1], "boss") || !strcmp(row[1], "boss+router")) {
+		if (!strcmp(row[1], "boss") || !strcmp(row[1], "boss+router") ||
+		    !strcmp(row[1], "boss+fs+router")) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "BOSSNODE=%s\n",
 				       row[3]);
 			bufp += OUTPUT(bufp, ebufp - bufp, "BOSSIP=%s\n",
