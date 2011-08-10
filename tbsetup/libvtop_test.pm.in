@@ -1132,6 +1132,7 @@ sub LoadVirtNodes($)
 			    $vnode->rpms(),
 			    $vnode->startupcmd(),
 			    $vnode->tarfiles(),
+			    $vnode->loadlist(),
 			    $vnode->failureaction(),
 			    $vnode->routertype() ]);
 
@@ -6291,7 +6292,7 @@ sub InitializePhysNode($$$)
 	#
 	# A normal user node (physical or virtual).
 	#
-	my ($cmdline,$rpms,$startupcmd,$tarfiles,
+	my ($cmdline,$rpms,$startupcmd,$tarfiles,$loadlist,
 	    $failureaction,$routertype) = @{ $virtnode->_settings() };
 
 	$osid = (defined($virtnode->_osinfo()) ?
@@ -6350,6 +6351,7 @@ sub InitializePhysNode($$$)
 		     "deltas"            => '', 
 		     "ready"             => 0,
 		     "startupcmd"        => $startupcmd || '',
+		     "loadlist"          => $loadlist || '',
 		     "failureaction"     => $failureaction,
 		     "routertype"        => $routertype);
 

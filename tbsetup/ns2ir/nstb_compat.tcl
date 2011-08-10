@@ -24,6 +24,7 @@ proc tb-set-node-service {service args} {}
 proc tb-add-node-service-hook {service args} {}
 proc tb-set-hardware {node type args} {}
 proc tb-set-node-os {node os {parentos 0}} {}
+proc tb-set-node-loadlist {node loadlist} {}
 proc tb-set-link-loss {src args} {}
 proc tb-set-lan-loss {lan rate} {}
 proc tb-set-node-rpms {node args} {}

@@ -66,6 +66,9 @@ Node instproc init {s} {
     # table).
     $self set osid ""
 
+    # And an alternate load list.
+    $self set loadlist ""
+
     # We have this for a bad, bad reason.  We can't expose $vhost variables
     # in ns files because assign can't yet handle fixing vnodes to vhosts (or
     # any other mapping constraints, since that would imply multiple levels 
@@ -177,6 +180,7 @@ Node instproc updatedb {DB} {
     $self instvar type
     $self instvar osid
     $self instvar parent_osid
+    $self instvar loadlist
     $self instvar cmdline
     $self instvar rpms
     $self instvar startup
@@ -356,6 +360,11 @@ Node instproc updatedb {DB} {
     if { $sharing_mode != "" } {
 	lappend fields "sharing_mode"
 	lappend values $sharing_mode
+    }
+
+    if { $loadlist != "" } {
+	lappend fields "loadlist"
+	lappend values $loadlist
     }
 
     if { $numeric_id != {} } {

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package libossetup;
@@ -164,7 +164,7 @@ sub osmap($$;$)
 # To avoid writing out all the methods.
 sub AUTOLOAD {
     my $self = shift;
-    my $type = ref($self) or die("$self is not an object\n");
+    my $type = ref($self) or die("$self is not an object");
 
     my $name = $AUTOLOAD;
     $name =~ s/.*://;   # strip fully-qualified portion
@@ -192,9 +192,9 @@ sub OperationList($)
 # Setup a reload of a node if we can find an image.
 # This goo constructs a hashed array of lists.
 #
-sub SetupReload($$$)
+sub SetupReload($$$$)
 {
-    my ($self, $node, $osinfo) = @_;
+    my ($self, $node, $osinfo, $auxload) = @_;
     my $type = $node->type();
 
     #
@@ -210,8 +210,23 @@ sub SetupReload($$$)
     }
 
     if ((my $image = $osinfo->MapToImage($type))) {
-	# Mark this node as needing this image. 
-	$node->_loadimage($image);
+	#
+	# We support aux image loading, but have to distingush between a boot
+	# load and an aux load, since an aux load should not change what is
+	# actually booted.
+	#
+	if ($auxload) {
+	    if (!defined($node->_loadimages())) {
+		$node->_loadimages([]);
+	    }
+	    my @list = @{ $node->_loadimages() };
+	    push(@list, $image);
+	    $node->_loadimages(\@list);
+	}
+	else {
+	    $node->_loadimages(undef);
+	    $node->_loadimage($image);
+	}
 	$node->_setupoperation($RELOAD);
     }
     else {
@@ -334,11 +349,9 @@ sub SetOS($$)
     my $imageable     = $node->imageable();
     my $osid          = $node->def_boot_osid();
     my $osinfo        = OSinfo->Lookup($osid);
+    my $loadlist      = $node->loadlist();
     my $experiment    = $self->experiment();
     my $pid           = $experiment->pid();
-    # Do we use def_boot_path anymore?
-    my $bootpath      = defined($node->def_boot_path()) && 
-	$node->def_boot_path() ne "";
 
     die_noretry("Could not map $osid to its object!")
 	if (!defined($osinfo));
@@ -358,7 +371,7 @@ sub SetOS($$)
 	$imageable = 1;
     }
 
-    if (!$bootpath && $imageable) {
+    if ($imageable) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
@@ -366,64 +379,22 @@ sub SetOS($$)
 	if (! $osinfo) {
 	    die_noretry("$node has no bootpath and no def_boot_osid set!");
 	}
+	$self->SetOSAux($node, $osinfo, 0);
+
 	#
-	# If there is an actual path, its an OSKit kernel not an image.
+	# Now look for additional loads. 
 	#
-	if (! defined($osinfo->path()) || $osinfo->path() eq "") {
-	    my $nextosinfo;
-	    
-	    #
-	    # Not an OSKit kernel.
-	    #
-	    if ($osinfo->IsGeneric()) {
-		#
-		# Map generic OSID to the specific one.
-		#
-		$nextosinfo = $osinfo->ResolveNextOSID($experiment);
-		if (!defined($nextosinfo)) {
-		    die_noretry("No next mapping for $osinfo on $node!\n");
-		}
-		print "Mapping $osinfo on $node_id to $nextosinfo\n";
-		$osinfo = $nextosinfo;
-	    }
-	    #
-	    # Make sure this OSID is actually loaded on the machine.
-	    #
-	    my $isloaded = $node->IsOSLoaded($osinfo);
-	    if ($isloaded < 0) {
-		die_noretry("Error determining if $osinfo ".
-			    "is loaded on $node\n");
-	    }
-	    if ($isloaded) {
-		#
-		# OSID is loaded, but might need to be cleaned.
-		#
-		if ($self->dolastload() &&
-		    defined($node->last_reservation()) &&
-		    $node->last_reservation() ne $pid) {
-		    $self->SetupReload($node, $osinfo);
-		}
-		elsif ($nextosinfo) {
-		    #
-		    # Seems like a bad place for this; if the OS was
-		    # mapped to something else that is already on the
-		    # disk, need to reset def_boot_osid.
-		    #
-		    if ($self->impotent()) {
-			print STDERR "$node_id:def_boot_osid --> $osinfo\n"
-			    if ($self->debug());
-		    }
-		    elsif ($node->OSSelect($osinfo, "def_boot_osid", 0)) {
-			die_noretry("Could not set boot OS to ".
-				    "$osinfo for $node");
-		    }
-		}
-	    }
-	    else {
-		#
-		# OS not loaded.
-		#
-		$self->SetupReload($node, $osinfo);
+	if ($loadlist) {
+	    my @osnamelist = split(",", $loadlist);
+
+	    foreach my $osname (@osnamelist) {
+		my $osinfo = OSinfo->Lookup($pid, $osname) ||
+		    OSinfo->LookupByName($osname);
+
+		die_noretry("Could not map $osname to its object!")
+		    if (!defined($osinfo));
+
+		$self->SetOSAux($node, $osinfo, 1);
 	    }
 	}
     }
@@ -432,6 +403,76 @@ sub SetOS($$)
     
     print STDERR "$node_id - $osinfo\n"
 	if ($self->debug());
+}
+
+#
+# Helper for above.
+#
+sub SetOSAux($$$$)
+{
+    my ($self, $node, $osinfo, $auxload) = @_;
+    my $node_id       = $node->node_id();
+    my $experiment    = $self->experiment();
+    my $pid           = $experiment->pid();
+    
+    #
+    # If there is an actual path, its an OSKit kernel not an image.
+    #
+    if (! defined($osinfo->path()) || $osinfo->path() eq "") {
+	my $nextosinfo;
+	    
+	#
+	# Not an OSKit kernel.
+	#
+	if ($osinfo->IsGeneric()) {
+	    #
+	    # Map generic OSID to the specific one.
+	    #
+	    $nextosinfo = $osinfo->ResolveNextOSID($experiment);
+	    if (!defined($nextosinfo)) {
+		die_noretry("No next mapping for $osinfo on $node!\n");
+	    }
+	    print "Mapping $osinfo on $node_id to $nextosinfo\n";
+	    $osinfo = $nextosinfo;
+	}
+	#
+	# Make sure this OSID is actually loaded on the machine.
+	#
+	my $isloaded = $node->IsOSLoaded($osinfo);
+	if ($isloaded < 0) {
+	    die_noretry("Error determining if $osinfo is loaded on $node\n");
+	}
+	if ($isloaded) {
+	    #
+	    # OSID is loaded, but might need to be cleaned.
+	    #
+	    if ($self->dolastload() &&
+		defined($node->last_reservation()) &&
+		$node->last_reservation() ne $pid) {
+		$self->SetupReload($node, $osinfo, $auxload);
+	    }
+	    elsif ($nextosinfo && !$auxload) {
+		#
+		# Seems like a bad place for this; if the OS was
+		# mapped to something else that is already on the
+		# disk, need to reset def_boot_osid.
+		#
+		if ($self->impotent()) {
+		    print STDERR "$node_id:def_boot_osid --> $osinfo\n"
+			if ($self->debug());
+		}
+		elsif ($node->OSSelect($osinfo, "def_boot_osid", 0)) {
+		    die_noretry("Could not set boot OS to $osinfo for $node");
+		}
+	    }
+	}
+	else {
+	    #
+	    # OS not loaded.
+	    #
+	    $self->SetupReload($node, $osinfo, $auxload);
+	}
+    }
 }
 
 #
@@ -465,13 +506,28 @@ sub LightUpNodes($@)
 	    if ($op == $NOSTATE);
 
 	if ($op == $RELOAD) {
-	    my $image = $node->_loadimage();
-		
-	    if (!exists($reloads{$image->imageid()})) {
-		$reloads{$image->imageid()} = [];
+	    my $image    = $node->_loadimage();
+	    my @images   = ($image);
+	    my $imageids = $image->imageid();
+	    my $auxloads = $node->_loadimages();
+
+	    #
+	    # Watch for multiple loads, but remember that the boot image
+	    # has to be last since libosload assumes that is the one to boot.
+	    #
+	    if (defined($auxloads)) {
+		foreach my $aux (@{ $auxloads }) {
+		    my $auxid = $aux->imageid();
+		    unshift(@images, $aux);
+		    $imageids = "${auxid},${imageids}";
+		}
 	    }
-	    push(@{ $reloads{$image->imageid()} }, $node);
-	    $action = "reloaded with $image";
+	    
+	    if (!exists($reloads{"$imageids"})) {
+		$reloads{"$imageids"} = [];
+	    }
+	    push(@{ $reloads{"$imageids"} }, $node);
+	    $action = "reloaded with @images";
 	}
 	elsif ($op == $REBOOT) {
 	    $reboots{$node_id} = $node;

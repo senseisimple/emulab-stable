@@ -614,6 +614,19 @@ proc tb-set-node-os {node os {parentos 0}} {
 	$node set parent_osid $parentos
     }
 }
+proc tb-set-node-loadlist {node loadlist} {
+    if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
+	var_import ::TBCOMPAT::osids
+	set oslist [split $loadlist ","]
+	foreach os $oslist {
+	    if {! [info exists osids($os)]} {
+		perror "\[tb-set-node-loadlist] Invalid osid $os."
+		return
+	    }
+	}
+    }
+    $node set loadlist $loadlist
+}
 proc tb-set-node-cmdline {node cmdline} {
     $node set cmdline $cmdline
 }
@@ -2076,8 +2089,8 @@ proc tb-set-node-inner-elab-role {node role} {
 	perror "\[tb-set-node-inner-elab-role] $node is not a node."
 	return
     }
-    if {[lsearch -exact {boss boss+router router ops ops+fs fs node} $role] == -1} {
-	perror "\[tb-set-node-inner-elab-role] type must be one of boss|boss+router|router|ops|ops+fs|fs|node"
+    if {[lsearch -exact {boss boss+router boss+fs+router router ops ops+fs fs node} $role] == -1} {
+	perror "\[tb-set-node-inner-elab-role] type must be one of boss|boss+router|boss+fs+router|router|ops|ops+fs|fs|node"
 	return
     }
     $node set inner_elab_role $role
