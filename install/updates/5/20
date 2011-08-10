@@ -1,0 +1,47 @@
+#
+# Doh! Forgot to create the logfile for the master frisbee server.
+#
+use strict;
+use libinstall;
+
+my $SYSLOG_CONF  = "/etc/syslog.conf";
+my $MFRISLOG     = "$TBROOT/log/mfrisbeed.log";
+my $CHMOD        = "/bin/chmod";
+my $CHGRP        = "/usr/bin/chgrp";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "mfrisbeedlog", "Create master frisbee server log", sub {
+	    Phase "syslog.conf", "Updating $SYSLOG_CONF", sub {
+		DoneIfEdited($SYSLOG_CONF);
+		BackUpFileFatal($SYSLOG_CONF);
+
+		AppendToFileFatal($SYSLOG_CONF,
+			  "!mfrisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/mfrisbeed.log");
+	    };
+	    Phase "logfile", "Creating $MFRISLOG", sub {
+		DoneIfExists($MFRISLOG);
+		CreateFileFatal($MFRISLOG);
+		ExecQuietFatal("$CHGRP tbadmin $MFRISLOG");
+		ExecQuietFatal("$CHMOD 640 $MFRISLOG");
+	    };
+	    Phase "syslogd", "Restarting syslogd", sub {
+		HUPDaemon("syslog");
+	    };
+	};
+    }
+
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    return 0;
+}
+1;
