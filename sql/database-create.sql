@@ -3841,6 +3841,7 @@ CREATE TABLE `user_sslcerts` (
   `created` datetime default NULL,
   `expires` datetime default NULL,
   `revoked` datetime default NULL,
+  `warned` datetime default NULL,
   `password` tinytext,
   `encrypted` tinyint(1) NOT NULL default '0',
   `DN` text,

@@ -1,0 +1,17 @@
+#
+# Add a warning date to user_sslcerts;
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (! DBSlotExists("user_sslcerts", "warned")) {
+	DBQueryFatal("alter table user_sslcerts add ".
+		     "  `warned` datetime default NULL after revoked");
+    }
+    return 0;
+}
+1;
