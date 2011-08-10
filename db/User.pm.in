@@ -1286,6 +1286,25 @@ sub SendVerifiedEmail($)
     return 0;
 }
 
+sub SendEmail($$$)
+{
+    my ($self, $subject, $body) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid        = $self->uid();
+    my $user_email = $self->usr_email();
+    my $user_name  = $self->name();
+
+    # Audit email.
+    SENDMAIL("$user_name <$user_email>", $subject, $body,
+	     undef, "Bcc: $TBAUDIT");
+
+    return 0;
+}
+
 #
 # Return group membership for a user.  
 #
