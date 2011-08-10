@@ -451,8 +451,9 @@ foreach my $power_id (keys %outlets) {
     }
 
     if (!$errors) {
-	foreach my $node (@nodes) {
-	    print "$node now ",($op eq "cycle" ? "rebooting" : $op),"\n";
+	foreach my $nodeid (@nodes) {
+	    my $node = $nodes{$nodeid};
+	    print "$nodeid now ",($op eq "cycle" ? "rebooting" : $op),"\n";
 	    if ($sendevent) {
 		my $oldstate = $node->eventstate();
 		my $newstate;
@@ -477,8 +478,8 @@ foreach my $power_id (keys %outlets) {
 		$node->SetEventState($newstate)
 		    if (defined($newstate) && $newstate ne $oldstate);
 	    }
-	    push(@wolnodes, $node)
-		if ($postwol{$node});
+	    push(@wolnodes, $nodeid)
+		if ($postwol{$nodeid});
 	}
     } else {
 	$exitval += $errors;
