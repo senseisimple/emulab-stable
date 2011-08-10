@@ -1687,6 +1687,7 @@ CREATE TABLE `images` (
   `global` tinyint(4) NOT NULL default '0',
   `mbr_version` varchar(50) NOT NULL default '1',
   `updated` datetime default NULL,
+  `format` varchar(8) NOT NULL default 'ndz',
   `access_key` varchar(64) default NULL,
   `auth_uuid` varchar(64) default NULL,
   `auth_key` varchar(512) default NULL,
@@ -2516,6 +2517,7 @@ CREATE TABLE `nodes` (
   `next_boot_path` text,
   `next_boot_cmd_line` text,
   `pxe_boot_path` text,
+  `next_pxe_boot_path` text,
   `rpms` text,
   `deltas` text,
   `tarballs` text,
@@ -4816,4 +4818,3 @@ CREATE TABLE `wires` (
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-

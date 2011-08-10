@@ -971,6 +971,7 @@ REPLACE INTO table_regex VALUES ('images','wholedisk','text','redirect','default
 REPLACE INTO table_regex VALUES ('images','mbr_version','text','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','max_concurrent','text','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','reboot_waittime','text','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','format','text','regex','^[-\\w]+$',1,8,NULL);
 
 REPLACE INTO table_regex VALUES ('node_types','new_type','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','node_type','text','regex','^[-\\w]+$',1,30,NULL);

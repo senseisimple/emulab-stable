@@ -1,0 +1,34 @@
+#
+# Support for WinPE/ImageX loaded images.
+# Need an image format field to identify when the process is needed.
+# Need a "one shot" PXE boot field too.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    
+    if (! DBSlotExists("images", "format")) {
+	DBQueryFatal("alter table images add ".
+		     "  `format` varchar(8) NOT NULL default 'ndz' ".
+		     "   after updated");
+	#
+	# Everything is considered an ndz image right now so we don't
+	# do any other fix-up here.
+	#
+	# At Utah we have other types (for motes, switches, etc),
+	# but probably not anywhere else.
+	#
+    }
+    if (! DBSlotExists("nodes", "next_pxe_boot_path")) {
+	DBQueryFatal("alter table nodes add ".
+		     "  `next_pxe_boot_path` text after `pxe_boot_path`");
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "('images','format','text','regex',".
+		 "'^[-\\\\w]+\$',1,8,NULL)");
+    return 0;
+}
+1;
