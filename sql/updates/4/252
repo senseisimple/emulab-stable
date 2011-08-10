@@ -37,12 +37,12 @@ sub DoUpdate($$$)
 
     DBQueryFatal("REPLACE INTO table_regex VALUES ".
 	 "('virt_nodes','inner_elab_role','text','regex',".
-	 "'^(boss|boss\\+router|boss\\+fs\\+router|router|ops|ops\\+fs|fs|node)\$',".
+	 "'^(boss|boss\\\\+router|boss\\\\+fs\\\\+router|router|ops|ops\\\\+fs|fs|node)\$',".
 	 "0,0,NULL)");
 
     DBQueryFatal("REPLACE INTO table_regex VALUES ".
 		 "('virt_nodes','loadlist','text','regex', ".
-		 " '^[-\\w\\.+,]+\$',2,256,NULL)");
+		 " '^[-\\\\w\\\\.+,]+\$',2,256,NULL)");
 
     return 0;
 }
