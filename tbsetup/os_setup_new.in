@@ -600,6 +600,10 @@ my $exit_code = (($experiment->canceled() || $MyStruct->noretry()) ? -1 :
 # If not failing for any reason, record some stats
 #
 if ($exit_code == 0) {
+    # Record some stats on the OS requested and the images loaded to
+    # the image_history table. Put in in an eval loop to catch any
+    # errors so they are non-fatal.
+    use strict;
     eval {
 	my ($exptidx, $state) =
 	    DBQuerySingleFatal("select idx,state from experiments ".
@@ -627,21 +631,27 @@ if ($exit_code == 0) {
 	}
 
 	my %todo;
-	foreach my $node_id ( keys(%osids) ) {
-	    $todo{$node_id} = [$osids{$node_id}];
-	}
-	foreach my $imageid ( keys(%reloads) ) {
-	    my @nodelist = @{ $reloads{$imageid} };
-	    foreach my $node_id (@nodelist) {
-		$todo{$node_id}[1] = $imageid;
+
+	# Collect the list of nodes and store the osid requested
+	# and the imageid loaded (if any).
+	foreach my $object (@{$MyStruct->OperationList()}) {
+	    foreach my $node_id (keys %{$object->{NODES}}) {
+		my $node = $object->{NODES}{$node_id};
+		my $osinfo = $node->_bootosinfo();
+		my $osid = $osinfo->osid();
+		my $op = $node->_setupoperation();
+		my $imageid = 0;
+		# Only set the imageid if the disk needed a reload
+		if ($op == $RELOAD) {
+		    my $image = $node->_loadimage();
+		    $imageid = $image->imageid();
+		}
+		$todo{$node_id} = [$osid, $imageid];
 	    }
 	}
 
 	foreach my $node_id ( keys(%todo) ) {
-	    #next unless defined $nodes{$node_id};
-
 	    my ($osid, $imageid) = @{$todo{$node_id}};
-	    $imageid = 0 unless defined $imageid;
 
 	    my $newly_alloc = exists $prev_alloc{$node_id} ? 0 : 1;
 	    $newly_alloc = 'NULL' if $cant_find_prev_alloc;
@@ -669,8 +679,6 @@ if ($exit_code == 0) {
 			 "       $log_session, '$req_type', '$phys_type', ".
 			 "       $req_os, $osid, $imageid)")
 		if (!$impotent);
-	    
-	    #$done{$node_id} = 1;
 	}
     };
     if ($@) {
