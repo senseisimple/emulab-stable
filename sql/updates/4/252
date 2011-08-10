@@ -1,0 +1,49 @@
+#
+# 1. Change elab role from enums to tinytext.
+# 2. Add a new inner_elab_role; boss+fs+router which makes boss the FSNODE
+# 3. Add loadlist to both virt_node and nodes for plumbing multi image load
+#    through from the NS parser.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (! DBSlotExists("virt_nodes", "loadlist")) {
+	DBQueryFatal("alter table virt_nodes add ".
+		     "  `loadlist` text after osname");
+    }
+    if (! DBSlotExists("nodes", "loadlist")) {
+	DBQueryFatal("alter table nodes add ".
+		     "  `loadlist` text after tarballs");
+    }
+    my $type = DBSlotType("virt_nodes", "inner_elab_role");
+    if (!$type) {
+	Fatal("Could not get type for 'inner_elab_role' in 'virt_nodes'");
+    }
+    if ($type =~ /boss/) {
+        DBQueryFatal("alter table virt_nodes modify inner_elab_role tinytext");
+    }
+
+    $type = DBSlotType("reserved", "inner_elab_role");
+    if (!$type) {
+	Fatal("Could not get type for 'inner_elab_role' in 'reserved'");
+    }
+    if ($type =~ /boss/) {
+        DBQueryFatal("alter table reserved modify inner_elab_role tinytext");
+    }
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+	 "('virt_nodes','inner_elab_role','text','regex',".
+	 "'^(boss|boss\\+router|boss\\+fs\\+router|router|ops|ops\\+fs|fs|node)\$',".
+	 "0,0,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "('virt_nodes','loadlist','text','regex', ".
+		 " '^[-\\w\\.+,]+\$',2,256,NULL)");
+
+    return 0;
+}
+1;
