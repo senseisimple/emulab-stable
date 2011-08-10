@@ -1375,16 +1375,17 @@ foreach $node (@nodenames) {
     #
     # Handle subnodes
     #
+    # XXX This breaks if subnodes can themselves have subnodes
     if ($current->is_subnode()) {
 	# We don't want to include subnodes unless their parent node is going
 	# to be in the ptop file too
-	if (!$nodes{$current->subnode_of()} ||
+	if (! exists($nodes{$current->subnode_of()}) ||
 	    $sharing_mode{$current->subnode_of()} ||
 	    !$nodetoavailable{$current->subnode_of()}) {
 	    # In fact, nuke it from %nodes so that we don't include its links,
 	    # either
 	    $nodetoavailable{$node} = 0;
-	    if (! $allnodes) {
+	    if (! $allnodes || ! exists($nodes{$current->subnode_of()})) {
 		delete $nodes{$node};
 		next;
 	    }
