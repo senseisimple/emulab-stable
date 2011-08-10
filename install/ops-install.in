@@ -62,6 +62,9 @@ my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 # True if we are also the FS node
 my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
 
+# Are we a VM on boss?
+my $OPSVM_ENABLE = @OPSVM_ENABLE@;
+
 # For /share export below.
 my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
 my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
@@ -831,6 +834,9 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     if ($ISFS) {
 	PhaseSkip("FSes are local");
     }
+    if ($OPSVM_ENABLE) {
+	PhaseSkip("FSes are mounted from outside the VM");
+    }
 
     Phase "mountpoints", "Creating mountpoints", sub {
 	foreach my $dir (@MOUNTPOINTS) {
@@ -1078,8 +1084,10 @@ Phase "ssh", "Allowing root ssh", sub {
 	if (! -e $AUTHKEYS) {
 	    CreateFileFatal($AUTHKEYS);
 	}
-	AppendToFileFatal($AUTHKEYS,
-			  "from=\"${BOSSNODE}\" $ident");
+	# This does not work when ops is a vm on boss.
+	$ident = "from=\"${BOSSNODE}\" $ident"
+	    if (!$OPSVM_ENABLE);
+	AppendToFileFatal($AUTHKEYS, $ident);
     };
 };
 

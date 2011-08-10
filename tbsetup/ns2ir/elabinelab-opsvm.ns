@@ -10,7 +10,7 @@
 # 
 set myboss [$ns node]
 
-tb-set-node-inner-elab-role $myboss boss+router
+tb-set-node-inner-elab-role $myboss boss+fs+router
 tb-set-elabinelab-attribute CONFIG_OPSVM 1
 tb-set-elabinelab-attribute OPSNODE myops
 
@@ -107,3 +107,4 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("boss")]} {
 } else {
     tb-set-node-os $myboss FBSD73-STD
 }
+tb-set-node-loadlist $myboss FBSD73-S2

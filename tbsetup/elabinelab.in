@@ -246,7 +246,7 @@ while (my ($node_id,$role) = $query_result->fetchrow_array()) {
 	
     $noderoles{$node_id} = $role;
     $bossnode = $node_id
-	if ($role eq 'boss' || $role eq 'boss+router');
+	if ($role =~ /^boss/);
     $routernode = $node_id
 	if ($role eq 'router');
     $opsnode = $node_id
@@ -304,12 +304,15 @@ my $mkextrafs = "";
 if (-e "$TB/etc/mkextrafs.pl") {
     $mkextrafs = "$TB/etc/mkextrafs.pl";
 }
-print "Copying $mkelab $mkextrafs to ${bossnode}/${opsnode}";
+print "Copying $mkelab $mkextrafs to ${bossnode}";
+print "/${opsnode}"
+    if (defined($opsnode));
 print "/${fsnode}"
     if (defined($fsnode));
 print "\n";
 system("scp $mkelab $mkextrafs ${bossnode}:/tmp");
-system("scp $mkelab $mkextrafs ${opsnode}:/tmp");
+system("scp $mkelab $mkextrafs ${opsnode}:/tmp")
+    if (defined($opsnode));
 system("scp $mkelab $mkextrafs ${fsnode}:/tmp")
     if (defined($fsnode));
 
@@ -330,20 +333,22 @@ if (defined($fsnode)) {
 	exit(($debug ? 0 : -1));
     }
 }
-TBDebugTimeStamp("Setting up opsnode");
-print "Setting up opsnode on $opsnode\n";
-system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > $opslogfile 2>&1");
-if ($?) {
-    $UID = $SAVEUID;
-    SENDMAIL("$user_name <$user_email>",
-	     "ElabInElab Failure: $pid/$eid",
-	     "Error building the ops node ($opsnode)",
-	     $TBOPS,
-	     "Cc: $TBOPS",
-	     ($opslogfile));
-    print STDERR "*** $0:\n".
-	         "    Error building the opsnode ($opsnode)!\n";
-    exit(($debug ? 0 : -1));
+if (defined($opsnode)) {
+    TBDebugTimeStamp("Setting up opsnode");
+    print "Setting up opsnode on $opsnode\n";
+    system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > $opslogfile 2>&1");
+    if ($?) {
+	$UID = $SAVEUID;
+	SENDMAIL("$user_name <$user_email>",
+		 "ElabInElab Failure: $pid/$eid",
+		 "Error building the ops node ($opsnode)",
+		 $TBOPS,
+		 "Cc: $TBOPS",
+		 ($opslogfile));
+	print STDERR "*** $0:\n".
+	             "    Error building the opsnode ($opsnode)!\n";
+	exit(($debug ? 0 : -1));
+    }
 }
 TBDebugTimeStamp("Setting up bossnode");
 print "Setting up bossnode on $bossnode\n";
@@ -404,7 +409,9 @@ if ($?) {
 }
 
 if ($inparallel) {
-    my $nodes = "$bossnode $opsnode";
+    my $nodes = "$bossnode";
+    $nodes .= " $opsnode"
+	if (defined($opsnode));
     $nodes .= " $fsnode"
 	if (defined($fsnode));
     print "Rebooting servers ($nodes).\n";
@@ -425,13 +432,15 @@ if ($inparallel) {
 		"    Error rebooting the fsnode ($fsnode)!\n");
 	}
     }
-    # Reboot ops and wait for it to come back.
-    print "Rebooting opsnode ($opsnode).\n";
-    TBDebugTimeStamp("Rebooting opsnode");
-    system("$nodereboot -w $opsnode");
-    if ($?) {
-	die("*** $0:\n".
-	    "    Error rebooting the opsnode ($opsnode)!\n");
+    if (defined($opsnode)) {
+	# Reboot ops and wait for it to come back.
+	print "Rebooting opsnode ($opsnode).\n";
+	TBDebugTimeStamp("Rebooting opsnode");
+	system("$nodereboot -w $opsnode");
+	if ($?) {
+	    die("*** $0:\n".
+		"    Error rebooting the opsnode ($opsnode)!\n");
+	}
     }
     # Reboot boss and wait for it to come back.
     print "Rebooting bossnode ($bossnode).\n";
@@ -626,6 +635,34 @@ sub DumpDBGoo()
 	    "    Could not chmod $statedir\n");
 
     #
+    # No place else for this; when ops is a vm on boss, need to generate
+    # a proper IP that is routable on the control network.
+    #
+    my $attributes = $experiment->GetElabInElabAttrs();
+    die("*** $0:\n".
+	"    Could not get elabinelab attributes\n")
+	if (!defined($attributes));
+
+    if (exists($attributes->{'CONFIG_OPSVM'}) && $attributes->{'CONFIG_OPSVM'}){
+	#
+	# Need to assign an IP to the ops node for the jail.
+	#
+	my $pnode = Node->Lookup($bossnode);
+	die("*** $0:\n".
+	    "    Could not lookup $bossnode\n")
+	    if (!defined($pnode));
+	my $ip = $pnode->GetJailIP();
+	die("*** $0:\n".
+	    "    Could not generate an IP for OPS jail\n")
+	    if (!defined($ip));
+	
+	print "Setting the IP for OPS jail to $ip\n";
+	$experiment->SetElabInElabAttr("boss", "OPSIP", $ip);
+	$experiment->SetElabInElabAttr("ops",  "OPSIP", $ip);
+	$experiment->SetElabInElabAttr("fs",   "OPSIP", $ip);
+    }
+
+    #
     # These tables are dumped completely.
     #
     my @FULLTABLES = ("node_types", "node_type_attributes", "interface_types",
@@ -712,7 +749,8 @@ sub DumpDBGoo()
 		     "where node_id='$fsnode'")
 	    if (defined($fsnode));
 	DBQueryFatal("update temp_${table} set node_id='ops' ".
-		     "where node_id='$opsnode'");
+		     "where node_id='$opsnode'")
+	    if (defined($opsnode));
 
 	if ($table eq "nodes") {
 	    DBQueryFatal("update temp_${table} set ".
@@ -950,10 +988,12 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not fs node_id in temp_interfaces\n");
     }
-    DBQueryWarn("update temp_interfaces set node_id='ops' ".
-		"where node_id='$opsnode'")
-	or die("*** $0:\n".
-	       "    Could not ops node_id in temp_interfaces\n");
+    if (defined($opsnode)) {
+	DBQueryWarn("update temp_interfaces set node_id='ops' ".
+		    "where node_id='$opsnode'")
+	    or die("*** $0:\n".
+		   "    Could not ops node_id in temp_interfaces\n");
+    }
 
     # Also add the interfaces that correspond to the "trunk" wires.
     DBQueryFatal("insert into temp_interfaces ".
@@ -986,10 +1026,12 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not fs node_id in temp_wires\n");
     }
-    DBQueryWarn("update temp_wires set node_id1='ops' ".
-		"where node_id1='$opsnode'")
-	or die("*** $0:\n".
-	       "    Could not ops node_id in temp_wires\n");
+    if (defined($opsnode)) {
+	DBQueryWarn("update temp_wires set node_id1='ops' ".
+		    "where node_id1='$opsnode'")
+	    or die("*** $0:\n".
+		   "    Could not ops node_id in temp_wires\n");
+    }
 
     if (! $elabinelab_singlenet) {
 	# But we need to take out the wires that are being used as the
@@ -1037,14 +1079,16 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not update temporary table temp_reserved\n");
     }
-    DBQueryWarn("update temp_reserved set ".
-		"   node_id='ops', ".
-		"   pid='$TBOPSPID', ".
-		"   eid='opsnodes', ".
-		"   exptidx=1 ".
-		"where node_id='$opsnode'")
-	or die("*** $0:\n".
-	       "    Could not update temporary table temp_reserved\n");
+    if (defined($opsnode)) {
+	DBQueryWarn("update temp_reserved set ".
+		    "   node_id='ops', ".
+		    "   pid='$TBOPSPID', ".
+		    "   eid='opsnodes', ".
+		    "   exptidx=1 ".
+		    "where node_id='$opsnode'")
+	    or die("*** $0:\n".
+		   "    Could not update temporary table temp_reserved\n");
+    }
     DBQueryWarn("select * from temp_reserved ".
 		"into outfile '$statedir/reserved'")
 	or die("*** $0:\n".
@@ -1170,7 +1214,8 @@ sub TearDownEmulab()
 		 "  temp_boot_osid=NULL ".
 		 "where " .
 		    join(" or ", map("node_id='$_'",
-				     ($bossnode, $opsnode,
+				     ($bossnode,
+				      defined($opsnode) ? $opsnode : (),
 				      defined($fsnode) ? $fsnode : (),
 				      @expnodes))));
     

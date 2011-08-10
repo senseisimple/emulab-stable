@@ -52,7 +52,19 @@ my $GROUPROOT   = "@GROUPSROOT_DIR@";
 my $USERROOT    = "@USERSROOT_DIR@";
 my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
 my $SHAREROOT	= "@SHAREROOT_DIR@";
+my $NOSHAREDFS  = @NOSHAREDFS@;
 my $ELVIN_COMPAT= @ELVIN_COMPAT@;
+
+# True if we are also the FS node
+my $ISFS	= ($BOSSNODE eq $FSNODE) ? 1 : 0;
+
+# Is ops a VM on boss?
+my $OPSVM_ENABLE     = @OPSVM_ENABLE@;
+my $OPSVM_MOUNTPOINT = "@OPSVM_MOUNTPOINT@";
+
+# For /share export below.
+my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
+my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
 
 #
 # Some programs we use
@@ -94,6 +106,8 @@ my $RCCONF          = "/etc/rc.conf";
 my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $INETD_CONF      = "/etc/inetd.conf";
+my $EXPORTS_FILE    = "/etc/exports";
+my $EXPORTS_HEAD    = "$EXPORTS_FILE.head";
 
 my $PROTOUSER_KEY   = "$TOP_SRCDIR/install/elabman_dsa.pub";
 my $ROOT_PRIVKEY    = "/root/.ssh/id_rsa";
@@ -181,15 +195,27 @@ my $CISCO_MIB_FTP = "ftp://ftp.cisco.com/pub/mibs/v2";
 # And some lists that we use
 #
 my @TESTBED_DIRS = ($PREFIX);
+my @EXPORTDIRS   = ();
 
-my @MOUNTPOINTS = ("$USERSVAR_DIR", "$OPSDIR_DIR",
-		   "$USERROOT", "$PROJROOT", "$GROUPROOT");
+my @MOUNTPOINTS = ("$USERROOT", "$PROJROOT", "$GROUPROOT");
 if ($SHAREDIR) {
     push(@MOUNTPOINTS, "$SHAREROOT");
 }
 if ($SCRATCHDIR) {
     push(@MOUNTPOINTS, "$SCRATCHROOT");
 }
+#
+# If we are the FS, then the above dirs already exist, but we *do*
+# have to export them. Note that the only reason to make boss the
+# FSNODE, is if ops is a VM on boss and there is no actual FSNODE.
+#
+if ($ISFS) {
+    @EXPORTDIRS = @MOUNTPOINTS;
+    @MOUNTPOINTS = ();
+}
+# But these always have to be mounted no matter where ops is.
+push(@MOUNTPOINTS, "$USERSVAR_DIR", "$OPSDIR_DIR")
+    if (!$OPSVM_ENABLE);
 
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
@@ -256,18 +282,24 @@ else {
 # a boss node. These are OS dependent as we upgrade.
 #
 my $BOSS_PORT = "emulab-boss-1.8";
+my $FS_PORT = "emulab-fs-1.4";
 if ($FBSD_MAJOR > 4) {
     if ($FBSD_MAJOR > 7) {
 	# XXX someday...
 	$BOSS_PORT = "emulab-boss-4.0";
+	$FS_PORT = "emulab-fs-4.0";
     } elsif ($FBSD_MAJOR == 7 && $FBSD_MINOR > 2) {
 	$BOSS_PORT = "emulab-boss-3.1";
+	$FS_PORT = "emulab-fs-3.1";
     } elsif ($FBSD_MAJOR == 7) {
 	$BOSS_PORT = "emulab-boss-3.0";
+	$FS_PORT = "emulab-fs-3.0";
     } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
 	$BOSS_PORT = "emulab-boss-2.1";
+	$FS_PORT = "emulab-fs-2.1";
     } else {
 	$BOSS_PORT = "emulab-boss-2.0";
+	$FS_PORT = "emulab-fs-2.0";
     }
 }
 
@@ -331,7 +363,7 @@ my $domakes  = 0;
 my $password;
 my %opts;
 
-if (! getopts("P:p:bsw:", \%opts)) {
+if (! getopts("P:p:bsw:F:", \%opts)) {
     usage();
 }
 if (defined($opts{p})) {
@@ -345,6 +377,9 @@ if (defined($opts{s})) {
 }
 if (defined($opts{w})) {
     $password = $opts{w};
+}
+if (defined($opts{F})) {
+    $FS_PORT = $opts{F};
 }
 if (defined($opts{P})) {
     $BOSS_PORT = $opts{P};
@@ -576,6 +611,17 @@ Phase "ports", "Installing ports", sub {
 	    };
 	}
     };
+    if ($ISFS) {
+	Phase "fs-packages", "Installing FS packages", sub {
+	    if (!ExecQuiet("$PKG_INFO -e $FS_PORT")) {
+		PhaseSkip("FS ports already installed");
+	    }
+	    if (!$packagedir) {
+		PhaseSkip("No package directory provided");
+	    }
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $FS_PORT");
+	};
+    }
     PhaseSkip("Package directory provided; not installing from sources")
 	if ($packagedir);
 
@@ -591,6 +637,16 @@ Phase "ports", "Installing ports", sub {
 		PhaseSkip("Patch already applied");
 	    }
 	    ExecQuietFatal("$PATCH -f -l -p0 -i $PHP4_PATCH");
+	};
+    }
+    if ($ISFS) {
+	Phase "fs-pinstall", "Installing FS ports (may take a while)", sub {
+	    if (!ExecQuiet("$PKG_INFO -e $FS_PORT")) {
+		PhaseSkip("Ports already installed");
+	    }
+	    chdir "$PORTSMISCDIR/emulab-fs" or
+		PhaseFail "Unable to change to $PORTSMISCDIR/emulab-fs: $!";
+	    ExecQuietFatal("make -DBATCH install");
 	};
     }
     PhaseFail("Please install ports manually, since some\n of them are " .
@@ -1143,9 +1199,12 @@ else {
 
 Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
     DoneIfEdited($HOSTS);
-    my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss".
-	      "\n${USERNODE_IP}\t@OPS_NAMES";
-    if ($USERNODE ne $FSNODE) {
+    my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss";
+    if ($ISFS) {
+	$hstr .= " fs";
+    }
+    $hstr .= "\n${USERNODE_IP}\t@OPS_NAMES";
+    if ($USERNODE ne $FSNODE && $BOSSNODE ne $FSNODE) {
 	$hstr .= "\n${FSNODE_IP}\t${FSNODE} fs";
     }
     AppendToFileFatal($HOSTS, $hstr);
@@ -1153,7 +1212,7 @@ Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
 
 Phase "resolve", "Checking to make sure names for boss/ops/fs resolve", sub {
     my @hnames = (@OPS_NAMES, ${BOSSNODE}, "boss");
-    if ($USERNODE ne $FSNODE) {
+    if ($USERNODE ne $FSNODE && !$ISFS) {
 	push @hnames, ${FSNODE}, "fs";
     }
     foreach my $name (@hnames) {
@@ -1168,7 +1227,80 @@ Phase "resolve", "Checking to make sure names for boss/ops/fs resolve", sub {
     }
 };
 
-Phase "NFSmounts", "Setting up NFS mounts", sub {
+Phase "exports", "Setting up exports", sub {
+    if (!$ISFS) {
+	PhaseSkip("Not FS Node");
+    }
+    Phase "ex.head", "Creating $EXPORTS_HEAD", sub {
+	DoneIfExists($EXPORTS_HEAD);
+
+	#
+	# Figure out which of these directories are on the same
+	# filesystems.  Note: we cannot do /share on the same exports line
+	# as the other filesystems because of the RO mount below (trust me).
+	#
+	my @dirs;
+	# XXX /share is not a separate partition when opsvm/elabinelab
+	if (!($OPSVM_ENABLE && $ELABINELAB)) {
+	    @dirs = grep(!/^$SHAREROOT$/, @EXPORTDIRS);
+	}
+	else {
+	    @dirs = @EXPORTDIRS;
+	}
+	@dirs = map {`realpath $_`} @dirs;
+	chomp @dirs;
+	my %filesystems;
+	foreach my $dir (@dirs) {
+	    my ($dev,@junk) = stat $dir;
+	    push @{$filesystems{$dev}}, $dir;
+	}
+
+	#
+	# Use that knowledge to create lines for /etc/exports.head
+	#
+	my @exports_lines;
+	foreach my $key (keys %filesystems) {
+	    push @exports_lines,
+		join(" ",@{$filesystems{$key}}) .
+		    "\t$BOSSNODE -maproot=root";
+	}
+
+	# XXX /share is not a separate partition when opsvm/elabinelab
+	if (!($OPSVM_ENABLE && $ELABINELAB)) {
+	    #
+	    # /share is special. We want to export to boss read-write,
+	    # but to the control network read-only.
+	    #
+	    my $realdir = `realpath $SHAREROOT`;
+	    chomp($realdir);
+	    push(@exports_lines,
+		 "$realdir\t$BOSSNODE -maproot=root");
+	    if (!$NOSHAREDFS) {
+		my ($a,$b,$c,$d) =
+		    ($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
+		push(@exports_lines,
+		     "$realdir\t-network ${a}.${b}.${c} ".
+		     "-mask $CONTROL_NETMASK -maproot=root -ro -alldirs");
+	    }
+	}
+
+	#
+	# Put them in exports.head, and copy that to /etc/exports
+	#
+	CreateFileFatal($EXPORTS_HEAD, @exports_lines);
+	ExecQuietFatal("cp $EXPORTS_HEAD $EXPORTS_FILE");
+    };
+
+    # XXX Newhup
+    Phase "mountd", "HUPing mountd", sub {
+	PhaseSkip("No new exports file") if PhaseWasSkipped("ex.head");
+	PhaseSkip("mountd not running")
+	    unless `ps -auxw | grep mountd | grep -v grep`;
+	ExecQuietFatal("killall -HUP mountd");
+    };
+};
+
+Phase "Mounts", "Setting up NFS mounts", sub {
     Phase "mountpoints", "Creating mountpoints", sub {
 	foreach my $dir (@MOUNTPOINTS) {
 	    Phase $dir, $dir, sub {
@@ -1183,20 +1315,25 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
 	my $nfsopt = "nosuid";
 	$nfsopt .= ",nodev"
 	    if ($FBSD_MAJOR < 7);
-	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
+	
+	my @lines = ();
+	if (! $ISFS) {
+	    @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
 		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,$nfsopt\t0\t0",
 		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,$nfsopt\t0\t0",
 		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,$nfsopt\t0\t0");
-	if ($SCRATCHDIR) {
 	    push(@lines,
-		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,$nfsopt\t0\t0");
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,$nfsopt\t0\t0")
+		if ($SCRATCHDIR);
 	}
-	push(@lines,
+	if (!$OPSVM_ENABLE) {
+	    push(@lines,
 	     "$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,-b,$nfsopt\t0\t0",
 	     "$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b,$nfsopt\t0\t0");
+	}
 	AppendToFileFatal($FSTAB, @lines);
     };
-    Phase "mounts", "Mounting NFS filesystems", sub {
+    Phase "mounts", "Mounting filesystems", sub {
 	foreach my $dir (@MOUNTPOINTS) {
 	    Phase $dir, $dir, sub {
 		DoneIfMounted($dir);
@@ -1204,6 +1341,20 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
 	    };
 	}
     };
+    if ($OPSVM_ENABLE) {
+	Phase "symlinks", "Symlinking to OPS VM", sub {
+	    Phase $OPSDIR_DIR, $OPSDIR_DIR, sub {
+		PhaseSkip("exists")
+		    if (-e $OPSDIR_DIR && -l $OPSDIR_DIR);
+		ExecQuietFatal("ln -s ${OPSVM_MOUNTPOINT}/usr/testbed $OPSDIR_DIR");
+	    };
+	    Phase $USERSVAR_DIR, $USERSVAR_DIR, sub {
+		PhaseSkip("exists")
+		    if (-e $USERSVAR_DIR && -l $USERSVAR_DIR);
+		ExecQuietFatal("ln -s ${OPSVM_MOUNTPOINT}/var $USERSVAR_DIR");
+	    };
+	};
+    }
 };
 
 #
@@ -1302,6 +1453,9 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
     Phase "keycopy2", "Copy root ssh keys to fs", sub {
 	if ($USERNODE eq $FSNODE) {
 	    PhaseSkip("FS node is ops node");
+	}
+	if ($BOSSNODE eq $FSNODE) {
+	    PhaseSkip("FS node is boss node");
 	}
 	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${FSNODE} pwd")) {
 	    PhaseSkip("Key already copied");
@@ -1551,6 +1705,9 @@ Phase "named", "Setting up initial named configuration", sub {
     Phase "copying2", "Copying resolv.conf over to fs", sub {
 	if ($USERNODE eq $FSNODE) {
 	    PhaseSkip("FS node is ops node");
+	}
+	if ($BOSSNODE eq $FSNODE) {
+	    PhaseSkip("FS node is boss node");
 	}
  	ExecQuietFatal("$SCP $TOP_OBJDIR/named/resolv.conf.ops ".
 		       "     ${FSNODE}:/etc/resolv.conf");

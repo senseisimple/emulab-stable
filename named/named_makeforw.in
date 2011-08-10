@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -126,7 +126,19 @@ while (<IF>) {
 		}
 	    }
 	    elsif ($2 eq "fsnode_ina") {
-		if ($USERNODE_IP ne $FSNODE_IP) {
+		if ($USERNODE_IP eq $FSNODE_IP) {
+		    $internal_strings .=
+                          "fs\t\tIN\tCNAME\tops\n";
+		    $external_strings .=
+                          "fs\t\tIN\tCNAME\tops\n";
+		}
+		elsif ($BOSSNODE_IP eq $FSNODE_IP) {
+		    $internal_strings .=
+                          "fs\t\tIN\tCNAME\tboss\n";
+		    $external_strings .=
+                          "fs\t\tIN\tCNAME\tboss\n";
+		}
+		else {
 		    #
 		    # If name is not "fs", we need an A record for that
 		    #
@@ -140,11 +152,6 @@ while (<IF>) {
                           "${FSTOKEN}\t\tIN\tA\t\t${FSNODE_IP}\n";
 		    $external_strings .=
                           "${FSTOKEN}\t\tIN\tA\t\t${EXTERNAL_FSNODE_IP}\n";
-		} else {
-		    $internal_strings .=
-                          "fs\t\tIN\tCNAME\tops\n";
-		    $external_strings .=
-                          "fs\t\tIN\tCNAME\tops\n";
 		}
 	    }
 	    elsif ($2 eq "fsnode_mx") {

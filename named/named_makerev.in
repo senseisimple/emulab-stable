@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -90,7 +90,7 @@ for (my $i = $ic; $i <= $ic + (255 - $imc); $i++) {
     if ($USERNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
 	print REV "${1}\tIN\tPTR\tops.${OURDOMAIN}.\n";
     }
-    if ($FSNODE_IP ne $USERNODE_IP &&
+    if ($FSNODE_IP ne $USERNODE_IP && $FSNODE_IP ne $BOSSNODE_IP &&
 	$FSNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
 	print REV "${1}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
     }
@@ -126,6 +126,7 @@ for (my $i = $ec; $i <= $ec + (255 - $emc); $i++) {
 	print REV "${1}\tIN\tPTR\tops.${OURDOMAIN}.\n";
     }
     if ($EXTERNAL_FSNODE_IP ne $EXTERNAL_USERNODE_IP &&
+	$EXTERNAL_FSNODE_IP ne $EXTERNAL_BOSSNODE_IP &&
 	$EXTERNAL_FSNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
 	print REV "${1}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
     }
