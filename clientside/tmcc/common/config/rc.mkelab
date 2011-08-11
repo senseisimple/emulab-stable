@@ -2365,6 +2365,7 @@ sub CreateDefsFile($)
     my $bossnode_ip     = $emulabconfig{"BOSSIP"};
     my $opsnode_ip      = $emulabconfig{"OPSIP"};
     my $fsnode_ip       = $emulabconfig{"FSIP"};
+    my $control_ip      = ($opsvm ? $bossnode_ip : $opsnode_ip);
     my $control_netmask = "255.255.255.0";
 
     #
@@ -2374,7 +2375,7 @@ sub CreateDefsFile($)
 	$control_netmask = $outer_netmask;
     }
     
-    my $control_network = inet_ntoa(inet_aton($opsnode_ip) &
+    my $control_network = inet_ntoa(inet_aton($control_ip) &
 				    inet_aton($control_netmask));
     # Put dynrange at the top.
     my $dynrange_low    = inet_ntoa(inet_aton($control_network) |
