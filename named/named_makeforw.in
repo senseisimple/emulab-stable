@@ -155,7 +155,8 @@ while (<IF>) {
 		}
 	    }
 	    elsif ($2 eq "fsnode_mx") {
-		if ("$USERNODE_IP" ne "$FSNODE_IP") {
+		if ("$USERNODE_IP" ne "$FSNODE_IP" &&
+                    "$BOSSNODE_IP" ne "$FSNODE_IP") {
 		    $internal_strings .= ${MXSTR};
 		    $external_strings .= ${MXSTR};
 		} else {
