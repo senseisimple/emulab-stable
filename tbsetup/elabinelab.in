@@ -418,8 +418,9 @@ if ($inparallel) {
     TBDebugTimeStamp("Rebooting servers");
     system("$nodereboot -w $nodes");
     if ($?) {
-	die("*** $0:\n".
-	    "    Error rebooting the servers ($nodes)!\n");
+	print STDERR "*** $0:\n".
+	    "    Error rebooting the servers ($nodes)!\n";
+	exit(($debug ? 0 : -1));
     }
 } else {
     if (defined($fsnode)) {
@@ -428,8 +429,9 @@ if ($inparallel) {
 	TBDebugTimeStamp("Rebooting fsnode");
 	system("$nodereboot -w $fsnode");
 	if ($?) {
-	    die("*** $0:\n".
-		"    Error rebooting the fsnode ($fsnode)!\n");
+	    print STDERR "*** $0:\n".
+		"    Error rebooting the fsnode ($fsnode)!\n";
+	    exit(($debug ? 0 : -1));
 	}
     }
     if (defined($opsnode)) {
@@ -438,8 +440,9 @@ if ($inparallel) {
 	TBDebugTimeStamp("Rebooting opsnode");
 	system("$nodereboot -w $opsnode");
 	if ($?) {
-	    die("*** $0:\n".
-		"    Error rebooting the opsnode ($opsnode)!\n");
+	    print STDERR "*** $0:\n".
+		"    Error rebooting the opsnode ($opsnode)!\n";
+	    exit(($debug ? 0 : -1));
 	}
     }
     # Reboot boss and wait for it to come back.
@@ -447,8 +450,9 @@ if ($inparallel) {
     TBDebugTimeStamp("Rebooting bossnode");
     system("$nodereboot -w $bossnode");
     if ($?) {
-	die("*** $0:\n".
-	    "    Error rebooting the bossnode ($bossnode)!\n");
+	print STDERR "*** $0:\n".
+	    "    Error rebooting the bossnode ($bossnode)!\n";
+	exit(($debug ? 0 : -1));
     }
 }
 $EUID = 0;
