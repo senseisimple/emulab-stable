@@ -565,6 +565,9 @@ sub doboot()
     elsif ($emulabconfig{"ROLE"} eq "opsjail") {
 	SetupOpsJail();
     }
+    elsif ($emulabconfig{"ROLE"} eq "node") {
+	;
+    }
     else {
 	fatal("Do not recognize role '", $emulabconfig{"ROLE"}, "'!\n";
     }
