@@ -313,7 +313,7 @@ foreach my $type (@types) {
 }
 DBQueryFatal("unlock tables");
 if ($current >= $count) {
-    print "Got as many nodes as you wanted the free pool. Yippie!\n";
+    print "Got as many nodes as you wanted from the free pool. Yippie!\n";
 }
 
 #
