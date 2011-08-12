@@ -1022,9 +1022,9 @@ sub SetStatus($$)
 #
 # Get user ssl certificate (pubkey). 
 #
-sub SSLCert($$$)
+sub SSLCert($$$;$)
 {
-    my ($self, $encrypted, $pref) = @_;
+    my ($self, $encrypted, $pref, $pkey) = @_;
     $encrypted = ($encrypted ? 1 : 0);
     
     # Must be a real reference. 
@@ -1034,15 +1034,17 @@ sub SSLCert($$$)
     my $uid_idx = $self->uid_idx();
 
     my $query_result =
-	DBQueryWarn("select cert from user_sslcerts ".
+	DBQueryWarn("select cert,privkey from user_sslcerts ".
 		    "where uid_idx='$uid_idx' and encrypted=$encrypted and ".
 		    "      revoked is null");
 		    
     return -1
 	if (!defined($query_result) || !$query_result->numrows);
 
-    my ($cert) = $query_result->fetchrow_array();
+    my ($cert,$privkey) = $query_result->fetchrow_array();
     $$pref = $cert;
+    $$pkey = $privkey
+	if (defined($pkey));
     return 0;
 }
 
@@ -1295,7 +1297,7 @@ sub SendEmail($$$)
 	if (! ref($self));
 
     my $uid        = $self->uid();
-    my $user_email = $self->usr_email();
+    my $user_email = $self->email();
     my $user_name  = $self->name();
 
     # Audit email.
