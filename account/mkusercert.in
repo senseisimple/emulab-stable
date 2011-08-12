@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -22,14 +22,15 @@ use User;
 # 
 sub usage()
 {
-    print("Usage: mkusercert [-d] [-o] [-g] [-p password] <user>\n");
+    print("Usage: mkusercert [-d] [-o] [-r] [-g] [-p password] <user>\n");
     exit(-1);
 }
-my $optlist  = "dp:og";
+my $optlist  = "dp:ogr";
 my $debug    = 0;
 my $output   = 0;
 my $password = "";
 my $geniflag = 0;
+my $reusekey = 0;
 
 #
 # Configure variables
@@ -93,6 +94,7 @@ $| = 1;
 # Function prototypes
 #
 sub fatal($);
+sub UserFatal($);
 
 #
 # Rewrite audit version of ARGV to prevent password in mail logs.
@@ -115,6 +117,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"r"})) {
+    $reusekey = 1;
 }
 if (defined($options{"g"})) {
     $geniflag = 1;
@@ -144,6 +149,9 @@ if (@ARGV != 1) {
 if ($geniflag && !$encrypted) {
     fatal("GENI certs must be encrypted (use -p password).");
 }
+if ($reusekey && !$encrypted) {
+    fatal("Cannot reuse the key for an unencrypted cert (use -p password).");
+}
 my $user = $ARGV[0];
 
 #
@@ -169,16 +177,6 @@ if (! defined($this_user)) {
 }
 
 #
-# This script is always audited. Mail is sent automatically upon exit.
-#
-if (AuditStart(0)) {
-    #
-    # Parent exits normally
-    #
-    exit(0);
-}
-
-#
 # CD to the workdir, and then serialize on the lock file since there is
 # some shared goop that the ssl tools muck with (serial number, index, etc.).
 # 
@@ -187,6 +185,54 @@ chdir("$WORKDIR") or
 
 TBScriptLock("mkusercert") == 0 or
     fatal("Could not get the lock!");
+
+#
+# Create a client side cert. Reuse the original key if are told to,
+# and it actually exists, and the password is valid.
+#
+# Do this before the AuditStart() so that user error goes back to web.
+#
+my $reqargs = "";
+
+if ($reusekey) {
+    my $privkey;
+    my $cert;
+    if ($target_user->SSLCert(1, \$cert, \$privkey)) {
+	$reusekey = 0;
+	goto newkey;
+    }
+
+    open(KEYF, "> usercert_key.pem") or
+	fatal("Could not create file to store existing private key");
+    print KEYF "-----BEGIN RSA PRIVATE KEY-----\n";
+    print KEYF $privkey;
+    print KEYF "-----END RSA PRIVATE KEY-----\n";
+    close(KEYF);
+
+    #
+    # Make sure the user provided the proper passphrase. 
+    #
+    system("$OPENSSL rsa -check -in usercert_key.pem ".
+	   "  -passin 'pass:${sh_password}' -noout >/dev/null 2>&1") == 0
+	   or UserFatal("Cannot decrypt private key. Correct pass phrase?");
+	   
+    $reqargs  = "-key usercert_key.pem -passin 'pass:${sh_password}' ";
+}
+else {
+  newkey:
+    $reqargs  = "-keyout usercert_key.pem";
+    $reqargs .= ($encrypted ? " -passout 'pass:${sh_password}' " : " -nodes ")
+}
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
 
 #
 # Get the user info (the user being operated on).
@@ -267,8 +313,7 @@ close(TEMP)
 # Create a client side private key and certificate request.
 #
 system("$OPENSSL req -new -config usercert.cnf ".
-       ($encrypted ? " -passout 'pass:${sh_password}' " : " -nodes ") .
-       " -keyout usercert_key.pem -out usercert_req.pem") == 0
+       "$reqargs -out usercert_req.pem") == 0
     or fatal("Could not create certificate request");
 
 #
@@ -420,4 +465,12 @@ sub fatal($) {
     TBScriptUnlock();
     die("*** $0:\n".
 	"    $mesg\n");
+}
+sub UserFatal($) {
+    my($mesg) = $_[0];
+
+    TBScriptUnlock();
+    print STDERR $mesg;
+    # Tell web interface to tell user. 
+    exit(1);
 }

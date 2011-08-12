@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -128,12 +128,29 @@ function SPITFORM($target_user, $formfields, $errors)
                          size=24></td>
           </tr>\n";
 
+    if (1) {
+	echo "<tr>
+  	          <td>Reuse Private Key?[<b>3</b>]:</td>
+		  <td class=left>
+		      <input type=checkbox
+			     name=\"formfields[reusekey]\"
+			     value=Yep";
+
+	if (isset($formfields["reusekey"]) &&
+	    strcmp($formfields["reusekey"], "Yep") == 0)
+	    echo "           checked";
+	    
+	echo "                       > Yes
+		  </td>
+	      </tr>\n";
+    }
+    
     #
     # Verify with password.
     #
     if (!$isadmin) {
 	echo "<tr>
-                  <td>Emulab Password[<b>3</b>]:</td>
+                  <td>Emulab Password[<b>4</b>]:</td>
                   <td class=left>
                       <input type=password
                              name=\"formfields[password]\"
@@ -157,7 +174,9 @@ function SPITFORM($target_user, $formfields, $errors)
             <li> You must supply a passphrase to use when encrypting the
                  private key for your SSL certificate. You will be prompted
                  for this passphrase whenever you attempt to use it. Pick
-                 a good one!";
+                 a good one!
+            <li> Reuse your existing private key unless you think it has been
+                 compromised. Must provide correct passphrase for your key.";
     if (!$isadmin) {
 	echo "<li> As a security precaution, you must supply your Emulab user
                  password when creating new ssl certificates. ";
@@ -171,6 +190,7 @@ function SPITFORM($target_user, $formfields, $errors)
 #
 if (! isset($_POST['submit'])) {
     $defaults = array();
+    $defaults["reusekey"] = "Yep";
     
     SPITFORM($target_user, $defaults, 0);
     PAGEFOOTER();
@@ -237,15 +257,43 @@ if (count($errors)) {
     return;
 }
 
+$reusekey = "";
+if (isset($formfields["reusekey"]) &&
+    strcmp($formfields["reusekey"], "Yep") == 0) {
+    $reusekey = "-r";
+}
+
 #
 # Insert key, update authkeys files and nodes if appropriate.
 #
 STARTBUSY("Generating Certificate");
-SUEXEC($target_uid, "nobody",
-       "webmkusercert -p " .
-       escapeshellarg($formfields["passphrase1"]) . " $target_uid",
-       SUEXEC_ACTION_DIE);
-STOPBUSY();
+$retval = SUEXEC($target_uid, "nobody",
+		 "webmkusercert $reusekey -p " .
+		 escapeshellarg($formfields["passphrase1"]) . " $target_uid",
+		 SUEXEC_ACTION_IGNORE);
+HIDEBUSY();
+
+#
+# Fatal Error. Report to tbops.
+# 
+if ($retval < 0) {
+    SUEXECERROR(SUEXEC_ACTION_DIE);
+    #
+    # Never returns ...
+    #
+    die("");
+}
+
+#
+# User Error. Report to user.
+#
+if ($retval > 0) {
+    $errors["PassPhrase"] = $suexec_output;
+    
+    SPITFORM($target_user, $formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
 
 #
 # Redirect back, avoiding a POST in the history.
