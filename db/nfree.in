@@ -597,6 +597,9 @@ foreach my $node (@freed_nodes) {
 	    DBQueryWarn("delete from last_reservation ".
 			"where node_id='$node_id'")
 		or $error++;
+
+	    # Handle pre-reserve.
+	    my $rpid = $node->CheckPreReserve($quiet);
 	}
 	next;
     }
@@ -611,6 +614,9 @@ foreach my $node (@freed_nodes) {
 	DBQueryWarn("replace into last_reservation (pid_idx,node_id,pid)".
 		    "values ($pid_idx, '$node_id', '$pid')");
     }
+
+    # Handle pre-reserve.
+    my $rpid = $node->CheckPreReserve($quiet);
 
     print "Releasing node '$node_id' ...\n"
 	if (!$quiet);

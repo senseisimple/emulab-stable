@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,7 +26,8 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   wanodecheckin wanodecreate spewimage \
                   anonsendmail epmodeset fixexpinfo node_traffic \
 		  dumpdescriptor subboss_tftpboot_sync testbed-control \
-		  archive-expinfo grantfeature emulabfeature addblob readblob
+		  archive-expinfo grantfeature emulabfeature addblob readblob \
+		  prereserve
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
                   webwanodecheckin webspewimage

@@ -2916,5 +2916,84 @@ sub GetJailIP($;$)
     return "${IPBASE1}.${pnet}.${pnode2}.${num}";
 }
 
+#
+# Check for, and update a node pre reservation.
+#
+sub CheckPreReserve($$)
+{
+    my ($self, $quiet) = @_;
+    my $result = undef;
+
+    #
+    # Look for a pre-reserve request.
+    #
+    my $type = $self->type();
+    my $node_id = $self->node_id();
+    
+    DBQueryWarn("lock tables node_reservations write, nodes write")
+	or return undef;
+
+    #
+    # Need to check for existing reserved_pid, but have to go to the DB,
+    # not look in the object ($self) since it might be stale.
+    #
+    my $query_result =
+	DBQueryWarn("select reserved_pid,count from nodes ".
+		    "left join node_reservations on ".
+		    "     node_reservations.pid=nodes.reserved_pid ".
+		    "where nodes.node_id='$node_id'");
+
+    goto done
+	if (!defined($query_result) || !$query_result->numrows);
+
+    #
+    # If there is a reserved pid already set for this node, check to see
+    # if the reervation request is still active. If not, we can clear it,
+    # which will allow it to be set again below, if needed.
+    #
+    my ($pid,$count) = $query_result->fetchrow_array();
+    if (defined($pid)) {
+	goto done
+	    if (defined($count));
+	
+	DBQueryWarn("update nodes set reserved_pid=null ".
+		    "where node_id='$node_id'");
+
+	if (!$quiet) {
+	    print "Clearing pre reserve for $node_id\n";
+	}
+    }
+    
+    $query_result =
+	DBQueryWarn("select pid from node_reservations ".
+		    "where count>0 and ".
+		    "       (types is null or ".
+		    "        FIND_IN_SET('$type', types)) ".
+		    "order by priority desc, created asc ".
+		    "limit 1");
+
+    goto done
+	if (!$query_result);
+    
+    if ($query_result->numrows) {
+	my ($pid) = $query_result->fetchrow_array();
+
+	if (DBQueryWarn("update nodes set reserved_pid='$pid' ".
+			"where node_id='$node_id'")) {
+	    
+	    DBQueryWarn("update node_reservations set count=count-1 ".
+			"where pid='$pid'");
+	    
+	    $result = $pid;
+	}
+    }
+  done:
+    DBQueryWarn("unlock tables");
+    if (defined($result) && !$quiet) {
+	print "Setting pre reserve for $node_id to $result\n";
+    }
+    return $result;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;

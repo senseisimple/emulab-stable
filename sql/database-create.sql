@@ -2356,6 +2356,23 @@ CREATE TABLE `node_idlestats` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `node_reservations`
+--
+
+DROP TABLE IF EXISTS `node_reservations`;
+CREATE TABLE `node_reservations` (
+  `pid` varchar(12) NOT NULL default '',
+  `pid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `priority` smallint(5) NOT NULL default '0',
+  `count` smallint(5) NOT NULL default '0',
+  `types` varchar(128) default NULL,
+  `creator` varchar(8) NOT NULL default '',
+  `creator_idx` mediumint(8) unsigned NOT NULL default '0',
+  `created` datetime default NULL,
+  PRIMARY KEY (`pid_idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `node_rusage`
 --
 
