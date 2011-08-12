@@ -1,0 +1,99 @@
+#
+# More support for WinPE/ImageX loaded images.
+# stated state machine definitions.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    my @mode_transitions = (
+	["PXEFBSD","SHUTDOWN","WIMRELOAD","SHUTDOWN",""],
+	["MINIMAL","SHUTDOWN","WIMRELOAD","SHUTDOWN",""],
+	["NETBOOT","SHUTDOWN","WIMRELOAD","SHUTDOWN",""],
+	["NORMAL","SHUTDOWN","WIMRELOAD","SHUTDOWN",""],
+	["NORMALv1","SHUTDOWN","WIMRELOAD","SHUTDOWN",""],
+	["NORMALv2","SHUTDOWN","WIMRELOAD","SHUTDOWN",""],
+	["WIMRELOAD","SHUTDOWN","PXEFBSD","SHUTDOWN",""],
+	["WIMRELOAD","SHUTDOWN","MINIMAL","SHUTDOWN",""],
+	["WIMRELOAD","SHUTDOWN","NETBOOT","SHUTDOWN",""],
+	["WIMRELOAD","SHUTDOWN","NORMAL","REBOOTING",""],
+	["WIMRELOAD","SHUTDOWN","NORMALv1","SHUTDOWN",""],
+	["WIMRELOAD","SHUTDOWN","NORMALv2","SHUTDOWN",""],
+	["WIMRELOAD","RELOADDONE","MINIMAL","SHUTDOWN",""],
+	["WIMRELOAD","RELOADDONE","NETBOOT","SHUTDOWN",""],
+	["WIMRELOAD","RELOADDONE","NORMAL","SHUTDOWN",""],
+	["WIMRELOAD","RELOADDONE","NORMALv1","SHUTDOWN",""],
+	["WIMRELOAD","RELOADDONE","NORMALv2","SHUTDOWN",""]
+    );
+    my @timeouts = (
+	["WIMRELOAD","SHUTDOWN",240,"REBOOT"],
+	["WIMRELOAD","RELOADSETUP",60,"NOTIFY"],
+	["WIMRELOAD","RELOADING",1800,"NOTIFY"],
+	["WIMRELOAD","RELOADDONE",60,"NOTIFY"]
+    );
+    my @transitions = (
+	["WIMRELOAD","SHUTDOWN","RELOADSETUP","BootOK"],
+	["WIMRELOAD","RELOADSETUP","RELOADING","ReloadStart"],
+	["WIMRELOAD","RELOADING","RELOADDONE","ReloadDone"],
+	["WIMRELOAD","SHUTDOWN","SHUTDOWN","Retry"],
+	["WIMRELOAD","SHUTDOWN","PXEBOOTING","WrongPXEboot"],
+	["WIMRELOAD","RELOADSETUP","SHUTDOWN","Error"],
+	["WIMRELOAD","RELOADING","SHUTDOWN","Error"]
+    );
+    my @triggers = (
+	["*","WIMRELOAD","RELOADDONE","PXERESET, RESET, RELOADDONE"],
+	["*","WIMRELOAD","PXEBOOTING","REBOOT"],
+	["*","WIMRELOAD","BOOTING","REBOOT"],
+	["*","WIMRELOAD","ISUP","REBOOT"]
+    );
+
+    foreach my $row (@mode_transitions) {
+	my ($opm1,$s1,$opm2,$s2,$lab) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode1 FROM mode_transitions WHERE ".
+			 "op_mode1='$opm1' AND state1='$s1' AND ".
+			 "op_mode2='$opm2' AND state2='$s2'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO mode_transitions VALUES ".
+			 "('$opm1','$s1','$opm2', '$s2','$lab')");
+	}
+    }
+
+    foreach my $row (@timeouts) {
+	my ($opm,$s,$to,$act) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode FROM state_timeouts WHERE ".
+			 "op_mode='$opm' AND state='$s'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_timeouts VALUES ".
+			 "('$opm','$s','$to', '$act')");
+	}
+    }
+
+    foreach my $row (@transitions) {
+	my ($opm,$s1,$s2,$lab) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode FROM state_transitions WHERE ".
+			 "op_mode='$opm' AND state1='$s1' AND state2='$s2'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_transitions VALUES ".
+			 "('$opm','$s1','$s2','$lab')");
+	}
+    }
+
+    foreach my $row (@triggers) {
+	my ($node,$opm,$s,$trig) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT node_id FROM state_triggers WHERE ".
+			 "node_id='$node' AND op_mode='$opm' AND state='$s'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_triggers VALUES ".
+			 "('$node','$opm','$s','$trig')");
+	}
+    }
+
+    return 0;
+}
+1;
