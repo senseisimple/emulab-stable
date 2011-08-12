@@ -400,7 +400,13 @@ sub AssignLoop()
 	#
 	# When precheck is off, we do a precheck run if the first try fails
 	# to find a solution. This avoids looping on an unsolvable topology.
+	# But, if the reason we are here is cause we could not allocate nodes,
+	# then we found a solution, and so trying on an empty testbed is
+	# pointless; it will obviously find a solution again.
 	#
+	if (!$precheck && !$tried_precheck && ($retval == 2 || $retval == 3)) {
+	    $tried_precheck = 1;
+	}
 	if (!$precheck && !$tried_precheck) {
 	    chat("Trying assign on an empty testbed to verify mapability.\n");
 	    my $save_impotent = $impotent;
