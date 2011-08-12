@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -232,6 +232,7 @@ $EUID = 0;
 #
 # Then the project table itself, plus a few other bits and pieces
 # 
+DBQueryFatal("delete FROM node_reservations where pid='$pid'");
 DBQueryFatal("delete FROM images where pid='$pid'");
 DBQueryFatal("delete FROM os_info where pid='$pid'");
 DBQueryFatal("delete FROM nodetypeXpid_permissions where pid='$pid'");
