@@ -33,7 +33,7 @@ my $info     = 0;
 my $list     = 0;
 my $clear    = 0;
 my $revoke   = 0;
-my $typelist;
+my $typelist = "";
 my $pid;
 my $count;
 
@@ -231,7 +231,7 @@ if ($info) {
 
 # Sanity check the type list.
 my @types = ();
-if (defined($typelist)) {
+if ($typelist ne "") {
     @types = split(",", $typelist);
     foreach my $typename (@types) {
 	my $type = NodeType->Lookup($typename);
@@ -266,8 +266,7 @@ if ($current) {
     print "There are currently $current nodes with a pre-reservation ".
 	"for project $pid.\n";
     if ($current >= $count) {
-	print "Not doing anything since you have as many as you wanted.\n";
-	exit(0);
+	goto done;
     }
 }
 
@@ -314,14 +313,16 @@ foreach my $type (@types) {
 }
 DBQueryFatal("unlock tables");
 if ($current >= $count) {
-    print "Got as many nodes as you wanted from the free pool. Yippie!\n";
+    print "Got as many nodes as you wanted the free pool. Yippie!\n";
 }
 
 #
 # Still need more nodes. Insert a node_reservation entry for nfree, for the
 # remaining nodes we need.
 #
+done:
 $count -= $current;
+$count = 0 if ($count < 0);
 
 DBQueryFatal("insert into node_reservations set ".
 	     "  pid='$pid', pid_idx='$pid_idx', count='$count', ".
