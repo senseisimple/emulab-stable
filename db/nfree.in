@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -351,8 +351,9 @@ if ($moveToOldReserved) {
 # NOTE: this does not happen very often. elabinelab, plabinelab?
 #
 foreach my $node (@freed_nodes) {
-    if ($node->pxe_boot_path() && $node->pxe_boot_path() ne "") {
-	$node->Update({"pxe_boot_path" => "NULL"}) == 0 or
+    if ($node->pxe_boot_path() || $node->next_pxe_boot_path()) {
+	$node->Update({"pxe_boot_path" => "NULL",
+		       "next_pxe_boot_path" => "NULL"}) == 0 or
 	    die("*** $0:\n".
 		"    Could not update pxe_boot_path for $node\n");
 	$mustmakeconf = 1;

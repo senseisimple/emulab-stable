@@ -1,0 +1,233 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# pxe_select sets the PXE boot program that should be loaded on a node,
+# either one time or permanently.
+
+sub usage() {
+    print <<"EOF";
+Usage: pxe_select -P [-c] [-1] [<path>] <node> [<node> ...]
+ -h    Display this help message
+ -d    Debug mode
+ -c    Clear the PXE boot path for nodes. Do not provide a path.
+       Either clears the one-time field (for -1) or resets to the default PXE boot.
+ -1    Apply change to one-time PXE boot field
+ -N    Do not restart dhcpd on a change
+ path  Path to PXE boot program (must be in /tftpboot)
+ node  Node identifiers (ie pcXX)
+EOF
+    exit(-1);
+}
+my $optlist = "hdc1lN";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+# Configure variables
+my $TB          = "@prefix@";
+my $TBOPS       = "@TBSTATEDEMAIL@";
+my $TBLOG	= "@TBLOGFACIL@";
+
+# Testbed Support libraries
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use OSinfo;
+use Node;
+use English;
+use Getopt::Std;
+use Sys::Syslog;
+
+# Constants
+my $makeconf = "$TB/sbin/dhcpd_makeconf";
+my $MBKERNEL = TB_OSID_MBKERNEL;
+my %osidmap = # Map some magic OSIDs to op_modes
+    ( $MBKERNEL => "MINIMAL");
+
+# Functions
+
+sub set_nextmode($;$);
+sub set_boot_osid($);
+sub node_opmode($);
+sub debug($;$);
+sub notify($);
+sub info($);
+sub fatal($);
+sub warning($);
+
+# Global vars
+my $debug	= 0; # debug/verbose
+my $oneshot	= 0; # apply change to next_boot_osid.
+my $clear       = 0; # Clear the selected boot (def,temp,next).
+my $list	= 0; # Just list the current settings.
+my $nochange	= 0; # Do not restart dhcpd on a change
+my @nodes       = ();
+my $pxebootpath = "";
+
+# Set up syslog
+openlog("pxeselect", "pid", $TBLOG);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) { usage(); }
+if (defined($options{"h"})) { usage(); }
+if (defined($options{"d"})) { $debug=1; }
+if (defined($options{"1"})) { $oneshot=1; }
+if (defined($options{"c"})) { $clear=1; }
+if (defined($options{"l"})) { $list=1; }
+if (defined($options{"N"})) { $nochange=1; }
+
+if (! ($clear || $list)) {
+    usage()
+	if (@ARGV < 2);
+    $pxebootpath = shift();
+
+    # Untaint args.
+    if ($pxebootpath !~ /\.\./ &&
+	$pxebootpath =~ /^(\/tftpboot\/[-\w\+\.\/]+)$/) {
+	$pxebootpath = $1;
+    }
+    else {
+	fatal("Bad path: '$pxebootpath'");
+    }
+}
+else {
+    usage()
+	if (@ARGV < 1);
+}
+
+# Untaint the nodes.
+foreach my $node ( @ARGV ) {
+    if ($node =~ /^([-\@\w]+)$/) {
+	$node = $1;
+    }
+    else {
+	fatal("Bad node name: $node");
+    }
+    push(@nodes, $node);
+}
+
+#
+# Figure out who called us. Only root, people with admin status
+# in the DB, or members of the right project can do this.
+#
+if ($UID && !TBAdmin($UID)) {
+    if ($list && !TBNodeAccessCheck($UID, TB_NODEACCESS_READINFO, @nodes)) {
+	fatal("pxe_select: You do not have permission to access ".
+	      "one or more of the nodes.\n");
+    }
+    if (!$list && !TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, @nodes)) {
+	fatal("pxe_select: You do not have permission to modify ".
+	      "one or more of the nodes.\n");
+    }
+}
+
+my $changed = 0;
+foreach my $node (@nodes) {
+    my $nodeobject = Node->Lookup($node);
+
+    # In list mode, show all the IDs
+    if ($list) {
+	my $npb = $nodeobject->next_pxe_boot_path();
+	my $pb = $nodeobject->pxe_boot_path();
+	if (!$pb) {
+	    $nodeobject->NodeTypeAttribute("pxe_boot_path", \$pb);
+	    if ($pb) {
+		$pb = "$pb (NODE TYPE DEFAULT)";
+	    } else {
+		$pb = "/tftpboot/pxeboot.emu (SYSTEM DEFAULT)";
+	    }
+	}
+	print "$node: ";
+	if ($npb) {
+	    print "next_pxeboot=$npb";
+	    print ", ";
+	}
+	if ($pb) {
+	    print "pxeboot=$pb";
+	}
+	print "\n";
+	next;
+    }
+
+    # The field to change in the DB. 
+    my $field  = "pxe_boot_path";
+    $field = "next_pxe_boot_path"
+	if ($oneshot);
+    my $did;
+    if ($nodeobject->PXESelect($pxebootpath, $field, $debug, \$did) != 0) {
+	fatal("PXESelect(): " . ($pxebootpath ? "$pxebootpath " : "") ."failed on $node");
+    }
+    $changed += $did;
+}
+
+#
+# Need to remake the dhcpd.conf file if we changed a
+# pxeboot path.
+#
+if (!$nochange && $changed) {
+    system("$makeconf -i -r") == 0 ||
+	notify("$makeconf failed!\n");
+}
+
+exit(0);
+
+sub debug($;$)
+{
+    my $msg = shift;
+    my $notice = shift || 0;
+    my $prio="info";
+    
+    if ($notice) { $prio = "notice"; }
+    
+    syslog($prio, $msg);
+    if ($debug) { print $msg; }
+}
+
+sub notify($)
+{
+    my $msg = shift;
+    
+    if (!$debug) {
+	SENDMAIL($TBOPS, "pxe_select error", $msg);
+    } 
+    debug($msg, 1);
+}
+
+sub info($)
+{
+    my $msg = shift;
+    
+    debug($msg);
+}
+
+sub fatal($)
+{
+    my $msg = shift;
+    
+    notify("FATAL: $msg\n");
+    exit(1);
+}
+
+sub warning($)
+{
+    my $msg = shift;
+    
+    info("WARNING: $msg\n");
+}
+
+# This is called when we exit with exit() or die()
+END {
+  closelog();
+}

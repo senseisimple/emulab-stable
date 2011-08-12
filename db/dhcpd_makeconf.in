@@ -213,7 +213,8 @@ while (<IF>) {
 		my $nodetype = $2;
 
 		$query_result =
-		    DBQueryWarn("select n.node_id,n.pxe_boot_path,n.type, ".
+		    DBQueryWarn("select n.node_id,n.type, ".
+				"       n.pxe_boot_path,n.next_pxe_boot_path,".
 				"       i.IP,i.MAC,r.pid,r.eid,r.vname, ".
 				"       r.inner_elab_role,r.inner_elab_boot, ".
 				"       r.plab_role,r.plab_boot ".
@@ -308,13 +309,17 @@ while (<IF>) {
 
 		    #
 		    # Handle alternate boot program filename if it exists.
-		    # Use mutable nodes.pxe_boot_path if it is defined.
+		    # Use mutable nodes.next_pxe_boot_path or
+		    # nodes.pxe_boot_path if one is defined.
 		    # Otherwise use the node_types.pxe_boot_path if it is
 		    # defined.  Otherwise don't set anything (use the global
 		    # default).
 		    #
-		    $filename = SetupPXEBoot($node_id, $mac, 1,
-					     $row{"pxe_boot_path"});
+		    my $pxeboot = $row{"next_pxe_boot_path"};
+		    if (!$pxeboot) {
+			$pxeboot = $row{"pxe_boot_path"};
+		    }
+		    $filename = SetupPXEBoot($node_id, $mac, 1, $pxeboot);
 		    if (!$filename) {
 			# Get the type info for this type.
 			my $nodetype = NodeType->Lookup($row{"type"});

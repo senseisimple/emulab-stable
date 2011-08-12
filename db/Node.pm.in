@@ -2628,6 +2628,34 @@ sub OSSelect($$$$)
     return Refresh($self);
 }
 
+#
+#
+#
+sub PXESelect($$$$$)
+{
+    my ($self, $path, $field, $debug, $changedp) = @_;
+    my $nodeid  = $self->node_id();
+    my $didit = 0;
+
+    print STDERR "Setting $field for $nodeid to '$path'.\n"
+	if ($debug && $path);
+
+    my $cur = ($field eq "pxe_boot_path") ?
+	$self->pxe_boot_path() : $self->next_pxe_boot_path();
+    $cur = "" if (!$cur);
+    if ($cur ne $path) {
+	DBQueryWarn("update nodes set ${field}=".
+		    ($path ? "'$path'" : "NULL") .
+		    " where node_id='$nodeid'")
+	    or return -1;
+	$didit = 1;
+    }
+    $$changedp = $didit
+	if (defined($changedp));
+
+    return Refresh($self);
+}
+
 sub ResetNextOpMode($$)
 {
     my ($self,$debug) = @_;

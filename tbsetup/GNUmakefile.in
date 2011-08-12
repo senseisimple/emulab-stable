@@ -26,6 +26,7 @@ BIN_STUFF	= power snmpit snmpit_new tbend tbprerun tbreport \
 		  node_reboot nscheck node_update savelogs node_control \
 		  portstats checkports eventsys_control os_select tbrestart \
 		  tbswap nseswap tarfiles_setup node_history tbrsync \
+		  pxe_select \
 		  archive_control template_create \
 		  template_swapin template_swapout template_graph \
 		  template_exprun template_delete template_metadata \

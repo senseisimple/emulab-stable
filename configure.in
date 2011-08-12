@@ -927,7 +927,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/power_mail.pm tbsetup/power_whol.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
-	tbsetup/node_reboot tbsetup/nscheck \
+	tbsetup/node_reboot tbsetup/nscheck tbsetup/pxe_select \
 	tbsetup/resetvlans tbsetup/rmuser tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
 	tbsetup/batchexp tbsetup/batch_daemon tbsetup/repos_daemon \

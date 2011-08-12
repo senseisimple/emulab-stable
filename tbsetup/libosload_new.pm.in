@@ -44,6 +44,11 @@ my $OUTERBOSS	= "@OUTERBOSS_NODENAME@";
 my $TBUISP	    = "$TB/bin/tbuisp";
 my $FRISBEE         = "$TB/sbin/frisbee";
 
+# XXX windows load
+my $MAKECONF	    = "$TB/sbin/dhcpd_makeconf";
+my $IMAGEX_OSNAME   = "IMAGEX-MFS";
+my $IMAGEX_PXEPATH  = "/tftpboot/pxelinux/winpe";
+
 #
 # Max number of retries (per node) before its deemed fatal. This allows
 # for the occasional pxeboot failure.
@@ -215,7 +220,7 @@ sub nodeflag($$$;$)
     return $retval;
 }
     
-# Get/Set the osid->osinfo mapping. Nice to keep this to avoid lookups.
+# Get/Set the imageid->images mapping. Nice to keep this to avoid lookups.
 sub imageinfo($$;$)
 {
     my ($self,$imageid,$imageinfo) = @_;
@@ -2188,6 +2193,7 @@ sub SetupReload($$)
 {
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
+    my $osinfo;
 
     $self->dprint(0,"SetupReload($node_id): setting up reload");
 
@@ -2208,9 +2214,24 @@ sub SetupReload($$)
     return -1
 	if (!$query_result);
 
+    # XXX windows load
+    my $needswinpe = 0;
+
     my $idx = 1;
     foreach my $imageid (@imageids) {
 	my $prepare0 = $idx == 1 && $prepare ? 1 : 0;
+
+	# XXX windows load
+	my $rowref = $self->imageinfo($imageid);
+	if (!defined($rowref)) {
+	    tberror "$self: Mike make a bad assumption!";
+	    return -1;
+	}
+	my $format = $rowref->{'format'};
+	if (defined($format) && $format eq "wim") {
+	    $needswinpe++;
+	}
+
 	my $query_result = 
 	    DBQueryWarn("insert into current_reloads ".
 			"(node_id, idx, image_id, mustwipe, prepare) values ".
@@ -2220,9 +2241,35 @@ sub SetupReload($$)
 	++$idx;
     }
 
-    my $osinfo = OSinfo->Lookup($osid);
+    # XXX windows load
+    if ($needswinpe) {
+	if (@imageids > 1) {
+	    tberror("$self: Cannot load more than one image with WinPE/ImageX");
+	    return -1;
+	}
+	# Look up the magic osid for the imageX loader
+	$osinfo = OSinfo->Lookup(TB_OPSPID, $IMAGEX_OSNAME);
+    }
+    else {
+	$osinfo = OSinfo->Lookup($osid);
+    }
+
     if ($nodeobject->OSSelect($osinfo,"next_boot_osid",$self->debug())) {
 	tberror "$self: os_select $osid failed!";
+	return -1;
+    }
+
+    # XXX windows load
+    # whether windows or not, we always make sure this is set correctly
+    my $changed = 0;
+    my $path = $needswinpe ? $IMAGEX_PXEPATH : "";
+    if ($nodeobject->PXESelect($path, "next_pxe_boot_path",
+			       $self->debug(), \$changed)) {
+	tberror "$self: pxe_select $path failed!";
+	return -1;
+    }
+    if ($changed && system("$MAKECONF -i -r")) {
+	tberror "$self: restart DHCPD failed!";
 	return -1;
     }
 

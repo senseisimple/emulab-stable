@@ -275,8 +275,11 @@ if (1) {
     }
 
     # fixup any nodes table entries with non-standard pxe_boot_path's
+    # and clear any one-shot values
     DBQueryFatal("update nodes set pxe_boot_path=NULL ".
 		 "  where pxe_boot_path is not NULL");
+    DBQueryFatal("update nodes set next_pxe_boot_path=NULL ".
+		 "  where next_pxe_boot_path is not NULL");
 
     #
     # Now symlink all the alternate boots to pxeboot.emu

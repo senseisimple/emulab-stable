@@ -9312,14 +9312,15 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 	mysql_free_result(res);
 
 	res = mydb_query("select n.node_id,n.pxe_boot_path,i.IP,i.mac,n.type,r.eid,r.pid,"
-			 "r.inner_elab_role,r.inner_elab_boot,r.plab_role,r.plab_boot "
+			 "r.inner_elab_role,r.inner_elab_boot,r.plab_role,r.plab_boot,"
+			 "n.next_pxe_boot_path "
 			 "from nodes as n "
 			 "left join subbosses as s on n.node_id = s.node_id "
 			 "left join interfaces as i on n.node_id = i.node_id "
 			 "left join reserved as r on n.node_id = r.node_id "
 			 "where s.subboss_id = '%s' and "
-	                 "s.service='dhcp' and i.role='ctrl' order by n.priority", 11,
-			 reqp->nodeid);
+	                 "s.service='dhcp' and i.role='ctrl' "
+			 "order by n.priority", 12, reqp->nodeid);
 
 	if (!res) {
 		error("dodhcpconf: %s: "
@@ -9475,7 +9476,17 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 			remain -= rc;
 		}
 
-		if (row[1] != NULL) {
+		if (row[11] && row[11][0]) {
+			rc = snprintf(b, remain, " FILENAME=\"%s\"", row[11]);
+
+			if (rc < 0) {
+				error("dodhcpdconf: error creating output\n");
+				return 1;
+			}
+
+			b += rc;
+			remain -= rc;
+		} else if (row[1] && row[1][0]) {
 			rc = snprintf(b, remain, " FILENAME=\"%s\"", row[1]);
 
 			if (rc < 0) {

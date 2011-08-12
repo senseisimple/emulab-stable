@@ -26,6 +26,7 @@ my $TBOPS = "@TBSTATEDEMAIL@";
 my $REALTBOPS = "@TBOPSEMAIL@";
 my $TBDBNAME = "@TBDBNAME@";
 my $REALTBDBNAME = "tbdb"; # So we know if we're using the "real" db
+my $pxeselect = "$TB/bin/pxe_select";
 my $osselect = "$TB/bin/os_select";
 my $nodereboot = "$TB/bin/node_reboot";
 my $rebootlog  = "$TB/log/nodereboot.log";
@@ -124,6 +125,7 @@ if ($opt{d}) {
 
 # Grab some constants into variables
 my $TBANYMODE    = TBDB_NODEOPMODE_ANY;
+my $TBPXERESET   = TBDB_TBCONTROL_PXERESET;
 my $TBRESET      = TBDB_TBCONTROL_RESET;
 my $TBTIMEOUT    = TBDB_TBCONTROL_TIMEOUT;
 my $PXEBOOT      = TBDB_TBCONTROL_PXEBOOT;
@@ -891,6 +893,12 @@ sub stateTransition($$) {
 		CheckPortRegistration($node);
 		next;
 	    };
+	    /^$TBPXERESET$/ && do {
+		# We successfully booted, so reset one-shot PXEboot if any
+		# Check if we really need to do a reset
+		handleCtrlEvent($node,$trig);
+		next;
+	    };
 	    /^$TBRESET$/ && do {
 		# We successfully booted, so clear some flags
 		$nodes{$node}{noretry}   = 0;
@@ -1050,6 +1058,21 @@ sub handleCtrlEvent($$) {
     info("CtrlEvent: $node, $event\n");
 
     foreach ($event) {
+	/^$TBPXERESET$/ && do {
+	    #
+	    # Clear next_pxe_boot_path with pxe_select.
+	    #
+	    # Note that this will recreate the DHCPD config file and HUP it.
+	    # It will also ssh over to any subbosses and do the same.
+	    # Thus there is lost of potential to get hung or take a long time.
+	    #
+	    $cmd = "$pxeselect -d -c -1 $node";
+	    system($cmd) and
+		notify("$node/$event: Could not clear next_pxe_boot_path!\n");
+
+	    info("Performed $TBPXERESET for $node\n");
+	    next;
+	};
 	/^$TBRESET$/ && do {
 	    #
 	    # Clear next_boot_path with os_select.
