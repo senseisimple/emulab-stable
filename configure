@@ -7404,6 +7404,7 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/tmcc/fedora/GNUmakefile clientside/tmcc/fedora/supfile \
  clientside/tmcc/linux-sg/GNUmakefile clientside/tmcc/ubuntu7/GNUmakefile \
  clientside/tmcc/ubuntu10/GNUmakefile \
+ clientside/tmcc/ubuntu11/GNUmakefile \
  clientside/tmcc/freebsd5/GNUmakefile clientside/tmcc/freebsd5/supfile \
  clientside/tmcc/freebsd6/GNUmakefile clientside/tmcc/freebsd6/supfile \
  clientside/tmcc/freebsd6/netif-emulab clientside/tmcc/freebsd7/GNUmakefile \

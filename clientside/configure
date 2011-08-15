@@ -4867,6 +4867,7 @@ outfiles="Makeconf GNUmakefile \
 	  tmcc/fedora/GNUmakefile tmcc/fedora/supfile \
 	  tmcc/linux-sg/GNUmakefile tmcc/ubuntu7/GNUmakefile \
 	  tmcc/ubuntu10/GNUmakefile \
+	  tmcc/ubuntu11/GNUmakefile \
 	  tmcc/freebsd5/GNUmakefile tmcc/freebsd5/supfile \
 	  tmcc/freebsd6/GNUmakefile tmcc/freebsd6/supfile \
 	  tmcc/freebsd6/netif-emulab tmcc/freebsd7/GNUmakefile \
