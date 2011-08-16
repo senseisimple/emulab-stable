@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,7 +40,6 @@ use Exporter;
 # Must come after package declaration!
 use English;
 use Data::Dumper;
-use Fcntl qw(:DEFAULT :seek);
 
 #
 # Turn off line buffering on output
