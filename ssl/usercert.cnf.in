@@ -9,7 +9,7 @@ req_extensions	        = request_extensions
 string_mask             = nombstr
 
 [ request_extensions ]
-basicConstraints=critical,CA:TRUE
+basicConstraints=critical,CA:FALSE
 subjectKeyIdentifier=hash
 subjectAltName=@req_altname
 
