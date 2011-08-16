@@ -357,7 +357,7 @@ if (! strcmp($showtype, "summary")) {
 # 
 $query_result =
     DBQueryFatal("select distinct n.node_id,n.phys_nodeid,n.type,ns.status, ".
-		 "   n.def_boot_osid, ".
+		 "   n.def_boot_osid,n.reserved_pid, ".
 		 "   if(r.pid is not null,r.pid,rp.pid) as pid, ".
 	         "   if(r.pid is not null,r.eid,rp.eid) as eid, ".
 		 "   nt.class, ".
@@ -497,6 +497,9 @@ if ($isadmin) {
     echo "<th align=center>PID</th>
           <th align=center>EID</th>
           <th align=center>Default<br>OSID</th>\n";
+    if (strcmp($showtype, "widearea")) {
+	echo "<th align=center>Reserved<br>PID</th>\n";
+    }
 }
 elseif (strcmp($showtype, "widearea")) {
     # Widearea nodes are always "free"
@@ -523,6 +526,7 @@ while ($row = mysql_fetch_array($query_result)) {
     $eid                = $row["eid"];
     $vname              = $row["vname"];
     $status             = $row["status"];
+    $reserved_pid	= $row["reserved_pid"];
 
     if (!strcmp($showtype, "widearea")) {	
 	$site         = $row["site"];
@@ -592,6 +596,12 @@ while ($row = mysql_fetch_array($query_result)) {
 	}
 	else
 	    echo "<td>&nbsp</td>\n";
+	if (strcmp($showtype, "widearea")) {
+	    if ($reserved_pid)
+		echo "<td>$reserved_pid</td>\n";
+	    else
+		echo "<td>&nbsp</td>\n";
+	}
     }
     elseif (strcmp($showtype, "widearea")) {
 	if ($pid)
