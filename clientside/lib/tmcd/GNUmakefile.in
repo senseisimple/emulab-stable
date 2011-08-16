@@ -28,6 +28,15 @@ LDFLAGS += $(LDSTATIC)
 CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
 SSLFLAGS = -DWITHSSL
 
+#
+# Kerberos foo for really old Linux clients
+#
+ifeq ($(SYSTEM),Linux)
+ifneq ($(wildcard /usr/kerberos/bin/krb5-config),)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+endif
+endif
+
 libtmcc.a:	ssl.o tpm.o 
 	$(AR) crv $@ ssl.o tpm.o
 	$(RANLIB) $@

@@ -16,6 +16,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/time.h>
 #include "decls.h"
 #include "utils.h"
 #include "uploadio.h"
