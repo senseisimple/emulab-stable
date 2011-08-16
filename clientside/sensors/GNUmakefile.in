@@ -12,9 +12,13 @@ SYSTEM         := $(shell uname -s)
 include $(OBJDIR)/Makeconf
 
 SUBDIRS		= slothd
+ifeq ($(SYSTEM),FreeBSD)
+FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 ifeq ($(FBSDVERSION),FreeBSD4)
 SUBDIRS	+= canaryd
 endif
+endif
+
 all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
