@@ -176,7 +176,11 @@ sub Create($$;$)
 	if (!defined($uuid));
     $url  = (defined($url) ? "-u $url" : "");
 
-    if (! open(CERT, "$MKCERT -i \"$urn\" $url -e \"$email\" $hrn $uuid |")) {
+    my ($authority, $type, $name) = GeniHRN::Parse($urn);
+    my $caflag = $type eq "authority" ? "" : "-n";
+
+    if (! open(CERT, "$MKCERT $caflag -i \"$urn\" $url -e \"$email\" $hrn " .
+	       "$uuid |")) {
 	print STDERR "Could not start $MKCERT\n";
 	return undef;
     }

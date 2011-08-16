@@ -23,7 +23,8 @@ use libtestbed;
 sub usage()
 {
     print("Usage: mksyscert [-d] [-o file] [-p password] [-e email] ".
-	  "[-u url] [-i urn] [-k keyfile] [-a authority] <orgunit> [uuid]\n");
+	  "[-u url] [-i urn] [-k keyfile] [-a authority] <orgunit> " .
+	  "[-n] [uuid]\n");
     exit(-1);
 }
 my $debug    = 0;
@@ -35,6 +36,7 @@ my @urls;
 my $urn;
 my $oldkeyfile;
 my $authority;
+my $notca    = 0;
 my %optlist = ( "debug" => \$debug,
 		"password=s" => \$password,
 		"output=s" => \$outfile,
@@ -43,7 +45,8 @@ my %optlist = ( "debug" => \$debug,
 		"url=s" => \@urls,
 		"identifier=s" => \$urn,
 		"keyfile=s" => \$oldkeyfile,
-		"authority=s" => \$authority );
+		"authority=s" => \$authority,
+		"notca" => \$notca );
 
 #
 # Configure variables
@@ -159,6 +162,8 @@ if (@ARGV < 1) {
 my $orgunit = shift(@ARGV);
 my $uuid    = (@ARGV ? shift(@ARGV) : undef);
 
+my $is_ca = !$notca;
+
 # Moved before uuid generation. Might be a race, might not.
 TBScriptLock("mkusercert") == 0 or
     fatal("Could not get the lock!");
@@ -212,6 +217,9 @@ system("cp -f $TEMPLATE syscert.cnf") == 0
 
 open(TEMP, ">>syscert.cnf")
     or fatal("Could not open $TEMPLATE for append: $!");
+
+print TEMP "basicConstraints=critical,CA:" .
+    ( $is_ca ? "TRUE" : "FALSE" ) . "\n\n";
 
 if (@urls) {
     my $count = 0;
