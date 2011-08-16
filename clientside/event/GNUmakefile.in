@@ -15,12 +15,16 @@ SUBDIRS		= program-agent link-agent tevc proxy linktest
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif
-ifeq ($(SYSTEM),FreeBSD)
 ifeq ($(WITH_EMULAB),1)
 # only in a full build for now.
+ifeq ($(SYSTEM),FreeBSD)
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+FBSDMAJ := $(basename $(FBSDREL))
 ifneq ($(FBSDMAJ),8)
+ifneq ($(FBSDMAJ),9)
 # doesn't build right now due to API changes
 SUBDIRS	       += delay-agent
+endif
 endif
 endif
 endif

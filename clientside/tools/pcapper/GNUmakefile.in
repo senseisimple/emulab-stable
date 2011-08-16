@@ -22,7 +22,9 @@ FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
 FBSDMAJ := $(basename $(FBSDREL))
 ifneq ($(FBSDMAJ),7)
 ifneq ($(FBSDMAJ),8)
+ifneq ($(FBSDMAJ),9)
 WITH_LTHREADS = 1
+endif
 endif
 endif
 endif

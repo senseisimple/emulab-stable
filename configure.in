@@ -1117,6 +1117,7 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/tmcc/freebsd/init/6/GNUmakefile \
  clientside/tmcc/freebsd/init/7/GNUmakefile \
  clientside/tmcc/freebsd/init/8/GNUmakefile \
+ clientside/tmcc/freebsd/init/9/GNUmakefile \
  clientside/tmcc/freebsd/supfile clientside/tmcc/freebsd/sethostname \
  clientside/tmcc/linux/GNUmakefile clientside/tmcc/linux/supfile \
  clientside/tmcc/linux/sethostname.dhclient \

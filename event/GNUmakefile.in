@@ -16,8 +16,6 @@ SYSTEM	       := $(shell uname -s)
 
 SUBDIRS		= proxy example
 ifeq ($(SYSTEM),FreeBSD)
-FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
-FBSDMAJ := $(basename $(FBSDREL))
 SUBDIRS	       += sched stated
 ifeq ($(ISMAINSITE),1)
 SUBDIRS        += new_sched

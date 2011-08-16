@@ -28,6 +28,9 @@ endif
 ifeq ($(FBSDVERSION),FreeBSD8)
 FSUBDIR	       = 8
 endif
+ifeq ($(FBSDVERSION),FreeBSD9)
+FSUBDIR	       = 9
+endif
 SUBDIRS	       = $(FSUBDIR)
 
 all:

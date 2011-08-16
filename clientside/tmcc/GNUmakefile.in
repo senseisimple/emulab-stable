@@ -89,6 +89,9 @@ endif
 ifeq ($(MDSUBDIR),freebsd8)
 MDSUBDIR  = freebsd7
 endif
+ifeq ($(MDSUBDIR),freebsd9)
+MDSUBDIR  = freebsd7
+endif
 endif
 
 ifeq ($(SYSTEM),Cygwin)

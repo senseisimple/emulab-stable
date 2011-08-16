@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -30,7 +30,6 @@
 #include <netdb.h>
 #include <signal.h>
 #include <syslog.h>
-#include <utmp.h>
 
 #ifdef __linux__
 #include <net/if.h>
