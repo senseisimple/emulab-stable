@@ -4727,7 +4727,8 @@ class elabinelab:
                                   res[0][1] + "/" + res[0][2]);
         
         # Must be the boss node that is making the request.
-        if (not (res[0][6] == "boss" or res[0][6] == "boss+router")):
+        if (not (res[0][6] == "boss" or res[0][6] == "boss+router"
+		 or res[0][6] == "boss+fs+router")):
             return EmulabResponse(RESPONSE_FORBIDDEN,
                                   output="Must be boss node accessing " +
                                   "elabinelab method for " +

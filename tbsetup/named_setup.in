@@ -164,8 +164,7 @@ while (my ($node_id,$pid,$eid,$vname,$erole) = $db_result->fetchrow_array()) {
     #
     # Special case for inner elab boss; add CNAME for www.
     #
-    if (defined($erole) &&
-        ($erole eq "boss" || $erole eq "boss+router")) {
+    if (defined($erole) && $erole =~ /boss/) {
         push @{$cnames{$node_id}}, "www.$eid.$pid";
     }
     #

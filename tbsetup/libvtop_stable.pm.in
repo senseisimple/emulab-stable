@@ -6094,9 +6094,7 @@ sub InitializePhysNode($$$)
 	    elsif ($pnode->_needslinkdelay()) {
 		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
 	    }
-	    elsif (defined($inner_elab_role) &&
-		   ($inner_elab_role eq "boss" ||
-		    $inner_elab_role eq "boss+router")) {
+	    elsif (defined($inner_elab_role) && $inner_elab_role =~ /boss/) {
 		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
 	    }
 	    if (!defined($cmdline)) {

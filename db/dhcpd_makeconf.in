@@ -144,6 +144,7 @@ my $query_result =
                 "     r.node_id=i.node_id ".
                 "where (r.inner_elab_role='boss' or ".
 		"       r.inner_elab_role='boss+router' or ".
+		"       r.inner_elab_role='boss+fs+router' or ".
 		"       r.plab_role='plc') and ".
 		"      i.role='$CRTLTAG' ");
 if (! $query_result) {

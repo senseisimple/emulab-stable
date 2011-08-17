@@ -9393,6 +9393,7 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 					  "r.eid = '%s' and r.pid = '%s' and "
 					  "(r.inner_elab_role = 'boss' or "
 					  "r.inner_elab_role = 'boss+router' or "
+					  "r.inner_elab_role = 'boss+fs+router' or "
 					  "r.plab_role='plc') and i.role='ctrl'", 1,
 					  row[5], row[6]);
 
