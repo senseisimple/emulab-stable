@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -565,6 +565,7 @@ elabinelab_hackcheck(struct sockaddr_in *target)
 
 	if (row[0] != 0 && row[0][0] != '\0') {
 		inet_aton(row[0], &(target->sin_addr));
+		mysql_free_result(res);
 		return 0;
 	}
 	mysql_free_result(res);
