@@ -4869,6 +4869,7 @@ outfiles="Makeconf GNUmakefile \
 	  tmcc/linux/xen/emulab-cnet \
 	  tmcc/linux9/GNUmakefile tmcc/linux9/supfile \
 	  tmcc/fedora/GNUmakefile tmcc/fedora/supfile \
+	  tmcc/fedora15/GNUmakefile \
 	  tmcc/linux-sg/GNUmakefile tmcc/ubuntu7/GNUmakefile \
 	  tmcc/ubuntu10/GNUmakefile \
 	  tmcc/ubuntu11/GNUmakefile \

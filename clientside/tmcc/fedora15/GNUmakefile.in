@@ -69,6 +69,10 @@ bin-install:	dir-install
 	@echo "no fedora-specific bin files"
 
 etc-install:	dir-install sysetc-remove sysetc-install
+	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
+	$(INSTALL) -m 644 $(SRCDIR)/passwd $(ETCDIR)/passwd
+	$(INSTALL) -m 600 $(SRCDIR)/shadow $(ETCDIR)/shadow
+	$(INSTALL) -m 600 $(SRCDIR)/gshadow $(ETCDIR)/gshadow
 	@echo "fedora-specific etc-install done"
 
 sysetc-install:	ifcfgs dir-install
@@ -78,6 +82,7 @@ sysetc-install:	ifcfgs dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd $(SYSETCDIR)/init.d/ntpd
 	$(INSTALL) -m 644 $(SRCDIR)/ifcfg-eth99 $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 744 $(SRCDIR)/ifup-emulabcnet $(SYSETCDIR)/sysconfig/network-scripts
 
 sysetc-remove:
 	rm -rf $(SYSETCDIR)/modules.conf $(SYSETCDIR)/ntp.conf $(SYSETCDIR)/cron.pend

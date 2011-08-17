@@ -7403,6 +7403,7 @@ outfiles="$outfiles clientside/GNUmakefile \
  clientside/tmcc/linux/xen/emulab-cnet \
  clientside/tmcc/linux9/GNUmakefile clientside/tmcc/linux9/supfile \
  clientside/tmcc/fedora/GNUmakefile clientside/tmcc/fedora/supfile \
+ clientside/tmcc/fedora15/GNUmakefile \
  clientside/tmcc/linux-sg/GNUmakefile clientside/tmcc/ubuntu7/GNUmakefile \
  clientside/tmcc/ubuntu10/GNUmakefile \
  clientside/tmcc/ubuntu11/GNUmakefile \

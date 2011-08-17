@@ -63,6 +63,7 @@ endif
 #	Windows XP  -> cygwinxp
 #
 MDSUBDIR  := $(shell $(SRCDIR)/osstuff.sh -t)
+MDREL     := $(shell $(SRCDIR)/osstuff.sh -r)
 
 ifeq ($(SYSTEM),Linux)
 ifeq ($(MDSUBDIR),redhat7)
@@ -72,7 +73,11 @@ ifeq ($(MDSUBDIR),redhat9)
 MDSUBDIR  = linux9
 endif
 ifeq ($(findstring fedora,$(MDSUBDIR)),fedora)
+ifeq ($(MDREL),15)
+MDSUBDIR  = fedora15
+else
 MDSUBDIR  = fedora
+endif
 endif
 ifeq ($(findstring centos,$(MDSUBDIR)),centos)
 MDSUBDIR  = fedora
