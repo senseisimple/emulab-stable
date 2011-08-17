@@ -39,6 +39,7 @@ $| = 1;
 
 use event;
 use libdb;
+use Node;
 use libtestbed;
 use TimeoutQueue;
 use Getopt::Std;
@@ -1055,6 +1056,13 @@ sub opModeTransition($$;$) {
 sub handleCtrlEvent($$) {
     my ($node,$event) = @_;
 
+    # stated should use the node objects.
+    my $nodeobj = Node->Lookup($node);
+    if (!defined($nodeobj)) {
+	notify("handleCtrlEvent: Could not lookup node object for $node!\n");
+	return;
+    }
+    $nodeobj->FlushReserved();
     info("CtrlEvent: $node, $event\n");
 
     foreach ($event) {
@@ -1086,16 +1094,21 @@ sub handleCtrlEvent($$) {
 	};
 	(/^$TBRELOADDONEV1$/ || /^$TBRELOADDONEV2$/) && do {
 	    info("Clearing reload info for $node\n");
-	    DBQueryFatal("delete from current_reloads where node_id='$node'");
-	    my ($pid,$eid);
-	    NodeidToExp($node,\$pid,\$eid);
-	    if (($pid eq NODERELOADING_PID) && ($eid eq NODERELOADING_EID)) {
-		DBQueryFatal("delete from scheduled_reloads ".
-			     "where node_id='$node'");
-		DBQueryFatal("delete from reserved where node_id='$node'");
-		TBSetNodeHistory($node, TB_NODEHISTORY_OP_FREE,
-				 $UID, $pid, $eid);
-		info("Released $node from $pid/$eid\n");
+	    $nodeobj->ClearCurrentReload();
+	    $nodeobj->FlushReserved();
+	    my $experiment = $nodeobj->Reservation();
+	    if (defined($experiment) &&
+		$experiment->pid() eq NODERELOADING_PID &&
+		$experiment->eid() eq NODERELOADING_EID) {
+		$nodeobj->ClearSchedReload();
+		my $reserved_pid = $nodeobj->CheckPreReserve(1);
+		if (defined($reserved_pid)) {
+		    info("Setting pre reserve for $node to $reserved_pid\n");
+		}
+		$nodeobj->ClearReservation();
+		$nodeobj->SetNodeHistory(TB_NODEHISTORY_OP_FREE,
+					 undef, $experiment);
+		info("Released $node from $experiment\n");
 	    }
 	    if ($event eq $TBRELOADDONEV2) {
 		info("Sending an apod to $node\n");
