@@ -220,7 +220,7 @@ push(@MOUNTPOINTS, "$USERSVAR_DIR", "$OPSDIR_DIR")
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
     "$LOGDIR/frisbeed.log", "$LOGDIR/mfrisbeed.log", "$LOGDIR/proxydhcpd.log",
-    "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
+    "$LOGDIR/stated.log", "$LOGDIR/osselect.log", "$LOGDIR/power.log",
     "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log", "$LOGDIR/genlastlog.log",
     "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log",
     "$LOGDIR/plabrenew.log", "$LOGDIR/sslxmlrpc.log", "$LOGDIR/pubsubd.log");
@@ -913,6 +913,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!mfrisbeed", "*.*\t\t\t\t\t\t$LOGDIR/mfrisbeed.log",
 	    "!pubsubd",   "*.*\t\t\t\t\t\t$LOGDIR/pubsubd.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log",
+	    "!power",     "*.*\t\t\t\t\t\t$LOGDIR/power.log",
 	    "!genlastlog","*.*\t\t\t\t\t\t$LOGDIR/genlastlog.log",
 	    "!sdcollectd","*.*\t\t\t\t\t\t$LOGDIR/sdcollectd.log",
 	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
