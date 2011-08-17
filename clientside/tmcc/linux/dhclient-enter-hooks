@@ -4,6 +4,7 @@
 # Copyright (c) 2004-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
+OLDETCDIR="$ETCDIR"
 . /etc/emulab/paths.sh
 
 #
@@ -11,6 +12,8 @@
 # thus screwing up its default setting.  Put a stop to that early on!
 #
 if [ xxx$interface = xxxlo ]; then
+    ETCDIR="$OLDETCDIR"
+    export ETCDIR
     exit_status=1
     return
 fi
@@ -93,3 +96,6 @@ elif [ "$new_network_number" = "10.200.1.0" ]; then
 fi
 
 echo "`date`: ${interface}: ${reason}: done" >>$LOGDIR/dhclient-enter.log 2>&1
+
+ETCDIR="$OLDETCDIR"
+export ETCDIR

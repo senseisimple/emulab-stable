@@ -4,12 +4,15 @@
 # Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
+OLDETCDIR="$ETCDIR"
 . /etc/emulab/paths.sh
 
 echo "`date`: ${interface}: ${reason}" >>$LOGDIR/dhclient-exit.log 2>&1
 
 if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
 then
+    ETCDIR="$OLDETCDIR"
+    export ETCDIR
     exit 0
 fi
 
@@ -26,6 +29,8 @@ fi
 if [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
     echo "`date`: ${interface}: exit with bad name server, removing..."
     cp /dev/null /etc/resolv.conf
+    ETCDIR="$OLDETCDIR"
+    export ETCDIR
     exit_status=1
     exit 1
 fi >>$LOGDIR/dhclient-exit.log 2>&1
@@ -48,6 +53,8 @@ fi
 # no hostname.  We don't need to record anything in this case, so skip it.
 #
 if [ x"$new_host_name" = x ]; then
+    ETCDIR="$OLDETCDIR"
+    export ETCDIR
     exit 0
 fi
 
@@ -77,5 +84,8 @@ echo "`date`: ${interface}: ${reason}: done" >>$LOGDIR/dhclient-exit.log 2>&1
 # The killing of dhclient and shutdown of other interfaces is handled
 # by the dhclient caller (sysconfig/network-scripts/ifcfg-eth99)
 #
+
+ETCDIR="$OLDETCDIR"
+export ETCDIR
 
 exit 0
