@@ -48,6 +48,8 @@ $ENV{'TBLOG_OFF'} = "yep";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
+use Node;
 use NodeType;
 
 #
@@ -154,6 +156,13 @@ $SIG{HUP} = \&handler
     if (!$debug);
 
 print "Reload Daemon starting... pid $$, at ".`date`;
+
+# We use this a lot.
+my $reloading_experiment = Experiment->Lookup($RELOADPID, $RELOADEID);
+if (!defined($reloading_experiment)) {
+    Fatal("Could not locate experiment object for $RELOADEID");
+    return;
+}
 
 #
 # Loop, looking for nodes to reload.
@@ -397,28 +406,28 @@ while (1) {
 	#
 	my %images = ();
 	my %imagenodes = ();
+	my %nodeobjs = ();
 	foreach $ref (@pending_list) {
 	    ($node, $mustwipe) = @{$ref};
-
-	    $query_result =
-	      DBQueryWarn("select image_id from scheduled_reloads " .
-			  "where node_id='$node'");
-
-	    if ((! $query_result) || (!$query_result->numrows())) {
+	    my $nodeobj = Node->Lookup($node);
+	    if (!defined($nodeobj)) {
+		notify("Could not local node object for $node\n");
+		next;
+	    }
+	    $nodeobjs{$node} = $nodeobj;
+	    
+	    my ($image_id, $reload_type) = $nodeobj->GetSchedReload();
+	    if (!defined($image_id)) {
 		#
 		# If this node didn't make it into the scheduled_reloads table
 		# for some reason, then we load it with the default image and
-		# type
+		# type.
 		#
 		$imageid = "";
-
-	    } else {
-		@row     = $query_result->fetchrow_array();
-		$imageid = $row[0];
 	    }
 
             # XXX Garcia Hack
-            if (TBNodeType($node) eq "garcia") {
+            if ($nodeobj->type() eq "garcia") {
                 $imageid = $gimageid;
             }
             # XXX End Garcia Hack
@@ -452,21 +461,15 @@ while (1) {
 	# We change the reservation EID over and fire up an os_load
 	# directly.
 	#
-	my $cond = "node_id in (" .
-	    join(",", map("'$_->[0]'", @pending_list)) . ")";
-	if (! DBQueryWarn("update reserved set ".
-			  "rsrv_time=now(),eid='$RELOADEID' ".
-			  "where $cond")) {
-	    print "Could not update EID for " .
-		join(" ", map("$_->[0]", @pending_list)) .
-		    ". Waiting a bit.\n";
-	    next;
-	} else {
-	    print "Pending nodes moved to $RELOADEID at ".`date`;
+	foreach $ref (@pending_list) {
+	    ($node, $mustwipe) = @{$ref};
+	    my $nodeobj = $nodeobjs{$node};
+	    next
+		if (!defined($nodeobj));
 
-	    foreach my $n (map("$_->[0]", @pending_list)) {
-		TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
-				 $RELOADPID, $RELOADEID);
+	    if ($nodeobj->MoveReservation($reloading_experiment) == 0) {
+		$nodeobj->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, undef,
+					 $reloading_experiment);
 	    }
 	}
 	# It is now safe to clear this.
@@ -596,37 +599,45 @@ while (1) {
 # (code stolen from stated).
 #
 sub freefromreloading($) {
-    my $node = shift;
-
-    DBQueryFatal("delete from current_reloads where node_id='$node'");
-    my ($pid,$eid);
-    NodeidToExp($node,\$pid,\$eid);
-    if ($pid eq $RELOADPID && ($eid eq $RELOADEID || $eid eq $PENDINGEID)) {
-	DBQueryFatal("delete from scheduled_reloads where node_id='$node'");
+    my $nodeid = shift;
+    my $node = Node->Lookup($nodeid);
+    if (!defined($node)) {
+	notify("Could not get node object for $nodeid\n");
+	return;
+    }
+    $node->FlushReserved();
+    $node->ClearCurrentReload();
+    my $experiment = $node->Reservation();
+    if (defined($experiment) &&
+	$experiment->pid() eq $RELOADPID &&
+	($experiment->eid() eq $RELOADEID ||
+	 $experiment->eid() eq $PENDINGEID)) {
+	$node->ClearSchedReload();
 
 	# Check if the robot is back in its pen, otherwise we have to throw it
 	# back to repositionpending.
 	my $loc_result =
 	    DBQueryWarn("SELECT * FROM reposition_status ".
-			"WHERE node_id='$node'");
+			"WHERE node_id='$nodeid'");
 
 	if ($loc_result->numrows) {
-	    if (!DBQueryWarn("update reserved set ".
-			     "rsrv_time=now(),eid='$RPPENDINGEID' ".
-			     "where node_id='$node'")) {
-		print "Could not update EID for $node. Waiting a bit.\n";
-	    } else {
+	    my $target_experiment =
+		Experiment->Lookup($RELOADPID, $RPPENDINGEID);
+	    if (!defined($target_experiment)) {
+		notify("Could not locate experiment object for $RPPENDINGEID\n");
+		return;
+	    }
+	    if ($node->MoveReservation($target_experiment) == 0) {
 		print "Reposition pending nodes moved to $RPPENDINGEID at ".
 		    `date`;
 		
-		TBSetNodeHistory($node, TB_NODEHISTORY_OP_MOVE, $UID,
-				 $REPOSPID, $RPPENDINGEID);
+		$node->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, undef,
+				      $target_experiment);
 	    }
 	}
 	else {
-	    DBQueryFatal("delete from reserved where node_id='$node'");
-	    TBSetNodeHistory($node, TB_NODEHISTORY_OP_FREE,
-			     $UID, $pid, $eid);
+	    $node->ClearReservation();
+	    $node->SetNodeHistory(TB_NODEHISTORY_OP_FREE, undef, $experiment);
 	}
     }
 }
