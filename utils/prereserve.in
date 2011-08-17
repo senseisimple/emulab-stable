@@ -33,7 +33,7 @@ my $info     = 0;
 my $list     = 0;
 my $clear    = 0;
 my $revoke   = 0;
-my $typelist = "";
+my $typelist;
 my $pid;
 my $count;
 
@@ -231,7 +231,7 @@ if ($info) {
 
 # Sanity check the type list.
 my @types = ();
-if ($typelist ne "") {
+if (defined($typelist)) {
     @types = split(",", $typelist);
     foreach my $typename (@types) {
 	my $type = NodeType->Lookup($typename);
@@ -323,10 +323,11 @@ if ($current >= $count) {
 done:
 $count -= $current;
 $count = 0 if ($count < 0);
+$typelist = (defined($typelist) ? "'$typelist'" : "NULL");
 
 DBQueryFatal("insert into node_reservations set ".
 	     "  pid='$pid', pid_idx='$pid_idx', count='$count', ".
-	     "  types='$typelist', creator='$uid', creator_idx='$uid_idx', ".
+	     "  types=$typelist, creator='$uid', creator_idx='$uid_idx', ".
 	     "  created=now()");
 print "Node reservation request for $count nodes has been created.\n";
 exit(0);
