@@ -93,6 +93,7 @@ sysetc-onceonly-install:
 	@$(MYINSTALL) $(SRCDIR)/emulab-ld.so.conf $(SYSETCDIR)/ld.so.conf.d/emulab.conf
 	@$(MYINSTALL) $(SRCDIR)/network $(SYSETCDIR)/sysconfig/network
 	@$(MYINSTALL) $(SRCDIR)/init $(SYSETCDIR)/sysconfig/init
+	@$(MYINSTALL) -m 644 $(SRCDIR)/i18n $(SYSETCDIR)/sysconfig/i18n
 	@$(MYINSTALL) -m 600 $(SRCDIR)/login.defs $(SYSETCDIR)/login.defs
 	@$(MYINSTALL) -m 600 $(SRCDIR)/securetty $(SYSETCDIR)/securetty
 	@$(MYINSTALL) -m 440 $(SRCDIR)/sudoers $(SYSETCDIR)/sudoers
