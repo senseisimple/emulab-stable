@@ -13,9 +13,10 @@ use vars qw(@ISA @EXPORT $AUTOLOAD @EXPORT_OK);
 @EXPORT = qw();
 
 # Configure variables
-use vars qw($TB $BOSSNODE $WOL $OSSELECT $ISUTAH $CONTROL_NETMASK);
+use vars qw($TB $BOSSNODE $WOL $OSSELECT $ISUTAH $CONTROL_NETMASK $TBOPS);
 $TB	     = "@prefix@";
 $BOSSNODE    = "@BOSSNODE@";
+$TBOPS       = "@TBOPSEMAIL@";
 $WOL         = "$TB/sbin/whol";
 $OSSELECT    = "$TB/bin/os_select";
 # XXX stinky hack detection
@@ -60,7 +61,6 @@ sub checknodeid($$)
 	if (!exists($carped{$nid}) && open(MAIL, "| /usr/sbin/sendmail -t")) {
 	    $carped{$nid} = 1;
 	    require Carp;
-	    my $TBOPS = "@TBOPSEMAIL@";
 	    print MAIL "To: $TBOPS\n";
 	    print MAIL "Subject: NUL in node_id '$nid' ('$onid')\n";
 	    print MAIL "$msg\n";
@@ -2351,6 +2351,68 @@ sub SetSchedReload($$;$)
     return 0;
 }
 
+sub GetSchedReload($)
+{
+    my ($self) = @_;
+
+    my $node_id = $self->node_id();
+
+    my $query_result =
+	DBQueryWarn("select image_id,reload_type from scheduled_reloads " .
+		    "where node_id='$node_id'");
+
+    return ()
+	if (! (defined($query_result) && $query_result->numrows));
+    
+    return $query_result->fetchrow_array();
+}
+
+sub ClearSchedReload($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    DBQueryWarn("delete from scheduled_reloads where node_id='$node_id'");
+
+    return 0;
+}
+
+sub ClearCurrentReload($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    DBQueryWarn("delete from current_reloads where node_id='$node_id'");
+
+    return 0;
+}
+
+sub ClearReservation($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    if (DBQueryWarn("delete from reserved where node_id='$node_id'")) {
+	$self->FlushReserved();
+    }
+    return 0;
+}
+
 #
 # Mark a node as down. We schedule a next reservation for it so that it
 # remains in the users experiment through the termination so that there
@@ -2965,7 +3027,7 @@ sub CheckPreReserve($$)
     }
     
     $query_result =
-	DBQueryWarn("select pid from node_reservations ".
+	DBQueryWarn("select pid,count from node_reservations ".
 		    "where count>0 and ".
 		    "       (types is null or ".
 		    "        FIND_IN_SET('$type', types)) ".
@@ -2976,7 +3038,7 @@ sub CheckPreReserve($$)
 	if (!$query_result);
     
     if ($query_result->numrows) {
-	my ($pid) = $query_result->fetchrow_array();
+	my ($pid,$count) = $query_result->fetchrow_array();
 
 	if (DBQueryWarn("update nodes set reserved_pid='$pid' ".
 			"where node_id='$node_id'")) {
@@ -2985,6 +3047,12 @@ sub CheckPreReserve($$)
 			"where pid='$pid'");
 	    
 	    $result = $pid;
+
+	    if ($count == 1) {
+		SENDMAIL($TBOPS, "Pre Reservation for $pid has completed",
+			 "The pre reservation request for project $pid, ".
+			 "has been fullfilled\n");
+	    }
 	}
     }
   done:
