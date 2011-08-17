@@ -569,7 +569,7 @@ sub doboot()
 	;
     }
     else {
-	fatal("Do not recognize role '", $emulabconfig{"ROLE"}, "'!\n";
+	fatal("Do not recognize role '". $emulabconfig{"ROLE"} ."'!\n");
     }
     print "Done!\n";
     return 0;
