@@ -29,12 +29,17 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $EMULAB_NS $XSI_NS $STITCH_NS
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2
+            $RSPEC_0_1_NS $RSPEC_0_2_NS $RSPEC_2_NS
+            $EMULAB_NS $XSI_NS $STITCH_NS
             $REQUEST_URL $MANIFEST_URL);
 $RSPEC_0_1 = "0.1";
 $RSPEC_0_2 = "0.2";
 $RSPEC_2 = "2";
 
+$RSPEC_0_1_NS = "http://www.protogeni.net/resources/rspec/0.1";
+$RSPEC_0_2_NS = "http://www.protogeni.net/resources/rspec/0.2";
+$RSPEC_2_NS = "http://www.protogeni.net/resources/rspec/2";
 $EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
 $XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
 $STITCH_NS = "http://hpn.east.isi.edu/rspec/ext/stitch/0.1/";
@@ -753,7 +758,7 @@ sub CreateDocument($$)
 {
     my ($ns, $name) = @_;
     my $doc = XML::LibXML::Document->createDocument("1.0", "UTF-8");
-    my $root = $doc->createElementNS($ns, "rs:$name");
+    my $root = $doc->createElementNS($ns, "$name");
     $doc->setDocumentElement($root);
     return $doc;
 }

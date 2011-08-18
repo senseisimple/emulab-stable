@@ -168,10 +168,19 @@ sub Lookup($$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
+    return LookupRow($class, $query_result->fetchrow_hashref());
+}
+
+#
+# Lookup a (physical) node based on an existing row from the database.
+# Useful for bulk lookups.
+#
+sub LookupRow($$)
+{
+    my ($class, $hash_orig) = @_;
     #
     # Make a copy of the array. Still fighting memory corruption error.
     #
-    my $hash_orig = $query_result->fetchrow_hashref();
     my $hash_copy = {};
     foreach my $key (keys(%{ $hash_orig })) {
 	my $val = $hash_orig->{$key};
@@ -190,7 +199,7 @@ sub Lookup($$)
 
     # XXX debug
     my $row = $self->{"DBROW"};
-    $nodeid = checknodeid($row->{'node_id'}, "From DB");
+    my $nodeid = checknodeid($row->{'node_id'}, "From DB");
 
     # Add to cache.
     $nodes{$nodeid} = $self;
@@ -739,6 +748,16 @@ sub IsReserved($)
     return 1;
 }
 
+#
+# Set reserved member based on a database row. Useful for bulk lookups.
+#
+sub SetReservedRow($$)
+{
+    my ($self, $reserved) = @_;
+    if ($reserved->{"node_id"} eq $self->node_id()) {
+	$self->{"RSRV"} = $reserved;
+    }
+}
 
 sub GetSubboss($$)
 {

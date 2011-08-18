@@ -1,0 +1,94 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# TODO: USER_COMPONENT --> No caching, willPrint, available, etc.
+
+use strict;
+use English;
+use Getopt::Std;
+use Math::BigInt;
+use List::Util 'shuffle';
+
+#use lib "@prefix@/lib";
+use lib "/usr/testbed/lib";
+use lib ".";
+use libdb;
+use libadminctrl;
+use libptopnew;
+use Experiment;
+use Lan;
+use Node;
+use NodeType;
+use GeniXML;
+
+sub processArgs();
+sub consultDatabase();
+sub process();
+sub printResults();
+
+libptopnew::Init();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+my $print_xml = 0;
+my $print_format = "CRAPPY";
+my $print_ns = $GeniXML::RSPEC_2_NS;
+
+processArgs();
+consultDatabase();
+printResults();
+
+sub processArgs()
+{
+}
+
+sub consultDatabase()
+{
+    my $dbresult;
+    my $row;
+    # Bulk lookup on nodes table
+    $dbresult = DBQueryFatal("select * from nodes");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	libptopnew::CreateNode($row);
+    }
+    # Bulk lookup on reserved table
+    $dbresult = DBQueryFatal("select * from reserved");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	libptopnew::Nodes()->{$row->{"node_id"}}->node()->SetReservedRow($row);
+    }
+
+    # Process each node adding ptypes and features
+    foreach my $current (values(%{ libptopnew::Nodes() })) {
+	if ($current->willPrint()) {
+	    $current->processSwitch();
+	    $current->processLocal();
+	    $current->processWidearea();
+	}
+    }
+}
+
+sub printResults()
+{
+    my $doc = GeniXML::CreateDocument($print_ns, "rspec");
+    my $rspec = $doc->documentElement();
+    foreach my $current (values(%{ libptopnew::Nodes() })) {
+	if ($current->willPrint()) {
+	    if ($print_xml) {
+		$current->toXML($rspec);
+	    } else {
+		print $current->toString()."\n";
+	    }
+	}
+    }
+    if ($print_xml) {
+	print GeniXML::Serialize($rspec, 1)."\n";
+    }
+}
