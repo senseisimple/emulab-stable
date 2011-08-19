@@ -11,8 +11,12 @@ use Exporter;
 use lib "/usr/testbed/lib";
 #use lib "@prefix@/lib";
 use Node;
-use libdb qw(TBGetSiteVar);
+use libdb qw(TBGetSiteVar DBQueryFatal);
 use vars qw(@ISA @EXPORT @EXPORT_OK);
+
+sub FD_ADDITIVE  { return "FD_ADDITIVE"; }
+sub FD_FIRSTFREE { return "FD_FIRSTFREE"; }
+sub FD_ONCEONLY  { return "FD_ONCEONLY"; }
 
 my $PGENISUPPORT = 1;
 my $OURDOMAIN = "jonlab.tbres.emulab.net";
@@ -36,41 +40,111 @@ my $user_project = undef;
 my $exempt_eid = undef;
 my $available_only = 0;
 my $print_widearea = 0;
-my $print_shared = 0;
+my $print_shared = 1;
+my $print_virtual = 1;
+my $print_sim = 1;
 my $genimode = 1;
+my $delaycap_override = undef;
+my $multiplex_override = undef;
 
 our %nodeList = ();
 our %linkList = ();
 # Table of which types the user project is allowed to have.
 # Keyed by type where 1 = allowed, 0 = denied, and ! exists = allowed
 our %permissions = ();
-
-sub Init()
-{
-    InitPermissions();
-}
+# Map from auxtype names to real type names
+our %auxtypemap = ();
+# Map from type names to lists of features
+our %typefeatures = ();
 
 #
 # Initialize project permissions table if the user specified a project.
 #
-sub InitPermissions()
+sub LookupPermissions()
 {
     if (defined($user_project)) {
         # By default a type is allowed for every project. If a type is
         # in the permissions table, it is allowed only for those
         # projects which it is attached to.
-	my $dbresult
-	    = DBQueryFatal("select distinct type ".
+	my $dbresult =
+	    DBQueryFatal("select distinct type ".
 			   "from nodetypeXpid_permissions");
-	while (my ($type) = $dbresult->fetchrow_array) {
+	while (my ($type) = $dbresult->fetchrow_array()) {
 	    $permissions{$type} = 0;
 	}
-	$dbresult
-	    = DBQueryFatal("select type ".
+	$dbresult =
+	    DBQueryFatal("select type ".
 			   "from nodetypeXpid_permissions".
 			   "where pid='$user_project'");
-	while (my ($type) = $dbresult->fetchrow_array) {
+	while (my ($type) = $dbresult->fetchrow_array()) {
 	    $permissions{$type} = 1;
+	}
+    }
+}
+
+sub LookupGlobalCounts()
+{
+    my $condition = " ";
+    if (defined($exempt_eid)) {
+	$condition = "and not (pid='$user_project' and eid='$exempt_eid') "
+    }
+    my $dbresult = 
+	DBQueryFatal("select phys_nodeid,count(phys_nodeid) ".
+		     "from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "where n.node_id!=n.phys_nodeid ".
+		     $condition.
+		     "group by phys_nodeid");
+    while (my ($node_id, $count) = $dbresult->fetchrow_array()) {
+	$nodeList{$node_id}->set_globalcount($count);
+    }
+}
+
+sub LookupAuxtypes()
+{
+    my $dbresult;
+    #
+    # Read the auxtypes for each type.
+    # 
+    $dbresult = DBQueryFatal("select auxtype,type from node_types_auxtypes");
+    while (my ($auxtype,$type) = $dbresult->fetchrow_array()) {
+	$auxtypemap{$auxtype} = $type;
+    }
+
+    #
+    # Read in the node_auxtypes table for each node.
+    #
+    $dbresult = DBQueryFatal("select node_id, type, count from node_auxtypes");
+    while (my ($node_id, $type, $count) = $dbresult->fetchrow_array()) {
+	$nodeList{$node_id}->addAuxtype($type, $count);
+    }
+}
+
+sub LookupFeatures()
+{
+    my $dbresult;
+    #
+    # Read the features table for each type.
+    # 
+    $dbresult =
+	DBQueryFatal("select type, feature, weight from node_type_features");
+    while (my ($type, $feature, $weight) = $dbresult->fetchrow()) {
+	if (! exists($typefeatures{$type})) {
+	    $typefeatures{$type} = [];
+	}
+	push(@{ $typefeatures{$type} }, $feature.":".$weight);
+    }
+
+    #
+    # Read the features table for each individual node
+    #
+    $dbresult =
+	DBQueryFatal("select node_id, feature, weight from node_features");
+    while (my ($node_id, $feature, $weight) = $dbresult->fetchrow()) {
+	my $pnode = $nodeList{$node_id};
+	if ($pnode->iswidearea()
+	    || ($pnode->islocal() && ! $pnode->node()->sharing_mode())) {
+	    $pnode->addFeatureString($feature.":".$weight);
 	}
     }
 }
@@ -102,7 +176,7 @@ sub CreateNode($)
 
 package libptop::pnode;
 
-use EmulabConstants;
+use libdb qw(TBOSID TB_OPSPID);
 
 sub Create($$)
 {
@@ -113,15 +187,20 @@ sub Create($$)
     $self->{'NODE'} = Node->LookupRow($row);
     $self->{'PTYPES'} = [];
     $self->{'FEATURES'} = [];
+    $self->{'GLOBALCOUNT'} = undef;
+    $self->{'AUXTYPES'} = {};
 
     bless($self, $class);
     return $self;
 }
 
 # Accessors
-sub name($)       { return $_[0]->{'NODE'}->node_id(); }
-sub node($)       { return $_[0]->{'NODE'}; }
-sub type($)       { return $_[0]->node()->NodeTypeInfo(); }
+sub name($)        { return $_[0]->{'NODE'}->node_id(); }
+sub node($)        { return $_[0]->{'NODE'}; }
+sub type($)        { return $_[0]->node()->NodeTypeInfo(); }
+sub globalcount($) { return $_[0]->{'GLOBALCOUNT'}; }
+
+sub set_globalcount { $_[0]->{'GLOBALCOUNT'} = $_[1]; }
 
 sub available($;$)
 {
@@ -263,16 +342,37 @@ sub willPrint($;$)
     return $result;
 }
 
-sub addPType($$)
+sub addPType($$$;$)
 {
-    my ($self, $newType) = @_;
-    push(@{ $self->{'PTYPES'} }, $newType);
+    my ($self, $newname, $newvalue, $newstatic) = @_;
+    push(@{ $self->{'PTYPES'} },
+	 libptop::pnode_type->Create($newname, $newvalue, $newstatic));
 }
 
-sub addFeature($$)
+sub addFeature($$$;$$)
 {
-    my ($self, $newFeature) = @_;
-    push(@{ $self->{'FEATURES'} }, $newFeature);
+    my ($self, $newname, $newvalue, $newflag, $newvolatile) = @_;
+    push(@{ $self->{'FEATURES'} },
+	 libptop::feature->Create($newname, $newvalue,
+				  $newflag, $newvolatile));
+}
+
+sub addFeatureString($$)
+{
+    my ($self, $newfeature) = @_;
+    push(@{ $self->{'FEATURES'} },
+	 libptop::feature->CreateFromString($newfeature));
+}
+
+sub addFlag($$$)
+{
+    my ($self, $key, $value) = @_;
+}
+
+sub addAuxtype($$$)
+{
+    my ($self, $key, $value) = @_;
+    $self->{'AUXTYPES'}->{$key} = $value;
 }
 
 sub processSwitch($)
@@ -283,14 +383,13 @@ sub processSwitch($)
     }
 
     # Add switch and lan types
-    $self->addPType(libptop::pnode_type->Create("switch", 1));
-    if (!(defined($MAINSITE) && $MAINSITE
-	  && $self->name() eq "procurve1")) {
-	$self->addPType(libptop::pnode_type->Create("lan", undef, 1));
+    $self->addPType("switch", 1);
+    if (!(defined($MAINSITE) && $MAINSITE && $self->name() eq "procurve1")) {
+	$self->addPType("lan", undef, 1);
     }
 
     # Add real-switch feature
-    $self->addFeature(libptop::feature->Create("real-switch", 0));
+    $self->addFeature("real-switch", 0);
 }
 
 sub processLocal($)
@@ -299,6 +398,219 @@ sub processLocal($)
     if (! $self->islocal()) {
 	return;
     }
+    my $node = $self->node();
+    my $type = $self->type();
+    # XXX temporary hack until node reboot avoidance 
+    # is available. Nodes running the FBSD-NSE image
+    # will have a feature def-osid-fbsd-nse 0.0
+    # This is used by assign to prefer these pnodes
+    # first before using others.
+    if($node->def_boot_osid() && 
+       $node->def_boot_osid() eq  TBOSID(TB_OPSPID, "FBSD-NSE")) { 
+	$self->addFeature("FBSD-NSE", 0.0);
+    }
+    $self->addPType($node->type(), 1);
+    # Might be equal, which assign would sum as two, not one!
+    #
+    # XXX: Temporary hack - don't mark switches that are testnodes
+    # as having class 'switch' - assign treats those specially. We
+    # use the knowledge that 'real' switches don't hit this point!
+    #
+    if ($node->type() ne $node->class() && $node->class() ne "switch") {
+	$self->addPType($node->class(), 1);
+    }
+
+    $self->addDelayCapacity();
+    if ($node->sharing_mode()) {
+	$self->addShared();
+    }
+    $self->processAuxtypes();
+}
+
+sub addDelayCapacity($)
+{
+    my ($self) = @_;
+    my $delay = $self->type()->delay_capacity();
+    if (defined($delaycap_override) &&
+	$delaycap_override > 0 &&
+	$delaycap_override < $delay) {
+	$delay = $delaycap_override
+    }
+    $self->addPType("delay", $delay);
+    $self->addPType("delay-".$self->node()->type(), $delay);
+    
+}
+
+#
+# Shared mode features
+#
+sub addShared($)
+{
+    my ($self) = @_;
+    my $node = $self->node();
+    #
+    # Add a feature that says this node should not be picked
+    # unless the corresponding desire is in the vtop. This
+    # allows the node to be picked, subject to other type constraints.
+    #
+    $self->addFeature("pcshared", 1.0, undef, 1);
+
+    #
+    # The pool daemon may override the share weight.
+    #
+    my $sharedweight = undef;
+    $node->NodeAttribute("shared_weight", \$sharedweight);
+    if (defined($sharedweight)) {
+	$self->addFeature("shareweight", $sharedweight);
+    } else {
+	#
+	# The point of this feature is to have assign favor shared nodes
+	# that already have nodes on them, so that they are well packed.
+	# Shared nodes with just a few vnodes on them are avoided so that
+	# they will free up eventually. 
+	#
+	my $maxvnodes = 10;
+	my $weight    = 0.5;
+	my $gcount    = 0.0;
+	if (defined($self->globalcount())) {
+	    $gcount = $self->globalcount();
+	}
+
+	if (exists($self->{'AUXTYPES'}->{'pcvm'})) {
+	    $maxvnodes = $self->{'AUXTYPES'}->{'pcvm'};
+	}
+
+	#
+	# No point in the feature if no room left. 
+	#
+	if ($maxvnodes > $gcount) {
+	    my $factor = ($gcount / $maxvnodes);
+	    if ($factor < 0.25) {
+		$weight = 0.8;
+	    }
+	    elsif ($factor > 0.75) {
+		$weight = 0.1;
+	    }
+	    else {
+		$weight = 0.3;
+	    }
+	    #addFeature("shareweight", $weight);
+	}
+    }
+}
+
+#
+# Add any auxiliary types
+#
+sub processAuxtypes($)
+{
+    my ($self) = @_;
+    my $node = $self->node();
+    my $needvirtgoo = 0;
+    foreach my $auxtype (keys(%{ $self->{'AUXTYPES'} })) {
+	my $count = $self->{'AUXTYPES'}->{$auxtype};
+	my $realtypename;
+
+	# Map an auxtype back to its real type, unless it is a real type.
+	if (defined($auxtypemap{$auxtype})) {
+	    $realtypename = $auxtypemap{$auxtype};
+	} else {
+	    $realtypename = $auxtype;
+	}
+	my $realtype = NodeType->Lookup($realtypename);
+	my $is_virtual = ($realtype->isvirtnode() && $count > 0);
+	if (! $is_virtual) {
+	    $self->addPType($auxtype, $count);
+	} elsif ($print_virtual) {
+	    $needvirtgoo = 1;
+	    #
+	    # If the node is shared, must subtract the current global count
+	    # from the max first, to see if there is any room left.
+	    #
+	    if ($node->sharing_mode() && defined($self->globalcount())) {
+		$count -= $self->globalcount();
+	    }
+	    if (defined($multiplex_override)
+		&& $multiplex_override <= $count) {
+		$count = $multiplex_override;
+	    }
+
+	    #
+	    # Add in machine specific auxtypes that use the same count.
+	    #
+	    $self->addPType($node->type()."-vm", $count);
+
+	    # And a legacy type.
+	    my $legacy_type = $node->type();
+	    if (($legacy_type =~ s/pc/pcvm/)) {
+		$self->addPType($legacy_type, $count);
+	    }
+	    $self->addPType($auxtype, $count);
+	}
+    }
+    if ($needvirtgoo) {
+	$self->processVirtGoo();
+    }
+    my $simcap = $self->type()->simnode_capacity();
+    my $needsim = ($print_sim && defined($simcap) && $simcap > 0);
+    if ($needsim) {
+	$self->processSim($simcap);
+    }
+    if ($needsim || $needvirtgoo) {
+	$self->addPType("lan", undef, 1);
+    }
+    if (($needvirtgoo && ! $node->sharing_mode())
+	|| $needsim) {
+	$self->processCpuRam();
+    }
+}
+
+sub processVirtGoo($)
+{
+    my ($self) = @_;
+    # Add trivial bw spec., but only if the node type has it
+    my $trivspeed = $self->type()->trivlink_maxspeed();
+    if ($trivspeed) {
+	$self->addFlag("trivial_bw", $trivspeed);
+    }
+    if (! $self->node()->sharing_mode()) {
+	# This number can be use for fine-tuning packing
+	$self->addFeature("virtpercent", 100, libptopnew::FD_ADDITIVE());
+    }
+    # Put this silly feature in so that we can try to keep vnodes
+    # on the same pnode they were before - but only if updating
+    if (defined($exempt_eid)) {
+	$self->addFeature($self->node()->node_id(), 0.0);
+    }
+}
+
+sub processSim($$)
+{
+    my ($self, $simcap) = @_;
+    #
+    # Use user specified multiplex factor
+    #
+    my $cap = $simcap;
+    if (defined($multiplex_override) && $multiplex_override <= $simcap) {
+	$cap = $multiplex_override;
+    }
+    $self->addPType("sim", $cap);
+    # Add trivial bw spec.
+    $self->addFlag("trivial_bw", 100000);
+}
+
+sub processCpuRam($)
+{
+    my ($self) = @_;
+    my $cpu_speed = $self->type()->frequency();
+    my $ram = $self->type()->memory();
+    # Add CPU and RAM information
+    $self->addFeature("cpu", $cpu_speed, libptopnew::FD_ADDITIVE())
+	if (defined($cpu_speed));
+    $self->addFeature("ram", $ram, libptopnew::FD_ADDITIVE())
+	if (defined($ram));
+    $self->addFeature("cpupercent", 92, libptopnew::FD_ADDITIVE()); # XXX Hack
+    $self->addFeature("rampercent", 80, libptopnew::FD_ADDITIVE()); # XXX Hack
 }
 
 sub processWidearea($)
@@ -306,6 +618,19 @@ sub processWidearea($)
     my ($self) = @_;
     if (! $self->iswidearea()) {
 	return;
+    }
+}
+
+sub processTypeFeatures($)
+{
+    my ($self) = @_;
+    if ($self->iswidearea()
+	|| ($self->islocal() && ! $self->node()->sharing_mode())) {
+	if (exists($typefeatures{$self->node()->type()})) {
+	    foreach my $feature (@{ $typefeatures{$self->node()->type()} }) {
+		$self->addFeatureString($feature);
+	    }
+	}
     }
 }
 
@@ -447,20 +772,17 @@ sub CreateFromString($$)
 
     my ($name, $value) = split(/:/, $str, 2);
     my $flags = "";
-    if ($value >= 1.0) {
-	$self->set_violatable();
-    }
     if ($name =~ /^\?\+/) {
 	$self->set_additive();
 	$name = substr($name, 2);
-    }
-    elsif ($name =~ /^\*&/) {
+    } elsif ($name =~ /^\*&/) {
 	$self->set_firstfree();
 	$name = substr($name, 2);
-    }
-    elsif ($name =~ /^\*!/) {
+    } elsif ($name =~ /^\*!/) {
 	$self->set_onceonly();
 	$name = substr($name, 2);
+    } elsif ($value >= 1.0) {
+	$self->set_violatable();
     }
     $self->{'NAME'} = $name;
     $self->{'VALUE'} = $value;
@@ -468,9 +790,9 @@ sub CreateFromString($$)
     return $self;
 }
 
-sub Create($$$)
+sub Create($$$;$$)
 {
-    my ($class, $name, $value) = @_;
+    my ($class, $name, $value, $flag, $violatable) = @_;
 
     my $self = {};
 
@@ -482,6 +804,20 @@ sub Create($$$)
     $self->{'ONCEONLY'} = 0;
 
     bless($self, $class);
+
+    if (defined($violatable)) {
+	$self->set_violatable();
+    }
+    if (defined($flag)) {
+	if ($flag eq libptopnew::FD_ADDITIVE()) {
+	    $self->set_additive();
+	} elsif ($flag eq libptopnew::FD_FIRSTFREE()) {
+	    $self->set_firstfree();
+	} elsif ($flag eq libptopnew::FD_ONCEONLY()) {
+	    $self->set_onceonly();
+	}
+    }
+
     return $self;
 }
 
