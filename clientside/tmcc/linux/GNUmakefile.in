@@ -237,7 +237,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
-	$(INSTALL) -m 755 $(SRCDIR)/fixup-fstab-swaps $(BINDIR)/rc
+	$(INSTALL) -m 755 $(SRCDIR)/fixup-fstab-swaps $(BINDIR)
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g $(DIRGROUP) -d $(DESTDIR)/etc/sfs
