@@ -420,7 +420,7 @@ function FormRenderElements($fields, $submitted)
     global $footnotes;
     $html = "";
     
-    while (list ($name, $attributes) = each ($fields)) {
+    foreach ($fields as $name => $attributes) {
 	$field_html = FormRenderElement($name, $attributes, $submitted);
 
 	if ($field_html) {
@@ -654,7 +654,7 @@ function FormValidateFileUpload($name, &$errors, $attributes)
 
 function FormValidate($form, &$errors, $fields, &$submitted, $parent_label = '') 
 {
-    while (list ($name, $attributes) = each ($fields)) {
+    foreach ($fields as $name => $attributes) {
 	switch ($attributes['#type']) {
 	case "textfield":
 	case "password":
@@ -724,7 +724,7 @@ function FormTextDumpElement($name, $attributes, $values, $label_width, $parent_
 function FormTextDump($form, $fields, $values, $label_width = 20, $parent_label = '') 
 {
     $res = '';
-    while (list ($name, $attributes) = each ($fields)) {
+    foreach ($fields as $name => $attributes) {
 	switch ($attributes['#type']) {
 	case "hidden":
 	case "textfield":
