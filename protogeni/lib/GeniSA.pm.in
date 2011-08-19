@@ -462,7 +462,8 @@ sub Register($)
 	    $expires = $when;
 	}
 	
-	my $urn = GeniHRN::Generate( "@OURDOMAIN@", "slice", $hrn );
+	my ($ourdomain, undef, undef) = GeniHRN::Parse( $ENV{ 'MYURN' } );
+	my $urn = GeniHRN::Generate( $ourdomain, "slice", $hrn );
 	
 	#
 	# When using this interface, the HRN does not correspond to an

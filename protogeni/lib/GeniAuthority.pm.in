@@ -57,10 +57,36 @@ sub Lookup($$)
 	    DBQueryWarn("select uuid from geni_authorities ".
 			"where urn='$token'");
 
-	return undef
-	    if (! $query_result || !$query_result->numrows);
+	if( $query_result && $query_result->numrows ) {
+	    ($uuid) = $query_result->fetchrow_array();
+	} else {
+	    # A lexically valid name, which isn't in the authority
+	    # database.  First, we check if the authority corresponds
+	    # to a valid local project: we generate those on demand.
+	    my ($auth, $type, $id) = GeniHRN::Parse( $token );
 
-	($uuid) = $query_result->fetchrow_array();
+	    if( $type eq "authority" && $auth =~ /^@OURDOMAIN@:([-\w]+)$/ ) {
+		my $pid = $1;
+		
+		require Project;
+
+		my $project = Project->Lookup($pid);
+		return undef if (!defined($project));
+
+		my $url = "@TBBASE@/protogeni/xmlrpc/project/$pid/$id";
+
+		my $cert = GeniCertificate->Create(
+		    { "urn" => GeniHRN::Generate( "@OURDOMAIN@:$pid",
+						  "authority", $id ),
+		      "url" => $url,
+		      "email" => "@TBOPSEMAIL@",
+		      "hrn" => "@OURDOMAIN@.$pid.$id" } );
+
+		return GeniAuthority->Create( $cert, $url, $id );
+	    }
+
+	    return undef;
+	}
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$uuid = $token;
