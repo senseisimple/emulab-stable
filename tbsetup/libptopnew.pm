@@ -112,6 +112,7 @@ sub Create($$)
 
     $self->{'NODE'} = Node->LookupRow($row);
     $self->{'PTYPES'} = [];
+    $self->{'FEATURES'} = [];
 
     bless($self, $class);
     return $self;
@@ -172,46 +173,6 @@ sub available($;$)
 	}
     }
     return $isfree;
-}
-
-sub addPType($$)
-{
-    my ($self, $newType) = @_;
-    push(@{ $self->{'PTYPES'} }, $newType);
-}
-
-sub processSwitch($)
-{
-    my ($self) = @_;
-    if (! $self->isswitch()) {
-	return;
-    }
-
-    # Add switch and lan types
-    $self->addPType(libptop::pnode_type->Create("switch", 1));
-    if (!(defined($MAINSITE) && $MAINSITE
-	  && $self->name() eq "procurve1")) {
-	$self->addPType(libptop::pnode_type->Create("lan", undef, 1));
-    }
-
-    # Add real-switch feature
-    #my $features = ["real-switch:0"];
-}
-
-sub processLocal($)
-{
-    my ($self) = @_;
-    if (! $self->islocal()) {
-	return;
-    }
-}
-
-sub processWidearea($)
-{
-    my ($self) = @_;
-    if (! $self->iswidearea()) {
-	return;
-    }
 }
 
 sub isswitch($)
@@ -302,14 +263,67 @@ sub willPrint($;$)
     return $result;
 }
 
+sub addPType($$)
+{
+    my ($self, $newType) = @_;
+    push(@{ $self->{'PTYPES'} }, $newType);
+}
+
+sub addFeature($$)
+{
+    my ($self, $newFeature) = @_;
+    push(@{ $self->{'FEATURES'} }, $newFeature);
+}
+
+sub processSwitch($)
+{
+    my ($self) = @_;
+    if (! $self->isswitch()) {
+	return;
+    }
+
+    # Add switch and lan types
+    $self->addPType(libptop::pnode_type->Create("switch", 1));
+    if (!(defined($MAINSITE) && $MAINSITE
+	  && $self->name() eq "procurve1")) {
+	$self->addPType(libptop::pnode_type->Create("lan", undef, 1));
+    }
+
+    # Add real-switch feature
+    $self->addFeature(libptop::feature->Create("real-switch", 0));
+}
+
+sub processLocal($)
+{
+    my ($self) = @_;
+    if (! $self->islocal()) {
+	return;
+    }
+}
+
+sub processWidearea($)
+{
+    my ($self) = @_;
+    if (! $self->iswidearea()) {
+	return;
+    }
+}
+
 sub toString($)
 {
     my ($self) = @_;
     my $result = "node " . $self->name();
 
+    # Print types
     foreach my $type (@{ $self->{'PTYPES'} }) {
 	$result .= " " . $type->toString();
     }
+    $result .= " -";
+    # Print features
+    foreach my $feature (@{ $self->{'FEATURES'} }) {
+	$result .= " " . $feature->toString();
+    }
+    $result .= " -";
     return $result;
 }
 
@@ -327,8 +341,13 @@ sub toXML($$)
     }
     GeniXML::SetText("component_name", $xml, $self->name());
 
+    # Add types
     foreach my $type (@{ $self->{'PTYPES'} }) {
 	$type->toXML($xml);
+    }
+    # Add features
+    foreach my $feature (@{ $self->{'FEATURES'} }) {
+	$feature->toXML($xml);
     }
 }
 
@@ -409,6 +428,107 @@ sub toXML($$)
 	GeniXML::SetText("type_slots", $elab, $slots);
 	if ($self->isstatic()) {
 	    GeniXML::SetText("static", $elab, "true");
+	}
+    }
+}
+
+###############################################################################
+# Physical Node Type. These are the types which are printed out in the
+# ptopgen file. Note that there is not a one-to-one correspondence
+# between these types and the 'type' of the node in the database.
+
+package libptop::feature;
+
+sub CreateFromString($$)
+{
+    my ($class, $str) = @_;
+
+    my $self = libptop::feature->Create($class, undef, undef);
+
+    my ($name, $value) = split(/:/, $str, 2);
+    my $flags = "";
+    if ($value >= 1.0) {
+	$self->set_violatable();
+    }
+    if ($name =~ /^\?\+/) {
+	$self->set_additive();
+	$name = substr($name, 2);
+    }
+    elsif ($name =~ /^\*&/) {
+	$self->set_firstfree();
+	$name = substr($name, 2);
+    }
+    elsif ($name =~ /^\*!/) {
+	$self->set_onceonly();
+	$name = substr($name, 2);
+    }
+    $self->{'NAME'} = $name;
+    $self->{'VALUE'} = $value;
+
+    return $self;
+}
+
+sub Create($$$)
+{
+    my ($class, $name, $value) = @_;
+
+    my $self = {};
+
+    $self->{'NAME'} = $name;
+    $self->{'VALUE'} = $value;
+    $self->{'VIOLATABLE'} = 0;
+    $self->{'ADDITIVE'} = 0;
+    $self->{'FIRSTFREE'} = 0;
+    $self->{'ONCEONLY'} = 0;
+
+    bless($self, $class);
+    return $self;
+}
+
+sub set_violatable($)  { $_[0]->{'VIOLATABLE'} = 1; }
+sub set_additive($)    { $_[0]->{'ADDITIVE'} = 1; }
+sub set_firstfree($)   { $_[0]->{'FIRSTFREE'} = 1; }
+sub set_onceonly($)    { $_[0]->{'ONCEONLY'} = 1; }
+
+sub violatable($)      { return $_[0]->{'VIOLATABLE'}; }
+sub additive($)        { return $_[0]->{'ADDITIVE'}; }
+sub firstfree($)       { return $_[0]->{'FIRSTFREE'}; }
+sub onceonly($)        { return $_[0]->{'ONCEONLY'}; }
+
+sub toString($)
+{
+    my ($self) = @_;
+    my $result = "";
+    if ($self->violatable()) {
+	# No representation as flat string
+    }
+    if ($self->additive()) {
+	$result .= "?+";
+    } elsif ($self->firstfree()) {
+	$result .= "*&";
+    } elsif ($self->onceonly()) {
+	$result .= "*!";
+    }
+    $result .= $self->{'NAME'}.':'.$self->{'VALUE'};
+    return $result;
+}
+
+sub toXML($$)
+{
+    my ($self, $parent) = @_;
+    if (! GeniXML::IsVersion0($parent)) {
+	my $xml = GeniXML::AddElement("fd", $parent, $GeniXML::EMULAB_NS);
+	GeniXML::SetText("name", $xml, $self->{'NAME'});
+	GeniXML::SetText("weight", $xml, $self->{'VALUE'});
+	if ($self->violatable()) {
+	    GeniXML::SetText("violatable", $xml, "true");
+	}
+	if ($self->additive()) {
+	    GeniXML::SetText("local_operator", $xml, "+");
+	} elsif ($self->firstfree()) {
+	    GeniXML::SetText("global_operator", $xml, "FirstFree");
+	} elsif ($self->onceonly()) {
+	    GeniXML::SetText("global_operator", $xml, "OnceOnly");
 	}
     }
 }
