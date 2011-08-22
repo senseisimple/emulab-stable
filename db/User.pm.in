@@ -1302,7 +1302,7 @@ sub SendEmail($$$)
 
     # Audit email.
     SENDMAIL("$user_name <$user_email>", $subject, $body,
-	     undef, "Bcc: $TBAUDIT");
+	     $TBOPS, "Bcc: $TBAUDIT");
 
     return 0;
 }
