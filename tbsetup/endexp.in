@@ -34,11 +34,14 @@ sub usage()
 
 sub fatal($;$);
 
-my $optlist  = "bwqxpN";
+my $optlist  = "bwqxpNfog";
 my $waitmode = 0;
 my $batch    = 0;
 my $quiet    = 0;
 my $purge    = 0;
+my $force    = 0;
+my $genimode = 0;
+my $lockforce= 0;
 my $template_mode = 0;
 my $noemail  = 0;
 
@@ -119,8 +122,17 @@ if (@ARGV != 1) {
 if (defined($options{"b"})) {
     $batch = 1;
 }
+if (defined($options{"g"})) {
+    $genimode = 1;
+}
 if (defined($options{"p"})) {
    $purge = 1;
+}
+if (defined($options{"f"})) {
+   $force = 1;
+}
+if (defined($options{"o"})) {
+    $lockforce = 1;
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
@@ -315,7 +327,7 @@ else {
 	
  	ExitWithStatus(1,
 		       "Experiment $pid/$eid is locked down; cannot swap!\n")
-	    if ($lockdown);
+	    if ($lockdown && !$lockforce);
 
 	#
 	# Must be unlocked if called by the user.
@@ -394,7 +406,7 @@ my $expt_head_email = $swapper->email();
 #
 # If not in batch mode, go into the background. Parent exits.
 #
-if (!$batch && !$template_mode) {
+if (! ($batch || $template_mode || $genimode)) {
     # Cleanup
     $experiment->CleanLogFiles() == 0
 	or fatal("Could not clean up logfiles!");
@@ -527,6 +539,8 @@ if ($estate ne EXPTSTATE_TERMINATED) {
 
 #
 # Try to copy off the files for testbed information gathering.
+# Note that the logfile will not contain anything printed after
+# this point. 
 #
 $experiment->SaveLogFiles();
 
@@ -556,35 +570,34 @@ $experiment->ClearReservedVlanTags() == 0 or
     fatal("Could not delete reserved vlan tags for $experiment");
 
 #
+# Send email now, since once we call Delete() the log file is going
+# to be unlinked.
+#
+if (! ($batch || $template_mode || $genimode)) {
+    my $message =
+	"Experiment `$eid' in project `$pid' has been terminated.\n" .
+	"You may now reuse `$eid' as an experiment name.\n";
+
+    SENDMAIL(($noemail ? $TBLOGS : "$user_name <$user_email>"),
+	     "Experiment $pid/$eid Terminated",
+	     $message,
+	     "$user_name <$user_email>",
+	     ($noemail ? "" 
+	      : "Cc:  $expt_head_name <$expt_head_email>\n".
+	      "Bcc: $TBLOGS"), 
+	     ($logname));
+}
+
+#
 # Cleanup DB state and remove directory. Purge flag is optional and generally
 # used by admins for cleaning up bad DB state caused by script errors.
 #
 $experiment->Delete($purge);
 
-#
 # In batch mode, exit now. 
-#
-if ($batch || $template_mode) {
-    exit(0);
-}
-
-#
-# Send email notification to user.
-#
-my $message =
-    "Experiment `$eid' in project `$pid' has been terminated.\n" .
-    "You may now reuse `$eid' as an experiment name.\n";
-
-SENDMAIL(($noemail ? $TBLOGS : "$user_name <$user_email>"),
-	 "Experiment $pid/$eid Terminated",
-	 $message,
-	 "$user_name <$user_email>",
-	 ($noemail ? "" 
-	  : "Cc:  $expt_head_name <$expt_head_email>\n".
-	    "Bcc: $TBLOGS"), 
-         ($logname));
-
-exit 0;
+exit(0)
+    if ($batch || $template_mode || $genimode);
+exit(0);
 
 sub fatal($;$)
 {
@@ -602,7 +615,7 @@ sub fatal($;$)
     #
     # In batch mode, exit without sending the email. 
     #
-    if ($batch) {
+    if ($batch || $genimode) {
 	exit(-1);
     }
     

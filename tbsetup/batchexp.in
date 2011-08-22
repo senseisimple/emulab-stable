@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -833,7 +833,7 @@ SENDMAIL(($noemail ? $TBLOGS : "$user_name <$user_email>"),
 	 "$user_name <$user_email>",
 	 ($noemail ? "" : "Bcc: $TBLOGS"),
 	 ($repfile, $logname, $nsfile))
-    if (!$zeemode);
+    if (! ($zeemode || $genimode));
 
 # Done!
 exit(0);

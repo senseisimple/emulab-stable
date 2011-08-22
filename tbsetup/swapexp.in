@@ -34,7 +34,7 @@ sub usage()
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
-my  $optlist = "biafres:wqxgNXn";
+my  $optlist = "biafres:wqxgNXno";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -99,6 +99,7 @@ my $batch    = 0;
 my $idleswap = 0;
 my $autoswap = 0;
 my $force    = 0;
+my $lockforce= 0;
 my $reboot   = 0;
 my $waitmode = 0;
 my $quiet    = 0;
@@ -168,6 +169,9 @@ if (defined($options{"a"})) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"o"})) {
+    $lockforce = 1;
 }
 if (defined($options{"g"})) {
     $genimode  = 1;
@@ -643,7 +647,7 @@ else {
 
  	ExitWithStatus(1,
 		       "Experiment $pid/$eid is locked down; cannot swap!\n")
-	    if ($lockdown);
+	    if ($lockdown && !$lockforce);
 
 	#
 	# Check the state for the various operations.
@@ -1491,6 +1495,9 @@ sub cleanup()
 
     # Unlock and reset state to its terminal value.
     $experiment->Unlock();
+
+    return
+	if ($genimode);
 
     #
     # Clear the cancel flag now that the operation is complete. Must be done
