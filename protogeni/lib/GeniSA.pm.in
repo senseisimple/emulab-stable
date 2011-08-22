@@ -142,6 +142,13 @@ sub GetCredential($)
     # the object referenced by the URN.
     #
     if (lc($type) eq "slice") {
+	#
+	# Bump the activity counter for the user. Lets us know in the
+	# main DB that a user is doing something useful.
+	#
+	$this_user->BumpActivity()
+	    if ($this_user->IsLocal());
+	
 	my $slice = GeniSlice->Lookup($urn);
 
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -394,6 +401,13 @@ sub Register($)
 				    "Who are you? No local record");
     }
     
+    #
+    # Bump the activity counter for the user. Lets us know in the
+    # main DB that a user is doing something useful.
+    #
+    $this_user->BumpActivity()
+	if ($this_user->IsLocal());
+	
     if ( lc( $type ) eq "slice") {
 	my $expires = $argref->{'expiration'};
 
