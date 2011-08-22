@@ -1,0 +1,16 @@
+[Unit]
+Description=Emulab fstab fixup (swap)
+#Before=systemd-readahead-collect.service systemd-readahead-replay.service swap.target
+Before=fedora-storage-init-late.service swap.target
+After=remount-rootfs.service
+DefaultDependencies=no
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/usr/local/etc/emulab/emulab-systemd-swaps
+Restart=no
+
+[Install]
+WantedBy=fedora-storage-init-late.service

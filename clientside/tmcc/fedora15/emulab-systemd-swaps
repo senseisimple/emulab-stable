@@ -1,0 +1,96 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# This is a hack to avoid Emulab and systemd conflicts.  Basically, sometimes
+# our MFSes add swap devices to /etc/fstab that are incorrect (i.e., /dev/hda 
+# instead of /dev/sda).  We could always add 'noauto' to the mount options so 
+# systemd would ignore it, but we have legacy or deployed MFSes to deal with.
+# When systemd encounters one of these, it tries to start the device and halts
+# the boot process for a long time while waiting for the device to "start".
+#
+# We can't edit the bogus /etc/fstab entry before system reads it, because 
+# because system reads it while the root is still mounted read-only, very early
+# on in the startup process.
+#
+# systemd doesn't allow us to remove units (a swap device is a unit, just like 
+# a service is a unit), so all we can do is, before the swap unit runs, cancel
+# any pending systemd jobs before they 
+#
+
+use English;
+use strict;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+my $FIXER = "$BINDIR/fixup-fstab-swaps -E";
+
+# Turn off line buffering on output
+$| = 1;
+
+open(LOG,">>$LOGDIR/emulab-systemd-swap.log");
+
+my @output = `$FIXER`;
+my %removed = ();
+my %added = ();
+
+foreach my $line (@output) {
+    chomp($line);
+    if ($line =~ /^Removing.*\/dev\/(.*)$/) {
+	$removed{$1} = 0;
+    }
+    elsif ($line =~ /^Using\s+\/dev\/([^ ]+)\s+.*$/) {
+	$added{$1} = 0;
+    }
+}
+
+foreach my $rdev (keys(%removed)) {
+    # it got added back, so don't bother deleting the systemd unit.
+    if (exists($added{$rdev})) {
+	delete $removed{$rdev};
+    }
+}
+
+if (!keys(%removed)) {
+    print LOG "No bogus Emulab swap devs to fix.\n";
+    exit(0);
+}
+
+print LOG "Will try to remove systemd jobs for bogus swap devices: " .
+    join(' ',keys(%removed)) . "\n";
+
+@output = `systemctl --full list-jobs`;
+
+foreach my $line (@output) {
+    chomp($line);
+    if ($line =~ /^\s*(\d+)\s+([^\s]+)\s+/) {
+	my ($job,$unit) = ($1,$2);
+	foreach my $rdev (keys(%removed)) {
+	    if ($unit =~ /^dev-$rdev\.(swap|device)$/) {
+		print LOG "Emulab canceling bogus swap device init job ($job,$unit).\n";
+		system("systemctl cancel $job");
+		$removed{$rdev} += 1;
+	    }
+	}
+    }
+}
+
+foreach my $rdev (keys(%removed)) {
+    if ($removed{$rdev} == 2) {
+	delete $removed{$rdev};
+	print LOG "Successfully canceled systemd jobs for bogus swap device $rdev.\n";
+    }
+}
+
+if (keys(%removed)) {
+    print LOG "Failed to cancel systemd jobs for bogus swap devices: " .
+	join(' ',keys(%removed)) . "\n";
+    exit(keys(%removed));
+}
+
+exit(0);
