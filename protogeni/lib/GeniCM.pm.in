@@ -61,7 +61,7 @@ my $OURDOMAIN      = "@OURDOMAIN@";
 my $MAINSITE       = @TBMAINSITE@;
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $CREATEEXPT     = "$TB/bin/batchexp";
-my $ENDEXPT        = "$TB/bin/endexp";
+my $ENDEXP         = "$TB/bin/endexp";
 my $NALLOC	   = "$TB/bin/nalloc";
 my $NFREE	   = "$TB/bin/nfree";
 my $AVAIL	   = "$TB/sbin/avail";
@@ -3755,16 +3755,11 @@ sub DeleteSliverAux($$$)
 					     "Could not delete sliver");
 	    goto bad;
 	}
-	# Add purge flag.
-	$experiment->RemovePhysicalState(1);
-	$experiment->SetState(EXPTSTATE_SWAPPED());
 
-	if (system("$EXPORTS_SETUP")) {
-	    print STDERR "$EXPORTS_SETUP failed\n";
-	}
-	if (system("$NAMEDSETUP")) {
-	    print STDERR "$NAMEDSETUP failed\n";
-	}
+	my $output = GeniUtil::ExecQuiet("$SWAPEXP -g -o -q -s out $pid $eid");
+	print STDERR $output;
+	goto bad
+	    if ($?);
 
 	#
 	# In the v2 API, caller returns a new ticket for the resources
@@ -5032,42 +5027,36 @@ sub CleanupDeadSlice($;$)
 		"where slice_uuid='$slice_uuid'");
 
     if (defined($experiment)) {
-	# These are not serious errors.
-	if (system("$EXPORTS_SETUP")) {
-	    print STDERR "$EXPORTS_SETUP failed\n";
-	}
-	if (system("$NAMEDSETUP")) {
-	    print STDERR "$NAMEDSETUP failed\n";
-	}
-	$experiment->SetState(EXPTSTATE_SWAPPED());
-    }
-
-    return 0
-	if (!$purge);
-
-    if (defined($experiment)) {
-	my @pnodes = $experiment->NodeList(1, 1);
-	my $pnodes = scalar(@pnodes);
-	# Ignore the firewall node in this test; released in endexp.
-	$pnodes--
-	    if ($slice->needsfirewall());
-	if ($pnodes != 0) {
-	    print STDERR "There were still nodes allocated to $experiment!\n";
-	    # Do this so that a full swapout is done.
-	    $experiment->SetState(EXPTSTATE_ACTIVE());
-	}
-	$experiment->LockDown(0);
-
+	# Do this so that a full swapout is done. Better then trying
+	# to guess what parts to do here. 
+	$experiment->SetState(EXPTSTATE_ACTIVE());
+	
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
-	system("$PLABSLICE destroy $pid $eid");
-    
-	system("$ENDEXPT -N -q $pid,$eid");
+
+	#
+	# Lets wait for this to complete so that we do not terminate
+	# the slice if there is an error. Sure, it means the client
+	# waits longer. 
+	#
+	my $output;
+	if ($purge) {
+	    $output = GeniUtil::ExecQuiet("$ENDEXP -g -o -q $pid,$eid");
+	}
+	else {
+	    $output = GeniUtil::ExecQuiet("$SWAPEXP -g -o -q -s out $pid $eid");
+	}
+	print STDERR $output;
 	return -1
 	    if ($?);
-	$experiment->Flush();
-	$slice->SetExperiment(undef);
+	
+	if ($purge) {
+	    $experiment->Flush();
+	    $slice->SetExperiment(undef);
+	}
     }
+    return 0
+	if (!$purge);
     
     if ($slice->Delete() != 0) {
 	print STDERR "Could not delete $slice\n";
