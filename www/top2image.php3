@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,6 +31,7 @@ $optargs = OptionalPageArguments("zoom",         PAGEARG_NUMERIC,
 #
 $pid = $experiment->pid();
 $eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
 
 # if they dont exist, or are non-numeric, use defaults.
 if (!isset($zoom))       { $zoom   = 1; }
@@ -93,7 +94,7 @@ if ($thumb != 0)  { $arguments .= " -t $thumb";  }
 # Spit out the image with a content header.
 #
 
-if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology " .
+if ($fp = popen("$TBSUEXEC_PATH $uid $unix_gid webvistopology " .
 		"$arguments -z $zoom $pid $eid", "r")) {
     header("Content-type: image/png");
     fpassthru($fp);

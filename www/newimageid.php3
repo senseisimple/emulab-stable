@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -758,6 +758,8 @@ if (! ($image = Image::NewImageId(0, $imagename, $args, $errors))) {
 $pid = $image->pid();
 $gid_idx = $image->gid_idx();
 $group = Group::Lookup($gid_idx);
+$project = $image->Project();
+    
 
 SUBPAGESTART();
 SUBMENUSTART("More Options");
@@ -802,6 +804,7 @@ if (isset($node_id)) {
     # Grab the unix GID for running script.
     #
     $unix_gid  = $group->unix_gid();
+    $unix_pid  = $project->unix_gid();
     $safe_name = escapeshellarg($imagename);
 
     echo "<br>
@@ -809,7 +812,7 @@ if (isset($node_id)) {
           <br><br>\n";
     flush();
 
-    SUEXEC($uid, "$pid,$unix_gid",
+    SUEXEC($uid, "$unix_pid,$unix_gid",
 	   "webcreate_image -p $pid $safe_name $node_id",
 	   SUEXEC_ACTION_DUPDIE);
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -36,6 +36,8 @@ PAGEHEADER("Modify Experiment");
 $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 $expstate = $experiment->state();
 $geniflags = $experiment->geniflags();
 
@@ -256,7 +258,7 @@ STARTBUSY("Starting Modify");
 #
 # Do an initial parse test.
 #
-$retval = SUEXEC($uid, "$pid,$unix_gid", "webnscheck $nsfile",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid", "webnscheck $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval != 0) {
@@ -291,7 +293,7 @@ if (isset($eventrestart) && $eventrestart) {
 }
 
 # Run the script.
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webswapexp $optargs -s modify $pid $eid $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 		 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -29,6 +29,8 @@ $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
 $expstate = $experiment->state();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to run remap on $pid/$eid!", 1);
@@ -116,7 +118,7 @@ if (isset($eventrestart) && $eventrestart) {
 }
 
 STARTBUSY("Starting experiment remap");
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webswapexp $optargs -s modify $pid $eid $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 CLEARBUSY();

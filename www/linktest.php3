@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -42,6 +42,7 @@ $isadmin   = ISADMIN();
 $pid            = "";
 $eid            = "";
 $unix_gid       = "";
+$unix_pid       = ""
 $linktest_level = 0;
 $linktest_pid   = 0;
 
@@ -53,7 +54,7 @@ function CHECKPAGEARGS() {
     global $this_user, $TB_EXPTSTATE_ACTIVE, $TB_EXPT_MODIFY;
     global $TB_EXPTSTATE_ACTIVATING, $TB_EXPTSTATE_MODIFY_RESWAP;
     global $pid, $eid, $experiment;
-    global $unix_gid, $linktest_level, $linktest_pid;
+    global $unix_gid, $unix_pid, $linktest_level, $linktest_pid;
 
     $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
     
@@ -71,6 +72,8 @@ function CHECKPAGEARGS() {
     $pid            = $experiment->pid();
     $eid            = $experiment->eid();
     $unix_gid       = $experiment->UnixGID();
+    $project        = $experiment->Project();
+    $unix_pid       = $project->unix_gid();
     $linktest_level = $experiment->linktest_level();
     $linktest_pid   = $experiment->linktest_pid();
 }
@@ -80,7 +83,8 @@ function CHECKPAGEARGS() {
 # 
 function stop_linktest() {
     global $linktest_pid;
-    global $uid, $pid, $unix_gid, $eid, $suexec_output, $session_interactive;
+    global $uid, $pid, $unix_pid, $unix_gid;
+    global $eid, $suexec_output, $session_interactive;
 
     # Must do this!
     CHECKPAGEARGS();
@@ -91,7 +95,7 @@ function stop_linktest() {
 	}
 	return "stopped:Linktest is not running on experiment $pid/$eid!";
     }
-    $retval = SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
+    $retval = SUEXEC($uid, "$unix_pid,$unix_gid", "weblinktest -k $pid $eid",
 		     SUEXEC_ACTION_IGNORE);
 
     if ($retval < 0) {
@@ -107,10 +111,10 @@ $linktest_running = 0;
 
 function SPEWCLEANUP()
 {
-    global $pid, $unix_gid, $uid, $eid, $linktest_running;
+    global $pid, $unix_pid, $unix_gid, $uid, $eid, $linktest_running;
 
     if (connection_aborted() && $linktest_running) {
-	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
+	SUEXEC($uid, "$unix_pid,$unix_gid", "weblinktest -k $pid $eid",
 	       SUEXEC_ACTION_IGNORE);
     }
 }
@@ -120,7 +124,7 @@ function SPEWCLEANUP()
 # 
 function start_linktest($level) {
     global $linktest_pid, $linktest_running, $TBSUEXEC_PATH;
-    global $uid, $pid, $unix_gid, $eid, $suexec_output;
+    global $uid, $pid, $unix_pid, $unix_gid, $eid, $suexec_output;
 
     # Must do this!
     CHECKPAGEARGS();
@@ -140,7 +144,7 @@ function start_linktest($level) {
 
     # XXX Hackish!
     $linktest_running = 1;
-    $fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
+    $fp = popen("$TBSUEXEC_PATH $uid $unix_pid,$unix_gid ".
 		"weblinktest -l $level $pid $eid", "r");
     if (! $fp) {
 	USERERROR("Could not start linktest!", 1);

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -290,11 +290,13 @@ $EUID = 0;
 
 #
 # This acts as check (and we need the numeric uid) in case mkacct failed!
-# 
+#
+my $unix_name = $target_project->unix_name();
+
 my (undef,undef,$uid) = getpwnam($leader_uid)
     or fatal("$leader_uid not in passwd file");
 
-my (undef,undef,$gid) = getgrnam($pid)
+my (undef,undef,$gid) = getgrnam($unix_name)
     or fatal("$pid not in group file");
 
 #

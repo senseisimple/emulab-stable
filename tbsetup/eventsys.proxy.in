@@ -25,13 +25,12 @@ sub usage()
 	"-l logfile -t record_file start|stop|replay\n";
     exit(-1);
 }
-my $optlist = "u:e:k:dl:g:t:aN";
+my $optlist = "u:e:k:dl:g:t:aNp:";
 my $debug   = 0;
 my $runagent= 0;
 my $user;
 my $pid;
 my $eid;
-my $gid;
 my $keyfile;
 my $logfile;
 my $recordfile;
@@ -93,6 +92,7 @@ if (@ARGV != 1) {
 if (! defined($options{"u"}) ||
     ! defined($options{"e"}) ||
     ! defined($options{"g"}) ||
+    ! defined($options{"p"}) ||
     ! defined($options{"l"}) ||
     ! defined($options{"k"})) {
     usage();
@@ -114,7 +114,8 @@ if (defined($options{"N"})) {
 $logfile    = $options{"l"};
 $keyfile    = $options{"k"};
 $user       = $options{"u"};
-$gid        = $options{"g"};
+$unix_gname  = $options{"g"};
+$unix_pname = $options{"p"};
 $action     = $ARGV[0];
 
 if ($options{"e"} =~ /^([-\w]*)\/([-\w]*)$/) {
@@ -198,13 +199,13 @@ my (undef,undef,$unix_uid) = getpwnam($user) or
     die("*** $0:\n".
 	"    No such user $user\n");
 
-my (undef,undef,$unix_ggid) = getgrnam($gid) or
+my (undef,undef,$unix_ggid) = getgrnam($unix_gname) or
     die("*** $0:\n".
-	"    No such group $gid\n");
+	"    No such group $unix_gname\n");
 
-my (undef,undef,$unix_pgid) = getgrnam($pid) or
+my (undef,undef,$unix_pgid) = getgrnam($unix_pname) or
     die("*** $0:\n".
-	"    No such group $pid\n");
+	"    No such group $unix_pname\n");
 
 my $LOGDIR = `dirname $logfile`;
 $LOGDIR =~ s/\s+$//;

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -37,6 +37,8 @@ PAGEHEADER("Replay Control");
 $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 #
 # Verify permissions.
@@ -78,7 +80,7 @@ if (!isset($confirmed)) {
 set_time_limit(0);
 
 STARTBUSY("Starting event replay");
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webeventsys_control replay $pid,$eid",
 		 SUEXEC_ACTION_IGNORE);
 CLEARBUSY();

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -66,6 +66,8 @@ $arg        = (isset($stamp) ? "-t " . escapeshellarg($stamp) : "");
 $group      = $image->Group();
 $pid        = $group->pid();
 $unix_gid   = $group->unix_gid();
+$project    = $image->Project();
+$unix_pid   = $project->unix_gid();
 
 #
 # We want to support HEAD requests to avoid send the file.
@@ -77,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] == "HEAD") {
     $headarg = "-h";
 }
 
-if ($fp = popen("$TBSUEXEC_PATH nobody $pid,$unix_gid ".
+if ($fp = popen("$TBSUEXEC_PATH nobody $unix_pid,$unix_gid ".
 		"webspewimage $arg $headarg -k $access_key $imageid", "r")) {
     header("Content-Type: application/octet-stream");
     header("Cache-Control: no-cache, must-revalidate");

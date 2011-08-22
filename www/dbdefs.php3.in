@@ -20,8 +20,10 @@ $NODERELOADPENDING_EID	= "reloadpending";
 # All these constants need to go at some point, replaced by data from
 # the regex table. 
 $TBDB_UIDLEN    = 8;
-$TBDB_PIDLEN    = 12;
-$TBDB_GIDLEN	= 12;
+# These are both shorter then the DB lengths, but since some images croak
+# on very long mount point names, we keep them short via this interface.
+$TBDB_PIDLEN    = 16;
+$TBDB_GIDLEN	= 16;
 $TBDB_UNIXGLEN	= 16;
 $TBDB_NODEIDLEN = 10;
 $TBDB_PHONELEN  = 32;

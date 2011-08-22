@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -24,6 +24,8 @@ $optargs = OptionalPageArguments("canceled",   PAGEARG_BOOLEAN,
 $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 # Canceled operation redirects back to showexp page. See below.
 if (isset($canceled) && $canceled) {
@@ -77,7 +79,7 @@ if (!isset($confirmed)) {
 # We run a wrapper script that does all the work.
 #
 STARTBUSY("Pressing the panic button");
-$retval = SUEXEC($uid, "$pid,$unix_gid", "webpanic $pid $eid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid", "webpanic $pid $eid",
 		 SUEXEC_ACTION_IGNORE);
 
 #

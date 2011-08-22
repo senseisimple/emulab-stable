@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -51,6 +51,8 @@ $guid     = $template->guid();
 $vers     = $template->vers();
 $pid      = $template->pid();
 $unix_gid = $template->UnixGID();
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
 if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to export from template ".
@@ -225,7 +227,7 @@ if ($spew) {
     ignore_user_abort(1);
     register_shutdown_function("SPEWCLEANUP");
 
-    if (($fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
+    if (($fp = popen("$TBSUEXEC_PATH $uid $unix_pid,$unix_gid ".
 		     "  webtemplate_export -s $export_args",
 		     "r"))) {
 	header("Content-Type: application/x-tar");
@@ -253,7 +255,7 @@ if ($spew) {
 #
 # Standard mode ...
 #
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webtemplate_export $export_args",
 		 SUEXEC_ACTION_IGNORE);
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -29,6 +29,8 @@ $guid = $template->guid();
 $vers = $template->vers();
 $pid  = $template->pid();
 $unix_gid = $template->UnixGID();
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
 if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to export in template ".
@@ -219,7 +221,7 @@ chmod($nsfile, 0666);
 STARTBUSY("Starting template modification!");
 
 # And run that script!
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webtemplate_create ".
 		 "-m $guid/$vers $command_args $pid $tid $nsfile",
 		 SUEXEC_ACTION_IGNORE);

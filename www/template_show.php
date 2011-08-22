@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -38,6 +38,8 @@ $tid  = $template->tid();
 $exptidx  = $experiment->idx();
 $unix_gid = $experiment->UnixGID();
 $this_url = CreateURL("template_show", $template);
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
 #
 # Verify Permission.
@@ -169,7 +171,7 @@ function Show($which, $zoom, $detail)
 function GraphChange($action, $recursive = 0, $no_output = 0)
 {
     global $pid, $unix_gid, $eid, $uid, $guid, $TBSUEXEC_PATH, $TBADMINGROUP;
-    global $template;
+    global $template, $unix_pid;
     $html = "";
 
     $reqarg  = "-a ";
@@ -186,7 +188,7 @@ function GraphChange($action, $recursive = 0, $no_output = 0)
 	}
 
         # Need to update the template graph.
-	SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
+	SUEXEC($uid, "$unix_pid,$unix_gid", "webtemplate_graph $optarg $guid",
 	       SUEXEC_ACTION_DIE);
     }
     else {
@@ -220,7 +222,7 @@ function GraphChange($action, $recursive = 0, $no_output = 0)
 	}
 	$reqarg .= " $guid/$versarg";
 	
-	SUEXEC($uid, "$pid,$unix_gid",
+	SUEXEC($uid, "$unix_pid,$unix_gid",
 	       "webtemplate_control $reqarg $optarg",
 	       SUEXEC_ACTION_DIE);
     }
@@ -254,7 +256,7 @@ if (isset($action) && $action == "deletetemplate" &&
     STARTBUSY("Deleting template $guid/$vers recursively");
 
     # Pass recursive option all the time.
-    $retval = SUEXEC($uid, "$pid,$unix_gid",
+    $retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		     "webtemplate_delete -r $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 

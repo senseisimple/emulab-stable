@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -34,6 +34,8 @@ $vers = $template->vers();
 $pid  = $template->pid();
 $eid  = $instance->eid();
 $unix_gid = $template->UnixGID();
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
 #
 # Check permission.
@@ -86,7 +88,7 @@ echo "<script type='text/javascript' language='javascript' ".
 echo "</script>\n";
 
 STARTBUSY("Starting commit");
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webtemplate_commit -e $eid $guid/$vers",
 		 SUEXEC_ACTION_IGNORE);
 

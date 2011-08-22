@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -1160,6 +1160,7 @@ if (isset($node)) {
     # Grab the unix GID for running script.
     #
     $unix_gid  = $group->unix_gid();
+    $unix_pid  = $project->unix_gid();
     $safe_name = escapeshellarg($imagename);
 
     echo "<br>
@@ -1167,7 +1168,7 @@ if (isset($node)) {
           <br><br>\n";
     flush();
 
-    SUEXEC($uid, "$pid,$unix_gid",
+    SUEXEC($uid, "$unix_pid,$unix_gid",
 	   "webcreate_image -p $pid $safe_name $node_id",
 	   SUEXEC_ACTION_DUPDIE);
 
@@ -1188,6 +1189,7 @@ if (isset($_FILES['upload_file']) &&
         
     # Get the correct group information for this image
     $unix_gid  = $group->unix_gid();
+    $unix_pid  = $project->unix_gid();
 
     $tmpfile   = $_FILES['upload_file']['tmp_name'];
     $localfile = $formfields['path'];
@@ -1200,7 +1202,7 @@ if (isset($_FILES['upload_file']) &&
         chmod($tmpfile,0644);
 	# Note - the script we call takes care of making sure that the local
         # filename is in /proj or /groups
-        $retval = SUEXEC($uid, "$pid,$unix_gid",
+        $retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 			 "webcopy " . escapeshellarg($tmpfile) . " " .
 			 escapeshellarg($localfile),
 			 SUEXEC_ACTION_DUPDIE);

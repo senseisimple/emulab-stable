@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -181,7 +181,8 @@ elseif ($type == "cvsrepo_public") {
     }
     $zapurl = CreateURL("showproject", $project);
     $project->SetCVSRepoPublic($value);
-    SUEXEC($uid, $pid, "webcvsrepo_ctrl $pid", SUEXEC_ACTION_DIE);
+    $unix_pid = $project->unix_gid();
+    SUEXEC($uid, $unix_pid, "webcvsrepo_ctrl $pid", SUEXEC_ACTION_DIE);
 }
 elseif ($type == "workbench") {
     # Must validate the pid since we allow non-admins to do this.

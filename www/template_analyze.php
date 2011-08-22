@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -36,6 +36,8 @@ $eid  = $instance->eid();
 $iid  = $instance->id();
 $unix_gid = $template->UnixGID();
 $exptidx  = $instance->exptidx();
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
 if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment template ".
@@ -88,7 +90,7 @@ sleep(1);
 #
 # Run the backend script
 #
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webtemplate_analyze -i $exptidx $guid/$vers",
 		 SUEXEC_ACTION_IGNORE);
 

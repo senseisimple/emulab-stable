@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,20 +20,21 @@ use POSIX ":sys_wait_h";
 #
 sub usage()
 {
-    print "Usage: linktest.proxy [-d level] -u user -g gid -e pid/eid ".
+    print "Usage: linktest.proxy [-d level] -u user -p unix_pid -g unix_gid -e pid/eid ".
 	"-l level -o logfile -t timeout -r\n";
     exit(-1);
 }
-my $optlist = "d:u:g:e:l:o:t:r";
+my $optlist = "d:u:g:e:l:o:t:rp:";
 my $debug   = 0;
 my $user;
-my $gid;
 my $pid;
 my $eid;
 my $level;
 my $logfile;
 my $timeout;
 my $reportonly = 0;
+my $unix_gid;
+my $unix_pid;
 
 #
 # Configure variables
@@ -80,14 +81,16 @@ if (@ARGV) {
 }
 if (! defined($options{"u"}) ||
     ! defined($options{"e"}) ||
+    ! defined($options{"p"}) ||
     ! defined($options{"l"}) ||
     ! defined($options{"g"})) {
     usage();
 }    
 	    
-$user   = $options{"u"};
-$gid    = $options{"g"};
-$level  = $options{"l"};
+$user       = $options{"u"};
+$level      = $options{"l"};
+$unix_gname = $options{"g"};
+$unix_pname = $options{"p"};
 
 if ($options{"e"} =~ /^([-\w]*)\/([-\w]*)$/) {
     $pid = $1;
@@ -96,7 +99,6 @@ if ($options{"e"} =~ /^([-\w]*)\/([-\w]*)$/) {
 else {
     usage();
 }
-
 if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
@@ -118,13 +120,13 @@ my (undef,undef,$unix_uid) = getpwnam($user) or
     die("*** $0:\n".
 	"    No such user $user\n");
 
-my (undef,undef,$unix_ggid) = getgrnam($gid) or
+my (undef,undef,$unix_ggid) = getgrnam($unix_gname) or
     die("*** $0:\n".
-	"    No such group $gid\n");
+	"    No such group $unix_gname\n");
 
-my (undef,undef,$unix_pgid) = getgrnam($pid) or
+my (undef,undef,$unix_pgid) = getgrnam($unix_pname) or
     die("*** $0:\n".
-	"    No such group $pid\n");
+	"    No such group $unix_pname\n");
 
 # Flip to user and never go back!
 $GID            = $unix_ggid;

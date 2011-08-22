@@ -1,0 +1,156 @@
+#
+# Expand length of pid to 48, and gid to 32.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    my $force = 1;
+    my %pidtables1 = ("bridges" => "pid",
+		      "delays" => "pid",
+		      "linkdelays" => "pid",
+		      "newdelays" => "pid",
+		      "nodes" => "reserved_pid",
+		      "switch_paths" => "pid",
+		      "traces" => "pid",
+		      "wireless_stats" => "data_pid");
+    my %pidtables2 = ("datapository_databases" => "pid",
+		      "delta_proj" => "pid",
+		      "elabinelab_attributes" => "pid",
+		      "elabinelab_vlans" => "pid",
+		      "event_groups" => "pid",
+		      "eventlist" => "pid",
+		      "experiment_blobs" => "pid",
+		      "experiment_features" => "pid",
+		      "experiment_stats" => "pid",
+		      "experiment_template_inputs" => "pid",
+		      "experiment_template_instance_bindings" => "pid",
+		      "experiment_template_instances" => "pid",
+		      "experiment_template_parameters" => "pid",
+		      "experiment_template_settings" => "pid",
+		      "experiment_templates" => "pid",
+		      "experiments" => "pid",
+		      "exppid_access" => "pid",
+		      "firewall_rules" => "pid",
+		      "firewalls" => "pid",
+		      "group_features" => "pid",
+		      "group_membership" => "pid",
+		      "group_policies" => "pid",
+		      "group_stats" => "pid",
+		      "groups" => "pid",
+		      "ifaces" => "pid",
+		      "images" => "pid",
+		      "ipport_ranges" => "pid",
+		      "ipsubnets" => "pid",
+		      "lans" => "pid",
+		      "last_reservation" => "pid",
+		      "motelogfiles" => "pid",
+		      "next_reserve" => "pid",
+		      "node_reservations" => "pid",
+		      "nodetypeXpid_permissions" => "pid",
+		      "nseconfigs" => "pid",
+		      "nsfiles" => "pid",
+		      "os_info" => "pid",
+		      "partitions" => "imagepid",
+		      "plab_slices" => "pid",
+		      "port_registration" => "pid",
+		      "portmap" => "pid",
+		      "proj_memb" => "pid",
+		      "project_stats" => "pid",
+		      "projects" => "pid",
+		      "reserved" => "pid",
+		      "reserved_vlantags" => "pid",
+		      "v2pmap" => "pid",
+		      "virt_agents" => "pid",
+		      "virt_blobs" => "pid",
+		      "virt_bridges" => "pid",
+		      "virt_client_service_ctl" => "pid",
+		      "virt_client_service_hooks" => "pid",
+		      "virt_client_service_opts" => "pid",
+		      "virt_firewalls" => "pid",
+		      "virt_lan_lans" => "pid",
+		      "virt_lan_member_settings" => "pid",
+		      "virt_lan_settings" => "pid",
+		      "virt_lans" => "pid",
+		      "virt_node_desires" => "pid",
+		      "virt_node_motelog" => "pid",
+		      "virt_node_startloc" => "pid",
+		      "virt_nodes" => "pid",
+		      "virt_parameters" => "pid",
+		      "virt_paths" => "pid",
+		      "virt_programs" => "pid",
+		      "virt_routes" => "pid",
+		      "virt_simnode_attributes" => "pid",
+		      "virt_tiptunnels" => "pid",
+		      "virt_trafgens" => "pid",
+		      "virt_user_environment" => "pid",
+		      "virt_vtypes" => "pid",
+		      "vis_graphs" => "pid",
+		      "vis_nodes" => "pid",
+		      "vlans" => "pid");
+    my %pidtables3 = ("exppid_access" => "exp_pid",
+		      "reserved" => "old_pid");
+    my %gidtables = ("datapository_databases" => "gid",
+		     "experiment_stats" => "gid",
+		     "experiment_templates" => "gid",
+		     "experiments" => "gid",
+		     "group_features" => "gid",
+		     "group_membership" => "gid",
+		     "group_policies" => "gid",
+		     "group_stats" => "gid",
+		     "groups" => "gid",
+		     "images" => "gid",
+		     "motelogfiles" => "gid",
+		     "unixgroup_membership" => "gid");
+
+    foreach my $table (keys(%pidtables1)) {
+	my $slot = $pidtables1{$table};
+	my $type = DBSlotType($table, $slot);
+	if ($force || !($type =~ /48/)) {
+	    DBQueryFatal("alter table `$table` modify `$slot` ".
+			 "  varchar(48) default NULL");
+	}
+    }
+    foreach my $table (keys(%pidtables2)) {
+	my $slot = $pidtables2{$table};
+	my $type = DBSlotType($table, $slot);
+	if ($force || !($type =~ /48/)) {
+	    DBQueryFatal("alter table `$table` modify `$slot` ".
+			 "  varchar(48) NOT NULL default ''");
+	}
+    }
+    foreach my $table (keys(%pidtables3)) {
+	my $slot = $pidtables3{$table};
+	my $type = DBSlotType($table, $slot);
+	if ($force || !($type =~ /48/)) {
+	    DBQueryFatal("alter table `$table` modify `$slot` ".
+			 "  varchar(48) NOT NULL default ''");
+	}
+    }
+    foreach my $table (keys(%gidtables)) {
+	my $slot = $gidtables{$table};
+	my $type = DBSlotType($table, $slot);
+	if ($force || !($type =~ /32/)) {
+	    DBQueryFatal("alter table `$table` modify `$slot` ".
+			 "  varchar(32) NOT NULL default ''");
+	}
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('projects','pid','text','regex','^[-\\\\w]+\$',2,48,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('projects','newpid','text','regex', ".
+		 "  '^[a-zA-Z][-a-zA-Z0-9]+\$',2,48,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('groups','gid','text','regex', ".
+		 "  '^[a-zA-Z][-\\\\w]+\$',2,32,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('groups','group_id','text','redirect', ".
+		 "  'groups:gid',2,32,NULL)");
+
+    return 0;
+}

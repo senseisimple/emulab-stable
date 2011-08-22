@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -33,6 +33,8 @@ $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
 $node_id  = (isset($node) ? $node->node_id() : "");
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 #
 # Standard Testbed Header
@@ -100,7 +102,7 @@ if (!isset($confirmed)) {
 }
 
 STARTBUSY("Starting node update");
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webnode_update -b $pid $eid $node_id",
 		 SUEXEC_ACTION_IGNORE);
 CLEARBUSY();

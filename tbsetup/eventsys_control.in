@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -133,6 +133,7 @@ if (! $experiment) {
 my $pid = $experiment->pid();
 my $eid = $experiment->eid();
 my $expstate = $experiment->state();
+my $project  = $experiment->GetProject();
 
 #
 # Check permission. Only people with permission to destroy the experiment
@@ -209,6 +210,7 @@ $cmd .= " -t " . $experiment->UserDir() . "/logs/events"
 $cmd .= " -l " . $experiment->UserDir() . "/logs/event-sched.log";
 $cmd .= " -k " . $experiment->EventKeyPath();
 $cmd .= " -g " . $group->unix_name();
+$cmd .= " -p " . $project->unix_name();
 $cmd .= " -e $pid/$eid";
 $cmd .= " -u $user_uid";
 $cmd .= " $action";

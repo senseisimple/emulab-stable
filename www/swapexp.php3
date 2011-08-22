@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -91,6 +91,8 @@ else {
 $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 #
 # Verify permissions.
@@ -257,7 +259,7 @@ set_time_limit(0);
 # plain force swap, it passes -f for us.
 $args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		  ($force ?
 		   "webidleswap $args $pid,$eid" :
 		   ($instance ?

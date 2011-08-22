@@ -446,7 +446,8 @@ if (isset($formfields["exp_linktest"]) && $formfields["exp_linktest"] != "") {
 #
 # Grab the unix GID for running scripts.
 #
-$unix_gid = $group->unix_gid();
+$unix_pgid = $project->unix_gid();
+$unix_ggid = $group->unix_gid();
 
 #
 # Run the backend script.
@@ -455,7 +456,7 @@ $unix_gid = $group->unix_gid();
 #
 set_time_limit(0);
 
-$retval = SUEXEC($uid, "$exp_pid,$unix_gid" . $extragroups ,
+$retval = SUEXEC($uid, "$unix_pgid,$unix_ggid" . $extragroups ,
 		 "webbatchexp $batcharg -E $exp_desc $exp_swappable ".
 		 "$linktestarg -p $exp_pid -g $exp_gid -e $exp_id ".
 		 ($nonsfile ? "" : "$thensfile"),

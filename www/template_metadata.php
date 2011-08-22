@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -34,6 +34,8 @@ $guid = $template->guid();
 $vers = $template->vers();
 $pid  = $template->pid();
 $unix_gid = $template->UnixGID();
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
 #
 # Spit the form out using the array of data.
@@ -437,7 +439,7 @@ if ($action != "delete") {
 $pid = $template->pid();
 $gid = $template->gid();
 
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webtemplate_metadata ".
 		 "$command_opts $template_guid/$template_vers",
 		 SUEXEC_ACTION_IGNORE);

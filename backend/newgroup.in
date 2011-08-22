@@ -320,24 +320,18 @@ if ($oldgroup) {
 # The unix group name must be globally unique.  Form a name and check it.
 # Subgroup names have a project-name prefix, and a numeric suffix if needed.
 #
-my $unix_gname	  = substr($group_pid, 0, 3) . "-" . $group_id;
+my $unix_gname	  = substr($group_pid, 0, 3) . "-" . substr($group_id, 0, 12);
 my $maxtries	  = 99;
 my $count	  = 0;
-my $TBDB_UNIXGLEN = 16;		# XXX Where should this be?
 while ($count < $maxtries) {
-    if (length($unix_gname) > $TBDB_UNIXGLEN) {
-	UserError("GroupId: Unix group name $unix_gname is too long!");
-    }
-
     my $query_result =
 	DBQueryFatal("select gid from groups where unix_name='$unix_gname'");
-    if (!$query_result->numrows) {
-	last;
-    }
+    last
+	if (!$query_result->numrows);
 
     $count++;
     $unix_gname = substr($group_pid, 0, 3) . "-" .
-	substr($group_id,  0, length($group_id) - 2) . "$count";
+	substr($group_id,  0, 10) . "$count";
 }
 if ($count == $maxtries) {
     UserError("GroupId: Could not form a unique Unix group name!");

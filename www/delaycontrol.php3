@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -25,7 +25,9 @@ $pid	  = $experiment->pid();
 $eid	  = $experiment->eid();
 $gid	  = $experiment->gid();
 $state	  = $experiment->state();
-$unix_gid = $experiment->UnixGID();
+$unix_ggid= $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pgid= $project->unix_gid();
 
 #
 # Standard Testbed Header
@@ -641,7 +643,7 @@ foreach ($changes as $lan => $foo) {
 	    }
 	}
 
-	if (! ($result = ChangeDelayConfig($uid, $pid, $unix_gid,
+	if (! ($result = ChangeDelayConfig($uid, $unix_pgid, $unix_ggid,
 					   $args, $errors))) {
 	    # Always respit the form so that the form fields are not lost.
 	    # I just hate it when that happens so lets not be guilty of it ourselves.

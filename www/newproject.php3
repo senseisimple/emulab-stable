@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -824,7 +824,12 @@ if (!isset($formfields["pid"]) ||
     $errors["Project Name"] = "Missing Field";
 }
 else {
-    if (!TBvalid_newpid($formfields["pid"])) {
+    # Lets not allow pids that are too long, via this interface.
+    if (strlen($formfields["pid"]) > $TBDB_PIDLEN) {
+	$errors["Project Name"] =
+	    "too long - $TBDB_PIDLEN chars maximum";
+    }
+    elseif (!TBvalid_newpid($formfields["pid"])) {
 	$errors["Project Name"] = TBFieldErrorString();
     }
     elseif (Project::LookupByPid($formfields["pid"])) {

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -37,6 +37,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use Project;
 
 #
 # We have to run this script as root.
@@ -52,10 +53,18 @@ if (! $CVSSUPPORT) {
 }
 
 my $query_result =
-    DBQueryFatal("select pid,head_uid from projects");
+    DBQueryFatal("select pid_idx from projects");
 
 my $PROJROOT = PROJROOT();
-while (my ($pid,$projhead) = $query_result->fetchrow_array()) {
+while (my ($pid_idx) = $query_result->fetchrow_array()) {
+    my $project = Project->Lookup($pid_idx);
+    next
+	if (!defined($project));
+
+    my $pid = $project->pid();
+    my $projhead = $project->head_uid();
+    my $unix_name = $project->unix_name();
+	
     next
 	if (! -d "$PROJROOT/$pid");
 
@@ -67,8 +76,8 @@ while (my ($pid,$projhead) = $query_result->fetchrow_array()) {
     my (undef,undef,$uid) = getpwnam($projhead)
 	or fatal("$projhead not in passwd file");
 
-    my (undef,undef,$gid) = getgrnam($pid)
-	or fatal("$pid not in group file");
+    my (undef,undef,$gid) = getgrnam($unix_name)
+	or fatal("$unix_name not in group file");
 
     if (! -e $CVSDIR) {
 	if (! mkdir("$CVSDIR", 0770)) {

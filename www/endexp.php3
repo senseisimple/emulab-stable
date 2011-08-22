@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -102,6 +102,8 @@ flush();
 # We need the unix gid for the project for running the scripts below.
 #
 $unix_gid = $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 if ($instance) {
     $guid = $instance->guid();
@@ -118,7 +120,7 @@ STARTBUSY("Terminating " . ($instance ? "Instance." : "Experiment."));
 #
 # Run the backend script.
 #
-$retval = SUEXEC($uid, "$pid,$unix_gid", $command, SUEXEC_ACTION_IGNORE);
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid", $command, SUEXEC_ACTION_IGNORE);
 
 HIDEBUSY();
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -28,6 +28,10 @@ $template = $instance->GetTemplate();
 $pid = $instance->pid();
 $eid = $instance->eid();
 $gid = $instance->gid();
+$project = $instance->Project();
+$unix_pid = $project->unix_gid();
+$group    = Group::LookupByPidGid($pid, $gid);
+$unix_gid = $group->unix_gid();
 
 # Permission
 if (!$isadmin &&
@@ -188,7 +192,7 @@ if (count($errors)) {
 
 STARTBUSY("Revising the record");
 
-SUEXEC($uid, "$pid,$gid",
+SUEXEC($uid, "$unix_pid,$unix_gid",
        "webtemplate_revise -t ReviseRecord $message $command ",
        SUEXEC_ACTION_DIE);
 

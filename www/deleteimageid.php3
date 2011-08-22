@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -25,6 +25,8 @@ $optargs = OptionalPageArguments("canceled", PAGEARG_BOOLEAN,
 $imageid = $image->imageid();
 $imagename = $image->imagename();
 $pid = $image->pid();
+$project = $image->Project();
+$unix_pgid = $project->unix_gid();
 
 #
 # Verify permission.
@@ -94,7 +96,8 @@ if (!isset($confirmed)) {
 #
 STARTBUSY("Removing imageid");
 
-$retval = SUEXEC($uid, $pid, "webfrisbeekiller $imageid", SUEXEC_ACTION_DIE);
+$retval = SUEXEC($uid, $unix_pgid,
+		 "webfrisbeekiller $imageid", SUEXEC_ACTION_DIE);
 
 DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 

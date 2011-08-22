@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -21,6 +21,8 @@ $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 # Need these below.
 $pid = $experiment->pid();
 $eid = $experiment->eid();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 #
 # Verify permission.
@@ -47,7 +49,7 @@ function SPEWCLEANUP()
 }
 register_shutdown_function("SPEWCLEANUP");
 
-if ($fp = popen("$TBSUEXEC_PATH $uid $pid webspewevents -w $pid $eid", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH $uid $unix_pid webspewevents -w $pid $eid", "r")) {
     header("Content-Type: text/plain");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
     header("Cache-Control: no-cache, must-revalidate");

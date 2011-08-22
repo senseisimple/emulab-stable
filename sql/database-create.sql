@@ -140,7 +140,7 @@ CREATE TABLE `blobs` (
 
 DROP TABLE IF EXISTS `bridges`;
 CREATE TABLE `bridges` (
-  `pid` varchar(32) default NULL,
+  `pid` varchar(48) default NULL,
   `eid` varchar(32) default NULL,
   `exptidx` int(11) NOT NULL default '0',
   `node_id` varchar(32) NOT NULL default '',
@@ -360,8 +360,8 @@ CREATE TABLE `daily_stats` (
 DROP TABLE IF EXISTS `datapository_databases`;
 CREATE TABLE `datapository_databases` (
   `dbname` varchar(64) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(16) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `uid` varchar(8) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
@@ -442,7 +442,7 @@ CREATE TABLE `delays` (
   `iface1` varchar(8) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `eid` varchar(32) default NULL,
-  `pid` varchar(32) default NULL,
+  `pid` varchar(48) default NULL,
   `vname` varchar(32) default NULL,
   `vlan0` varchar(32) default NULL,
   `vlan1` varchar(32) default NULL,
@@ -505,7 +505,7 @@ CREATE TABLE `delta_inst` (
 DROP TABLE IF EXISTS `delta_proj`;
 CREATE TABLE `delta_proj` (
   `delta_id` varchar(10) NOT NULL default '',
-  `pid` varchar(10) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   PRIMARY KEY  (`delta_id`,`pid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -528,7 +528,7 @@ CREATE TABLE `deltas` (
 
 DROP TABLE IF EXISTS `elabinelab_attributes`;
 CREATE TABLE `elabinelab_attributes` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `role` enum('boss','router','ops','fs','node') NOT NULL default 'node',
@@ -544,7 +544,7 @@ CREATE TABLE `elabinelab_attributes` (
 
 DROP TABLE IF EXISTS `elabinelab_vlans`;
 CREATE TABLE `elabinelab_vlans` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `inner_id` varchar(32) NOT NULL default '',
@@ -680,7 +680,7 @@ CREATE TABLE `event_eventtypes` (
 
 DROP TABLE IF EXISTS `event_groups`;
 CREATE TABLE `event_groups` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `idx` int(10) unsigned NOT NULL auto_increment,
@@ -720,7 +720,7 @@ CREATE TABLE `event_triggertypes` (
 
 DROP TABLE IF EXISTS `eventlist`;
 CREATE TABLE `eventlist` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `idx` int(10) unsigned NOT NULL auto_increment,
@@ -746,7 +746,7 @@ CREATE TABLE `eventlist` (
 DROP TABLE IF EXISTS `experiment_blobs`;
 CREATE TABLE `experiment_blobs` (
   `idx` int(11) unsigned NOT NULL auto_increment,
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `path` varchar(255) NOT NULL default '',
@@ -764,7 +764,7 @@ CREATE TABLE `experiment_features` (
   `feature` varchar(64) NOT NULL default '',
   `added` datetime NOT NULL,
   `exptidx` int(11) NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   PRIMARY KEY  (`feature`,`exptidx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -893,7 +893,7 @@ CREATE TABLE `experiment_runs` (
 
 DROP TABLE IF EXISTS `experiment_stats`;
 CREATE TABLE `experiment_stats` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `eid` varchar(32) NOT NULL default '',
   `eid_uuid` varchar(40) NOT NULL default '',
@@ -902,7 +902,7 @@ CREATE TABLE `experiment_stats` (
   `exptidx` int(10) unsigned NOT NULL default '0',
   `rsrcidx` int(10) unsigned NOT NULL default '0',
   `lastrsrc` int(10) unsigned default NULL,
-  `gid` varchar(16) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
   `created` datetime default NULL,
   `destroyed` datetime default NULL,
@@ -982,7 +982,7 @@ CREATE TABLE `experiment_template_inputs` (
   `idx` int(10) unsigned NOT NULL auto_increment,
   `parent_guid` varchar(16) NOT NULL default '',
   `parent_vers` smallint(5) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `tid` varchar(32) NOT NULL default '',
   `input_idx` int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (`parent_guid`,`parent_vers`,`idx`),
@@ -999,7 +999,7 @@ CREATE TABLE `experiment_template_instance_bindings` (
   `parent_guid` varchar(16) NOT NULL default '',
   `parent_vers` smallint(5) unsigned NOT NULL default '0',
   `exptidx` int(10) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `name` varchar(64) NOT NULL default '',
   `value` tinytext NOT NULL,
@@ -1032,7 +1032,7 @@ CREATE TABLE `experiment_template_instances` (
   `parent_guid` varchar(16) NOT NULL default '',
   `parent_vers` smallint(5) unsigned NOT NULL default '0',
   `exptidx` int(10) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
@@ -1099,7 +1099,7 @@ DROP TABLE IF EXISTS `experiment_template_parameters`;
 CREATE TABLE `experiment_template_parameters` (
   `parent_guid` varchar(16) NOT NULL default '',
   `parent_vers` smallint(5) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `tid` varchar(32) NOT NULL default '',
   `name` varchar(64) NOT NULL default '',
   `value` tinytext,
@@ -1132,7 +1132,7 @@ DROP TABLE IF EXISTS `experiment_template_settings`;
 CREATE TABLE `experiment_template_settings` (
   `parent_guid` varchar(16) NOT NULL default '',
   `parent_vers` smallint(5) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `tid` varchar(32) NOT NULL default '',
   `uselinkdelays` tinyint(4) NOT NULL default '0',
   `forcelinkdelays` tinyint(4) NOT NULL default '0',
@@ -1177,8 +1177,8 @@ CREATE TABLE `experiment_templates` (
   `parent_vers` smallint(5) unsigned default NULL,
   `child_guid` varchar(16) default NULL,
   `child_vers` smallint(5) unsigned default NULL,
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(16) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `tid` varchar(32) NOT NULL default '',
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
@@ -1216,8 +1216,8 @@ CREATE TABLE `experiments` (
   `eid_uuid` varchar(40) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(16) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `creator_idx` mediumint(8) unsigned NOT NULL default '0',
   `swapper_idx` mediumint(8) unsigned default NULL,
   `expt_created` datetime default NULL,
@@ -1332,8 +1332,8 @@ CREATE TABLE `exported_tables` (
 DROP TABLE IF EXISTS `exppid_access`;
 CREATE TABLE `exppid_access` (
   `exp_eid` varchar(32) NOT NULL default '',
-  `exp_pid` varchar(12) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
+  `exp_pid` varchar(48) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   PRIMARY KEY  (`exp_eid`,`exp_pid`,`pid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -1358,7 +1358,7 @@ CREATE TABLE `external_networks` (
 
 DROP TABLE IF EXISTS `firewall_rules`;
 CREATE TABLE `firewall_rules` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `fwname` varchar(32) NOT NULL default '',
@@ -1375,7 +1375,7 @@ CREATE TABLE `firewall_rules` (
 
 DROP TABLE IF EXISTS `firewalls`;
 CREATE TABLE `firewalls` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `fwname` varchar(32) NOT NULL default '',
@@ -1486,8 +1486,8 @@ CREATE TABLE `group_features` (
   `added` datetime NOT NULL,
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   PRIMARY KEY  (`feature`,`gid_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -1498,8 +1498,8 @@ CREATE TABLE `group_features` (
 DROP TABLE IF EXISTS `group_membership`;
 CREATE TABLE `group_membership` (
   `uid` varchar(8) NOT NULL default '',
-  `gid` varchar(16) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
@@ -1518,8 +1518,8 @@ CREATE TABLE `group_membership` (
 
 DROP TABLE IF EXISTS `group_policies`;
 CREATE TABLE `group_policies` (
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
   `policy` varchar(32) NOT NULL default '',
@@ -1535,8 +1535,8 @@ CREATE TABLE `group_policies` (
 
 DROP TABLE IF EXISTS `group_stats`;
 CREATE TABLE `group_stats` (
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_uuid` varchar(40) NOT NULL default '',
@@ -1567,8 +1567,8 @@ CREATE TABLE `group_stats` (
 
 DROP TABLE IF EXISTS `groups`;
 CREATE TABLE `groups` (
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_uuid` varchar(40) NOT NULL default '',
@@ -1616,7 +1616,7 @@ CREATE TABLE `ifaces` (
   `lanid` int(11) NOT NULL default '0',
   `ifaceid` int(11) NOT NULL default '0',
   `exptidx` int(11) NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `node_id` varchar(32) NOT NULL default '',
   `vnode` varchar(32) NOT NULL default '',
@@ -1664,8 +1664,8 @@ CREATE TABLE `images` (
   `imagename` varchar(30) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `imageid` int(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
   `old_imageid` varchar(45) NOT NULL default '',
@@ -1796,7 +1796,7 @@ DROP TABLE IF EXISTS `ipport_ranges`;
 CREATE TABLE `ipport_ranges` (
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `low` int(11) NOT NULL default '0',
   `high` int(11) NOT NULL default '0',
   PRIMARY KEY  (`exptidx`),
@@ -1809,7 +1809,7 @@ CREATE TABLE `ipport_ranges` (
 
 DROP TABLE IF EXISTS `ipsubnets`;
 CREATE TABLE `ipsubnets` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `idx` smallint(5) unsigned NOT NULL auto_increment,
@@ -1891,7 +1891,7 @@ DROP TABLE IF EXISTS `lans`;
 CREATE TABLE `lans` (
   `lanid` int(11) NOT NULL auto_increment,
   `exptidx` int(11) NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `vname` varchar(64) NOT NULL default '',
   `vidx` int(11) NOT NULL default '0',
@@ -1910,7 +1910,7 @@ CREATE TABLE `lans` (
 DROP TABLE IF EXISTS `last_reservation`;
 CREATE TABLE `last_reservation` (
   `node_id` varchar(32) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`pid_idx`),
   UNIQUE KEY `pid` (`node_id`,`pid`)
@@ -1929,7 +1929,7 @@ CREATE TABLE `linkdelays` (
   `type` enum('simplex','duplex') NOT NULL default 'duplex',
   `exptidx` int(11) NOT NULL default '0',
   `eid` varchar(32) default NULL,
-  `pid` varchar(32) default NULL,
+  `pid` varchar(48) default NULL,
   `vlan` varchar(32) NOT NULL default '',
   `vnode` varchar(32) NOT NULL default '',
   `pipe` smallint(5) unsigned NOT NULL default '0',
@@ -2098,8 +2098,8 @@ CREATE TABLE `mode_transitions` (
 DROP TABLE IF EXISTS `motelogfiles`;
 CREATE TABLE `motelogfiles` (
   `logfileid` varchar(45) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
-  `gid` varchar(12) default NULL,
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   `creator` varchar(8) NOT NULL default '',
   `created` datetime NOT NULL default '0000-00-00 00:00:00',
   `updated` datetime default NULL,
@@ -2210,7 +2210,7 @@ CREATE TABLE `newdelays` (
   `iface0` varchar(8) NOT NULL default '',
   `iface1` varchar(8) NOT NULL default '',
   `eid` varchar(32) default NULL,
-  `pid` varchar(32) default NULL,
+  `pid` varchar(48) default NULL,
   `vname` varchar(32) default NULL,
   `card0` tinyint(3) unsigned default NULL,
   `card1` tinyint(3) unsigned default NULL,
@@ -2225,7 +2225,7 @@ DROP TABLE IF EXISTS `next_reserve`;
 CREATE TABLE `next_reserve` (
   `node_id` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -2361,7 +2361,7 @@ CREATE TABLE `node_idlestats` (
 
 DROP TABLE IF EXISTS `node_reservations`;
 CREATE TABLE `node_reservations` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `priority` smallint(5) NOT NULL default '0',
   `count` smallint(5) NOT NULL default '0',
@@ -2576,7 +2576,7 @@ CREATE TABLE `nodes` (
   `destination_x` float default NULL,
   `destination_y` float default NULL,
   `destination_orientation` float default NULL,
-  `reserved_pid` varchar(12) default NULL,
+  `reserved_pid` varchar(48) default NULL,
   `uuid` varchar(40) NOT NULL default '',
   PRIMARY KEY  (`node_id`),
   KEY `phys_nodeid` (`phys_nodeid`),
@@ -2591,7 +2591,7 @@ CREATE TABLE `nodes` (
 DROP TABLE IF EXISTS `nodetypeXpid_permissions`;
 CREATE TABLE `nodetypeXpid_permissions` (
   `type` varchar(30) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   PRIMARY KEY  (`type`,`pid_idx`),
   UNIQUE KEY `typepid` (`type`,`pid`),
@@ -2708,7 +2708,7 @@ CREATE TABLE `nonlocal_users` (
 
 DROP TABLE IF EXISTS `nseconfigs`;
 CREATE TABLE `nseconfigs` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -2723,7 +2723,7 @@ CREATE TABLE `nseconfigs` (
 
 DROP TABLE IF EXISTS `nsfiles`;
 CREATE TABLE `nsfiles` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `nsfile` mediumtext,
@@ -2786,7 +2786,7 @@ CREATE TABLE `os_boot_cmd` (
 DROP TABLE IF EXISTS `os_info`;
 CREATE TABLE `os_info` (
   `osname` varchar(20) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `osid` int(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
@@ -2921,7 +2921,7 @@ CREATE TABLE `partitions` (
   `partition` tinyint(4) NOT NULL default '0',
   `osid` int(8) unsigned default NULL,
   `imageid` int(8) unsigned default NULL,
-  `imagepid` varchar(12) NOT NULL default '',
+  `imagepid` varchar(48) NOT NULL default '',
   PRIMARY KEY  (`node_id`,`partition`),
   KEY `osid` (`osid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -3149,7 +3149,7 @@ CREATE TABLE `plab_slice_nodes` (
 
 DROP TABLE IF EXISTS `plab_slices`;
 CREATE TABLE `plab_slices` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `slicename` varchar(64) NOT NULL default '',
@@ -3195,7 +3195,7 @@ CREATE TABLE `port_counters` (
 
 DROP TABLE IF EXISTS `port_registration`;
 CREATE TABLE `port_registration` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `service` varchar(64) NOT NULL default '',
@@ -3211,7 +3211,7 @@ CREATE TABLE `port_registration` (
 
 DROP TABLE IF EXISTS `portmap`;
 CREATE TABLE `portmap` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `vnode` varchar(32) NOT NULL default '',
   `vport` tinyint(4) NOT NULL default '0',
@@ -3237,7 +3237,7 @@ CREATE TABLE `priorities` (
 DROP TABLE IF EXISTS `proj_memb`;
 CREATE TABLE `proj_memb` (
   `uid` varchar(8) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `trust` enum('none','user','local_root','group_root') default NULL,
   `date_applied` date default NULL,
   `date_approved` date default NULL,
@@ -3250,7 +3250,7 @@ CREATE TABLE `proj_memb` (
 
 DROP TABLE IF EXISTS `project_stats`;
 CREATE TABLE `project_stats` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `exptstart_count` int(11) unsigned default '0',
   `exptstart_last` datetime default NULL,
@@ -3278,7 +3278,7 @@ CREATE TABLE `project_stats` (
 
 DROP TABLE IF EXISTS `projects`;
 CREATE TABLE `projects` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
   `created` datetime default NULL,
   `expires` date default NULL,
@@ -3391,14 +3391,14 @@ CREATE TABLE `reposition_status` (
 DROP TABLE IF EXISTS `reserved`;
 CREATE TABLE `reserved` (
   `node_id` varchar(32) NOT NULL default '',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `rsrv_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
   `vname` varchar(32) default NULL,
   `erole` enum('node','virthost','delaynode','simhost','sharedhost','subboss') NOT NULL default 'node',
   `simhost_violation` tinyint(3) unsigned NOT NULL default '0',
-  `old_pid` varchar(12) NOT NULL default '',
+  `old_pid` varchar(48) NOT NULL default '',
   `old_eid` varchar(32) NOT NULL default '',
   `old_exptidx` int(11) NOT NULL default '0',
   `cnet_vlan` int(11) default NULL,
@@ -3425,7 +3425,7 @@ CREATE TABLE `reserved` (
 --
 DROP TABLE IF EXISTS `reserved_vlantags`;
 CREATE TABLE `reserved_vlantags` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `lanid` int(11) NOT NULL default '0',
@@ -3578,7 +3578,7 @@ CREATE TABLE `sw_configfiles` (
 
 DROP TABLE IF EXISTS `switch_paths`;
 CREATE TABLE `switch_paths` (
-  `pid` varchar(12) default NULL,
+  `pid` varchar(48) default NULL,
   `eid` varchar(32) default NULL,
   `vname` varchar(32) default NULL,
   `node_id1` varchar(32) default NULL,
@@ -3748,7 +3748,7 @@ CREATE TABLE `traces` (
   `idx` int(10) unsigned NOT NULL auto_increment,
   `iface0` varchar(8) NOT NULL default '',
   `iface1` varchar(8) NOT NULL default '',
-  `pid` varchar(32) default NULL,
+  `pid` varchar(48) default NULL,
   `eid` varchar(32) default NULL,
   `exptidx` int(11) NOT NULL default '0',
   `linkvname` varchar(32) default NULL,
@@ -3784,7 +3784,7 @@ DROP TABLE IF EXISTS `unixgroup_membership`;
 CREATE TABLE `unixgroup_membership` (
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `gid` varchar(16) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
   PRIMARY KEY  (`uid`,`gid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -4000,7 +4000,7 @@ CREATE TABLE `usrp_orders` (
 
 DROP TABLE IF EXISTS `v2pmap`;
 CREATE TABLE `v2pmap` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4069,7 +4069,7 @@ CREATE TABLE `vinterfaces` (
 
 DROP TABLE IF EXISTS `virt_agents`;
 CREATE TABLE `virt_agents` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(64) NOT NULL default '',
@@ -4085,7 +4085,7 @@ CREATE TABLE `virt_agents` (
 
 DROP TABLE IF EXISTS `virt_blobs`;
 CREATE TABLE `virt_blobs` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vblob_id` varchar(40) NOT NULL default '',
@@ -4099,7 +4099,7 @@ CREATE TABLE `virt_blobs` (
 
 DROP TABLE IF EXISTS `virt_bridges`;
 CREATE TABLE `virt_bridges` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4115,7 +4115,7 @@ CREATE TABLE `virt_bridges` (
 
 DROP TABLE IF EXISTS `virt_client_service_ctl`;
 CREATE TABLE `virt_client_service_ctl` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vnode` varchar(32) NOT NULL default '',
@@ -4135,7 +4135,7 @@ CREATE TABLE `virt_client_service_ctl` (
 
 DROP TABLE IF EXISTS `virt_client_service_hooks`;
 CREATE TABLE `virt_client_service_hooks` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vnode` varchar(32) NOT NULL default '',
@@ -4156,7 +4156,7 @@ CREATE TABLE `virt_client_service_hooks` (
 
 DROP TABLE IF EXISTS `virt_client_service_opts`;
 CREATE TABLE `virt_client_service_opts` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vnode` varchar(32) NOT NULL default '',
@@ -4171,7 +4171,7 @@ CREATE TABLE `virt_client_service_opts` (
 
 DROP TABLE IF EXISTS `virt_firewalls`;
 CREATE TABLE `virt_firewalls` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `fwname` varchar(32) NOT NULL default '',
@@ -4188,7 +4188,7 @@ CREATE TABLE `virt_firewalls` (
 
 DROP TABLE IF EXISTS `virt_lan_lans`;
 CREATE TABLE `virt_lan_lans` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `idx` int(11) NOT NULL auto_increment,
@@ -4205,7 +4205,7 @@ CREATE TABLE `virt_lan_lans` (
 
 DROP TABLE IF EXISTS `virt_lan_member_settings`;
 CREATE TABLE `virt_lan_member_settings` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4222,7 +4222,7 @@ CREATE TABLE `virt_lan_member_settings` (
 
 DROP TABLE IF EXISTS `virt_lan_settings`;
 CREATE TABLE `virt_lan_settings` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4238,7 +4238,7 @@ CREATE TABLE `virt_lan_settings` (
 
 DROP TABLE IF EXISTS `virt_lans`;
 CREATE TABLE `virt_lans` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4308,7 +4308,7 @@ CREATE TABLE `virt_lans` (
 
 DROP TABLE IF EXISTS `virt_node_desires`;
 CREATE TABLE `virt_node_desires` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4324,7 +4324,7 @@ CREATE TABLE `virt_node_desires` (
 
 DROP TABLE IF EXISTS `virt_node_motelog`;
 CREATE TABLE `virt_node_motelog` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `vname` varchar(32) NOT NULL default '',
   `logfileid` varchar(45) NOT NULL default '',
@@ -4337,7 +4337,7 @@ CREATE TABLE `virt_node_motelog` (
 
 DROP TABLE IF EXISTS `virt_node_startloc`;
 CREATE TABLE `virt_node_startloc` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4356,7 +4356,7 @@ CREATE TABLE `virt_node_startloc` (
 
 DROP TABLE IF EXISTS `virt_nodes`;
 CREATE TABLE `virt_nodes` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `ips` text,
@@ -4390,7 +4390,7 @@ CREATE TABLE `virt_nodes` (
 
 DROP TABLE IF EXISTS `virt_parameters`;
 CREATE TABLE `virt_parameters` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `name` varchar(64) NOT NULL default '',
@@ -4406,7 +4406,7 @@ CREATE TABLE `virt_parameters` (
 
 DROP TABLE IF EXISTS `virt_paths`;
 CREATE TABLE `virt_paths` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `pathname` varchar(32) NOT NULL default '',
@@ -4425,7 +4425,7 @@ CREATE TABLE `virt_paths` (
 
 DROP TABLE IF EXISTS `virt_programs`;
 CREATE TABLE `virt_programs` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vnode` varchar(32) NOT NULL default '',
@@ -4445,7 +4445,7 @@ CREATE TABLE `virt_programs` (
 
 DROP TABLE IF EXISTS `virt_routes`;
 CREATE TABLE `virt_routes` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4466,7 +4466,7 @@ CREATE TABLE `virt_routes` (
 
 DROP TABLE IF EXISTS `virt_simnode_attributes`;
 CREATE TABLE `virt_simnode_attributes` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4482,7 +4482,7 @@ CREATE TABLE `virt_simnode_attributes` (
 
 DROP TABLE IF EXISTS `virt_tiptunnels`;
 CREATE TABLE `virt_tiptunnels` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `host` varchar(32) NOT NULL default '',
@@ -4497,7 +4497,7 @@ CREATE TABLE `virt_tiptunnels` (
 
 DROP TABLE IF EXISTS `virt_trafgens`;
 CREATE TABLE `virt_trafgens` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vnode` varchar(32) NOT NULL default '',
@@ -4522,7 +4522,7 @@ CREATE TABLE `virt_trafgens` (
 
 DROP TABLE IF EXISTS `virt_user_environment`;
 CREATE TABLE `virt_user_environment` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `idx` int(10) unsigned NOT NULL auto_increment,
@@ -4538,7 +4538,7 @@ CREATE TABLE `virt_user_environment` (
 
 DROP TABLE IF EXISTS `virt_vtypes`;
 CREATE TABLE `virt_vtypes` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `name` varchar(32) NOT NULL default '',
@@ -4554,7 +4554,7 @@ CREATE TABLE `virt_vtypes` (
 
 DROP TABLE IF EXISTS `vis_graphs`;
 CREATE TABLE `vis_graphs` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `zoom` decimal(8,3) NOT NULL default '0.000',
@@ -4570,7 +4570,7 @@ CREATE TABLE `vis_graphs` (
 
 DROP TABLE IF EXISTS `vis_nodes`;
 CREATE TABLE `vis_nodes` (
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
@@ -4589,7 +4589,7 @@ DROP TABLE IF EXISTS `vlans`;
 CREATE TABLE `vlans` (
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
-  `pid` varchar(12) NOT NULL default '',
+  `pid` varchar(48) NOT NULL default '',
   `virtual` varchar(64) default NULL,
   `members` text NOT NULL,
   `id` int(11) NOT NULL auto_increment,
@@ -4800,7 +4800,7 @@ CREATE TABLE `wireless_stats` (
   `floor` varchar(32) NOT NULL default '',
   `building` varchar(32) NOT NULL default '',
   `data_eid` varchar(32) default NULL,
-  `data_pid` varchar(32) default NULL,
+  `data_pid` varchar(48) default NULL,
   `type` varchar(32) default NULL,
   `altsrc` tinytext,
   PRIMARY KEY  (`name`)

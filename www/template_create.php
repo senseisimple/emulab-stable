@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -489,6 +489,7 @@ elseif ($nsfilelocale == "remote") {
 # Grab the unix GID for running scripts.
 #
 $unix_gid = $group->unix_gid();
+$unix_pid = $project->unix_gid();
 
 # Okay, we can spit back a header now that there is no worry of redirect.
 PAGEHEADER("Create an Experiment Template");
@@ -500,7 +501,7 @@ echo "</script>\n";
 STARTBUSY("Starting template creation!");
 
 # And run that script!
-$retval = SUEXEC($uid, "$pid,$unix_gid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		 "webtemplate_create -E $description ".
 		 "-g $gid $pid $tid $thensfile",
 		 SUEXEC_ACTION_IGNORE);

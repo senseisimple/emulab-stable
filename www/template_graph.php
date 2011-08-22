@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -64,8 +64,10 @@ $optarg = "-z " . ($zoom == "in" ? "in" : "out");
 $pid = $template->pid();
 $gid = $template->gid();
 $unix_gid = $template->UnixGID();
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
-$retval = SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid", "webtemplate_graph $optarg $guid",
 		 SUEXEC_ACTION_CONTINUE);
 
 if ($retval) {

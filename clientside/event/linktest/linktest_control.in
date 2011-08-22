@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -170,6 +170,8 @@ if (! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
 # Need the unix_gidname info to pass to ops.
 my $unix_gidname = $experiment->GetGroup()->unix_name();
 my $errlog       = $experiment->UserDir() . "/logs/linktest.log";
+my $project      = $experiment->GetProject();
+my $unix_pidname = $project->unix_name()
 
 #
 # Lets see if there is a linktest running already.
@@ -325,6 +327,7 @@ push(@cmdargs, ("-t", "$timeout"))
 push(@cmdargs, "-l");
 push(@cmdargs, (defined($level) ? $level : $experiment->linktest_level()));
 push(@cmdargs, ("-g", $unix_gidname));
+push(@cmdargs, ("-p", $unix_pidname));
 push(@cmdargs, ("-u", $dbuid));
 push(@cmdargs, ("-e", "$pid/$eid"));
 push(@cmdargs, ("-o", $errlog));

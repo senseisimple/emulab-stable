@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -1737,7 +1737,7 @@ class TemplateInstance
 	fclose($fp);
 	chmod($datafile, 0666);
 
-	SUEXEC($this_user->uid(), $template->pid(),
+	SUEXEC($this_user->uid(), $template->UnixGID(),
 	       "webtemplate_metadata -a $action -f $datafile -t annotation ".
 	       " $annoname $guid/$vers",
 	       SUEXEC_ACTION_CONTINUE);
@@ -1763,7 +1763,7 @@ class TemplateInstance
 	fclose($fp);
 	chmod($datafile, 0666);
 
-	SUEXEC($this_user->uid(), $template->pid(),
+	SUEXEC($this_user->uid(), $template->UnixGID(),
 	       "webtemplate_metadata -a $action -f $datafile -t annotation ".
 	       " $annoname $guid/$vers",
 	       SUEXEC_ACTION_CONTINUE);

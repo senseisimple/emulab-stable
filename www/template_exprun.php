@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -43,6 +43,8 @@ $eid  = $instance->eid();
 $unix_gid   = $template->UnixGID();
 $exptidx    = $instance->exptidx();
 $experiment = $instance->GetExperiment();
+$project  = $template->GetProject();
+$unix_pid = $project->unix_gid();
 
 if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to export in template ".
@@ -54,7 +56,7 @@ if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
 #
 function DOIT($instance, $action, $command_options)
 {
-    global $guid, $vers, $pid, $unix_gid, $eid, $uid;
+    global $guid, $vers, $pid, $unix_pid, $unix_gid, $eid, $uid;
     global $deletexmlfile, $parameter_xmlfile;
     $message    = "";
     $template   = $instance->GetTemplate();
@@ -100,7 +102,7 @@ function DOIT($instance, $action, $command_options)
     #
     # Run the backend script.
     #
-    $retval = SUEXEC($uid, "$pid,$unix_gid",
+    $retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		     "webtemplate_exprun $command_options $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 
@@ -132,7 +134,7 @@ function DOIT($instance, $action, $command_options)
 #
 function DOTIME($instance, $action)
 {
-    global $guid, $vers, $pid, $unix_gid, $eid, $uid;
+    global $guid, $vers, $pid, $unix_pid, $unix_gid, $eid, $uid;
     $message    = "";
     $template   = $instance->GetTemplate();
     $experiment = $instance->GetExperiment();
@@ -165,7 +167,7 @@ function DOTIME($instance, $action)
     #
     # Run the backend script.
     #
-    $retval = SUEXEC($uid, "$pid,$unix_gid",
+    $retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 		     "webtemplate_exprun $command_options $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 

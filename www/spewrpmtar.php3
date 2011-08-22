@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -74,6 +74,8 @@ $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
 $creator_uid = $creator->uid();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 #
 # We need the secret key to match
@@ -138,7 +140,7 @@ if (isset($elabinelab_source)) {
 	# Do it anyway.
 	$cvstag = escapeshellarg($cvstag);
 
-	if ($fp = popen("$TBSUEXEC_PATH $creator_uid $pid,$unix_gid ".
+	if ($fp = popen("$TBSUEXEC_PATH $creator_uid $unix_pid,$unix_gid ".
 			"spewsource -t $cvstag", "r")) {
 	    header("Content-Type: application/x-gzip");
 	    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
@@ -180,7 +182,7 @@ $arg    = (isset($stamp) ? "-t " . escapeshellarg($stamp) : "");
 # Then do it for real, spitting out the data. Sure, the user could
 # delete the file in the meantime, but thats his problem. 
 #
-$retval = SUEXEC($creator_uid, "$pid,$unix_gid",
+$retval = SUEXEC($creator_uid, "$unix_pid,$unix_gid",
 		 "spewrpmtar -v $arg $node_id $file",
 		 SUEXEC_ACTION_IGNORE);
 
@@ -202,7 +204,7 @@ if ($retval) {
 #
 # Okay, now do it for real. 
 # 
-if ($fp = popen("$TBSUEXEC_PATH $creator_uid $pid,$unix_gid ".
+if ($fp = popen("$TBSUEXEC_PATH $creator_uid $unix_pid,$unix_gid ".
 		"spewrpmtar $node_id $file", "r")) {
     header("Content-Type: application/octet-stream");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");

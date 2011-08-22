@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -34,6 +34,8 @@ $eid = $experiment->eid();
 $gid = $experiment->gid();
 $expstate = $experiment->state();
 $unix_gid = $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid();
 
 if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
     strcmp($expstate, $TB_EXPTSTATE_SWAPPED)) {
@@ -159,7 +161,7 @@ if (strcmp($mode, "record") == 0) {
     ignore_user_abort(1);
     
     # Start the script and pipe its output to the user.
-    $fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid webfeedback ".
+    $fp = popen("$TBSUEXEC_PATH $uid $unix_pid,$unix_gid webfeedback ".
 		"-d $duration $pid $gid $eid",	"r");
     if (! $fp) {
 	USERERROR("Feedback failed!", 1);
@@ -197,7 +199,7 @@ else if (strcmp($mode, "clear") == 0) {
     if (isset($clear_bootstrap) && !strcmp($clear_bootstrap, "1"))
 	$options .= " -b";
     if ($options != "") {
-	$retval = SUEXEC($uid, "$pid,$unix_gid",
+	$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 			 "webfeedback $options $pid $gid $eid",
 			 SUEXEC_ACTION_USERERROR);
 	
@@ -220,7 +222,7 @@ else if (strcmp($mode, "clear") == 0) {
 	fclose($fp);
 	chmod($nsfile, 0666);
 	
-	$retval = SUEXEC($uid, "$pid,$unix_gid",
+	$retval = SUEXEC($uid, "$unix_pid,$unix_gid",
 			 "webswapexp " . ($reboot ? "-r " : "") .
 			 ($eventrestart ? "-e " : "") .
 			 "-s modify $pid $eid $nsfile",

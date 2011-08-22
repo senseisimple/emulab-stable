@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -78,6 +78,8 @@ if (!$experiment) {
 $node_pid = $experiment->pid();
 $node_eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
+$project  = $experiment->Project();
+$unix_pid = $project->unix_gid()
 
 # Should check for file file_exists($image_path),
 # but too messy.
@@ -106,7 +108,7 @@ echo "<br>
 flush();
 
 SUEXEC($uid,
-       "$image_pid,$unix_gid" . ($image_pid != $node_pid ? ",$node_pid" : ""),
+       "$unix_pid,$unix_gid" . ($image_pid != $node_pid ? ",$node_pid" : ""),
        "webcreate_image -p $image_pid $image_name $node_id",
        SUEXEC_ACTION_DUPDIE);
 
