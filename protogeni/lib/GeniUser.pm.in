@@ -591,6 +591,7 @@ sub email($)		{ return $_[0]->{'USER'}->email(); }
 sub SSLPassPhrase($$$)  { return $_[0]->{'USER'}->SSLPassPhrase($_[1],$_[2]); }
 sub HomeDir($)          { return $_[0]->{'USER'}->HomeDir(); }
 sub admin($)		{ return $_[0]->{'USER'}->admin(); }
+sub BumpActivity($   )  { return $_[0]->{'USER'}->BumpActivity(); }
 
 # Need to construct this since not in User structure.
 sub hrn($)		{ return "${PGENIDOMAIN}." . $_[0]->uid(); }
