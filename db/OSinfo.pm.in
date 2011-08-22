@@ -137,13 +137,20 @@ sub Lookup($$;$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
+    return LookupRow($class, $query_result->fetchrow_hashref());
+}
+
+sub LookupRow($$)
+{
+    my ($class, $row) = @_;
+
     my $self           = {};
-    $self->{'OSINFO'}  = $query_result->fetchrow_hashref();
+    $self->{'OSINFO'}  = $row;
 
     bless($self, $class);
     
     # Add to cache. 
-    $osids{"$osid"} = $self;
+    $osids{$self->osid()} = $self;
     
     return $self;
 }
@@ -174,6 +181,7 @@ sub max_concurrent($)   { return field($_[0], "max_concurrent"); }
 sub mfs($)              { return field($_[0], "mfs"); }
 sub reboot_waittime($)  { return field($_[0], "reboot_waittime"); }
 sub def_parentosid($)   { return field($_[0], "def_parentosid"); }
+sub protogeni_export($) { return field($_[0], "protogeni_export"); }
 
 #
 # Create a new os_info. This installs the new record in the DB,

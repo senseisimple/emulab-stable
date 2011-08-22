@@ -11,7 +11,8 @@ use Exporter;
 use lib "/usr/testbed/lib";
 #use lib "@prefix@/lib";
 use Node;
-use libdb qw(TBGetSiteVar DBQueryFatal);
+use OSinfo;
+use libdb qw(TBGetSiteVar DBQueryFatal TBResolveNextOSID);
 use vars qw(@ISA @EXPORT @EXPORT_OK);
 
 sub FD_ADDITIVE  { return "FD_ADDITIVE"; }
@@ -56,6 +57,13 @@ our %permissions = ();
 our %auxtypemap = ();
 # Map from type names to lists of features
 our %typefeatures = ();
+# Keyed by osids. Contains OsInfo structures
+our %osinfo = ();
+# Mapping between types and osids, and vice versa. Hash of arrays.
+our %type_osid = ();
+our %osid_type = ();
+# Mapping between an osid and its subosids. Hash of arrays.
+our %osid_subosid = ();
 
 #
 # Initialize project permissions table if the user specified a project.
@@ -149,6 +157,83 @@ sub LookupFeatures()
     }
 }
 
+sub LookupOsids()
+{
+    my $dbresult;
+    my $row;
+    # Bulk lookup on os_info table
+    $dbresult = DBQueryFatal("select * from os_info");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	my $os = OSinfo->LookupRow($row);
+	$osinfo{$os->osid()} = $os;
+    }
+
+    #
+    # Read the table of which image types are supported on which
+    # hardware - we limit this to global images and ones that match
+    # the PID (if given) We do this limiting for two reasons:
+    # 1) To avoid an explosion in the number of features for nodes
+    # 2) To avoid information leaks, allowing projects to see each
+    #    other's images
+    # 
+    my $pidos = "";
+    if (defined($user_project)) {
+	$pidos = "or i.pid='$user_project'";
+    }
+    $dbresult =
+	DBQueryFatal("select distinct oi.osid, oi.type ".
+		     "from osidtoimageid as oi ".
+		     "left join images as i on oi.imageid = i.imageid ".
+		     "where i.global = 1 $pidos");
+    while (my ($osid, $typename) = $dbresult->fetchrow()) {
+	hashpush(\%type_osid, $typename, $osid);
+	hashpush(\%osid_type, $osid, $typename);
+    }
+
+    #
+    # We also have to resolve the 'generic' OSIDs, which use the
+    # nextosid field to redirect to another OSID
+    #
+    $dbresult = DBQueryFatal("select osid from os_info where " .
+			     "nextosid is not null");
+    while (my ($osid) = $dbresult->fetchrow()) {
+	#
+	# Check to see if they were allowed to use the real OSID
+	#
+	my $realosid = TBResolveNextOSID($osid, $user_project, $exempt_eid);
+	if (exists($osid_type{$realosid})) {
+	    foreach my $type (@{ $osid_type{$realosid} }) {
+		hashpush(\%type_osid, $type, $osid);
+	    }
+	}
+    }
+
+    #
+    # For subOS support (i.e., vnode OSes running atop vhost OSes), we
+    # have to check both the subosid and all the parent_osid it can
+    # run on.
+    #
+    my $subosidquery = "select distinct o.osid,o.parent_osid ".
+	"from os_submap as o " .
+	"left join osidtoimageid as oi1 on o.osid = oi1.osid " .
+	"left join osidtoimageid as oi2 on o.parent_osid = oi2.osid " .
+	"left join images as i1 on oi1.imageid = i1.imageid ".
+	"left join images as i2 on oi2.imageid = i2.imageid ".
+	"where (i1.global = 1";
+    if (defined($user_project)) {
+	$subosidquery .= " or i1.pid='$user_project'";
+    }
+    $subosidquery .= ") and (i2.global = 1";
+    if (defined($user_project)) {
+	$subosidquery .= " or i2.pid='$user_project'";
+    }
+    $subosidquery .= ")";
+    $dbresult = DBQueryFatal($subosidquery);
+    while (my ($subosid,$osid) = $dbresult->fetchrow()) {
+	hashpush(\%osid_subosid, $osid, $subosid);
+    }
+}
+
 sub TypeAllowed($)
 {
     my ($type) = @_;
@@ -168,6 +253,17 @@ sub CreateNode($)
     my $node = libptop::pnode->Create($row);
     Nodes()->{$node->name()} = $node;
     return $node;
+}
+
+# Push a value onto an array contained within a hash
+sub hashpush($$$)
+{
+    my ($hashref, $key, $value) = @_;
+    if (! exists($hashref->{$key})) {
+	$hashref->{$key} = [$value];
+    } else {
+	push(@{ $hashref->{$key} }, $value);
+    }
 }
 
 ###############################################################################
@@ -425,6 +521,7 @@ sub processLocal($)
 	$self->addShared();
     }
     $self->processAuxtypes();
+    $self->processOsFeatures();
 }
 
 sub addDelayCapacity($)
@@ -613,6 +710,51 @@ sub processCpuRam($)
     $self->addFeature("rampercent", 80, libptopnew::FD_ADDITIVE()); # XXX Hack
 }
 
+#
+# Add in OS features.
+#
+sub processOsFeatures($)
+{
+    my ($self) = @_;
+    my $node = $self->node();
+    if ($node->sharing_mode()) {
+	#
+	# A shared node is running just one OS, and we put that in
+	# so that the user can specify which of the current VM types
+	# is wanted.
+	#
+	my $osid = $node->def_boot_osid();
+	$self->addFeature("OS-$osid", 0.5);
+	# Add any subOSes the shared node osid can support
+	if (defined($osid_subosid{$osid})) {
+	    foreach my $subosid (@{ $osid_subosid{$osid} }) {
+		$self->addFeature("OS-$osid-$subosid", 0);
+	    }
+	}
+    } elsif (exists($type_osid{$node->type()})) {
+	#
+	# Add in features for all of the OSes that this node (as
+	# evidenced by its type) can support
+	#
+	foreach my $o1 (@{ $type_osid{$node->type()} }) {
+	    $self->addFeature("OS-$o1", 0);
+	    foreach my $o2 (@{ $osid_subosid{$o1} }) {
+		$self->addFeature("OS-$o1-$o2", 0);
+	    }
+	}
+    } elsif (! $self->type()->imageable() &&
+	     defined($self->type()->default_osid())) {
+	#
+	# If node is not imageable (and thus no entries in osidtoimageid,
+	# then assume it always has its default OSID loaded and ready to
+	# go, so that assign will agree to the allocation (assign_wrapper
+	# adds a desire that says it has to be running the OSID the user
+	# has selected, or the default OSID from the node_types table).
+	#
+	$self->addFeature("OS-".$self->type()->default_osid(), 0);
+    }
+}
+
 sub processWidearea($)
 {
     my ($self) = @_;
@@ -668,7 +810,7 @@ sub toXML($$)
 
     # Add types
     foreach my $type (@{ $self->{'PTYPES'} }) {
-	$type->toXML($xml);
+	$type->toXML($xml, $self->type());
     }
     # Add features
     foreach my $feature (@{ $self->{'FEATURES'} }) {
@@ -723,7 +865,7 @@ sub toString($)
 
 sub toXML($$)
 {
-    my ($self, $parent) = @_;
+    my ($self, $parent, $mainType) = @_;
     my $slots = $self->slots();
     if (! defined($slots)) {
 	$slots = "unlimited";
@@ -741,7 +883,7 @@ sub toXML($$)
 	if ($self->name() eq "pc") {
 	    $sliverxml = GeniXML::AddElement("sliver_type", $parent);
 	    GeniXML::SetText("name", $sliverxml, "raw-pc");
-	    # TODO: osids
+	    $self->osidToXML($sliverxml, $mainType);
 	}
 	if ($self->name() eq "pcvm") {
 	    $sliverxml = GeniXML::AddElement("sliver_type", $parent);
@@ -753,6 +895,31 @@ sub toXML($$)
 	GeniXML::SetText("type_slots", $elab, $slots);
 	if ($self->isstatic()) {
 	    GeniXML::SetText("static", $elab, "true");
+	}
+    }
+}
+
+sub osidToXML($$$)
+{
+    my ($self, $parent, $type) = @_;
+    my $default = $type->default_osid();
+    foreach my $osid (@{ $type_osid{$type->type()} }) {
+	my $os = $osinfo{$osid};
+	if (! defined($os)) {
+	    print STDERR "Undefined osid: ".$osid."\n";
+	    next;
+	}
+	if ($os->protogeni_export() ||
+	    (defined($default) && $default eq $type->type())) {
+	    # Fill out new disk image tag
+	    my $disk = GeniXML::AddElement("disk_image", $parent);
+	    GeniXML::SetText("name", $disk, $os->osname());
+	    GeniXML::SetText("os", $disk, $os->OS());
+	    GeniXML::SetText("version", $disk, $os->version());
+	    GeniXML::SetText("description", $disk, $os->description());
+	    if (defined($default) && $default eq $type->type()) {
+		GeniXML::SetText("default", $disk, "true");
+	    }
 	}
     }
 }

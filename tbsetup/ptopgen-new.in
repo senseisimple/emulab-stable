@@ -32,7 +32,7 @@ sub printResults();
 #
 $| = 1;
 
-my $print_xml = 0;
+my $print_xml = 1;
 my $print_ns = $GeniXML::RSPEC_2_NS;
 
 # Initialize permissions table for the current project
@@ -71,6 +71,9 @@ sub consultDatabase()
 
     # Bulk lookup of node and node_type features
     libptopnew::LookupFeatures();
+
+    # Bulk lookup of osids for features and genimode
+    libptopnew::LookupOsids();
 
     # Process each node adding ptypes and features
     foreach my $current (values(%{ libptopnew::Nodes() })) {
