@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -17,8 +17,9 @@ sub usage() {
     exit(-1);
 }
 sub fatal($);
-my $optlist = "d";
+my $optlist = "dn";
 my $debug   = 0;
+my $impotent= 0;
 
 #
 # Configure variables
@@ -26,6 +27,10 @@ my $debug   = 0;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $ISOLATEADMINS = @ISOLATEADMINS@;
+my $TBBASE      = "@TBBASE@";
+my $MKCERT      = "$TB/sbin/mkusercert";
+my $SUDO	= "/usr/local/bin/sudo";
+my $PROTOUSER   = "elabman";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -63,6 +68,9 @@ if (@ARGV) {
 }
 if (defined($options{"d"})) {
     $debug++;
+}
+if (defined($options{"n"})) {
+    $impotent++;
 }
 
 #
@@ -377,7 +385,8 @@ if ($ISOLATEADMINS) {
 	my $msg = "The following projects have an unsafe mix of admin and ".
 	    "non-admin users:\n\n@badlist\n";
 
-	SENDMAIL($TBOPS, "Testbed Admin Users Check", $msg, $TBOPS);
+	SENDMAIL($TBOPS, "Testbed Admin Users Check", $msg, $TBOPS)
+	    if (!$impotent);
     }
 }
 
@@ -386,6 +395,68 @@ if ($ISOLATEADMINS) {
 #
 DBQueryWarn("delete from login ".
 	    "where (unix_timestamp(now()) - timeout) > (12 * 60 * 60)");
+
+#
+# Warn users of expiring encrypted certificates.
+#
+$query_result =
+    DBQueryWarn("select u.uid,u.uid_idx,expires,encrypted,c.idx, ".
+		"   UNIX_TIMESTAMP(expires) as stamp from user_sslcerts as c ".
+		"left join users as u on u.uid_idx=c.uid_idx ".
+		"left join user_stats as s on s.uid_idx=u.uid_idx ".
+		"where u.status='active' and ".
+		"     revoked is null and warned is null and ".
+		"     (s.last_activity is not null and ".
+		"      UNIX_TIMESTAMP(now()) - ".
+		"      UNIX_TIMESTAMP(s.last_activity) < (24 * 3600 * 90)) and ".
+		"     (UNIX_TIMESTAMP(now()) > UNIX_TIMESTAMP(expires) || ".
+		"      (UNIX_TIMESTAMP(expires) - ".
+		"       UNIX_TIMESTAMP(now()) < (3600 * 48)))");
+
+while (my $row = $query_result->fetchrow_hashref()) {
+    my $uid       = $row->{'uid'};
+    my $uid_idx   = $row->{'uid_idx'};
+    my $expires   = $row->{'expires'};
+    my $stamp     = $row->{'stamp'};
+    my $serial    = $row->{'idx'};
+    my $encrypted = $row->{'encrypted'};
+    
+    # Skip old certs that have expired. User likely does not care.
+    next
+	if (0 && time() > $stamp);
+
+    if (!$encrypted) {
+	print STDERR 
+	"Unencrypted Certificate for $uid expires on $expires. Regenerating.\n";
+
+	next
+	    if ($impotent);
+
+	system("$SUDO -u $PROTOUSER $MKCERT $uid_idx");
+	if ($?) {
+	    SENDMAIL($TBOPS, "Error regenerating certificate for $uid",
+		     "Error regenerating unencrypted certificate for $uid", 
+		     $TBOPS)
+	}
+	next;
+    }
+    print STDERR
+	"Encrypted Certificate for $uid expires on $expires, sending mail.\n";
+
+    if (!$impotent) {
+	my $phrase = (time() > $stamp ? "expired" : "is going to expire");
+
+	my $user = User->Lookup($uid_idx);
+	$user->SendEmail("Emulab SSL Certificate Expiring!",
+			 "Your encrypted emulab certificate $phrase ".
+			 "on $expires.\n".
+			 "To generate a new certificate, please go to:\n\n".
+			 "    $TBBASE/gensslcert.php3?user=$uid_idx\n");
+	DBQueryWarn("update user_sslcerts set warned=now() ".
+		    "where uid_idx='$uid_idx' and idx='$serial'");
+
+    }
+}
 
 #
 # Send email if anything was reported.
