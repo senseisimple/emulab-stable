@@ -1282,4 +1282,165 @@ sub toXML($$)
     }
 }
 
+###############################################################################
+# Physical Wires. These contain the all of the per-link state used to
+# generate ptop or xml files.
+
+package libptop::plink;
+
+use libdb qw(TBOSID TB_OPSPID);
+
+sub Create($$)
+{
+    my ($class) = @_;
+
+    my $self = {};
+    $self->{'NAME'} = undef;
+    $self->{'SOURCE'} = undef;
+    $self->{'SOURCE_IF'} = undef;
+    $self->{'DEST'} = undef;
+    $self->{'DEST_IF'} = undef;
+    $self->{'BW'} = 0;
+    $self->{'DELAY'} = 0;
+    $self->{'LOSS'} = 0.0;
+    $self->{'TYPES'} = [];
+    $self->{'INTERCONNECT'} = 0;
+
+    bless($self, $class);
+    return $self;
+}
+
+sub name($)             { return $_[0]->{'NAME'}; }
+sub source($)           { return $_[0]->{'SOURCE'}; }
+sub sourceif($)         { return $_[0]->{'SOURCE_IF'}; }
+sub dest($)             { return $_[0]->{'DEST'}; }
+sub destif($)           { return $_[0]->{'DEST_IF'}; }
+sub bw($)               { return $_[0]->{'BW'}; }
+sub delay($)            { return $_[0]->{'DELAY'}; }
+sub loss($)             { return $_[0]->{'LOSS'}; }
+sub types($)            { return $_[0]->{'TYPES'}; }
+sub interconnect($)     { return $_[0]->{'INTERCONNECT'}; }
+
+sub set_name($$)        { $_[0]->{'NAME'} = $_[1]; }
+sub set_source($$)      { $_[0]->{'SOURCE'} = $_[1]; }
+sub set_sourceif($$)    { $_[0]->{'SOURCE_IF'} = $_[1]; }
+sub set_dest($$)        { $_[0]->{'DEST'} = $_[1]; }
+sub set_destif($$)      { $_[0]->{'DEST_IF'} = $_[1]; }
+sub set_bw($$)          { $_[0]->{'BW'} = $_[1]; }
+sub set_interconnect($) { $_[0]->{'INTERCONNECT'} = 1; }
+
+sub add_type($$)
+{
+    my ($self, $type) = @_;
+    push(@{ $self->{'TYPES'} }, $type);
+}
+
+sub toString($)
+{
+    my ($self) = @_;
+    my $result = "link ";
+    $result .= $self->name() . " ";
+    $result .= $self->source() . ":" . $self->sourceif() . " ";
+    $result .= $self->dest() . ":" . $self->destif() . " ";
+    $result .= $self->bw() . " " . $self->delay() . " " . $self->loss() . " ";
+    $result .= "1 " . join(" ", @{ $self->types() });
+    return $result;
+}
+
+sub toXML($$)
+{
+    my ($self, $parent) = @_;
+    my $xml = GeniXML::AddElement("link", $parent);
+    my $urn = GeniHRN::Generate($OURDOMAIN, "link", $self->name());
+    my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+    if (GeniXML::IsVersion0($xml)) {
+	GeniXML::SetText("component_manager_uuid", $xml, $cmurn);
+	GeniXML::SetText("component_uuid", $xml, $urn);
+	my $bw = GeniXML::AddElement("bandwidth", $xml);
+	$bw->appendText($self->bw());
+	my $latency = GeniXML::AddElement("latency", $xml);
+	$latency->appendText($self->delay());
+	my $loss = GeniXML::AddElement("packet_loss", $xml);
+	$loss->appendText($self->loss());
+    } else {
+	my $cm = GeniXML::AddElement("component_manager", $xml);
+	GeniXML::SetText("name", $cm, $cmurn);
+	GeniXML::SetText("component_id", $xml, $urn);
+	$self->propertyToXml($xml, $self->source(), $self->sourceif(),
+			     $self->dest(), $self->destif(),
+			     $self->bw(), $self->delay(), $self->loss());
+	$self->propertyToXml($xml, $self->dest(), $self->destif(),
+			     $self->source(), $self->sourceif(),
+			     $self->bw(), $self->delay(), $self->loss());
+    }
+    GeniXml::SetText("component_name", $xml, $self->name());
+    $self->ifaceToXml($xml, $self->source(), $self->sourceif());
+    $self->ifaceToXml($xml, $self->dest(), $self->destif());
+    foreach my $type (@{ $self->types() }) {
+	$self->typeToXml($xml, $type);
+    }
+    if ($genimode eq $NO_GENI || $genimode eq $V_0_1 || $genimode eq $V_0_2)
+    {
+	print "  <bandwidth>$bw</bandwidth>\n";
+	print "  <latency>$delay</latency>\n";
+	print "  <packet_loss>$loss</packet_loss>\n";
+    } elsif ($genimode eq $V_2) {
+	print_property($source, $source_if, $dest, $dest_if,
+		       $bw, $delay, $loss);
+	print_property($dest, $dest_if, $source, $source_if,
+		       $bw, $delay, $loss);
+    }
+    my $i = 0;
+    for (; $i < $proto_count; ++$i) {
+	if ($genimode eq $NO_GENI) {
+	    print "  <link_type><type_name>" . $proto[$i]
+		. "</type_name></link_type>\n";
+	} elsif ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print "  <link_type type_name=\"" . $proto[$i] . "\" />\n";
+	} elsif ($genimode eq $V_2) {
+	    print "  <link_type name=\"" . $proto[$i] . "\" />\n";
+	}
+    }
+    print "</link>\n\n";
+}
+
+sub ifaceToXml($$$$)
+{
+    my ($self, $parent, $node, $iface) = @_;
+    my $xml = GeniXML::AddElement("interface_ref", $parent);
+    my $nodeUrn = GeniHRN::Generate($OURDOMAIN, "node", $node);
+    my $interfaceUrn = GeniHRN::GenerateInterface($OURDOMAIN, $node,
+						  $iface);
+    if (GeniXML::IsVersion0($xml)) {
+	GeniXML::SetText("component_node_uuid", $xml, $nodeUrn);
+	GeniXML::SetText("component_interface_id", $xml, $interfaceUrn);
+    } else {
+	GeniXML::SetText("component_id", $xml, $interfaceUrn);
+    }
+}
+
+sub propertyToXml($$$$$$$$$)
+{
+    my ($self, $parent, $s, $si, $d, $di, $bw, $delay, $loss) = @_;
+    my $xml = GeniXML::AddElement("property", $parent);
+    my $source_urn = GeniHRN::GenerateInterface($OURDOMAIN, $s, $si);
+    my $dest_urn = GeniHRN::GenerateInterface($OURDOMAIN, $d, $di);
+    GeniXML::SetText("source_id", $xml, $source_urn);
+    GeniXML::SetText("dest_id", $xml, $dest_urn);
+    GeniXML::SetText("capacity", $xml, $bw);
+    GeniXML::SetText("latency", $xml, $delay);
+    GeniXML::SetText("packet_loss", $xml, $loss);
+}
+
+sub typeToXml($$$)
+{
+    my ($self, $parent, $type) = @_;
+    my $typexml = GeniXML::AddElement("link_type", $parent);
+    if (GeniXML::IsVersion0($parent)) {
+	GeniXML::SetText("type_name", $typexml, $type);
+    } else {
+	GeniXML::SetText("name", $typexml, $type);
+    }
+}
+
 1;
