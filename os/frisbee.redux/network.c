@@ -21,6 +21,9 @@
 #include <errno.h>
 #include "decls.h"
 #include "utils.h"
+#ifdef NO_SOCKET_TIMO
+#include <sys/select.h>
+#endif
 
 #ifdef STATS
 unsigned long nonetbufs;
@@ -101,7 +104,6 @@ static void
 CommonInit(int dobind)
 {
 	struct sockaddr_in	name;
-	struct timeval		timeout;
 	int			i;
 	char			buf[BUFSIZ];
 	struct hostent		*he;
@@ -196,15 +198,20 @@ CommonInit(int dobind)
 			pfatal("setsockopt(SOL_SOCKET, SO_BROADCAST)");
 	}
 
+#ifndef NO_SOCKET_TIMO
 	/*
 	 * We use a socket level timeout instead of polling for data.
 	 */
-	timeout.tv_sec  = 0;
-	timeout.tv_usec = PKTRCV_TIMEOUT;
-	
-	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
-		       &timeout, sizeof(timeout)) < 0)
-		pfatal("setsockopt(SOL_SOCKET, SO_RCVTIMEO)");
+	{
+		struct timeval timeout;
+
+		timeout.tv_sec  = 0;
+		timeout.tv_usec = PKTRCV_TIMEOUT;
+		if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
+			       &timeout, sizeof(timeout)) < 0)
+			pfatal("setsockopt(SOL_SOCKET, SO_RCVTIMEO)");
+	}
+#endif
 
 	/*
 	 * If a specific interface IP is specified, use that to
@@ -309,6 +316,24 @@ PacketReceive(Packet_t *p)
 	int		   mlen;
 	unsigned int	   alen;
 
+#ifdef NO_SOCKET_TIMO
+	fd_set		ready;
+	struct timeval	tv;
+	int		rv;
+
+	tv.tv_sec = 0;
+	tv.tv_usec = PKTRCV_TIMEOUT;
+	FD_ZERO(&ready);
+	FD_SET(sock, &ready);
+	rv = select(sock+1, &ready, NULL, NULL, &tv);
+	if (rv < 0) {
+		if (errno == EINTR)
+			return -1;
+		pfatal("PacketReceive(select)");
+	}
+	if (rv == 0)
+		return -1;
+#endif
 	alen = sizeof(from);
 	bzero(&from, alen);
 	if ((mlen = recvfrom(sock, p, sizeof(*p), 0,

@@ -118,6 +118,14 @@ IUZLIBS		+= -lcrypto
 endif
 
 #
+# Define this to use select to implement packet-receive-with-timeout
+# rather than using the SO_RCVTIMEO socket option.
+#
+ifeq ($(SYSTEM),CYGWIN_NT-5.1)
+CFLAGS		+= -DNO_SOCKET_TIMO
+endif
+
+#
 # Define this to break chunks into 8192 byte rather than 1024 byte blocks
 #
 ifeq ($(WITH_JUMBO),1)
