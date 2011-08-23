@@ -1294,6 +1294,8 @@ sub L__reservation($$)
 sub vname($)		{ return L__reservation($_[0], 'vname'); }
 sub sharing_mode($)	{ return L__reservation($_[0], 'sharing_mode'); }
 sub erole($)		{ return L__reservation($_[0], 'erole'); }
+sub eid($)              { return L__reservation($_[0], 'eid'); }
+sub pid($)              { return L__reservation($_[0], 'pid'); }
 sub external_resource_index($) {
     return L__reservation($_[0], 'external_resource_index'); }
 sub external_resource_id($) {

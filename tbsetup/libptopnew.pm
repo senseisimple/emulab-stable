@@ -66,6 +66,35 @@ our %osid_type = ();
 our %osid_subosid = ();
 
 #
+# Initialize nodes hash based on nodes, reservations, and node_status tables
+#
+sub LookupNodes()
+{
+    my $dbresult;
+    my $row;
+    $dbresult = DBQueryFatal("select * from nodes");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	CreateNode($row);
+    }
+
+    # Bulk lookup on reserved table
+    $dbresult = DBQueryFatal("select * from reserved");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	$nodeList{$row->{"node_id"}}->node()->SetReservedRow($row);
+    }
+
+    $dbresult = DBQueryFatal("select node_id, status from node_status");
+    while (my ($node_id, $status) = $dbresult->fetchrow()) {
+	$nodeList{$node_id}->set_status($status);
+    }
+
+    $dbresult = DBQueryFatal("select * from widearea_nodeinfo");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	$nodeList{$row->{'node_id'}}->set_widearea($row);
+    }
+}
+
+#
 # Initialize project permissions table if the user specified a project.
 #
 sub LookupPermissions()
@@ -90,6 +119,9 @@ sub LookupPermissions()
     }
 }
 
+#
+# Lookup global usage counts on virtual nodes.
+#
 sub LookupGlobalCounts()
 {
     my $condition = " ";
@@ -108,6 +140,10 @@ sub LookupGlobalCounts()
     }
 }
 
+#
+# Auxtypes can be associated with the main type of a node or with the
+# node itself. Lookup both of these cases.
+#
 sub LookupAuxtypes()
 {
     my $dbresult;
@@ -128,6 +164,12 @@ sub LookupAuxtypes()
     }
 }
 
+#
+# Find features associated both with types and with nodes. Add the
+# node features immediately and save the association between types and
+# features. We will add those features to nodes when we iterate over
+# all the nodes during processing.
+#
 sub LookupFeatures()
 {
     my $dbresult;
@@ -157,6 +199,10 @@ sub LookupFeatures()
     }
 }
 
+#
+# Bulk lookup on the os_info table. Find the mapping between types and
+# osids and between osids and subosids.
+#
 sub LookupOsids()
 {
     my $dbresult;
@@ -234,12 +280,39 @@ sub LookupOsids()
     }
 }
 
-sub TypeAllowed($)
+#
+# Lookup both wires and interfaces. Let nodes know which other nodes
+# they are connected to for later use when adding features.
+#
+sub LookupLinks()
 {
-    my ($type) = @_;
-    return (! defined($user_project)
-	    || ! exists($permissions{$type})
-	    || $permissions{$type});
+    my $dbresult;
+    my $row;
+    $dbresult =
+	DBQueryFatal("select w.type, w.node_id1, w.card1, w.port1, ".
+		     "w.node_id2, w.card2, w.port2, i.iface ".
+		     "from wires as w ".
+		     "left join interfaces as i ".
+		     "on w.node_id1=i.node_id and w.card1=i.card ".
+		     "and w.port1=i.port ".
+		     "where w.logical=0");
+    while (my ($type, $node_id1, $card1, $port1,
+	       $node_id2, $card2, $port2, $iface1) = $dbresult->fetchrow()) {
+	if ($type ne 'Unused') {
+	    my $node1 = $nodeList{$node_id1};
+	    my $node2 = $nodeList{$node_id2};
+	    if (defined($node1)) {
+		$node1->addConnection($node_id2);
+	    } else {
+		print STDERR "Unknown node: $node_id1\n";
+	    }
+	    if (defined($node2)) {
+		$nodeList{$node_id2}->addConnection($node_id1);
+	    } else {
+		print STDERR "Unknown node: $node_id2\n";
+	    }
+	}
+    }
 }
 
 # Accessors
@@ -253,6 +326,14 @@ sub CreateNode($)
     my $node = libptop::pnode->Create($row);
     Nodes()->{$node->name()} = $node;
     return $node;
+}
+
+sub TypeAllowed($)
+{
+    my ($type) = @_;
+    return (! defined($user_project)
+	    || ! exists($permissions{$type})
+	    || $permissions{$type});
 }
 
 # Push a value onto an array contained within a hash
@@ -283,8 +364,12 @@ sub Create($$)
     $self->{'NODE'} = Node->LookupRow($row);
     $self->{'PTYPES'} = [];
     $self->{'FEATURES'} = [];
+    $self->{'FLAGS'} = {};
     $self->{'GLOBALCOUNT'} = undef;
     $self->{'AUXTYPES'} = {};
+    $self->{'CONNECTIONS'} = {};
+    $self->{'STATUS'} = undef;
+    $self->{'WIDEAREA'} = undef;
 
     bless($self, $class);
     return $self;
@@ -295,20 +380,34 @@ sub name($)        { return $_[0]->{'NODE'}->node_id(); }
 sub node($)        { return $_[0]->{'NODE'}; }
 sub type($)        { return $_[0]->node()->NodeTypeInfo(); }
 sub globalcount($) { return $_[0]->{'GLOBALCOUNT'}; }
+sub status($)      { return $_[0]->{'STATUS'}; }
 
 sub set_globalcount { $_[0]->{'GLOBALCOUNT'} = $_[1]; }
+sub set_status($)   { $_[0]->{'STATUS'} = $_[1]; }
+sub set_widearea($) { $_[0]->{'WIDEAREA'} = $_[1]; }
 
-sub available($;$)
+sub widearea($$)
 {
-    my ($self, $tagRef) = @_;
+    my ($self, $key) = @_;
+    my $result = undef;
+    if (defined($self->{'WIDEAREA'})) {
+	$result = $self->{'WIDEARE'}->{$key};
+    }
+    return $result;
+}
+
+sub isreserved($)
+{
+    my ($self) = @_;
     my $node = $self->node();
-    my $reserved_pid = $node->reserved_pid();
-    my $reserved_eid = $node->ReservationID();
+    my $pre_pid = $node->reserved_pid();
+    my $reserved_eid = $node->eid();
+    my $reserved_pid = $node->pid();
     # A node is reserved to a project if it has a reserved_pid, and
     # that pid is not the user's pid.
-    my $project_reserved = defined($reserved_pid)
-			   && (! defined($user_project)
-			       || $user_project ne $reserved_pid);
+    my $pre_reserved = defined($pre_pid)
+	               && (! defined($user_project)
+			   || $user_project ne $pre_pid);
     # A node is reserved to an experiment if it has a reserved_eid,
     # a reserved_pid, and one of those is not the user's pid/eid.
     my $exp_reserved = defined($reserved_eid)
@@ -316,7 +415,13 @@ sub available($;$)
 	               && (! defined($exempt_eid)
 			   || $reserved_eid ne $exempt_eid
 			   || $reserved_pid ne $user_project);
-    my $isreserved = $project_reserved || $exp_reserved;
+    return $pre_reserved || $exp_reserved;
+}
+
+sub available($;$)
+{
+    my ($self, $tagRef) = @_;
+    my $node = $self->node();
 
     my $typeallowed = (libptopnew::TypeAllowed($node->class())
 		       && libptopnew::TypeAllowed($node->type()));
@@ -327,7 +432,7 @@ sub available($;$)
     # And they must also be allowed for the current project by the
     # nodetypeXpid_permissions table.
     my $isfree = ((!$self->islocal()
-		   || (! $isreserved && $self->isup())
+		   || (! $self->isreserved() && $self->isup())
 		   || $self->isshared())
 		  && $typeallowed);
 
@@ -463,12 +568,19 @@ sub addFeatureString($$)
 sub addFlag($$$)
 {
     my ($self, $key, $value) = @_;
+    $self->{'FLAGS'}->{$key} = $value;
 }
 
 sub addAuxtype($$$)
 {
     my ($self, $key, $value) = @_;
     $self->{'AUXTYPES'}->{$key} = $value;
+}
+
+sub addConnection($$)
+{
+    my ($self, $name) = @_;
+    $self->{'CONNECTIONS'}->{$name} = 1;
 }
 
 sub processSwitch($)
@@ -485,7 +597,7 @@ sub processSwitch($)
     }
 
     # Add real-switch feature
-    $self->addFeature("real-switch", 0);
+    $self->addFeature('real-switch', 0);
 }
 
 sub processLocal($)
@@ -503,7 +615,7 @@ sub processLocal($)
     # first before using others.
     if($node->def_boot_osid() && 
        $node->def_boot_osid() eq  TBOSID(TB_OPSPID, "FBSD-NSE")) { 
-	$self->addFeature("FBSD-NSE", 0.0);
+	$self->addFeature('FBSD-NSE', 0.0);
     }
     $self->addPType($node->type(), 1);
     # Might be equal, which assign would sum as two, not one!
@@ -522,6 +634,14 @@ sub processLocal($)
     }
     $self->processAuxtypes();
     $self->processOsFeatures();
+    $self->processConnections();
+    # This is for the case that we are modifying an existing experiment - tell
+    # assign to prefer nodes the user has already allocated
+    if (defined($exempt_eid) && $available_only
+	&& defined($node->eid()) && defined($node->pid())) {
+	$self->addFeature('already_reserved', 0);
+    }
+    $self->processSubnode();
 }
 
 sub addDelayCapacity($)
@@ -550,7 +670,7 @@ sub addShared($)
     # unless the corresponding desire is in the vtop. This
     # allows the node to be picked, subject to other type constraints.
     #
-    $self->addFeature("pcshared", 1.0, undef, 1);
+    $self->addFeature('pcshared', 1.0, undef, 1);
 
     #
     # The pool daemon may override the share weight.
@@ -558,7 +678,7 @@ sub addShared($)
     my $sharedweight = undef;
     $node->NodeAttribute("shared_weight", \$sharedweight);
     if (defined($sharedweight)) {
-	$self->addFeature("shareweight", $sharedweight);
+	$self->addFeature('shareweight', $sharedweight);
     } else {
 	#
 	# The point of this feature is to have assign favor shared nodes
@@ -591,7 +711,7 @@ sub addShared($)
 	    else {
 		$weight = 0.3;
 	    }
-	    #addFeature("shareweight", $weight);
+	    #addFeature('shareweight', $weight);
 	}
     }
 }
@@ -672,7 +792,7 @@ sub processVirtGoo($)
     }
     if (! $self->node()->sharing_mode()) {
 	# This number can be use for fine-tuning packing
-	$self->addFeature("virtpercent", 100, libptopnew::FD_ADDITIVE());
+	$self->addFeature('virtpercent', 100, libptopnew::FD_ADDITIVE());
     }
     # Put this silly feature in so that we can try to keep vnodes
     # on the same pnode they were before - but only if updating
@@ -702,12 +822,12 @@ sub processCpuRam($)
     my $cpu_speed = $self->type()->frequency();
     my $ram = $self->type()->memory();
     # Add CPU and RAM information
-    $self->addFeature("cpu", $cpu_speed, libptopnew::FD_ADDITIVE())
+    $self->addFeature('cpu', $cpu_speed, libptopnew::FD_ADDITIVE())
 	if (defined($cpu_speed));
-    $self->addFeature("ram", $ram, libptopnew::FD_ADDITIVE())
+    $self->addFeature('ram', $ram, libptopnew::FD_ADDITIVE())
 	if (defined($ram));
-    $self->addFeature("cpupercent", 92, libptopnew::FD_ADDITIVE()); # XXX Hack
-    $self->addFeature("rampercent", 80, libptopnew::FD_ADDITIVE()); # XXX Hack
+    $self->addFeature('cpupercent', 92, libptopnew::FD_ADDITIVE()); # XXX Hack
+    $self->addFeature('rampercent', 80, libptopnew::FD_ADDITIVE()); # XXX Hack
 }
 
 #
@@ -724,11 +844,11 @@ sub processOsFeatures($)
 	# is wanted.
 	#
 	my $osid = $node->def_boot_osid();
-	$self->addFeature("OS-$osid", 0.5);
+	$self->addFeature('OS-'.$osid, 0.5);
 	# Add any subOSes the shared node osid can support
 	if (defined($osid_subosid{$osid})) {
 	    foreach my $subosid (@{ $osid_subosid{$osid} }) {
-		$self->addFeature("OS-$osid-$subosid", 0);
+		$self->addFeature('OS-'.$osid.'-'.$subosid, 0);
 	    }
 	}
     } elsif (exists($type_osid{$node->type()})) {
@@ -737,9 +857,9 @@ sub processOsFeatures($)
 	# evidenced by its type) can support
 	#
 	foreach my $o1 (@{ $type_osid{$node->type()} }) {
-	    $self->addFeature("OS-$o1", 0);
+	    $self->addFeature('OS-'.$o1, 0);
 	    foreach my $o2 (@{ $osid_subosid{$o1} }) {
-		$self->addFeature("OS-$o1-$o2", 0);
+		$self->addFeature('OS-'.$o1.'-'.$o2, 0);
 	    }
 	}
     } elsif (! $self->type()->imageable() &&
@@ -751,16 +871,112 @@ sub processOsFeatures($)
 	# adds a desire that says it has to be running the OSID the user
 	# has selected, or the default OSID from the node_types table).
 	#
-	$self->addFeature("OS-".$self->type()->default_osid(), 0);
+	$self->addFeature('OS-'.$self->type()->default_osid(), 0);
+    }
+}
+
+sub processConnections($)
+{
+    my ($self) = @_;
+    if (! $self->node()->sharing_mode()) {
+	foreach my $name (keys(%{ $self->{'CONNECTIONS'} })) {
+	    $self->addFeature('connected-to-'.$name, 0.0);
+	}
+    }
+}
+
+sub processSubnode($)
+{
+    my ($self) = @_;
+    my $node = $self->node();
+    if ($node->issubnode()) {
+	$self->addFlag('subnode_of', $node->phys_nodeid());
     }
 }
 
 sub processWidearea($)
 {
     my ($self) = @_;
+    my $node = $self->node();
     if (! $self->iswidearea()) {
 	return;
     }
+
+    #
+    # Grab the global allocation count of vnodes on this pnode (if there
+    # is one). This modifies the counts below.  If the count has already
+    # been reached, then do not put this node into the ptop file.
+    #
+    my $maxvnodes = $self->type()->GetAttribute("global_capacity");
+    
+    if (defined($maxvnodes) && defined($self->globalcount())) {
+	$maxvnodes -= $self->globalcount();
+	if ($maxvnodes <= 0) {
+	    return;
+	}
+    }
+
+    #
+    # Mark any nodes that are not up with a feature, so that they won't
+    # normally get assigned. We want to include them, though, because we
+    # allow people to do fix-node to down nodes
+    #
+    if (! defined($self->status())) {
+	print STDERR "Widearea node does not have a status: ".
+	    $node->node_id()."\n";
+	return;
+    }
+    if (! defined($node->eid()) || ! defined($node->pid())) {
+	print STDERR "Widearea node is not reserved to an eid or pid".
+	    $node->node_id()."\n";
+	return;
+    }
+    if ($self->status() ne 'up' ||
+	($node->eid() eq NODEDEAD_EID() || $node->pid() eq NODEDEAD_PID())) {
+	if ($genimode) {
+	    return;
+	}
+	$self->addFeature('down', 1);
+    }
+
+    my $site = $self->widearea('site');
+    if ($site) {
+	$self->addFeature($site, 0.99, libptopnew::FD_FIRSTFREE());
+    }
+
+    #
+    # Add any auxiliary types.
+    #
+    foreach my $auxtype (keys(%{ $self->{'AUXTYPES'} })) {
+	my $count = $self->{'AUXTYPES'}->{$auxtype};
+	if (defined($maxvnodes) && $maxvnodes < $count) {
+	    $count = $maxvnodes;
+	}
+	if (defined($multiplex_override) && $multiplex_override < $count) {
+	    $count = $multiplex_override;
+	}
+	$self->addPType($auxtype, $count);
+    }
+
+    # Add trivial bw spec.
+    $self->addFlag("trivial_bw", 400000);
+
+    # Indicate that these nodes are beautiful and unique snowflakes
+    $self->addFlag("unique", 1);
+
+    $self->processOsFeatures();
+
+    #
+    # Put in a feature indicating whether or not this node has a bandwidth
+    # cap
+    #
+    my $bwlimit = $self->widearea('bwlimit');
+    if (!defined($bwlimit) || $bwlimit eq "-1") {
+	$self->addFeature('nobwlimit', 0);
+    } else {
+	$self->addFeature('bwlimit', 0);
+    }
+
 }
 
 sub processTypeFeatures($)
@@ -791,6 +1007,15 @@ sub toString($)
 	$result .= " " . $feature->toString();
     }
     $result .= " -";
+    foreach my $flag (keys(%{ $self->{'FLAGS'} })) {
+	my $value = $self->{'FLAGS'}->{$flag};
+	# Special case for the unique flag. :)
+	if ($flag eq "unique") {
+	    $result .= " $flag";
+	} else {
+	    $result .= " $flag:$value";
+	}
+    }
     return $result;
 }
 
@@ -815,6 +1040,27 @@ sub toXML($$)
     # Add features
     foreach my $feature (@{ $self->{'FEATURES'} }) {
 	$feature->toXML($xml);
+    }
+
+    if (! GeniXML::IsVersion0($xml)) {
+	foreach my $flag (keys(%{ $self->{'FLAGS'} })) {
+	    my $value = $self->{'FLAGS'}->{$flag};
+	    if ($flag eq 'trivial_bw') {
+		my $triv = GeniXML::AddElement("trivial_bandwidth", $xml,
+					       $GeniXML::EMULAB_NS);
+		GeniXML::SetText("value", $triv, $value);
+	    } elsif ($flag eq 'subnode_of') {
+		my $suburn = GeniHRN::Generate($OURDOMAIN, "node", $value);
+		my $relation = GeniXML::AddElement("relation", $xml);
+		GeniXML::SetText("type", $relation, "subnode_of");
+		GeniXML::SetText("component_id", $relation, $suburn);
+	    } elsif ($flag eq 'unique') {
+		GeniXML::AddElement("unique", $xml, $GeniXML::EMULAB_NS);
+	    } elsif ($flag eq 'disallow_trivial_mix') {
+		GeniXML::AddElement("disallow_trivial_mix", $xml,
+				    $GeniXML::EMULAB_NS);
+	    }
+	}
     }
 }
 
