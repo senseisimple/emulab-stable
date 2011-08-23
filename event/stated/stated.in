@@ -917,6 +917,11 @@ sub stateTransition($$) {
 		elsif ($osid ne $defosid) {
 		    handleCtrlEvent($node,$trig);
 		}
+		# XXX tmp hack
+		elsif ($mode eq "WIMRELOAD") {
+		    info("$node: RESET in WIMRELOAD, but osid=defosid=$osid\n");
+		    handleCtrlEvent($node,$trig);
+		}
 		next;
 	    };
 	    (/^$TBRELOADDONEV1$/ || /^$TBRELOADDONEV2$/) && do {
