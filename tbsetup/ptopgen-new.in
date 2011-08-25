@@ -11,8 +11,6 @@
 use strict;
 use English;
 use Getopt::Std;
-#use Math::BigInt;
-#use List::Util 'shuffle';
 
 #use lib "@prefix@/lib";
 use lib "/usr/testbed/lib";
@@ -64,7 +62,10 @@ sub consultDatabase()
     # Bulk lookup of osids for features and genimode
     libptopnew::LookupOsids();
 
-    # Bulk lookup of wires and interfaces
+    # Bulk lookup of interfaces
+    libptopnew::LookupInterfaces();
+
+    # Bulk lookup of wires
     libptopnew::LookupLinks();
 
     # Process each node adding ptypes and features
@@ -83,6 +84,15 @@ sub printResults()
     my $doc = GeniXML::CreateDocument($print_ns, "rspec");
     my $rspec = $doc->documentElement();
     foreach my $current (values(%{ libptopnew::Nodes() })) {
+	if ($current->willPrint()) {
+	    if ($print_xml) {
+		$current->toXML($rspec);
+	    } else {
+		print $current->toString()."\n";
+	    }
+	}
+    }
+    foreach my $current (values(%{ libptopnew::Links() })) {
 	if ($current->willPrint()) {
 	    if ($print_xml) {
 		$current->toXML($rspec);

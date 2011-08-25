@@ -189,21 +189,7 @@ sub Lookup($$$$)
     return undef
 	if (!$query_result->numrows);
 
-    my $interface = {};
-	
-    $interface->{"DBROW"} = $query_result->fetchrow_hashref();
-    bless($interface, $class);
-
-    #
-    # Grab the wires table entry.
-    #
-    $query_result =
-	DBQueryWarn("select * from wires ".
-		    "where node_id1='$nodeid' and ".
-		    "      card1='$card' and port1='$port'");
-    if ($query_result && $query_result->numrows) {
-	$interface->{'WIRES'} = $query_result->fetchrow_hashref();
-    }
+    my $iface_row = $query_result->fetchrow_hashref();
 
     #
     # And the interface_state table.
@@ -217,14 +203,44 @@ sub Lookup($$$$)
 	if (!$query_result);
     return undef
 	if (!$query_result->numrows);
-    $interface->{'STATE'} = $query_result->fetchrow_hashref();
+
+    my $state_row = $query_result->fetchrow_hashref();
+
+    my $interface = LookupRow($class, $iface_row, $state_row);
+
+    #
+    # Grab the wires table entry.
+    #
+    $query_result =
+	DBQueryWarn("select * from wires ".
+		    "where node_id1='$nodeid' and ".
+		    "      card1='$card' and port1='$port'");
+    if ($query_result && $query_result->numrows) {
+	$interface->{'WIRES'} = $query_result->fetchrow_hashref();
+    }
+
+    return $interface;
+}
+
+sub LookupRow($$$)
+{
+    my ($class, $iface_row, $state_row) = @_;
+    my $nodeid = $iface_row->{'node_id'};
+    my $card = $iface_row->{'card'};
+    my $port = $iface_row->{'port'};
+    my $interface = {};
+	
+    $interface->{"DBROW"} = $iface_row;
+    $interface->{'STATE'} = $state_row;
+    bless($interface, $class);
+
     
     # Cache by card,port and by iface
     my $iface = $interface->iface();
     
     $all_interfaces{"$nodeid:$card:$port"} = $interface;
     $all_interfaces{"$nodeid:$iface"}      = $interface;
-    
+
     return $interface;
 }
 

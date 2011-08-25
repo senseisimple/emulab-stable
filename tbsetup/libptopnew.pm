@@ -11,6 +11,7 @@ use Exporter;
 use lib "/usr/testbed/lib";
 #use lib "@prefix@/lib";
 use Node;
+use Interface;
 use OSinfo;
 use libdb qw(TBGetSiteVar DBQueryFatal TBResolveNextOSID);
 use vars qw(@ISA @EXPORT @EXPORT_OK);
@@ -50,20 +51,38 @@ my $multiplex_override = undef;
 
 our %nodeList = ();
 our %linkList = ();
+our %interfaceList = ();
+
 # Table of which types the user project is allowed to have.
 # Keyed by type where 1 = allowed, 0 = denied, and ! exists = allowed
 our %permissions = ();
+
 # Map from auxtype names to real type names
 our %auxtypemap = ();
+
 # Map from type names to lists of features
 our %typefeatures = ();
+
 # Keyed by osids. Contains OsInfo structures
 our %osinfo = ();
+
 # Mapping between types and osids, and vice versa. Hash of arrays.
 our %type_osid = ();
 our %osid_type = ();
+
 # Mapping between an osid and its subosids. Hash of arrays.
 our %osid_subosid = ();
+
+# Mapping between interface_type:base and bandwidth values based on
+# interface_capabilities table. 'base' is the capkey prefix to one of
+# the defspeed keys.
+our %itype_bw = ();
+
+# Keyed by $node:$iface, this is the amount of shared bandwidth
+# available on that interface. Overrides the remaining_bandwidth from
+# Interface. It should be the remaining bandwidth with the
+# exempt_eid's bandwidth added back in.
+our %sharedbw = ();
 
 #
 # Initialize nodes hash based on nodes, reservations, and node_status tables
@@ -281,23 +300,120 @@ sub LookupOsids()
 }
 
 #
-# Lookup both wires and interfaces. Let nodes know which other nodes
-# they are connected to for later use when adding features.
+# Lookup interfaces and interface types. Important for determining
+# bandwidth on links below and for printing out on nodes in genimode.
+#
+sub LookupInterfaces()
+{
+    my $dbresult;
+    my $row;
+    my %states = ();
+
+    
+    $dbresult = DBQueryFatal("select * from interface_state");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	my $key = $row->{'node_id'}.':'.$row->{'iface'};
+	$states{$key} = $row;
+    }
+
+    $dbresult = DBQueryFatal("select * from interfaces");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	my $key = $row->{'node_id'}.':'.$row->{'iface'};
+	my $iface = Interface->LookupRow($row, $states{$key});
+	$interfaceList{$key} = $iface;
+    }
+
+    $dbresult =
+	DBQueryFatal("SELECT type,capkey,capval from interface_capabilities ".
+		     "where capkey='protocols' or capkey like '%_defspeed'");
+    while (my ($type,$capkey,$capval) = $dbresult->fetchrow_array()) {
+	if ($capkey eq "protocols") {
+#	    $interfaceprotocols{$type} = [ split(",", $capval) ];
+	} elsif ($capkey =~ /^([-\w]+)_defspeed$/) {
+	    $itype_bw{$type.":".$1} = $capval;
+	} else {
+	    die("Improper defspeed $capval for $type!\n");
+	}
+    }
+
+    if (defined($exempt_eid)) {
+	AddSharedBandwidth();
+    }
+}
+
+#
+# Bandwidth for shared nodes is calculated differently and already
+# subtracts out all reserved capacity. So if the user specifies an
+# exempt_eid, we must add back in that experiment's shared bandwidth.
+#
+sub AddSharedBandwidth()
+{
+    my $experiment = Experiment->Lookup($user_project, $exempt_eid);
+    if (! defined($experiment)) {
+	die("Could not look up experiment $user_project/$exempt_eid\n");
+    }
+    # Read the vinterfaces table to get any bandwidth in use by
+    # this experiment.
+    my $exptidx   = $experiment->idx();
+    my $pstateDir = $experiment->WorkDir() . "/pstate";
+
+    # This awful mess of creating a temporary table from a file on
+    # boss is because the vinterfaces table itself will be purged of
+    # experiment data when we are doing a swapmod. The only place
+    # where the data remains is in the backup file.
+    DBQueryFatal("create temporary table if not exists ".
+		 "vinterfaces_${exptidx} like vinterfaces");
+
+    DBQueryFatal("delete from vinterfaces_${exptidx}");
+    
+    DBQueryFatal("load data infile '$pstateDir/vinterfaces' ".
+		 "into table vinterfaces_${exptidx}")
+	    if (-e "$pstateDir/vinterfaces");
+    
+    my $result = DBQueryFatal("select * from vinterfaces_$exptidx ".
+			      "where exptidx=$exptidx");
+
+    while (my $row = $result->fetchrow_hashref()) {
+	my $node      = $row->{'node_id'};
+	my $iface     = $row->{'iface'};
+	my $bandwidth = $row->{'bandwidth'};
+
+	next
+	    if (!defined($iface) || $bandwidth <= 0);
+	next
+	    if (! exists($interfaceList{"$node:$iface"}));
+
+	if (! exists($sharedbw{"$node:$iface"})) {
+	    $sharedbw{"$node:$iface"} =
+		$interfaceList{"$node:$iface"}->remaining_bandwidth();
+	}
+	$sharedbw{"$node:$iface"} += $bandwidth;
+    }
+}
+
+#
+# Lookup wires. Let nodes know which other nodes they are connected to
+# for later use when adding features. Add links between nodes for
+# later printing.
 #
 sub LookupLinks()
 {
     my $dbresult;
     my $row;
     $dbresult =
-	DBQueryFatal("select w.type, w.node_id1, w.card1, w.port1, ".
-		     "w.node_id2, w.card2, w.port2, i.iface ".
+	DBQueryFatal("select w.type, w.node_id1, w.card1, w.port1, i1.iface, ".
+		     "w.node_id2, w.card2, w.port2, i2.iface ".
 		     "from wires as w ".
-		     "left join interfaces as i ".
-		     "on w.node_id1=i.node_id and w.card1=i.card ".
-		     "and w.port1=i.port ".
+		     "left join interfaces as i1 ".
+		     "on w.node_id1=i1.node_id and w.card1=i1.card ".
+		     "and w.port1=i1.port ".
+		     "left join interfaces as i2 ".
+		     "on w.node_id2=i2.node_id and w.card2=i2.card ".
+		     "and w.port2=i2.port ".
 		     "where w.logical=0");
-    while (my ($type, $node_id1, $card1, $port1,
-	       $node_id2, $card2, $port2, $iface1) = $dbresult->fetchrow()) {
+    while (my ($type, $node_id1, $card1, $port1, $iface1,
+	       $node_id2, $card2, $port2, $iface2) = $dbresult->fetchrow()) {
+	# Add connections between nodes for features later.
 	if ($type ne 'Unused') {
 	    my $node1 = $nodeList{$node_id1};
 	    my $node2 = $nodeList{$node_id2};
@@ -311,6 +427,56 @@ sub LookupLinks()
 	    } else {
 		print STDERR "Unknown node: $node_id2\n";
 	    }
+	}
+	if ($type eq 'Trunk') {
+	    # This is a switch/switch link potentially trunked to other wires.
+	    if (! defined($iface1)) {
+		print STDERR "Undefined interface for ".
+		    "$node_id1:$card1:$port1\n";
+	    }
+	    if (! defined($iface2)) {
+		print STDERR "Undefined interface for ".
+		    "$node_id2:$card2:$port2\n";
+	    }
+	    my ($source, $dest, $sourcebw, $destbw);
+	    if ($node_id1 le $node_id2) {
+		$source = $node_id1;
+		$dest = $node_id2;
+		$sourcebw = SwitchBandwidth($node_id1, $iface1);
+		$destbw = SwitchBandwidth($node_id2, $iface2);
+	    } else {
+		$source = $node_id2;
+		$dest = $node_id1;
+		$sourcebw = SwitchBandwidth($node_id2, $iface2);
+		$destbw = SwitchBandwidth($node_id1, $iface1);
+	    }
+	    my $name = "link-$source:$dest";
+	    if (! exists($linkList{$name})) {
+		$linkList{$name} = libptop::plink->CreateTrunk($name,
+							       $source,
+							       $dest);
+	    }
+	    $linkList{$name}->addTrunk($sourcebw, $destbw);
+	} elsif ($type eq 'Node') {
+	    # Add a switch/node or node/node link.
+	    my $link = libptop::plink->Create();
+	    $link->set_source($node_id1);
+	    $link->set_sourceif($iface1);
+	    if (! defined($iface1)) {
+		$link->set_sourceif($card1.".".$port1);
+	    }
+	    $link->set_sourcecard($card1);
+	    $link->set_sourceport($port1);
+	    $link->set_dest($node_id2);
+	    $link->set_destif($iface2);
+	    if (! defined($iface2)) {
+		$link->set_destif($card2.".".$port2);
+	    }
+	    $link->set_destcard($card2);
+	    $link->set_destport($port2);
+
+	    $link->processLink();
+	    $linkList{$link->name()} = $link;
 	}
     }
 }
@@ -334,6 +500,67 @@ sub TypeAllowed($)
     return (! defined($user_project)
 	    || ! exists($permissions{$type})
 	    || $permissions{$type});
+}
+
+sub NodeBandwidth($$)
+{
+    my ($nodename, $iface) = @_;
+    my $node = $nodeList{$nodename};
+    if ($node->node()->sharing_mode()) {
+	return ShareBandwidth($nodename, $iface);
+    } else {
+	return TypeBandwidth($nodename, $iface, "ethernet");
+    }
+}
+
+sub SwitchBandwidth($$)
+{
+    my ($nodename, $iface) = @_;
+    my $node = $nodeList{$nodename};
+    # Default to 100 MBit. The default should never be used unless
+    # there is an error in the database. If the wires table references
+    # a node which doesn't exist, for instance.
+    my $result = Math::BigInt->new(100000);
+    if (defined($node)) {
+	my $basetype = undef;
+	$node->node()->NodeTypeAttribute("forwarding_protocols", \$basetype);
+	if (! defined($basetype)) {
+	    $basetype = "ethernet";
+	}
+	$result = TypeBandwidth($nodename, $iface, $basetype);
+    }
+    return $result;
+}
+
+sub TypeBandwidth($$$)
+{
+    my ($node, $iface, $base) = @_;
+    # Default to 100 MBit. The default should never be used unless
+    # there is an error in the database. If a trunk wire exists
+    # without corresponding interface rows for both ends, for
+    # instance.
+    my $result = 100000;
+    if (defined($iface)) {
+	if (exists($interfaceList{"$node:$iface"})) {
+	    my $type = $interfaceList{"$node:$iface"}->type();
+	    if (exists($itype_bw{"$type:$base"})) {
+		$result = $itype_bw{"$type:$base"};
+	    }
+	}
+    }
+    return Math::BigInt->new($result);
+}
+
+sub ShareBandwidth($$)
+{
+    my ($node, $iface) = @_;
+    my $result = new Math::BigInt->new(0);
+    if (exists($sharedbw{"$node:$iface"})) {
+	$result = $sharedbw{"$node:$iface"};
+    } elsif (exists($interfaceList{"$node:$iface"})) {
+	$result = $interfaceList{"$node:$iface"}->remaining_bandwidth();
+    }
+    return Math::BigInt->new($result);
 }
 
 # Push a value onto an array contained within a hash
@@ -1289,8 +1516,9 @@ sub toXML($$)
 package libptop::plink;
 
 use libdb qw(TBOSID TB_OPSPID);
+use Math::BigInt;
 
-sub Create($$)
+sub Create($)
 {
     my ($class) = @_;
 
@@ -1298,9 +1526,13 @@ sub Create($$)
     $self->{'NAME'} = undef;
     $self->{'SOURCE'} = undef;
     $self->{'SOURCE_IF'} = undef;
+    $self->{'SOURCE_CARD'} = undef;
+    $self->{'SOURCE_PORT'} = undef;
     $self->{'DEST'} = undef;
     $self->{'DEST_IF'} = undef;
-    $self->{'BW'} = 0;
+    $self->{'DEST_CARD'} = undef;
+    $self->{'DEST_PORT'} = undef;
+    $self->{'BW'} = new Math::BigInt 0;
     $self->{'DELAY'} = 0;
     $self->{'LOSS'} = 0.0;
     $self->{'TYPES'} = [];
@@ -1310,11 +1542,28 @@ sub Create($$)
     return $self;
 }
 
+sub CreateTrunk($$$$)
+{
+    my ($class, $name, $source, $dest) = @_;
+    my $self = $class->Create();
+    $self->set_name($name);
+    $self->set_source($source);
+    $self->set_sourceif($dest);
+    $self->set_dest($dest);
+    $self->set_destif($source);
+    $self->set_interconnect();
+    return $self;
+}
+
 sub name($)             { return $_[0]->{'NAME'}; }
 sub source($)           { return $_[0]->{'SOURCE'}; }
 sub sourceif($)         { return $_[0]->{'SOURCE_IF'}; }
+sub sourcecard($)       { return $_[0]->{'SOURCE_CARD'}; }
+sub sourceport($)       { return $_[0]->{'SOURCE_PORT'}; }
 sub dest($)             { return $_[0]->{'DEST'}; }
 sub destif($)           { return $_[0]->{'DEST_IF'}; }
+sub destcard($)         { return $_[0]->{'DEST_CARD'}; }
+sub destport($)         { return $_[0]->{'DEST_PORT'}; }
 sub bw($)               { return $_[0]->{'BW'}; }
 sub delay($)            { return $_[0]->{'DELAY'}; }
 sub loss($)             { return $_[0]->{'LOSS'}; }
@@ -1324,8 +1573,12 @@ sub interconnect($)     { return $_[0]->{'INTERCONNECT'}; }
 sub set_name($$)        { $_[0]->{'NAME'} = $_[1]; }
 sub set_source($$)      { $_[0]->{'SOURCE'} = $_[1]; }
 sub set_sourceif($$)    { $_[0]->{'SOURCE_IF'} = $_[1]; }
+sub set_sourcecard($$)  { $_[0]->{'SOURCE_CARD'} = $_[1]; }
+sub set_sourceport($$)  { $_[0]->{'SOURCE_PORT'} = $_[1]; }
 sub set_dest($$)        { $_[0]->{'DEST'} = $_[1]; }
 sub set_destif($$)      { $_[0]->{'DEST_IF'} = $_[1]; }
+sub set_destcard($$)    { $_[0]->{'DEST_CARD'} = $_[1]; }
+sub set_destport($$)    { $_[0]->{'DEST_PORT'} = $_[1]; }
 sub set_bw($$)          { $_[0]->{'BW'} = $_[1]; }
 sub set_interconnect($) { $_[0]->{'INTERCONNECT'} = 1; }
 
@@ -1335,6 +1588,78 @@ sub add_type($$)
     push(@{ $self->{'TYPES'} }, $type);
 }
 
+sub willPrint($)
+{
+    my ($self) = @_;
+    my $bwok = $self->bw() > 0;
+    my $node1 = $nodeList{$self->source()};
+    my $node2 = $nodeList{$self->dest()};
+    my $nodesok = defined($node1) && defined($node2)
+	&& $node1->willPrint() && $node2->willPrint();
+    return $bwok && $nodesok;
+}
+
+sub addTrunk($$$)
+{
+    my ($self, $sourcebw, $destbw) = @_;
+    my $bw = $sourcebw;
+    if ($destbw < $sourcebw) {
+	$bw = $destbw;
+    }
+    $self->set_bw($self->bw() + $bw);
+}
+
+# Figure out what kind of link this is and then dispatch to the proper
+# function to find out its properties.
+sub processLink($)
+{
+    my ($self) = @_;
+    # This is a node/node or switch/node link
+    my $source = $nodeList{$self->source()};
+    my $dest = $nodeList{$self->dest()};
+    if ($source->isswitch()) {
+	# This is a switch/node link
+	$self->processSwitchNode($self->source(), $self->dest(),
+				 $self->destif());
+    } elsif ($dest->isswitch()) {
+	# This is a node/switch link
+	$self->processSwitchNode($self->dest(), $self->source(),
+				 $self->sourceif());
+    } else {
+	# This is a node/node link
+	$self->processNodeNode();
+    }
+    # Add types
+}
+
+sub standardName($)
+{
+    my ($self) = @_;
+    $self->set_name("link-".$self->source().":".$self->sourceif()."-".
+		    $self->dest().":".$self->destif());
+}
+
+sub processSwitchNode($$$$)
+{
+    my ($self, $switch, $node, $nodeif) = @_;
+    $self->standardName();
+    $self->set_bw(libptopnew::NodeBandwidth($node, $nodeif));
+}
+
+sub processNodeNode($)
+{
+    my ($self) = @_;
+    $self->standardName();
+    my $sourcebw = libptopnew::NodeBandwidth($self->source(),
+					     $self->sourceif());
+    my $destbw = libptopnew::NodeBandwidth($self->dest(), $self->destif());
+    my $bw = $sourcebw;
+    if ($destbw < $sourcebw) {
+	$bw = $destbw;
+    }
+    $self->set_bw($bw);
+}
+
 sub toString($)
 {
     my ($self) = @_;
@@ -1342,7 +1667,9 @@ sub toString($)
     $result .= $self->name() . " ";
     $result .= $self->source() . ":" . $self->sourceif() . " ";
     $result .= $self->dest() . ":" . $self->destif() . " ";
-    $result .= $self->bw() . " " . $self->delay() . " " . $self->loss() . " ";
+    $result .= $self->bw()->bstr() . " ";
+    $result .= $self->delay() . " ";
+    $result .= $self->loss() . " ";
     $result .= "1 " . join(" ", @{ $self->types() });
     return $result;
 }
@@ -1357,7 +1684,7 @@ sub toXML($$)
 	GeniXML::SetText("component_manager_uuid", $xml, $cmurn);
 	GeniXML::SetText("component_uuid", $xml, $urn);
 	my $bw = GeniXML::AddElement("bandwidth", $xml);
-	$bw->appendText($self->bw());
+	$bw->appendText($self->bw()->bstr());
 	my $latency = GeniXML::AddElement("latency", $xml);
 	$latency->appendText($self->delay());
 	my $loss = GeniXML::AddElement("packet_loss", $xml);
@@ -1368,10 +1695,12 @@ sub toXML($$)
 	GeniXML::SetText("component_id", $xml, $urn);
 	$self->propertyToXml($xml, $self->source(), $self->sourceif(),
 			     $self->dest(), $self->destif(),
-			     $self->bw(), $self->delay(), $self->loss());
+			     $self->bw()->bstr(), $self->delay(),
+			     $self->loss());
 	$self->propertyToXml($xml, $self->dest(), $self->destif(),
 			     $self->source(), $self->sourceif(),
-			     $self->bw(), $self->delay(), $self->loss());
+			     $self->bw()->bstr(), $self->delay(),
+			     $self->loss());
     }
     GeniXml::SetText("component_name", $xml, $self->name());
     $self->ifaceToXml($xml, $self->source(), $self->sourceif());
@@ -1379,29 +1708,6 @@ sub toXML($$)
     foreach my $type (@{ $self->types() }) {
 	$self->typeToXml($xml, $type);
     }
-    if ($genimode eq $NO_GENI || $genimode eq $V_0_1 || $genimode eq $V_0_2)
-    {
-	print "  <bandwidth>$bw</bandwidth>\n";
-	print "  <latency>$delay</latency>\n";
-	print "  <packet_loss>$loss</packet_loss>\n";
-    } elsif ($genimode eq $V_2) {
-	print_property($source, $source_if, $dest, $dest_if,
-		       $bw, $delay, $loss);
-	print_property($dest, $dest_if, $source, $source_if,
-		       $bw, $delay, $loss);
-    }
-    my $i = 0;
-    for (; $i < $proto_count; ++$i) {
-	if ($genimode eq $NO_GENI) {
-	    print "  <link_type><type_name>" . $proto[$i]
-		. "</type_name></link_type>\n";
-	} elsif ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
-	    print "  <link_type type_name=\"" . $proto[$i] . "\" />\n";
-	} elsif ($genimode eq $V_2) {
-	    print "  <link_type name=\"" . $proto[$i] . "\" />\n";
-	}
-    }
-    print "</link>\n\n";
 }
 
 sub ifaceToXml($$$$)
