@@ -4,5 +4,20 @@
 # Arrange for "prepare" to be run on the way down.
 #
 touch /var/lock/subsys/tbprepare
+
+#
+# If this Linux is using systemd as its init, make sure to "start" the tbprepare
+# service.  systemd will not honor the K89tbprepare rc*.d symlinks *unless the
+# tbprepare service has been started* -- and of course it doesn't "start" via
+# an S89tbprepare link.  So we make sure systemd thinks it got started, and 
+# then the K89tbprepare links will be run appropriately...
+#
+if [ -x /bin/systemd ]; then
+    echo "Emulab scheduling tbprepare to run via systemd."
+    systemctl start tbprepare.service
+fi
+
+# Reboot!
 /sbin/reboot
+
 exit 0
