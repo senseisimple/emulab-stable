@@ -126,7 +126,7 @@ else {
 # work at the moment, but if device names change again
 # it could break.
 
-if (`uname -s` eq 'Linux') {
+if ($^O eq 'linux') {
 	$device =~ m#/dev/(\D+)(\d+)#;
 	($dtype, $dunit) = ($1, $2);
 	$dunit -= 4 if ($dtype eq 'ad' && $dunit > 3);
