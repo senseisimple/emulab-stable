@@ -2920,16 +2920,22 @@ sub SliverWorkAux($$$$$$$)
 		GeniXML::SetText("sliver_id", $linkref, $tunnel->urn());
 	    }
 
-	    if (!GeniXML::IsVersion0($linkref)) {
-		my @tunnel_slivers = ();
-		if ($tunnel->SliverList(\@tunnel_slivers) != 0) {
-		    $message = "Could not get slivers for $tunnel\n";
-		    goto bad;
-		}
-		foreach my $tunnel_sliver (@tunnel_slivers) {
-		    my $id = GeniXML::GetInterfaceId($tunnel_sliver->rspec());
+	    my @tunnel_slivers = ();
+	    if ($tunnel->SliverList(\@tunnel_slivers) != 0) {
+		$message = "Could not get slivers for $tunnel\n";
+		goto bad;
+	    }
+	    foreach my $tunnel_sliver (@tunnel_slivers) {
+		my $id = GeniXML::GetInterfaceId($tunnel_sliver->rspec());
+		if (!GeniXML::IsVersion0($linkref)) {
 		    GeniXML::SetText("sliver_id", $ifacexml{$id},
 				     $tunnel_sliver->sliver_urn());
+		}
+		# Find the right interface_ref and update the manifest
+		my $tmp = GeniXML::GetElementByVirtualId($id, 'interface_ref',
+							 $linkref);
+		if ($tmp) {
+		    $tunnel_sliver->AnnotateManifest($tmp);
 		}
 	    }
 
@@ -3082,6 +3088,8 @@ sub SliverWorkAux($$$$$$$)
 		    goto bad;
 		}
 	    }
+	    # Initial update of the manifest.
+	    $ifaceref = $sliver->AnnotateManifest($ifaceref);
 	    my $outref;
 	    my $sliverName = "sliver_urn";
 	    my $macName = "MAC";

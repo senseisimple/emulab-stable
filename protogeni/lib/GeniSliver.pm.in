@@ -1240,30 +1240,16 @@ sub Create()
 
     # These are silly; uuids should go away for interfaces. 
     my $interface_uuid = GeniUtil::NewUUID();
-    my $component_urn  = GeniHRN::GenerateInterface($OURDOMAIN,
-						    $nodeid, $iface);
     my $nickname       = "$linkname.$nodeid.$iface";
     my $hrn            = "${PGENIDOMAIN}.$nodeid.$iface";
     my $resource_id    = "$nodeid//$iface";
 
-    #
-    # Add this stuff to the rspec (which becomes the manifest).
-    #
-    if (GeniXML::IsVersion0($rspec)) {
-	GeniXML::SetText("component_urn", $rspec, $component_urn);
-    } else {
-	GeniXML::SetText("component_id", $rspec, $component_urn);
-    }
     my $sliver = GeniSliver->Create($slice, $user, $interface_uuid,
 				    "Interface", $resource_id,
 				    $hrn, $nickname, $rspec);
     return undef
 	if (!defined($sliver));
-    if (GeniXML::IsVersion0($rspec)) {
-	GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
-    } else {
-	GeniXML::SetText("sliver_id", $rspec, $sliver->sliver_urn());
-    }
+
     return $sliver;
 }
 
@@ -1271,9 +1257,31 @@ sub Create()
 # Annotate the rspec of this interface with the proper information to become
 # a manifest. Returns LibXML tree or undef on error.
 #
-sub AnnotateManifest($)
+sub AnnotateManifest($$)
 {
-    return undef;
+    my ($self, $rspec) = @_;
+
+    my ($linkname,$nodeid,$iface) = split('.', $self->nickname());
+    if (! (defined($nodeid) && defined($iface))) {
+	print STDERR "Could not parse nickname for interface $self\n";
+	return undef;
+    }
+    my $component_urn = GeniHRN::GenerateInterface($OURDOMAIN, $nodeid, $iface);
+
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("component_urn", $rspec, $component_urn);
+	GeniXML::SetText("sliver_uuid", $rspec, $self->uuid());
+    }
+    else {
+	GeniXML::SetText("component_id", $rspec, $component_urn);
+	GeniXML::SetText("sliver_id", $rspec, $self->sliver_urn());
+    }
+
+    if ($self->UpdateRspec($rspec)) {
+	print STDERR "Could not insert annotated manifest for $self\n";
+	return undef;
+    }
+    return $rspec;
 }
 
 sub Provision($)
