@@ -7,9 +7,25 @@
 . /etc/emulab/paths.sh
 
 #
-# testbed       Run "prepare" on the way down.
+# tbprepare       Run "prepare" on the way down.
 #
-# description:	Clean up node using Emulab's prepare script.
+### BEGIN INIT INFO
+# Provides: tbprepare
+# Required-Start:
+# Required-Stop: $network
+# Should-Start:
+# Should-Stop:
+# Default-Start:
+# Default-Stop: 1 6
+# Short-Description: Clean up node using Emulab's prepare script.
+# Description:       Clean up node using Emulab's prepare script.
+### END INIT INFO
+#
+# The fields below are left around for legacy tools (will remove later).
+#
+# chkconfig: 16 89 89
+# description:  Clean up node using Emulab's prepare script.
+#
 
 # Source networking configuration.
 if [ -f /etc/sysconfig/network ]; then
