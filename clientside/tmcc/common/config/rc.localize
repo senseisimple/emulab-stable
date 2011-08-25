@@ -124,6 +124,8 @@ sub doboot()
 	my $authdir   = (WINDOWS() ? "/sshkeys/root" : "/root/.ssh");
 	my $authkeys  = $authdir . "/authorized_keys";
 	my $authkeys2 = $authkeys . "2";
+
+	my $oldumask = umask(022);
 	
 	if (-e "$authkeys") {
 	    system("cp -pf $authkeys $authkeys2") == 0
@@ -132,8 +134,10 @@ sub doboot()
 
 	if (!open(AUTHKEYS, "> ${authkeys}.new")) {
 	    warning("Could not open ${authkeys}.new: $!");
+	    umask($oldumask);
 	    return -1;
 	}
+	umask($oldumask);
 	print AUTHKEYS "#\n";
 	print AUTHKEYS "# DO NOT EDIT! This file auto generated at bootup.\n";
 	print AUTHKEYS "#\n";
