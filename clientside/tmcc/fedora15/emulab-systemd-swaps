@@ -19,7 +19,7 @@
 #
 # systemd doesn't allow us to remove units (a swap device is a unit, just like 
 # a service is a unit), so all we can do is, before the swap unit runs, cancel
-# any pending systemd jobs before they 
+# any pending systemd jobs before they try to initialize the the bogus device(s).
 #
 
 use English;
