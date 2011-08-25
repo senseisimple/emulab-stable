@@ -66,6 +66,7 @@ sup-install:	dir-install
 	@echo "fedora-specific sup-install done"
 
 bin-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/emulab-systemd-swaps $(BINDIR)
 	@echo "no fedora-specific bin files"
 
 etc-install:	dir-install sysetc-remove sysetc-install
@@ -83,6 +84,8 @@ sysetc-install:	ifcfgs dir-install
 	$(INSTALL) -m 644 $(SRCDIR)/ifcfg-eth99 $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 744 $(SRCDIR)/ifup-emulabcnet $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 644 $(SRCDIR)/emulab-fstab-fixup.service $(SYSETCDIR)/systemd/system
+	systemctl enable emulab-fstab-fixup.service
 
 sysetc-remove:
 	rm -rf $(SYSETCDIR)/modules.conf $(SYSETCDIR)/ntp.conf $(SYSETCDIR)/cron.pend
