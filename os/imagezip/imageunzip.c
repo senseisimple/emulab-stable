@@ -901,6 +901,15 @@ main(int argc, char *argv[])
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
 
+	/* Flush any cached data and close the output device */
+	if (outfd >= 0) {
+		if (fsync(outfd) < 0) {
+			perror("flushing output data");
+			exit(1);
+		}
+		close(outfd);
+	}
+
 	dump_stats(0);
 	if (docrconly)
 		fprintf(stderr, "%s: CRC=%u\n", argv[0], ~crc);
@@ -1048,13 +1057,25 @@ ImageUnzipChunk(char *chunkdata, int chunksize)
 	return inflate_subblock(chunkdata);
 }
 
-void
+int
 ImageUnzipFlush(void)
 {
+	int rv = 0;
+
 	/* When zeroing, may need to zero the rest of the disk */
 	zero_remainder();
 
 	threadwait();
+
+	if (outfd >= 0) {
+		if (fsync(outfd) < 0) {
+			perror("fsync");
+			rv = -1;
+		}
+		close(outfd);
+	}
+
+	return(rv);
 }
 
 int

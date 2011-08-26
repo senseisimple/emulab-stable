@@ -87,7 +87,7 @@ extern void	ImageUnzipSetChunkCount(unsigned long chunkcount);
 extern void	ImageUnzipSetMemory(unsigned long writebufmem);
 extern int	ImageWriteChunk(int chunkno, char *chunkdata, int chunksize);
 extern int	ImageUnzipChunk(char *chunkdata, int chunksize);
-extern void	ImageUnzipFlush(void);
+extern int	ImageUnzipFlush(void);
 extern int	ImageUnzipQuit(void);
 
 /*
@@ -1073,7 +1073,9 @@ ChunkerStartup(void)
 	 * Make sure any asynchronous writes are done
 	 * and collect stats from the unzipper.
 	 */
-	ImageUnzipFlush();
+	if (ImageUnzipFlush())
+		pfatal("ImageUnzipFlush failed");
+
 #ifdef STATS
 	{
 		Stats.u.v1.decompblocks = decompblocks;
