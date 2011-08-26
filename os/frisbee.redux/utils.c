@@ -18,6 +18,8 @@
 #include <sys/time.h>
 #if !defined(linux) && !defined(__CYGWIN__)
 #include <sys/sysctl.h>
+#elif defined(linux)
+#include <time.h>
 #endif
 #include <assert.h>
 
@@ -71,6 +73,17 @@ sleeptime(unsigned int usecs, char *str, int doround)
 		if (sysctlbyname("kern.clockrate", &ci, &cisize, 0, 0) == 0 &&
 		    ci.hz > 0)
 			clockres_us = ci.tick;
+		else
+#elif defined(linux)
+		struct timespec res;
+
+		if (clock_getres(CLOCK_REALTIME, &res) == 0 && res.tv_sec == 0) {
+			/* Assume min resolution of 1000 usec, round to nearest usec */
+			if (res.tv_nsec < 1000000)
+				clockres_us = 1000;
+			else
+				clockres_us = (res.tv_nsec / 1000) * 1000;
+		}
 		else
 #endif
 		{

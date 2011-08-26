@@ -68,7 +68,7 @@ endif
 endif
 
 CLIENTFLAGS	= $(CFLAGS)
-CLIENTLIBS	= -lz $(PTHREADLIBS)
+CLIENTLIBS	= -lz -lrt $(PTHREADLIBS)
 CLIENTOBJS	= client.o frisbee.o checksum.o disksize.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
