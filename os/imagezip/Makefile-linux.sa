@@ -23,6 +23,8 @@ WITH_NTFS	= 1
 WITH_HASH	= 0
 WITH_EXT4FS	= 0
 
+WITH_V3COMPAT   = 1
+
 PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
 #PTHREADLIBS	= -L/usr/local/lib -llgcc_r
 
@@ -65,6 +67,10 @@ ifeq ($(WITH_NTFS),1)
 FSOBJS		+= ntfs/ntfs_glue.o
 FSLIBS		+= ntfs/libntfs/libntfs.a
 CFLAGS		+= -DWITH_NTFS -DOLD_LIBNTFS -Intfs/libntfs/ntfsprogs-1.7.1.linux/include
+endif
+
+ifeq ($(WITH_NTFS),1)
+CFLAGS += -DWITH_V3COMPAT
 endif
 
 # with HASH
