@@ -57,6 +57,7 @@ SHAREDOBJS	= log.o network.o trace.o utils.o
 
 ifeq ($(SYSTEM),Linux)
 PTHREADCFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -D_THREAD_SAFE -pthread
+CFLAGS		+= -lrt
 else
 ifeq ($(WITH_LTHREADS),1)
 PTHREADCFLAGS	= -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
@@ -68,7 +69,7 @@ endif
 endif
 
 CLIENTFLAGS	= $(CFLAGS)
-CLIENTLIBS	= -lz -lrt $(PTHREADLIBS)
+CLIENTLIBS	= -lz $(PTHREADLIBS)
 CLIENTOBJS	= client.o frisbee.o checksum.o disksize.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
