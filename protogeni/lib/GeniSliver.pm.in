@@ -1261,7 +1261,7 @@ sub AnnotateManifest($$)
 {
     my ($self, $rspec) = @_;
 
-    my ($linkname,$nodeid,$iface) = split('.', $self->nickname());
+    my ($linkname,$nodeid,$iface) = split('\.', $self->nickname());
     if (! (defined($nodeid) && defined($iface))) {
 	print STDERR "Could not parse nickname for interface $self\n";
 	return undef;
