@@ -999,7 +999,11 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		$exclusive = 1;
-		if (! GeniXML::SetVirtualizationSubtype($ref, "raw")) {
+		my $subtype = "raw-pc";
+		if (GeniXML::IsVersion0($ref)) {
+		    $subtype = "raw";
+		}
+		if (! GeniXML::SetVirtualizationSubtype($ref, $subtype)) {
 		    $response = GeniResponse->Create(GENIRESPONSE_BADARGS,
 						     undef,
 			"Malformed rspec: Cannot set virtualization_type to raw");
