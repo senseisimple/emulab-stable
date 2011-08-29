@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -48,6 +48,7 @@ my $agent    = "$TB/sbin/program-agent";
 my $PIDDIR   = "/var/run/emulab/evsched";
 my $PIDFILE;
 my $EXPDIR;
+my $epid;
 
 #
 # Turn off line buffering on output
@@ -126,6 +127,19 @@ else {
 $PIDFILE = "$PIDDIR/${pid}_${eid}.pid";
 $EXPDIR  = PROJROOT() . "/$pid/exp/$eid";
 
+# Look for existing pid file and get it.
+if (-e $PIDFILE) {
+    my $epid = `cat $PIDFILE`;
+    # untaint
+    if ($epid =~ /^(\d*)$/) {
+	$epid = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in pid: $epid!\n");
+    }
+}
+
 #
 # Deal with stop and replay.
 #
@@ -139,15 +153,6 @@ if ($action eq "stop" || $action eq "replay") {
 	# complete.
 	system("$TB/bin/tevc -w -t 5 -e ${pid}/${eid} now __ns_teardown run");
 
-	my $epid = `cat $PIDFILE`;
-	# untaint
-	if ($epid =~ /^(\d*)$/) {
-	    $epid = $1;
-	}
-	else {
-	    die("*** $0:\n".
-		"    Bad data in pid: $epid!\n");
-	}
 	unlink($PIDFILE);
 
 	if (kill(0, $epid) || ! $!{ESRCH}) {
@@ -163,6 +168,16 @@ if ($action eq "stop" || $action eq "replay") {
     }
     # replay continues below, but give exiting scheduler a chance to react!
     sleep(1);
+}
+else {
+    #
+    # If asked to start, but already running, do nothing.
+    #
+    if (-e $PIDFILE && (kill(0, $epid) || ! $!{ESRCH})) {
+	print STDERR
+	    "*** event scheduler already running; not starting another\n";
+	exit(0);
+    }
 }
 
 #
