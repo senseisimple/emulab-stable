@@ -1127,6 +1127,16 @@ sub GetTicketAuxAux($$$$$$$$$)
 				      "weight"   => 0.95})
 	    if (!defined($exclusive) || !$exclusive);
 
+	# Stub program agent.
+	$virtexperiment->NewTableRow("virt_programs",
+				     {"vnode"   => $node_nickname,
+				      "vname"   => "program",
+				      "command" => ""});
+	$virtexperiment->NewTableRow("virt_agents",
+				     {"vnode"      => $node_nickname,
+				      "vname"      => "program",
+				      "objecttype" => "4"});
+
 	# Store reference so we can munge it below. 
 	$nodemap{$node_nickname} = {"rspec"    => $ref,
 				    "virtnode" => $virtnode};
