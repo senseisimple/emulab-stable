@@ -129,7 +129,7 @@ $EXPDIR  = PROJROOT() . "/$pid/exp/$eid";
 
 # Look for existing pid file and get it.
 if (-e $PIDFILE) {
-    my $epid = `cat $PIDFILE`;
+    $epid = `cat $PIDFILE`;
     # untaint
     if ($epid =~ /^(\d*)$/) {
 	$epid = $1;
