@@ -75,6 +75,7 @@ elsif ($GENI_VERSION eq "2.0") {
 	"ListUsage"         => \&GeniCMV2::ListUsage,
 	"ListHistory"       => \&GeniCMV2::ListHistory,
 	"ReserveVlanTags"   => \&GeniCMV2::ReserveVlanTags,
+	"InjectEvent"       => \&GeniCMV2::InjectEvent,
     };
 }
 

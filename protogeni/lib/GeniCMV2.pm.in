@@ -55,6 +55,7 @@ my $CREATEEXPT     = "$TB/bin/batchexp";
 my $ENDEXPT        = "$TB/bin/endexp";
 my $NALLOC	   = "$TB/bin/nalloc";
 my $NFREE	   = "$TB/bin/nfree";
+my $TEVC	   = "$TB/bin/tevc";
 my $AVAIL	   = "$TB/sbin/avail";
 my $PTOPGEN	   = "$TB/libexec/ptopgen";
 my $TBSWAP	   = "$TB/bin/tbswap";
@@ -2091,6 +2092,83 @@ sub Credential2SliceAggregate($)
 	}
     }
     return ($slice, $aggregate);
+}
+
+#
+# Emulab specific function to inject events into the experiment event scheduler.
+#
+sub InjectEvent($)
+{
+    my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
+    my $credentials  = $argref->{'credentials'};
+    my $time         = $argref->{'time'};
+    my $name         = $argref->{'name'};
+    my $event	     = $argref->{'event'};
+    my $args         = "";
+    my $waitmode     = 0;
+    
+    if (! (defined($credentials) && defined($slice_urn))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    if (! (defined($time) && defined($name) && defined($event))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    if (! ($time eq "now" || $time =~ /^\+\d*$/)) {
+	return GeniResponse->MalformedArgsResponse("Improper time argument");
+    }
+    if (! ($name =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse("Improper name argument");
+    }
+    if (! ($event =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse("Improper event argument");
+    }
+    if (exists($argref->{'args'})) {
+	if (ref($argref->{'args'}) ne "ARRAY") {
+	    return
+		GeniResponse->MalformedArgsResponse("Improper args argument");
+	}
+	my @args = @{ $argref->{'args'} };
+	# Sanitize for shell.
+	foreach my $arg (@args) {
+	    $arg =~ s/(')/'\\''/g;
+	    $args .= "'$arg' ";
+	}
+    }
+    $waitmode = 1
+	if (exists($argref->{'waitmode'}) && $argref->{'waitmode'});
+    
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    return $slice
+	if (defined($slice) && GeniResponse::IsResponse($slice));
+
+    if (! (defined($slice) && defined($aggregate))) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "Sliver does not exist");
+    }
+    if ($slice_urn ne $slice->urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
+				    "Credential does not match the URN");
+    }
+    my $experiment = $slice->GetExperiment();
+    if (!defined($experiment)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No local experiment for slice");
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+    my $opt = ($waitmode ? "-w" : "");
+
+    my $output =
+	GeniUtil::ExecQuiet("$TEVC $opt -e $pid/$eid $time $name $event $args");
+    if ($?) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $output);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

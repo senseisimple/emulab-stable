@@ -1130,11 +1130,11 @@ sub GetTicketAuxAux($$$$$$$$$)
 	# Stub program agent.
 	$virtexperiment->NewTableRow("virt_programs",
 				     {"vnode"   => $node_nickname,
-				      "vname"   => "program",
+				      "vname"   => "${node_nickname}-program",
 				      "command" => ""});
 	$virtexperiment->NewTableRow("virt_agents",
-				     {"vnode"      => $node_nickname,
-				      "vname"      => "program",
+				     {"vnode"     => $node_nickname,
+				      "vname"     => "${node_nickname}-program",
 				      "objecttype" => "4"});
 
 	# Store reference so we can munge it below. 
