@@ -1131,7 +1131,11 @@ sub GetTicketAuxAux($$$$$$$$$)
 	$virtexperiment->NewTableRow("virt_programs",
 				     {"vnode"   => $node_nickname,
 				      "vname"   => "${node_nickname}-program",
-				      "command" => ""});
+				      "command" => "",
+				      "dir"     => "",
+				      "timeout" => 0,
+				      "expected_exit_code" => 0});
+	
 	$virtexperiment->NewTableRow("virt_agents",
 				     {"vnode"     => $node_nickname,
 				      "vname"     => "${node_nickname}-program",
