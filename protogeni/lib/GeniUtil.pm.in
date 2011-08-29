@@ -25,6 +25,7 @@ my $OURDOMAIN          = "@OURDOMAIN@";
 my $UUIDGEN	       = "@UUIDGEN@";
 my $ELABINELAB         = "@ELABINELAB@";
 my $OUTERBOSS_NODENAME = "@OUTERBOSS_NODENAME@";
+my $USERROOT           = "@USERSROOT_DIR@";
 my $user	       = "geniuser";
 my $group              = "GeniSlices";
 
@@ -68,6 +69,7 @@ sub FlipToGeniUser(;$)
     $EUID = $UID    = $unix_uid;
     $ENV{'USER'}    = $user;
     $ENV{'LOGNAME'} = $user;
+    $ENV{'HOME'}    = "$USERROOT/$user";
     return 0;
 }
 
