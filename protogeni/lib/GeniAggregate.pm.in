@@ -48,6 +48,7 @@ my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NODEREBOOT	   = "$TB/bin/node_reboot";
+my $EVENTSYS	   = "$TB/bin/eventsys_control";
 my $VNODESETUP     = "$TB/sbin/vnode_setup";
 my $POWER          = "$TB/bin/power";
 my $OSLOAD         = "$TB/bin/os_load";
@@ -1095,6 +1096,16 @@ sub Start($$$)
 	}
     }
     #
+    # Start the event scheduler.
+    #
+    my $action = ($restart ? "replay" : "start");
+    system("$EVENTSYS $action $pid,$eid");
+    if ($?) {
+	$msg .= "Failed to (re)start the event system";
+	goto bad;
+    }
+
+    #
     # Worked? Set the new state. Needs more thought ...
     #
     foreach my $sliver (@slivers) {
@@ -1233,6 +1244,15 @@ sub Stop($$)
     foreach my $sliver (@slivers) {
 	$sliver->SetState("stopped")
 	    if (ref($sliver) eq "GeniSliver::Node");
+    }
+
+    #
+    # Stop the event scheduler.
+    #
+    system("$EVENTSYS stop $pid,$eid");
+    if ($?) {
+	$msg .= "Failed to stop the event system";
+	goto bad;
     }
     return 0;
 
