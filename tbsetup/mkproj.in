@@ -99,6 +99,7 @@ my $CVSREPOS = "$PROJROOT/cvsrepos";
 # Locals
 my $leader;
 my $oldleader;
+my $isnonlocal;
 
 #
 # We do not want to run this script unless its the real version.
@@ -240,6 +241,8 @@ else {
 }
 # Avoid taint check problem.
 $leader_uid = $leader->uid();
+$isnonlocal = $target_project->IsNonLocal();
+$wasactive  = ($leader->status() eq USERSTATUS_ACTIVE() ? 1 : 0);
 
 # Approve the project; we are committed to the leader.
 $target_project->SetApproved(1) == 0 or
@@ -263,25 +266,28 @@ $EUID = $UID;
 system("$MKGROUP $gid_idx") == 0 or
     fatal("$MKGROUP $pid failed!");
 
-if ($WIKISUPPORT) {
+if ($WIKISUPPORT && !$isnonlocal) {
     system("$ADDWIKIPROJ $pid") == 0 or
 	fatal("$ADDWIKIPROJ $pid failed!");
 }
-if ($BUGDBSUPPORT) {
+if ($BUGDBSUPPORT && !$isnonlocal) {
     system("$ADDBUGDBPROJ $pid") == 0 or
 	fatal("$ADDBUGDBPROJ $pid failed!");
 }
-if ($OPSDBSUPPORT) {
+if ($OPSDBSUPPORT && !$isnonlocal) {
     system("$OPSDBCONTROL addproj $pid") == 0 or
 	fatal("$OPSDBCONTROL addproj $pid failed!");
 }
-if ($MAILMANSUPPORT) {
+if ($MAILMANSUPPORT && !$isnonlocal) {
     system("$ADDMMLIST -a ${pid}-users") == 0 or
 	fatal("$ADDMMLIST -a ${pid}-users failed!");
 }
 
-system("$MKACCT $leader_uid") == 0 or
-    fatal("$MKACCT $leader_uid failed!");
+# Skip if user was already an active user; lots of work avoided.
+if (!$wasactive) {
+    system("$MKACCT $leader_uid") == 0 or
+	fatal("$MKACCT $leader_uid failed!");
+}
 
 system("$MODGROUPS -a $pid:$pid:project_root $leader_uid") == 0 or
     fatal("$MODGROUPS -a $pid:$pid:project_root $leader_uid failed!");
@@ -355,7 +361,7 @@ foreach my $dir (@DIRLIST) {
 #
 # Create a tftp directory for oskit kernels.
 #
-if (! -e "$TFTPDIR/$pid") {
+if (! -e "$TFTPDIR/$pid" && !$isnonlocal) {
     if (! mkdir("$TFTPDIR/$pid", 0770)) {
 	fatal("Could not make directory $TFTPDIR/$pid: $!");
     }
@@ -370,7 +376,7 @@ if (! -e "$TFTPDIR/$pid") {
 #
 # Do the CVS stuff if its turned on.
 #
-if ($CVSSUPPORT) {
+if ($CVSSUPPORT && !$isnonlocal) {
     my $CVSDIR = "$CVSREPOS/$pid";
 
     if (! -e "$CVSDIR") {
@@ -461,7 +467,7 @@ if (! -e $infodir) {
 # Need to add that I guess, but in the meantime we have just 3 remote
 # phys types to worry about. 
 #
-if (!$ELABINELAB) {
+if (! ($ELABINELAB || $isnonlocal)) {
     my $query_result =
 	DBQueryFatal("select pcremote_ok from projects where pid='$pid'");
     if ($query_result->num_rows) {
