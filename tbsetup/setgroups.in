@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -58,6 +58,7 @@ my $SAVEUID = $UID;
 
 my $dbuid;
 my @userlist = ();
+my @modusers = ();
 my $pid;
 my $logname;
 my @db_row;
@@ -215,6 +216,12 @@ foreach my $uid (@userlist) {
 	print "Skipping $uid; webonly account!\n";
 	next;
     }
+    if ($user->IsNonLocal()) {
+	print "Skipping $uid; nonlocal account!\n";
+	next;
+    }
+    # want to skip nonlocal/webonly in second loop below.
+    push(@modusers, $user);
 
     #
     # Form a list of project (group) membership names. We do this in two
@@ -382,20 +389,24 @@ $EUID = $UID;
 
 # and the twiki.
 if ($WIKISUPPORT || $BUGDBSUPPORT || $OPSDBSUPPORT) {
-    foreach $user (@userlist) {
+    foreach $user (@modusers) {
+	next
+	    if ($user->nocollabtools());
+	
+	my $uid_idx = $user->uid_idx();
+	
 	if ($WIKISUPPORT) {
-	    system("$SETWIKIGROUPS $optarg $user") == 0 or
+	    system("$SETWIKIGROUPS $optarg $uid_idx") == 0 or
 		fatal("$SETWIKIGROUPS $user failed!");
 	}
 	if ($BUGDBSUPPORT) {
-	    system("$SETBUGDBGROUPS $optarg $user") == 0 or
+	    system("$SETBUGDBGROUPS $optarg $uid_idx") == 0 or
 		fatal("$SETBUGDBGROUPS $user failed!");
 	}
 	if ($OPSDBSUPPORT) {
-	    system("$OPSDBCONTROL $optarg setgroups $user") == 0 or
+	    system("$OPSDBCONTROL $optarg setgroups $uid_idx") == 0 or
 		fatal("$OPSDBCONTROL setgroups $user failed!");
 	}
-	
     }
 }
 
