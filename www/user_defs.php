@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2010 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -75,11 +75,13 @@ class User
     function LookupByUid($uid) {
 	$safe_uid = addslashes($uid);
 	$status_archived = TBDB_USERSTATUS_ARCHIVED;
+	$status_nonlocal = TBDB_USERSTATUS_NONLOCAL;
 
 	$query_result =
 	    DBQueryWarn("select uid_idx from users ".
 			"where uid='$safe_uid' and ".
-			"      status!='$status_archived'");
+			"      status!='$status_archived' and ".
+			"      status!='$status_nonlocal'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
@@ -95,11 +97,13 @@ class User
     function LookupByEmail($email) {
 	$safe_email = addslashes($email);
 	$status_archived = TBDB_USERSTATUS_ARCHIVED;
+	$status_nonlocal = TBDB_USERSTATUS_NONLOCAL;
 
 	$query_result =
 	    DBQueryWarn("select uid_idx from users ".
 			"where LCASE(usr_email)=LCASE('$safe_email') and ".
-			"      status!='$status_archived'");
+			"      status!='$status_archived' and ".
+			"      status!='$status_nonlocal'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
@@ -115,11 +119,13 @@ class User
     function LookupByWikiName($wikiname) {
 	$safe_wikiname = addslashes($wikiname);
 	$status_archived = TBDB_USERSTATUS_ARCHIVED;
+	$status_nonlocal = TBDB_USERSTATUS_NONLOCAL;
 
 	$query_result =
 	    DBQueryWarn("select uid_idx from users ".
 			"where wikiname='$safe_wikiname' and ".
-			"      status!='$status_archived'");
+			"      status!='$status_archived' and".
+			"      status!='$status_nonlocal'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
@@ -133,11 +139,13 @@ class User
     function LookupByUUID($uuid) {
 	$safe_uuid = addslashes($uuid);
 	$status_archived = TBDB_USERSTATUS_ARCHIVED;
+	$status_nonlocal = TBDB_USERSTATUS_NONLOCAL;
 
 	$query_result =
 	    DBQueryWarn("select uid_idx from users ".
 			"where uid_uuid='$safe_uuid' and ".
-			"      status!='$status_archived'");
+			"      status!='$status_archived' and ".
+			"      status!='$status_nonlocal'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
@@ -698,14 +706,14 @@ class User
         #
 	if (($lastweblogin = LASTWEBLOGIN($uid_idx)) == 0)
 	    $lastweblogin = "&nbsp;";
-	if (($lastuserslogininfo = TBUsersLastLogin($uid)) == 0)
+	if (($lastuserslogininfo = TBUsersLastLogin($uid_idx)) == 0)
 	    $lastuserslogin = "N/A";
 	else {
 	    $lastuserslogin = $lastuserslogininfo["date"] . " " .
 		$lastuserslogininfo["time"];
 	}
     
-	if (($lastnodelogininfo = TBUidNodeLastLogin($uid)) == 0)
+	if (($lastnodelogininfo = TBUidNodeLastLogin($uid_idx)) == 0)
 	    $lastnodelogin = "N/A";
 	else {
 	    $lastnodelogin = $lastnodelogininfo["date"] . " " .
