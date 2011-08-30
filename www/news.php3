@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,6 +20,7 @@ $optargs = OptionalPageArguments("show_archived",   PAGEARG_BOOLEAN,
 				 "edit",            PAGEARG_STRING,
 				 "subject",         PAGEARG_STRING,
 				 "author",          PAGEARG_STRING,
+				 "author_idx",      PAGEARG_INTEGER,
 				 "bodyfile",        PAGEARG_STRING,
 				 "body",            PAGEARG_ANYTHING,
 				 "msgid",           PAGEARG_STRING,
@@ -55,6 +56,7 @@ if ($protogeni) {
 
 if ($this_user) {
     $uid     = $this_user->uid();
+    $uid_idx = $this_user->uid_idx();
     $isadmin = ISADMIN();
 }
 else {
@@ -115,9 +117,8 @@ if ($isadmin) {
 	    # USERERROR("No subject!",1);
 	    $subject = "Testbed News";
 	} 
-	if (!isset($author) || !strcmp($author,"") ) {
-	    # USERERROR("No author!",1);
-	    $author = "testbed-ops";
+	if (!isset($author_idx) || !strcmp($author_idx,"") ) {
+	    USERERROR("No author!",1);
 	} 
 
 	if (isset($bodyfile) && 
@@ -137,9 +138,10 @@ if ($isadmin) {
 	    USERERROR("No message body!",1);
 	} 
 
-	$subject = addslashes($subject);
-	$author  = addslashes($author);
-	$body = addslashes($body);
+	$subject    = addslashes($subject);
+	$author     = addslashes($author);
+	$author_idx = addslashes($author_idx);
+	$body       = addslashes($body);
 
 	if (isset($msgid)) {
 	    $msgid = addslashes($msgid);
@@ -150,13 +152,16 @@ if ($isadmin) {
 	    DBQueryFatal("UPDATE $db_table SET ".
 			 "subject='$subject', ".
 			 "author='$author', ".
+			 "author_idx='$author_idx', ".
 			 "date='$date', ".
 			 "body='$body' ".			
 			 "WHERE msgid='$msgid'");
 	    echo "<h3>Updated message with subject '$subject'.</h3><br />";
 	} else {	    
-	    DBQueryFatal("INSERT INTO $db_table (subject, date, author,body) ".
-			 "VALUES ('$subject', NOW(), '$author', '$body')");
+	    DBQueryFatal("INSERT INTO $db_table ".
+			 "  (subject, date, author, author_idx, body) ".
+			 "VALUES ('$subject', NOW(), ".
+			 "        '$author', '$author_idx', '$body')");
 	    echo "<h3>Posted message with subject '$subject'.</h3><br />";
 	}
 	flush();
@@ -169,7 +174,7 @@ if ($isadmin) {
     if (isset($edit)) {
 	$edit = addslashes($edit);
 	$query_result = 
-	    DBQueryFatal("SELECT subject, author, body, msgid, date ".
+	    DBQueryFatal("SELECT subject, author, author_idx, body,msgid,date ".
 			 "FROM $db_table ".
 		         "WHERE msgid='$edit'" );
 
@@ -181,6 +186,7 @@ if ($isadmin) {
 	$subject = htmlspecialchars($row["subject"], ENT_QUOTES);
 	$date    = htmlspecialchars($row["date"],    ENT_QUOTES);
 	$author  = htmlspecialchars($row["author"],  ENT_QUOTES);
+	$author_idx = htmlspecialchars($row["author_idx"],  ENT_QUOTES);
 	$body    = htmlspecialchars($row["body"],    ENT_QUOTES);
 	$msgid   = htmlspecialchars($row["msgid"],   ENT_QUOTES);
     }
@@ -188,6 +194,7 @@ if ($isadmin) {
     if (isset($edit) || isset($addnew)) {	
 	if (isset($addnew)) {
 	    $author = $uid;
+	    $author_idx = $uid_idx;
 	    echo "<h3>Add new message:</h3>\n";
 	} else {
 	    echo "<h3>Edit message:</h3>\n";
@@ -201,6 +208,7 @@ if ($isadmin) {
 	    echo "<input type='hidden' name='msgid' value='$msgid' />";
 	}
 	echo "<input type='hidden' name=protogeni value='$protogeni'>";
+	echo "<input type='hidden' name=author_idx value='$author_idx'>";
 	
 	if (!isset($subject)) {
 	    $subject = "";
@@ -295,7 +303,7 @@ if (isset($single)) {
 }
 
 $query_result=
-    DBQueryFatal("SELECT subject, author, body, msgid, ".
+    DBQueryFatal("SELECT subject, author, author_idx, body, msgid, ".
 		 "DATE_FORMAT(date,'%W, %M %e, %Y, %l:%i%p') as prettydate, ".
 		 "(TO_DAYS(NOW()) - TO_DAYS(date)) as age, ".
 		 "archived, ".
@@ -322,6 +330,7 @@ if (!mysql_num_rows($query_result)) {
 	$subject = $row["subject"];
 	$date    = $row["prettydate"];
 	$author  = $row["author"];
+	$author_idx= $row["author_idx"];
 	$body    = $row["body"];
 	$msgid   = $row["msgid"];
 	$age     = $row["age"];
@@ -342,7 +351,7 @@ if (!mysql_num_rows($query_result)) {
 
 	echo "</th></tr>\n".
 	     "<tr><td style='padding: 4px; padding-top: 2px;'><font size=-1>";
-	echo "<b>$date</b>; posted by <b>$author</b>.";
+	echo "<b>$date</b>; posted by <b>$author ($author_idx)</b>.";
 	if ($archived) {
 	    echo "<font color=red> Archived on <b>$archived_date</b></font>.\n";
 	}

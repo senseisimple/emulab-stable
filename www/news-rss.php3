@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -22,8 +22,7 @@ $query_result=
     DBQueryFatal("SELECT subject, author, body, msgid, ".
     		 "date, usr_name " .
 		 "FROM $db_table as w ".
-                 "LEFT JOIN users on w.author = users.uid " .
-                 "WHERE w.archived=0 " .
+                 "LEFT JOIN users on w.author_idx = users.uid_idx " .
 		 "ORDER BY w.date DESC " .
                  "LIMIT 5");
 
