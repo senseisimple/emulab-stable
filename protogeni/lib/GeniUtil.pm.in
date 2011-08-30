@@ -26,8 +26,10 @@ my $UUIDGEN	       = "@UUIDGEN@";
 my $ELABINELAB         = "@ELABINELAB@";
 my $OUTERBOSS_NODENAME = "@OUTERBOSS_NODENAME@";
 my $USERROOT           = "@USERSROOT_DIR@";
-my $user	       = "geniuser";
-my $group              = "GeniSlices";
+my $GENIUSER	       = "geniuser";
+my $GENIGROUP          = "GeniSlices";
+my $PROTOUSER          = "elabman";
+my $PROTOPROJ          = "emulab-ops";
 
 use vars qw($EXTENSIONS_NS $XSI_NS $EXTENSIONS_PREFIX $EXTENSIONS_SCHEMA_LOCATION $CREDENTIAL_SCHEMA_LOCATION);
 #Extensions namespace URI.
@@ -45,17 +47,21 @@ sub GENI_PURGEFLAG()	{ return 1; }
 # there is an emulab user context, or many of the scripts we invoke
 # will complain and croak.
 #
-sub FlipToGeniUser(;$)
+sub FlipToUser($$;$)
 {
-    my ($default_gid) = @_;
+    my ($user, $group, $default_gid) = @_;
     my $glist;
     
-    my $unix_uid = getpwnam("$user") or
-	die("*** $0:\n".
-	    "    No such user $user\n");
-    my $unix_gid = getgrnam("$group") or
-	die("*** $0:\n".
-	    "    No such group $group\n");
+    my $unix_uid = getpwnam("$user");
+    if (!defined($unix_uid)) {
+	print STDERR "*** FlipToUser: No such user $user\n";
+	return -1;
+    }
+    my $unix_gid = getgrnam("$group");
+    if (!defined($unix_gid)) {
+	print STDERR "*** FlipToUser: No such group $group\n";
+	return -1;
+    }
 
     if (defined($default_gid) && $default_gid != $unix_gid) {
 	$glist = "$default_gid $default_gid $unix_gid";
@@ -73,12 +79,17 @@ sub FlipToGeniUser(;$)
     return 0;
 }
 
-sub ResetGroups($)
+sub FlipToGeniUser(;$)
 {
     my ($default_gid) = @_;
-    
+
     $EUID = 0;
-    return FlipToGeniUser($default_gid);
+    return FlipToUser($GENIUSER, $GENIGROUP, $default_gid);
+}
+sub FlipToElabMan()
+{
+    $EUID = 0;
+    return FlipToUser($PROTOUSER, $PROTOPROJ);
 }
 
 #
