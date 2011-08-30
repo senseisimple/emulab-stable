@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2006, 2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -318,7 +318,8 @@ doit(gzFile *infp)
 		if (strcasecmp(user, "ROOT") == 0)
 			continue;
 
-		dbres = mydb_query("select uid_idx from users where uid='%s' ",
+		dbres = mydb_query("select uid_idx from users where uid='%s' "
+				   "and status!='archived' and status!='nonlocal'",
 				   1, user);
 
 		if (!dbres) {
