@@ -21,10 +21,10 @@ use File::Basename;
 use overload ('""' => 'Stringify');
 use vars qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
 	    $NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
-	    $NEWUSER_FLAGS_NOUUID
+	    $NEWUSER_FLAGS_NOUUID $NEWUSER_FLAGS_NONLOCAL
 	    $USERSTATUS_ACTIVE $USERSTATUS_FROZEN
 	    $USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
-	    $USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED
+	    $USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED $USERSTATUS_NONLOCAL
 	    @EXPORT_OK);
 
 # Configure variables
@@ -48,6 +48,7 @@ $NEWUSER_FLAGS_WIKIONLY		= 0x02;
 $NEWUSER_FLAGS_WEBONLY		= 0x04;
 $NEWUSER_FLAGS_ARCHIVED		= 0x08;
 $NEWUSER_FLAGS_NOUUID		= 0x80;
+$NEWUSER_FLAGS_NONLOCAL		= 0x40;
 
 # Status values.
 $USERSTATUS_ACTIVE		= "active";
@@ -56,6 +57,7 @@ $USERSTATUS_UNAPPROVED		= "unapproved";
 $USERSTATUS_UNVERIFIED		= "unverified";
 $USERSTATUS_NEWUSER	        = "newuser";
 $USERSTATUS_ARCHIVED	        = "archived";
+$USERSTATUS_NONLOCAL	        = "nonlocal";
 
 # Why, why, why?
 @EXPORT_OK = qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
@@ -63,7 +65,7 @@ $USERSTATUS_ARCHIVED	        = "archived";
 		$NEWUSER_FLAGS_NOUUID
 		$USERSTATUS_ACTIVE $USERSTATUS_FROZEN
 		$USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
-		$USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED);
+		$USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED $USERSTATUS_NONLOCAL);
 
 # Protos
 sub SetUserInterface($$);
@@ -90,6 +92,7 @@ sub Lookup($$)
 {
     my ($class, $token) = @_;
     my $status_archived = $USERSTATUS_ARCHIVED;
+    my $status_nonlocal = $USERSTATUS_NONLOCAL;
     my $query_result;
 
     # Look in cache first
@@ -105,13 +108,15 @@ sub Lookup($$)
 	    DBQueryWarn("select * from users where uid_idx='$token'");
     }
     elsif ($token =~ /^\w+$/) {
-	# When looking up by uid, only look for non-archived users;
-	# Must use an idx if you really want an archived user. This
-	# will prevent problems with code that has not yet been
-	# changed to use the idx field.
+	#
+	# When looking up by uid, only look for local non-archived users.
+	# We know that those are unique in the table.
+	#
 	$query_result =
 	    DBQueryWarn("select * from users ".
-			"where uid='$token' and status!='$status_archived'");
+			"where uid='$token' and ".
+			"      status!='$status_archived' and ".
+			"      status!='$status_nonlocal'");
     }
     else {
 	return undef;
@@ -181,6 +186,12 @@ sub chpasswd_expires($) { return field($_[0], "chpasswd_expires"); }
 sub wikiname($)		{ return field($_[0], "wikiname"); }
 sub wikionly($)		{ return field($_[0], "wikionly"); }
 sub mailman_password($) { return field($_[0], "mailman_password"); }
+sub active($)		{ return ($_[0]->status() eq "active"   ? 1 : 0); };
+sub newuser($)		{ return ($_[0]->status() eq "newuser" ? 1 : 0); };
+sub archived($)		{ return ($_[0]->status() eq "archived" ? 1 : 0); };
+sub frozen($)		{ return ($_[0]->status() eq "frozen" ? 1 : 0); };
+sub default_project($)	{ return field($_[0], "default_project"); }
+sub nocollabtools($)	{ return field($_[0], "nocollabtools"); }
 
 # Temporary data storage ... useful.
 sub GetTempData($$) { return field($_[0], "tempdata"); } 
@@ -259,11 +270,13 @@ sub LookupByWikiName($$)
 {
     my ($class, $wikiname) = @_;
     my $status_archived = $USERSTATUS_ARCHIVED;
+    my $status_nonlocal = $USERSTATUS_NONLOCAL;
     
     my $query_result =
 	DBQueryFatal("select uid_idx from users ".
 		     "where wikiname='$wikiname' and ".
-		     "      status!='$status_archived'");
+		     "      status!='$status_archived' and ".
+		     "      status!='$status_nonlocal'");
 
     return undef
 	if (! $query_result || !$query_result->numrows);
@@ -281,11 +294,14 @@ sub LookupByEmail($$)
 {
     my ($class, $email) = @_;
     my $status_archived = $USERSTATUS_ARCHIVED;
+    my $status_nonlocal = $USERSTATUS_NONLOCAL;
 
     my $query_result =
 	DBQueryFatal("select uid_idx from users ".
 		     "where LCASE(usr_email)=LCASE('$email') and ".
-		     "      status!='$status_archived'");
+		     "      status!='$status_archived' and ".
+		     "      status!='$status_nonlocal'");
+		     
 
     return undef
 	if (! $query_result || !$query_result->numrows);
@@ -302,12 +318,36 @@ sub LookupByUUID($$)
 {
     my ($class, $uuid) = @_;
     my $status_archived = $USERSTATUS_ARCHIVED;
+    my $status_nonlocal = $USERSTATUS_NONLOCAL;
     my $safe_uuid = DBQuoteSpecial($uuid);
 
     my $query_result =
 	DBQueryFatal("select uid_idx from users ".
 		     "where uid_uuid=$safe_uuid and ".
-		     "      status!='$status_archived'");
+		     "      status!='$status_archived' and ".
+		     "      status!='$status_nonlocal'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup a nonlocal user.
+#
+sub LookupNonLocal($$)
+{
+    my ($class, $urn) = @_;
+    my $status_nonlocal = $USERSTATUS_NONLOCAL;
+    my $safe_urn = DBQuoteSpecial($urn);
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users ".
+		     "where nonlocal_id=$safe_urn and ".
+		     "      status='$status_nonlocal'");
 
     return undef
 	if (! $query_result || !$query_result->numrows);
@@ -329,6 +369,7 @@ sub Create($$$$)
     my $wikionly = ($flags & $NEWUSER_FLAGS_WIKIONLY   ? 1 : 0);
     my $webonly  = ($flags & $NEWUSER_FLAGS_WEBONLY    ? 1 : 0);
     my $archived = ($flags & $NEWUSER_FLAGS_ARCHIVED   ? 1 : 0);
+    my $nonlocal = ($flags & $NEWUSER_FLAGS_NONLOCAL   ? 1 : 0);
     my $nouuid   = ($flags & $NEWUSER_FLAGS_NOUUID     ? 1 : 0);
 
     #
@@ -503,6 +544,17 @@ sub Create($$$$)
 	push(@insert_data, "usr_pswd='*'");
 	push(@insert_data, "usr_email='bouncer\@${OURDOMAIN}'");
     }
+    elsif ($nonlocal) {
+	if (! (exists($argref->{'nonlocal_id'}) &&
+	       exists($argref->{'nonlocal_type'}))) {
+	    print STDERR "*** User->Create(): ".
+		"Must provide nonlocal_id and nonlocal_type!\n";
+	    return undef;
+	}
+	push(@insert_data, "status='$USERSTATUS_NONLOCAL'");
+	push(@insert_data, "pswd_expires=now()");
+	push(@insert_data, "usr_pswd='*'");
+    }
     else {
 	push(@insert_data, "status='$USERSTATUS_NEWUSER'");
 	push(@insert_data, "pswd_expires=date_add(now(), interval 1 year)");
@@ -525,6 +577,8 @@ sub Create($$$$)
     }
     return User->Lookup($uid_idx);
 }
+sub IsLocal($)		{ return (defined($_[0]->nonlocal_id()) ? 0 : 1); };
+sub IsNonLocal($)	{ return (defined($_[0]->nonlocal_id()) ? 1 : 0); };
 
 #
 # Delete the user from the users and user_stats tables.
@@ -668,8 +722,8 @@ sub IsAdmin($)
     return 0
 	if (! ref($self));
 
+    # Only current user can pass IsAdmin test.
     if (!$self->SameUser($self->ThisUser())) {
-	print STDERR "*** IsAdmin: Must be invoked on current user!\n";
 	return 0;
     }
     #
@@ -1517,6 +1571,10 @@ sub FlipTo($$)
     return -1
 	if (! ref($self));
 
+    # We must have been setuid to start with, and this allows us
+    # to flip to a different user in the case we already flipped.
+    $EUID = 0;
+
     my $glist = $self->GList($default_gid);
     return -1
 	if (!defined($glist));
@@ -1650,6 +1708,40 @@ sub escapeshellarg($)
     $str =~ s/[^[:alnum:]]/\\$&/g;
     $str =~ /^(.+)$/; # untaint the result
     return $1;
+}
+
+#
+# Check to see if a uid is valid.
+#
+sub ValidUID($$)
+{
+    my ($class, $uid) = @_;
+
+    return TBcheck_dbslot($uid, "users", "uid",
+			  TBDB_CHECKDBSLOT_WARN()|
+			  TBDB_CHECKDBSLOT_ERROR());
+}
+
+#
+# Default project. If not set in the users table, then look at the
+# project membership, and if only one project then use that. 
+#
+sub DefaultProject($)
+{
+    my ($self) = @_;
+    my $project = undef;
+    
+    require Project;
+    
+    if (defined($self->default_project())) {
+	$project = Project->Lookup($self->default_project());
+	return $project
+	    if (defined($project) && $project->LookupUser($self));
+    }
+    return $project
+	if ($self->FirstApprovedProject(\$project) == 0);
+    
+    return undef;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
