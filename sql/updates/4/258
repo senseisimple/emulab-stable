@@ -1,0 +1,111 @@
+#
+# More uid_idx changes, in prep for nonlocal users.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("webnews", "author_idx")) {
+	DBQueryFatal("alter table webnews add ".
+	     " `author_idx` mediumint(8) unsigned NOT NULL default '0' ".
+	     " after author");
+    }
+    if (!DBSlotExists("webnews_protogeni", "author_idx")) {
+	DBQueryFatal("alter table webnews_protogeni add ".
+	     " `author_idx` mediumint(8) unsigned NOT NULL default '0' ".
+	     " after author");
+    }
+    DBQueryFatal("update webnews as n left join users as u on ".
+		 "  n.author=u.uid ".
+		 "set n.author_idx=u.uid_idx ".
+		 "where u.status!='archived' and u.status!='frozen'");
+		 
+    DBQueryFatal("update webnews_protogeni as n left join users as u on ".
+		 "  n.author=u.uid ".
+		 "set n.author_idx=u.uid_idx ".
+		 "where u.status!='archived' and u.status!='frozen'");
+
+    my $type = DBSlotType("users", "status");
+    if (!$type) {
+	Fatal("Could not get type for 'status' in 'users'");
+    }
+    if (! ($type =~ /nonlocal/)) {
+        DBQueryFatal("alter table users modify `status` ".
+		     "enum('newuser','unapproved','unverified','active', ".
+		     "     'frozen','archived','nonlocal','other') ".
+		     " NOT NULL default 'newuser'");
+    }
+    # Not actually using the nonlocal slots of the user table, but
+    # putting adding them in case I want to later.
+    if (!DBSlotExists("users", "nonlocal_id")) {
+	DBQueryFatal("alter table users add ".
+		     "  `nonlocal_id` varchar(128) default NULL");
+    }
+    if (!DBSlotExists("users", "nonlocal_type")) {
+	DBQueryFatal("alter table users add ".
+		     "  `nonlocal_type` tinytext");
+    }
+    if (!DBSlotExists("users", "default_project")) {
+	DBQueryFatal("alter table users add ".
+		     "`default_project` mediumint(8) unsigned default NULL");
+    }
+    if (!DBSlotExists("users", "nocollabtools")) {
+	DBQueryFatal("alter table users add ".
+		     "`nocollabtools` tinyint(1) default '0'");
+
+	DBQueryFatal("update users set nocollabtools=1 ".
+		     "where uid='elabman' or uid='geniuser' or uid='elabckup'");
+    }
+    if (!DBSlotExists("projects", "nonlocal_id")) {
+	DBQueryFatal("alter table projects add ".
+		     "  `nonlocal_id` varchar(128) default NULL");
+    }
+    if (!DBSlotExists("projects", "nonlocal_type")) {
+	DBQueryFatal("alter table projects add ".
+		     "  `nonlocal_type` tinytext");
+    }
+    if (!DBSlotExists("projects", "hidden")) {
+	DBQueryFatal("alter table projects add ".
+		     " `hidden` tinyint(1) default '0' after approved");
+    }
+    if (!DBSlotExists("experiments", "nonlocal_id")) {
+	DBQueryFatal("alter table experiments add ".
+		     "  `nonlocal_id` varchar(128) default NULL");
+    }
+    if (!DBSlotExists("experiments", "nonlocal_user_id")) {
+	DBQueryFatal("alter table experiments add ".
+		     "  `nonlocal_user_id` varchar(128) default NULL ".
+		     "  after nonlocal_id");
+    }
+    if (!DBSlotExists("experiments", "nonlocal_type")) {
+	DBQueryFatal("alter table experiments add ".
+		     "  `nonlocal_type` tinytext");
+    }
+    if (!DBSlotExists("experiment_stats", "nonlocal_id")) {
+	DBQueryFatal("alter table experiment_stats add ".
+		     "  `nonlocal_id` varchar(128) default NULL");
+    }
+    if (!DBSlotExists("experiment_stats", "nonlocal_user_id")) {
+	DBQueryFatal("alter table experiment_stats add ".
+		     "  `nonlocal_user_id` varchar(128) default NULL ".
+		     "  after nonlocal_id");
+    }
+    if (!DBSlotExists("experiment_stats", "nonlocal_type")) {
+	DBQueryFatal("alter table experiment_stats add ".
+		     "  `nonlocal_type` tinytext");
+    }
+    
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "('projects','nonlocal_id','text','regex', ".
+		 " '^[-_\\\\w\\\\.\\\\/:+]*\$',10,128,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "('projects','nonlocal_type','text','regex', ".
+		 " '^[-\\\\w]*\$',1,64,NULL)");
+    
+    return 0;
+}
+1;
+

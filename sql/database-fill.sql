@@ -753,6 +753,8 @@ REPLACE INTO table_regex VALUES ('projects','default_user_interface','text','reg
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[-\\w]+$',2,48,NULL);
 REPLACE INTO table_regex VALUES ('projects','pid_idx','text','regex','^[\\d]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('projects','URL','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('projects','nonlocal_id','text','regex','^[-_\\w\\.\\/:+]*$',10,128,NULL);
+REPLACE INTO table_regex VALUES ('projects','nonlocal_type','text','regex','^[-\\w]*$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','uid_idx','text','regex','^[\\d]+$',1,12,NULL);
