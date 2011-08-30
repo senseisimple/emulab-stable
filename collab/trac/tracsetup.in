@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -82,7 +82,8 @@ if (@ARGV) {
 # Add all users to the Trac DB.
 #
 $query_result =
-    DBQueryFatal("select uid from users where status!='archived'");
+    DBQueryFatal("select uid from users ".
+		 "where (status='active' or status='frozen')");
     
 while (my ($uid) = $query_result->fetchrow_array()) {
     system("$ADDTRACUSER $uid") == 0

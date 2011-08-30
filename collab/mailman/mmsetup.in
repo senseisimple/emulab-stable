@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -90,8 +90,9 @@ my $optarg = ($debug ? "-d" : "");
 # Initialize a mailman password for all users. 
 #
 my $query_result =
-    DBQueryFatal("select uid,uid_uid from users ".
-		 "where mailman_password is NULL and status!='archived'");
+    DBQueryFatal("select uid,uid_idx from users ".
+		 "where mailman_password is NULL and ".
+		 "      (status='active' or status='frozen')");
 
 while (my ($uid,$uid_idx) = $query_result->fetchrow_array()) {
     print "Setting initial mailman password for $uid ($uid_idx)\n"
