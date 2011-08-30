@@ -499,7 +499,7 @@ if (!$nonsfile &&
 #
 # Gather statistics; start the clock ticking.
 #
-if ($frontend || $batchmode) {
+if ($frontend || $batchmode || $genimode) {
     $experiment->PreSwap($this_user, TBDB_STATS_PRELOAD, $exptstate) == 0 or
 	fatal("Preswap failed!");
 }
