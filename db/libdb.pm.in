@@ -1826,7 +1826,7 @@ sub TBNodeUpdateAccountsByUID($)
     my ($uid) = @_;
 
     DBQueryFatal("update users set usr_modified=now() ".
-		 "where uid='$uid' and status!='archived'");
+		 "where uid='$uid' and status='active'");
 
     my $query_result =
 	DBQueryFatal("select p.pid,pcremote_ok from users as u ".
