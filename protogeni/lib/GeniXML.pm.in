@@ -468,6 +468,42 @@ sub GetSubnodeOf($)
     return $result;
 }
 
+sub GetServices($)
+{
+    my ($node) = @_;
+    my @result = ();
+    my @services = FindNodes("n:services", $node)->get_nodelist();
+
+    foreach my $service (@services) {
+	foreach my $current ($service->childNodes()) {
+	    my $item;
+	    my $type = $current->nodeName();
+	
+	    if ($type eq "execute") {
+		$type = "execute";
+		my $cmd  = GetText("command", $current);
+		my $shell= GetText("shell", $current);
+		$item = {"type"   => $type,
+			 "cmd"    => $cmd,
+			 "shell"  => $shell};
+	    }
+	    elsif ($type eq "install") {
+		$type = "install";
+		my $dir = GetText("install_path", $current);
+		my $url = GetText("url", $current);
+		$item = {"type"   => $type,
+			 "dir"    => $dir,
+			 "url"    => $url};
+	    }
+	    else {
+		next;
+	    }
+	    push(@result, $item);
+	}
+    }
+    return @result;
+}
+
 sub GetStartupCommand($)
 {
     my ($node) = @_;

@@ -84,6 +84,7 @@ my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $XMLLINT	   = "/usr/local/bin/xmllint";
 my $ADDAUTHORITY   = "$TB/sbin/protogeni/addauthority";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
+my $TARINSTALL     = "/usr/local/bin/install-tarfile";
 my $API_VERSION    = 1;
 
 #
@@ -1091,27 +1092,86 @@ sub GetTicketAuxAux($$$$$$$$$)
 	}
 
 	# Tarball and startup command.
-	my $startupcmd = GeniXML::GetStartupCommand($ref);
-	if (defined($startupcmd)) {
-	    if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
-			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-		$response =
-		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					 "Invalid startup command");
-		goto bad;
-	    }
-	    $nodeblob->{'startupcmd'} = $startupcmd;
-	}
 	my $tarfiles = GeniXML::GetTarball($ref);
 	if (defined($tarfiles)) {
 	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarfiles",
-			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+				 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					 "Invalid tarfiles");
 		goto bad;
 	    }
 	    $nodeblob->{'tarfiles'} = $tarfiles;
+	}
+	if (GeniXML::IsVersion0($ref)) {
+	    my $startupcmd = GeniXML::GetStartupCommand($ref);
+	    if (defined($startupcmd)) {
+		if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
+				     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					     "Invalid startup command");
+		    goto bad;
+		}
+		$nodeblob->{'startupcmd'} = $startupcmd;
+	    }
+	}
+	elsif (my @services = GeniXML::GetServices($ref)) {
+	    my $count = 0;
+	    my $startfile = $slice_experiment->UserDir() . "/geni_startup";
+	    $nodeblob->{'startupcmd'} = $startfile;
+	    
+	    if (!open(STARTUP, ">$startfile")) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "Error creating startfile");
+		goto bad;
+	    }
+	    print STARTUP "#!/bin/sh\n\n";
+	    print STARTUP "# Redirect all output to a file\n";
+	    print STARTUP "exec &> /var/tmp/startup.log\n\n";
+
+	    #
+	    # It would be nice to interleave "install" with "execute", but
+	    # Emulab's tarfiles support arranges to copy the files locally,
+	    # and rewrites the names. Need to hook into that support somehow,
+	    # but for now tarfiles are all installed as a block above. 
+	    #
+	    foreach my $service (@services) {
+		my $type = $service->{'type'};
+
+		if ($type eq "execute") {
+		    my $shell = $service->{'shell'};
+		    my $cmd   = $service->{'cmd'};
+		    my $log   = "/var/tmp/startup-${count}.txt";
+		    my $stat  = "/var/tmp/startup-${count}.status";
+
+		    #
+		    # Support only sh and csh. Maybe perl later.
+		    #
+		    if (! ($shell eq "csh" || $shell eq "sh" ||
+			   $shell eq "/bin/csh" || $shell eq "/bin/sh")) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "Invalid shell in execute");
+			goto bad;
+		    }
+		    if (! ($shell =~ /bin/)) {
+			$shell = "/bin/$shell";
+		    }
+		    print STARTUP "echo -n 'Services execution $count at '\n";
+		    print STARTUP "date\n\n";
+		    print STARTUP "$shell -c \"$cmd\" >$log 2>&1\n";
+		    print STARTUP "status=\$?\n";
+		    print STARTUP "echo \"\$status\" > $stat\n";
+		    print STARTUP
+		      "echo \"Execution $count exited with status \$status\"\n";
+		    print STARTUP "echo '----------------------------------'\n";
+		    $count++;
+		}
+	    }
+	    print STARTUP "exit 0\n";
+	    close(STARTUP);
+	    chmod(0755, $startfile);
 	}
 
 	my $virtnode = $virtexperiment->NewTableRow("virt_nodes", $nodeblob);
