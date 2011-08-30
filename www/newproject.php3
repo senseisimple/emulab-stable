@@ -180,7 +180,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <td colspan=2>*<a
                              href='$WIKIDOCURL/SecReqs'
                              target=_blank>Username</a>
-                                (alphanumeric, lowercase):</td>
+                                (alphanumeric):</td>
                       <td class=left>
                           <input type=text
                                  name=\"formfields[proj_head_uid]\"

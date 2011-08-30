@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -179,7 +179,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <td colspan=2>*<a
                              href='$WIKIDOCURL/SecReqs'
                              target=_blank>Username</a>
-                                (alphanumeric, lowercase):</td>
+                                (alphanumeric):</td>
                       <td class=left>
                           <input type=text
                                  name=\"formfields[joining_uid]\"
