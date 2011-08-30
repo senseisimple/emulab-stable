@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -16,11 +16,12 @@ use Data::Dumper;
 sub usage()
 {
     print("Usage: newproj <xmlfile>\n");
-    print("       newproj -m <pid_idx>\n");
+    print("       newproj -l -m <pid_idx>\n");
     exit(-1);
 }
-my $optlist = "dm:";
+my $optlist = "dm:l";
 my $debug   = 0;
+my $nonlocal= 0;
 my $resend;
 
 #
@@ -79,6 +80,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"l"})) {
+    $nonlocal = 1;
 }
 if (defined($options{"m"})) {
     $resend = $options{"m"};
@@ -151,13 +155,22 @@ if (! defined($this_user)) {
 # These are the fields that we allow to come in from the XMLfile.
 #
 my %required = ("name"		    => "pid",
-		"short description" => "name",
-		"URL"		    => "URL",
-		"funders"	    => "funders",
-		"long description"  => "why",
-		"public"	    => "public",
-		"num_pcs"	    => "num_pcs",
-		"linkedtous"	    => "linked_to_us");
+		"short description" => "name");
+
+if ($nonlocal) {
+    %required =
+	(%required, ("nonlocal_id"      => "nonlocal_id",
+		     "nonlocal_type"    => "nonlocal_type"));
+}
+else {
+    %required =
+	(%required, ("URL"		=> "URL",
+		     "funders"	        => "funders",
+		     "long description" => "why",
+		     "public"	        => "public",
+		     "num_pcs"		=> "num_pcs",
+		     "linkedtous"	=> "linked_to_us"));
+}
 		
 my %optional = ("newuser_xml"    => "newuser_xml",
 		"leader"	 => "head_uid",	# May be chosen by newuser.
@@ -280,6 +293,7 @@ if (exists($newproj_args{'newuser_xml'})) {
     # determines which args are required or optional in the xml data!  The
     # user type is always "project leader" for new users under newproj.
     #
+    my $opt = ($nonlocal ? "-t nonlocal" : "");
     my $cmd = "newuser -t leader $newuser_xml";
     print $cmd . "\n"
 	if ($debug);
