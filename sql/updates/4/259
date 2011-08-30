@@ -1,0 +1,80 @@
+#
+# Assorted fixups for the secureboot/load path.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    my @mode_transitions = (
+    );
+    my @timeouts = (
+    );
+    my @transitions = (
+	["SECUREBOOT","BOOTING","PXEBOOTING","re-BootInfo"],
+	["SECUREBOOT","SECVIOLATION","POWEROFF","Power Off"],
+	["SECURELOAD","SECVIOLATION","POWEROFF","Power Off"],
+	["SECUREBOOT","POWEROFF","SHUTDOWN","Power On"],
+	["SECURELOAD","POWEROFF","SHUTDOWN","Power On"]
+    );
+    my @triggers = (
+    );
+
+    foreach my $row (@mode_transitions) {
+	my ($opm1,$s1,$opm2,$s2,$lab) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode1 FROM mode_transitions WHERE ".
+			 "op_mode1='$opm1' AND state1='$s1' AND ".
+			 "op_mode2='$opm2' AND state2='$s2'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO mode_transitions VALUES ".
+			 "('$opm1','$s1','$opm2', '$s2','$lab')");
+	}
+    }
+
+    foreach my $row (@timeouts) {
+	my ($opm,$s,$to,$act) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode FROM state_timeouts WHERE ".
+			 "op_mode='$opm' AND state='$s'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_timeouts VALUES ".
+			 "('$opm','$s','$to', '$act')");
+	}
+    }
+
+    foreach my $row (@transitions) {
+	my ($opm,$s1,$s2,$lab) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode FROM state_transitions WHERE ".
+			 "op_mode='$opm' AND state1='$s1' AND state2='$s2'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_transitions VALUES ".
+			 "('$opm','$s1','$s2','$lab')");
+	}
+    }
+
+    foreach my $row (@triggers) {
+	my ($node,$opm,$s,$trig) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT node_id FROM state_triggers WHERE ".
+			 "node_id='$node' AND op_mode='$opm' AND state='$s'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_triggers VALUES ".
+			 "('$node','$opm','$s','$trig')");
+	}
+    }
+
+    # tweak a previous transition that wasn't quite right
+    DBQueryFatal("UPDATE mode_transitions SET state2='SHUTDOWN' WHERE ".
+		 "  state1='TPMSIGNOFF' AND op_mode2='PXEKERNEL' AND ".
+		 "  state2='BOOTING'");
+
+    # no need to BOOTING, CHECKGENISUP as those will happen in next BOOTING
+    DBQueryFatal("UPDATE state_triggers SET `trigger`='PXEBOOT' WHERE ".
+		 "  op_mode='SECUREBOOT' AND state='TPMSIGNOFF'");
+
+    return 0;
+}
+1;

@@ -680,14 +680,15 @@ sub stateTransition($$) {
     if ($oldstate eq TBDB_NODESTATE_SECVIOLATION &&
 	$newstate ne TBDB_NODESTATE_SECVIOLATION) {
 	#
-	# Allow transitions to SHUTDOWN.
-	# This allows someone to reboot a node in the SECVIOLATION state
-	# getting it back to MINIMAL/SHUTDOWN.
+	# Allow transitions to SHUTDOWN/POWEROFF.
+	# This allows someone to reboot (turn-off and back on) a node in
+	# the SECVIOLATION state getting it back to MINIMAL/SHUTDOWN.
 	#
 	# XXX DEBUG ONLY!
 	# 
 	if ($soft_secviolation &&
 	    ($newstate eq TBDB_NODESTATE_SHUTDOWN ||
+	     $newstate eq TBDB_NODESTATE_POWEROFF ||
 	     $newstate eq TBDB_NODESTATE_GPXEBOOTING)) {
 	    notify("$node allowed to transition: SECVIOLATION => $newstate\n");
 	} else {
