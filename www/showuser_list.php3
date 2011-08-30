@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -126,7 +126,7 @@ $query_result =
 		 " TO_DAYS(CURDATE()) - TO_DAYS(ull.date) as usersidle ".
 		 "FROM users as u ".
 		 "$clause ".
-		 "left join userslastlogin as ull on u.uid=ull.uid ".
+		 "left join userslastlogin as ull on u.uid_idx=ull.uid_idx ".
 		 "left join user_stats as ll on u.uid_idx=ll.uid_idx ".
 		 "$where ".
 		 "order by u.uid");
