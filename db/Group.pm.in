@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Group;
@@ -15,6 +15,7 @@ use vars qw(@ISA @EXPORT);
 
 use libdb;
 use libtestbed;
+use emutil;
 use User;
 use English;
 use Data::Dumper;
@@ -1289,6 +1290,18 @@ sub BumpActivity($)
 		"where gid_idx='$gid_idx'");
 
     return 0;
+}
+
+#
+# Check to see if a gid is valid.
+#
+sub ValidGID($$)
+{
+    my ($class, $gid) = @_;
+
+    return TBcheck_dbslot($gid, "groups", "gid",
+			  TBDB_CHECKDBSLOT_WARN()|
+			  TBDB_CHECKDBSLOT_ERROR());
 }
 
 ############################################################################
