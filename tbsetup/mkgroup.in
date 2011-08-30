@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -151,6 +151,13 @@ if (!defined($leader)) {
 }
 my $unix_uid = $leader->unix_uid();
 
+# Need this below.
+my $project = $group->GetProject();
+if (!defined($group)) {
+    fatal("Could not load project for $group");
+}
+my $isnonlocal = $project->IsNonLocal();
+
 #
 # The group directory lives here.
 # 
@@ -177,29 +184,29 @@ $UID = $EUID;
 #
 # Create group on the control node if it does not exist.
 #
-if ($control_node ne $BOSSNODE) {
-    if (system("$SSH -host $control_node ".
-	       "egrep -q -s '^${unix_name}:' /etc/group")) {
-	print "Adding group $unix_name to $control_node.\n";
+if (system("$SSH -host $control_node ".
+	   "egrep -q -s '^${unix_name}:' /etc/group")) {
+    print "Adding group $unix_name to $control_node.\n";
 
-	if (system("$SSH -host $control_node ".
-		   "$GROUPADD $unix_name -g $unix_gid")) {
-	    fatal("Could not add $unix_name ($unix_gid) to $control_node!\n");
-	}
+    if (system("$SSH -host $control_node ".
+	       "$GROUPADD $unix_name -g $unix_gid")) {
+	fatal("Could not add $unix_name ($unix_gid) to $control_node!\n");
     }
 }
 
-#
-# Create group on the tip servers. 
-#
-foreach my $tipserver ( TBTipServers() ) {
-    if (system("$SSH -host $tipserver ".
-	       "egrep -q -s '^${unix_name}:' /etc/group")) {
-	print "Adding group $unix_name to $tipserver\n";
-
+if (!$isnonlocal) {
+    #
+    # Create group on the tip servers. 
+    #
+    foreach my $tipserver ( TBTipServers() ) {
 	if (system("$SSH -host $tipserver ".
-		   "$GROUPADD $unix_name -g $unix_gid")) {
-	    fatal("Could not add $unix_name ($unix_gid) to $tipserver!\n");
+		   "egrep -q -s '^${unix_name}:' /etc/group")) {
+	    print "Adding group $unix_name to $tipserver\n";
+
+	    if (system("$SSH -host $tipserver ".
+		       "$GROUPADD $unix_name -g $unix_gid")) {
+		fatal("Could not add $unix_name ($unix_gid) to $tipserver!\n");
+	    }
 	}
     }
 }
@@ -247,7 +254,7 @@ if ($pid ne $gid) {
 	}
     }
 
-    if (($MAILMANSUPPORT || $OPSDBSUPPORT) && !$ELABINELAB) {
+    if (($MAILMANSUPPORT || $OPSDBSUPPORT) && !($ELABINELAB || $isnonlocal)) {
 	$UID  = $SAVEUID;
 	$EUID = $UID;
 
