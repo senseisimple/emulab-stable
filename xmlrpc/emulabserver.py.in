@@ -308,11 +308,12 @@ class EmulabServer:
         self.clientip  = clientip;
         self.debug     = debug;
         self.instances = {};
+	self.unix_uid  = os.getuid()
         self.uid       = pwd.getpwuid(os.getuid())[0]
 
         res = DBQueryFatal("select uid_idx from users "
-                           "where uid=%s and status='active'",
-                           (self.uid,))
+                           "where unix_uid=%s and uid=%s",
+                           (self.unix_uid, self.uid))
         if len(res) == 0:
             return
         self.uid_idx = res[0][0]
