@@ -219,7 +219,8 @@ if (system("$RMGROUP $pid_idx")) {
 # approved
 #
 if ($MAILMANSUPPORT) {
-    my $approved = DBQuerySingleFatal("select approved from projects where pid='$pid'");
+    my $approved =
+	DBQuerySingleFatal("select approved from projects where pid='$pid'");
     if (!$approved) {
 	my $listname = "$pid-admin";
 	system("$DELMMLIST -a $listname") == 0 or
@@ -232,12 +233,15 @@ $EUID = 0;
 #
 # Then the project table itself, plus a few other bits and pieces
 # 
-DBQueryFatal("delete FROM node_reservations where pid='$pid'");
-DBQueryFatal("delete FROM images where pid='$pid'");
-DBQueryFatal("delete FROM os_info where pid='$pid'");
-DBQueryFatal("delete FROM nodetypeXpid_permissions where pid='$pid'");
-DBQueryFatal("delete FROM project_stats where pid='$pid'");
-DBQueryFatal("delete FROM projects where pid='$pid'");
+DBQueryFatal("delete FROM last_reservation where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM node_reservations where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM images where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM os_info where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM nodetypeXpid_permissions where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM project_stats where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM projects where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM group_policies where pid_idx='$pid_idx'");
+DBQueryFatal("delete FROM group_features where pid_idx='$pid_idx'");
 
 print "Project $pid has been removed!\n";
 exit(0);
