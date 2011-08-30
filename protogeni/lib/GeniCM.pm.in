@@ -2196,7 +2196,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	}
 	if (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @nodeids");
+		   "$NFREE -x -q $pid $eid @nodeids");
 	}
 	if (defined($slice_experiment) && $restorevirt) {
 	    $slice_experiment->RemoveVirtualState();
@@ -2210,7 +2210,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	}
 	elsif (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @nodeids");
+		   "$NFREE -x -q $pid $eid @nodeids");
 	}
 	#
 	# Lets leave the experiment lying around; it will get cleaned
@@ -5528,8 +5528,9 @@ sub FlipToUser($$)
 
     #
     # Nonlocal projects, operate as geniuser with added gid.
+    # XXX watch for Legacy GeniSlices project.
     #
-    if ($project->IsNonLocal()) {
+    if ($project->IsNonLocal() || $project->pid() eq "GeniSlices") {
 	require User;
 	
 	my $group = $experiment->GetGroup();
