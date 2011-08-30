@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2010 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -310,6 +310,7 @@ class Experiment
     function skipvlans()    { return $this->field('skipvlans'); }
     function created()      { return $this->field('expt_created'); }
     function swapper()      { return $this->field('expt_swap_uid');}
+    function swapper_idx()  { return $this->field('swapper_idx');}
     function swappable()    { return $this->field('swappable');}
     function idleswap()     { return $this->field('idleswap');}
     function autoswap()     { return $this->field('autoswap');}
@@ -690,6 +691,7 @@ class Experiment
 	$exp_end     = $exprow["expt_end"];
 	$exp_created = $exprow["expt_created"];
 	$exp_head    = $exprow["expt_head_uid"];
+	$exp_swapper = $exprow["swapper_idx"];
 	$exp_state   = $exprow["state"];
 	$exp_shared  = $exprow["shared"];
 	$exp_path    = $exprow["path"];
@@ -741,6 +743,11 @@ class Experiment
 	    TBERROR("Error getting object for user $exp_head", 1);
 	}
 	$showuser_url = CreateURL("showuser", $head_user);
+	if (! ($swapper = User::Lookup($exp_swapper))) {
+	    TBERROR("Error getting object for user $exp_swapper", 1);
+	}
+	$swapper_uid = $swapper->uid();
+	$swapper_url = CreateURL("showuser", $swapper);
 
 	if ($swappable)
 	    $swappable = "Yes";
@@ -824,10 +831,18 @@ class Experiment
 	}
 
 	echo "<tr>
-            <td>Experiment Head: </td>
+            <td>Creator: </td>
             <td class=\"left\">
               <a href='$showuser_url'>$exp_head</a></td>
           </tr>\n";
+
+	if (!$swapper->SameUser($head_user)) {
+	    echo "<tr>
+                      <td>Swapper: </td>
+                      <td class=\"left\">
+                          <a href='$swapper_url'>$swapper_uid</a></td>
+                  </tr>\n";
+	}
 
 	if (!$short) {
 	    $instance = TemplateInstance::LookupByExptidx($exptidx);
@@ -868,7 +883,8 @@ class Experiment
 	    if ($exp_swapped) {
 		echo "<tr>
                     <td>Last Swap/Modify: </td>
-                    <td class=\"left\">$exp_swapped ($exp_swapuid)</td>
+                    <td class=\"left\">$exp_swapped
+                        (<a href='$swapper_url'>$swapper_uid</a>)</td>
                   </tr>\n";
 	    }
 
