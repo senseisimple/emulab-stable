@@ -195,6 +195,8 @@ sub Lookup($$;$)
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
+sub uid_idx($)		{ return field($_[0], "idx"); }
+sub dbid($)		{ return field($_[0], "idx"); }
 sub uid($)		{ return field($_[0], "uid"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
@@ -591,7 +593,9 @@ sub email($)		{ return $_[0]->{'USER'}->email(); }
 sub SSLPassPhrase($$$)  { return $_[0]->{'USER'}->SSLPassPhrase($_[1],$_[2]); }
 sub HomeDir($)          { return $_[0]->{'USER'}->HomeDir(); }
 sub admin($)		{ return $_[0]->{'USER'}->admin(); }
-sub BumpActivity($   )  { return $_[0]->{'USER'}->BumpActivity(); }
+sub BumpActivity($)     { return $_[0]->{'USER'}->BumpActivity(); }
+sub DefaultProject($)   { return $_[0]->{'USER'}->DefaultProject(); }
+sub FlipTo($$)          { return $_[0]->{'USER'}->FlipTo($_[1]); }
 
 # Need to construct this since not in User structure.
 sub hrn($)		{ return "${PGENIDOMAIN}." . $_[0]->uid(); }
