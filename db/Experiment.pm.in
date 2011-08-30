@@ -17,6 +17,7 @@ use libdb;
 use EmulabConstants;
 use libtestbed;
 use Node;
+use emutil;
 use Logfile;
 use English;
 use Data::Dumper;
@@ -34,7 +35,9 @@ use vars qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPIN $EXPT_SWAPUPDATE
 	    @EXPORT_OK
 	    $TB $BOSSNODE $CONTROL $TBOPS $PROJROOT $STAMPS $TBBASE  
 	    $TEVC $DBCONTROL $RSYNC $MKEXPDIR $TBPRERUN $TBSWAP   
-	    $TBREPORT $TBEND $DU $MD5);
+	    $TBREPORT $TBEND $DU $MD5
+	    $EXPT_ACCESS_READINFO $EXPT_ACCESS_MODIFY $EXPT_ACCESS_DESTROY
+	    $EXPT_ACCESS_UPDATE $EXPT_ACCESS_MIN $EXPT_ACCESS_MAX);
 	  
 # Configure variables
 $TB	     = "@prefix@";
@@ -89,6 +92,14 @@ $EXPT_SWAPIN		= TBDB_STATS_SWAPIN();
 $EXPT_SWAPOUT		= TBDB_STATS_SWAPOUT();
 $EXPT_SWAPMOD		= TBDB_STATS_SWAPMODIFY();
 $EXPT_SWAPUPDATE	= TBDB_STATS_SWAPUPDATE();
+
+# Experiment Access.
+$EXPT_ACCESS_READINFO   = TB_EXPT_READINFO();
+$EXPT_ACCESS_MODIFY     = TB_EXPT_MODIFY();
+$EXPT_ACCESS_DESTROY    = TB_EXPT_DESTROY();
+$EXPT_ACCESS_UPDATE     = TB_EXPT_UPDATE();
+$EXPT_ACCESS_MIN	= $EXPT_ACCESS_READINFO;
+$EXPT_ACCESS_MAX	= $EXPT_ACCESS_UPDATE;
 
 # Other flags.
 $EXPT_FLAGS_LOCALONLY   = 0x01;
@@ -1106,7 +1117,7 @@ sub Update($$)
     my $eid = $self->eid();
 
     my $query = "update experiments set ".
-	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}), keys(%{$argref})));
 
     $query .= " where pid='$pid' and eid='$eid'";
 
@@ -1339,7 +1350,8 @@ sub TableUpdate($$$;$)
 	if (! ref($self));
 
     if (ref($sets) eq "HASH") {
-	$sets = join(",", map("$_='" . $sets->{$_} . "'", keys(%{$sets})));
+	$sets = join(",",
+		     map("$_=" . DBQuoteSpecial($sets->{$_}), keys(%{$sets})));
     }
     my $exptidx = $self->idx();
 
@@ -1368,8 +1380,8 @@ sub AccessCheck($$$)
     return 0
 	if (! ref($self));
 
-    if ($access_type < TB_EXPT_MIN() ||
-	$access_type > TB_EXPT_MAX()) {
+    if ($access_type < $EXPT_ACCESS_MIN ||
+	$access_type > $EXPT_ACCESS_MAX) {
 	die("*** Invalid access type: $access_type!");
     }
 
@@ -1390,7 +1402,7 @@ sub AccessCheck($$$)
     #
     my $mintrust;
     
-    if ($access_type == TB_EXPT_READINFO()) {
+    if ($access_type == $EXPT_ACCESS_READINFO) {
 	$mintrust = PROJMEMBERTRUST_USER();
     }
     else {
@@ -2014,7 +2026,7 @@ sub PreSwap($$$$)
 
     # Must be a real reference. 
     return -1
-	if (! (ref($self) && ref($swapper)));
+	if (! ref($self) && ref($swapper));
 
     my $exptidx  = $self->idx();
     my $rsrcidx  = $self->rsrcidx();
@@ -4920,6 +4932,36 @@ sub SetElabInElabAttr($$$$;$)
     return 0;
 }
 
-    
+#
+# Check to see if an eid is valid.
+#
+sub ValidEID($$)
+{
+    my ($class, $eid) = @_;
+
+    return TBcheck_dbslot($eid, "experiments", "eid",
+			  TBDB_CHECKDBSLOT_WARN()|
+			  TBDB_CHECKDBSLOT_ERROR());
+}
+
+#
+# Mark as nonlocal.
+#
+sub MarkNonlocal($$$$)
+{
+    my ($self, $nonlocal_id, $nonlocal_user_id, $nonlocal_type) = @_;
+
+    my $args = {"nonlocal_id"       => $nonlocal_id,
+		"nonlocal_user_id"  => $nonlocal_user_id,
+		"nonlocal_type"     => $nonlocal_type};
+
+    return -1
+	if ($self->Update($args));
+    return -1
+	if ($self->TableUpdate("experiment_stats", $args));
+
+    return 0;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
