@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -136,7 +136,8 @@ function GETUID() {
 	$query_result =
 	    DBQueryFatal("select uid_idx from users ".
 			 "where uid='$safe_uid' and ".
-			 "      status!='$status_archived'");
+			 "      status!='$status_archived' and ".
+			 "      status!='$status_nonlocal'");
     
 	if (! mysql_num_rows($query_result))
 	    return FALSE;
