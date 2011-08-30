@@ -210,7 +210,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	}
 
         echo "  <th class='sorttable_nosort'><a href=\"$WIKIDOCURL/ssh_mine\">SSH</a></th>
-                <th class='sorttable_nosort'><a href=\"$WIKIDOCURL/kb25\">Console</a></th> .
+                <th class='sorttable_nosort'><a href=\"$WIKIDOCURL/kb25\">Console</a></th>
                 <th class='sorttable_nosort'>Log</th>";
 
 	# Only put out a RDP column header if there are any Windows nodes.
