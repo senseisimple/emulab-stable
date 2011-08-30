@@ -69,7 +69,11 @@ endif
 endif
 
 CLIENTFLAGS	= $(CFLAGS)
+ifeq ($(SYSTEM),Linux)
+CLIENTLIBS	= -lrt -lz $(PTHREADLIBS)
+else
 CLIENTLIBS	= -lz $(PTHREADLIBS)
+endif
 CLIENTOBJS	= client.o frisbee.o checksum.o disksize.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
