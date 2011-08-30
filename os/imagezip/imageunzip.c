@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <zlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -903,7 +904,8 @@ main(int argc, char *argv[])
 
 	/* Flush any cached data and close the output device */
 	if (outfd >= 0) {
-		if (fsync(outfd) < 0) {
+		/* can return EINVAL if device doesn't support fsync */
+		if (fsync(outfd) < 0 && errno != EINVAL) {
 			perror("flushing output data");
 			exit(1);
 		}
@@ -1068,7 +1070,8 @@ ImageUnzipFlush(void)
 	threadwait();
 
 	if (outfd >= 0) {
-		if (fsync(outfd) < 0) {
+		/* can return EINVAL if device doesn't support fsync */
+		if (fsync(outfd) < 0 && errno != EINVAL) {
 			perror("fsync");
 			rv = -1;
 		}
@@ -2137,8 +2140,6 @@ reloc_lilocksum(void *addr, uint32_t off, uint32_t size)
 
 
 #if !defined(CONDVARS_WORK) && !defined(FRISBEE)
-#include <errno.h>
-
 /*
  * Sleep. Basically wraps nanosleep, but since the threads package uses
  * signals, it keeps ending early!
