@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -53,7 +53,7 @@ if debug:
 #
 params = {}
 params["credentials"] = (slicecred,)
-params["slice_urn"]   = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if rval:
     Fatal("Could not get Sliver credential")
@@ -68,9 +68,10 @@ if debug:
 # subset).
 #
 params = {}
-params["slice_urn"]   = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["credentials"] = (slivercred,)
-while True: # #@(%ing Python doesn't have do loops
+# Python does not have do loops
+while True: 
     rval,response = do_method("cm", "SliverStatus", params, version="2.0")
     if rval:
         Fatal("Could not get sliver status")
@@ -88,7 +89,7 @@ if debug:
 # Resolve the slice at the CM, to find the sliver URN.
 #
 params = {}
-params["urn"] = SLICEURN
+params["urn"] = myslice["urn"]
 params["credentials"] = (slicecred,)
 rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:

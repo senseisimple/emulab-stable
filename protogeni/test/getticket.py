@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -57,7 +57,7 @@ print "Got my SA credential, looking up " + SLICENAME
 #
 # Lookup slice and get credential.
 #
-myslice = resolve_slice( SLICEURN, mycredential )
+myslice = resolve_slice( SLICENAME, mycredential )
 
 print "Asking for slice credential for " + SLICENAME
 slicecredential = get_slice_credential( myslice, mycredential )
@@ -71,7 +71,7 @@ print "Got the slice credential"
 print "Asking for a ticket from the local CM"
 
 params = {}
-params["slice_urn"]   = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["credentials"] = (slicecredential,)
 params["rspec"]       = rspec
 params["impotent"]    = 0
@@ -90,7 +90,7 @@ sys.exit(0)
 #
 print "Got the ticket, doing a update on it. "
 params = {}
-params["slice_urn"]   = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["ticket"]      = ticket
 params["credentials"] = (slicecredential,)
 params["rspec"]       = rspec

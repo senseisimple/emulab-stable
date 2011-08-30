@@ -81,10 +81,10 @@ rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:
     Fatal("Could not resolve slice")
     pass
-myslice = response["value"]
-print str(myslice)
+mysliver = response["value"]
+print str(mysliver)
 
-if not "ticket_urn" in myslice:
+if not "ticket_urn" in mysliver:
     Fatal("No ticket exists for slice")
     pass
 
@@ -94,7 +94,7 @@ if not "ticket_urn" in myslice:
 print "Asking for a copy of the ticket"
 params = {}
 params["credentials"] = (slicecred,)
-params["urn"]         = myslice["ticket_urn"]
+params["urn"]         = mysliver["ticket_urn"]
 rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:
     Fatal("Could not get the ticket")
@@ -108,7 +108,7 @@ redeemcred = slicecred;
 #
 print "Asking for sliver credential"
 params = {}
-params["slice_urn"] = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["credentials"] = (slicecred,)
 rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if not rval:
@@ -122,7 +122,7 @@ print "Redeeming the ticket"
 params = {}
 params["credentials"] = (redeemcred,)
 params["ticket"]      = ticket
-params["slice_urn"]   = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["keys"]        = mykeys
 rval,response = do_method("cm", "RedeemTicket", params, version="2.0")
 if rval:

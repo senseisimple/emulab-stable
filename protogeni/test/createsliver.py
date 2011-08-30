@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -70,7 +70,7 @@ if debug: print str(mykeys)
 #
 # Lookup slice and get credential.
 #
-myslice = resolve_slice( SLICEURN, mycredential )
+myslice = resolve_slice( SLICENAME, mycredential )
 
 print "Asking for slice credential for " + SLICENAME
 slicecredential = get_slice_credential( myslice, mycredential )
@@ -82,7 +82,7 @@ print "Got the slice credential"
 print "Creating the Sliver ..."
 params = {}
 params["credentials"] = (slicecredential,)
-params["slice_urn"]   = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["rspec"]       = rspec
 params["keys"]        = mykeys
 params["impotent"]    = impotent

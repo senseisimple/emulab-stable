@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -102,7 +102,7 @@ print str(myslice)
 #
 print "Asking for sliver credential"
 params = {}
-params["slice_urn"] = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["credentials"] = (slicecred,)
 rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if rval:

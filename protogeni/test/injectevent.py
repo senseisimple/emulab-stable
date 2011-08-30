@@ -65,7 +65,7 @@ else:
 
 print "Injecting the event ..."
 params = {}
-params["slice_urn"]   = SLICEURN
+params["slice_urn"]   = myslice["urn"]
 params["credentials"] = (slicecred,)
 params["time"]        = REQARGS[0]
 params["name"]        = REQARGS[1]
