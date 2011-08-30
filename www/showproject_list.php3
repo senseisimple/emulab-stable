@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,36 +16,61 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments
 #
-$optargs = OptionalPageArguments("splitview",   PAGEARG_BOOLEAN);
+$optargs = OptionalPageArguments("showtype",   PAGEARG_STRING);
 
 #
 # Standard Testbed Header
 #
 PAGEHEADER("Project Information List");
 
-#
-# Admin users can see all projects, while normal users can only see
-# projects for which they are the leader.
-#
-# XXX Should we form the list from project members instead of leaders?
-#
-if (!isset($splitview) || !$isadmin)
-    $splitview = 0;
-
-    if ($isadmin) {
-    if (! $splitview) {
-	echo "<b><a href='showproject_list.php3?splitview=1'>Split View</a>
-              </b><br>\n";
-    }
-    else {
-	echo "<b><a href='showproject_list.php3'>Normal View</a>
-              </b><br>\n";
-    }
+if (! isset($showtype)) {
+    $showtype="Splitview";
 }
 
-$allproj_result =
-    DBQueryFatal("SELECT pid,expt_count FROM projects as p");
+if ($isadmin) {
+    echo "<b>Show: ";
+    
+    if ($showtype != "Active") {
+	echo "<a class='static'
+                 href='showproject_list.php3?showtype=Active'>Active</a>, ";
+    }
+    else {
+	echo "Active, ";
+    }
 
+    if ($showtype != "All") {
+	echo "<a class='static'
+                 href='showproject_list.php3?showtype=All'>All</a>, ";
+    }
+    else {
+	echo "All, ";
+    }
+
+    if ($showtype != "Splitview") {
+	echo "<a class='static'
+               href='showproject_list.php3?showtype=Splitview'>Splitview</a>, ";
+    }
+    else {
+	echo "Splitview, ";
+    }
+
+    if ($showtype != "ProtoGENI") {
+	echo "<a class='static'
+                 href='showproject_list.php3?showtype=ProtoGENI'>ProtoGENI</a>";
+    }
+    else {
+	echo "ProtoGENI";
+    }
+}
+echo "<br>\n";
+
+$allproj_result =
+    DBQueryFatal("SELECT p.pid,p.expt_count, ".
+		 "       UNIX_TIMESTAMP(s.last_activity) as last_activity ".
+		 "  FROM projects as p ".
+		 "left join project_stats as s ".
+		 "     on s.pid_idx=p.pid_idx");
+		 
 #
 # This is summary info, indexed by the pid, so no need to alter it
 # for admin vs non-admin. Thats handled in the project query below.
@@ -116,17 +141,26 @@ if ($isadmin) {
     #
     $total_projects  = mysql_num_rows($allproj_result);
     $active_projects = 0;
+    $recently_active = 0;
 
     while ($projectrow = mysql_fetch_array($allproj_result)) {
-	$expt_count = $projectrow["expt_count"];
+	$expt_count    = $projectrow["expt_count"];
+	$last_activity = $projectrow["last_activity"];
 
 	if ($expt_count > 0) {
 	    $active_projects++;
+	}
+	if (time() - $last_activity < (24 * 3600 * 90)) {
+	    $recently_active++;
 	}
     }
     $never_active = $total_projects - $active_projects;
 
     echo "<table border=0 align=center cellpadding=0 cellspacing=2>
+        <tr>
+          <td align=right><b>Recently Active:</b></td>
+          <td align=left>$recently_active</td>
+        </tr>
         <tr>
           <td align=right><b>Been Active:</b></td>
           <td align=left>$active_projects</td>
@@ -144,7 +178,7 @@ if ($isadmin) {
 
 function GENPLIST ($query_result)
 {
-    global $isadmin, $splitview, $ecounts, $ncounts, $pcounts;
+    global $isadmin, $ecounts, $ncounts, $pcounts, $showtype;
 
     $tablename = "SPL" . rand();
 
@@ -155,18 +189,20 @@ function GENPLIST ($query_result)
 
     echo "<th>PID</th>\n";
     echo "<th>(Approved?) Description</th>\n";
-    echo "<th>Leader</th>\n";
-    echo "<th>Affil</th>\n";
+    if ($showtype != "ProtoGENI") {
+	echo "<th>Leader</th>\n";
+	echo "<th>Affil</th>\n";
+    }
     echo "<th>Days<br>Idle</th>\n";
     echo "<th>Expts<br>Created</th>\n";
-    echo "<th>Expts<br>Run</th>\n";
+    echo "<th>Expts<br>Running</th>\n";
     echo "<th>Nodes<br>All</th>\n";
     echo "<th>Nodes<br>PCs</th>\n";
 
     #
     # Admin users get other fields.
     # 
-    if ($isadmin) {
+    if ($isadmin && $showtype != "ProtoGENI") {
 	echo "<th align=center>Pub?</th>\n";
     }
     echo "</tr>\n";
@@ -200,17 +236,18 @@ function GENPLIST ($query_result)
 	else {
 	    echo "    <img alt='N' src='redball.gif'>\n";
 	}
-	echo "             $Pname</td>
-                  <td><A href='$showuser_url'>$headuid</A></td>\n";
-	echo "<td>$affil</td>\n";
-
+	echo "             $Pname</td>";
+	if ($showtype != "ProtoGENI") {
+	    echo "<td><A href='$showuser_url'>$headuid</A></td>\n";
+	    echo "<td>$affil</td>\n";
+	}
 	echo "<td>$idle</td>\n";
 	echo "<td>$expt_count</td>\n";
 	echo "<td>$ecount</td>\n";
 	echo "<td>$ncount</td>\n";
 	echo "<td>$pcount</td>\n";
 
-	if ($isadmin) {
+	if ($isadmin && $showtype != "ProtoGENI") {
 	    if ($public) {
 		echo "<td align=center><img alt='Y' src='greenball.gif'></td>";
 	    }
@@ -251,7 +288,7 @@ if (! $isadmin) {
     GENPLIST($query_result);
 }
 else {
-    if ($splitview) {
+    if ($showtype == "Splitview") {
 	$query_result =
 	    DBQueryFatal("SELECT p.*, ".
 			 "IF(p.expt_last, ".
@@ -284,6 +321,39 @@ else {
 	    GENPLIST($query_result);
 	}
 
+    }
+    elseif ($showtype == "Active") {
+	$query_result =
+	    DBQueryFatal("select p.*, ".
+			 "IF(p.expt_last, ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+			 " FROM projects as p ".
+			 "left join project_stats as s ".
+			 "     on s.pid_idx=p.pid_idx ".
+			 "where (UNIX_TIMESTAMP(now()) - ".
+			 "       UNIX_TIMESTAMP(s.last_activity)) < ".
+			 "           (24 * 3600 * 90) ".
+			 "group by p.pid order by p.pid");
+
+	if (mysql_num_rows($query_result)) {
+	    GENPLIST($query_result);
+	}
+    }
+    elseif ($showtype == "ProtoGENI") {
+	$query_result =
+	    DBQueryFatal("select p.*, ".
+			 "IF(p.expt_last, ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+			 " FROM projects as p ".
+			 "where nonlocal_type is not null and ".
+			 "      nonlocal_type='protogeni' ".
+			 "group by p.pid order by p.pid");
+
+	if (mysql_num_rows($query_result)) {
+	    GENPLIST($query_result);
+	}
     }
     else {
 	$query_result =

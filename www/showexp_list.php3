@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -30,6 +30,7 @@ $clause      = 0;
 $having      = "";
 $active      = 0;
 $idle        = 0;
+$protogeni   = 0;
 
 #
 # Hack for NSDI deadline. Generalize later.
@@ -79,6 +80,12 @@ if ($isadmin) {
     } else {
 	echo "Idle, ";
     }
+
+    if ($showtype != "ProtoGENI") {
+	echo "<a class='static' href='showexp_list.php3?showtype=ProtoGENI&sortby=$sortby&thumb=$thumb'>ProtoGENI</a>, ";
+    } else {
+	echo "ProtoGENI, ";
+    }    
 }
 
 if ($showtype != "all") {
@@ -127,6 +134,12 @@ elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     #$having = "having (lastswap>=1)"; # At least one day since swapin
     $having = "having (lastswap>=0)";
     $idle = 1;
+    $showlastlogin = 0; # do not show a lastlogin column
+}
+elseif ($showtype == "ProtoGENI" && $isadmin) {
+    $title  = "ProtoGENI";
+    $clause = "e.nonlocal_type='protogeni'";
+    $protogeni = 1;
     $showlastlogin = 0; # do not show a lastlogin column
 }
 else {
@@ -255,12 +268,13 @@ count(r.node_id) as ncount, swap_requests,
 round((unix_timestamp(now())-unix_timestamp(last_swap_req))/3600,1) as lastreq,
 (unix_timestamp(now()) - unix_timestamp(max(greatest(
 last_tty_act,last_net_act,last_cpu_act,last_ext_act)))) as idlesec,
-(max(last_report) is not null) as canbeidle, s.rsrcidx
-from experiments as e 
+(max(last_report) is not null) as canbeidle, s.rsrcidx, p.nonlocal_id
+from experiments as e
 left join reserved as r on e.pid=r.pid and e.eid=r.eid
 left join experiment_stats as s on e.idx=s.exptidx
 left join nodes as n on r.node_id=n.node_id
 left join node_activity as na on r.node_id=na.node_id
+left join projects as p on p.pid_idx=e.pid_idx
 $openlist_join
 where (n.type!='dnard' or n.type is null) $clause $openlist_clause
 group by e.pid,e.eid $having order by $order");
@@ -284,8 +298,7 @@ where (n.type!='dnard' or n.type is null) and
 group by e.pid,e.eid $having order by $order");    
 }
 if (! mysql_num_rows($experiments_result)) {
-    USERERROR("There are no experiments running in any of the projects ".
-              "you are a member of.", 1);
+    USERERROR("There are no experiments running that match the criteria.", 1);
 }
 
 if (mysql_num_rows($experiments_result)) {
@@ -375,17 +388,25 @@ if ($thumb && !$idle) {
 	$pid  = $row["pid"];
 	$eid  = $row["eid"]; 
 	$huid = $row["expt_head_uid"];
+	$sidx = $row["swapper_idx"];
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["dshort"];
         $rsrcidx = $row["rsrcidx"];
 	$state= $row["state"];
 
-	if (! ($head_user = User::Lookup($huid))) {
-	    TBERROR("Could not lookup object for user $huid", 1);
+	if ($state == "active" && isset($sidx)) {
+	    if (! ($user = User::Lookup($sidx))) {
+		TBERROR("Could not lookup object for user $sidx", 1);
+	    }
 	}
-	$showuser_url = CreateURL("showuser", $head_user);
-	$head_affil   = $head_user->affil_abbrev();
-	$head_affil_text = $head_affil ? "&nbsp;($head_affil)" : "";
+	else {
+	    if (! ($user = User::Lookup($huid))) {
+		TBERROR("Could not lookup object for user $huid", 1);
+	    }
+	}
+	$showuser_url = CreateURL("showuser", $user);
+	$user_affil   = $user->affil_abbrev();
+	$user_affil_text = $user_affil ? "&nbsp;($user_affil)" : "";
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
 
@@ -448,7 +469,7 @@ if ($thumb && !$idle) {
 	    }	
 
 	    echo "<font size=-2><b>Created by:</b> ".
-		 "<a href='$showuser_url'>$huid</a>$head_affil_text".
+		 "<a href='$showuser_url'>$huid</a>$user_affil_text".
 		 "</font><br />\n";
 
 	    $special = 0;
@@ -489,48 +510,55 @@ if ($thumb && !$idle) {
     echo "<table border=2 cols=0
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
-              <th width=8%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pid$ni'>
+              <th >
+               <a class='static'
+                  href='showexp_list.php3?showtype=$showtype&sortby=pid$ni'>
                   PID</a></th>
-              <th width=8%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=eid$ni'>
+              <th >
+               <a class='static'
+                  href='showexp_list.php3?showtype=$showtype&sortby=eid$ni'>
                   EID</a></th>
-              <th align=center width=3%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pcs$ni'>
+              <th align=center >
+               <a class='static'
+                  href='showexp_list.php3?showtype=$showtype&sortby=pcs$ni'>
                   PCs</a> [1]</th>
-              <th align=center width=3%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=idle$ni'>
-               Hours Idle</a> [2]</th>\n";
+              <th align=center >
+               <a class='static'
+                  href='showexp_list.php3?showtype=$showtype&sortby=idle$ni'>
+                  Hours Idle</a> [2]</th>\n";
     
     if ($showlastlogin)
-        echo "<th width=17% align=center>Last Login</th>\n";
+        echo "<th align=center>Last Login</th>\n";
     if ($idle) {
 	#echo "<th width=4% align=center colspan=2>Swap Requests</th>\n";
-	echo "<th width=4% align=center>Swap Requests</th>\n";
+	echo "<th align=center>Swap Requests</th>\n";
     }
 
-    if (! $openlist_member) {
-	echo "<th width=60%>
+    if (! ($openlist_member || $protogeni)) {
+	echo "<th >
                   <a class='static' ".
                      "href='showexp_list.php3?showtype=$showtype".
                      "&sortby=name$ni'>Description</a></th>\n";
     }
-    echo "  <th width=4%>
+    echo "  <th >
                <a class='static' ".
                   "href='showexp_list.php3?showtype=$showtype&sortby=uid$ni'>
-                  Head UID</a></th>
+                  Creator/<br>Swapper</a></th>
             </tr>\n";
 
     while ($row = mysql_fetch_array($experiments_result)) {
 	$pid  = $row["pid"];
 	$eid  = $row["eid"]; 
 	$huid = $row["expt_head_uid"];
+	$sidx = $row["swapper_idx"];
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["dshort"];
 	$state= $row["state"];
 	$ignore = $row['idle_ignore'];
 	$idlesec= $row["idlesec"];
 	$swapreqs = $row["swap_requests"];
+	$nonlocal_id = $row["nonlocal_id"];
+	$nonlocal_user_id = $row["nonlocal_user_id"];
 	$isidle = ($idlesec >= 3600*$idlehours);
 	$daysidle=0;
 	$idletime = ($idlesec > 300 ? round($idlesec/3600,1) : 0);
@@ -542,13 +570,19 @@ if ($thumb && !$idle) {
 	}
 	$stale = $experiment->IdleStale();
 
-	if (! ($head_user = User::Lookup($huid))) {
-	    TBERROR("Could not lookup object for user $huid", 1);
+	if ($state == "active" && isset($sidx)) {
+	    if (! ($user = User::Lookup($sidx))) {
+		TBERROR("Could not lookup object for user $sidx", 1);
+	    }
 	}
-	$showuser_url = CreateURL("showuser", $head_user);
-	$head_affil = $head_user->affil_abbrev();
-	$head_affil_text = $head_affil ? "&nbsp;($head_affil)" : "";
-
+	else {
+	    if (! ($user = User::Lookup($huid))) {
+		TBERROR("Could not lookup object for user $huid", 1);
+	    }
+	}
+	$showuser_url = CreateURL("showuser", $user);
+	$user_affil   = $user->affil_abbrev();
+	$user_affil_text = $user_affil ? "&nbsp;($user_affil)" : "";
 	
 	if ($swapreqs && !$isidle) {
 	    $swapreqs = "";
@@ -664,7 +698,15 @@ if ($thumb && !$idle) {
 	if ($nodes==0) { $nodes = "&nbsp;"; }
 	
 	echo "<tr>
-                <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
+                <td><A href='showproject.php3?pid=$pid'>";
+	if ($protogeni && $nonlocal_id) {
+	    echo $nonlocal_id;
+	}
+	else {
+	    echo "$pid";
+	}
+	echo "</A>";
+	echo "  </td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>\n";
 	
@@ -696,11 +738,15 @@ if ($thumb && !$idle) {
 	if ($showlastlogin) echo "$lastlogin\n";
 	if ($idle) echo "$foo\n";
 
-	if (! $openlist_member) {
+	if (! ($openlist_member || $protogeni)) {
 	    echo "<td>$name</td>\n";
 	}
-	
-        echo "<td><A href='$showuser_url'>$huid</A>$head_affil_text</td>\n";
+	if ($protogeni) {
+	    echo "<td>$nonlocal_user_id</td>\n";
+	}
+	else {
+	    echo "<td><A href='$showuser_url'>$huid</A>$user_affil_text</td>\n";
+	}
 	echo "</tr>\n";
     }
     echo "</table>\n";
