@@ -121,6 +121,11 @@ sub approved($)         { return field($_[0], "approved"); }
 sub wikiname($)         { return field($_[0], "wikiname"); }
 sub mailman_password($) { return field($_[0], "mailman_password"); }
 sub allow_workbench($)  { return field($_[0], "allow_workbench"); }
+sub hidden($)		{ return field($_[0], "hidden"); }
+sub IsLocal($)		{ return (defined($_[0]->nonlocal_id()) ? 0 : 1); };
+sub IsNonLocal($)	{ return (defined($_[0]->nonlocal_id()) ? 1 : 0); };
+sub nonlocal_id($)	{ return field($_[0], "nonlocal_id"); }
+sub nonlocal_type($)	{ return field($_[0], "nonlocal_type"); }
 
 # These come from the group not the project.
 sub unix_gid($)         { return $_[0]->{'GROUP'}->unix_gid(); }
@@ -135,6 +140,26 @@ sub LookupByPid($$)
 
     my $query_result =
 	DBQueryWarn("select pid_idx from projects where pid='$pid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($pid_idx) = $query_result->fetchrow_array();
+
+    return Project->Lookup($pid_idx);
+}
+
+#
+# Lookup a nonlocal project.
+#
+sub LookupNonLocal($$)
+{
+    my ($class, $urn) = @_;
+    my $safe_urn = DBQuoteSpecial($urn);
+
+    my $query_result =
+	DBQueryFatal("select pid_idx from projects ".
+		     "where nonlocal_id=$safe_urn");
 
     return undef
 	if (! $query_result || !$query_result->numrows);
@@ -634,6 +659,44 @@ sub GroupList($$)
 }
 
 #
+# Find specific group in project.
+#
+sub LookupGroup($$)
+{
+    my ($self, $gid) = @_;
+    my @grouplist = ();
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self)));
+
+    my $pid_idx = $self->pid_idx();
+    my $clause;
+
+    if ($gid =~ /^\d*$/) {
+	$clause = "gid_idx='$gid'";
+    }
+    elsif ($gid =~ /^[-\w]*$/) {
+	$clause = "gid='$gid'";
+    }
+    else {
+	return undef;
+    }
+
+    my $query_result =
+	DBQueryWarn("select gid_idx from groups ".
+		    "where pid_idx=$pid_idx and $clause");
+    return undef
+	if (! $query_result);
+    
+    return undef
+	if (! $query_result->numrows);
+
+    my ($gid_idx) = $query_result->fetchrow_array();
+    return Group->Lookup($gid_idx);
+}
+
+#
 # Update the aggregate stats.
 #
 sub UpdateStats($$$$$)
@@ -686,6 +749,18 @@ sub BumpActivity($)
 		"where pid_idx='$pid_idx'");
 
     return 0;
+}
+
+#
+# Check to see if a pid is valid.
+#
+sub ValidPID($$)
+{
+    my ($class, $pid) = @_;
+
+    return TBcheck_dbslot($pid, "projects", "newpid",
+			  TBDB_CHECKDBSLOT_WARN()|
+			  TBDB_CHECKDBSLOT_ERROR());
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
