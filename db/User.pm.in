@@ -192,6 +192,10 @@ sub archived($)		{ return ($_[0]->status() eq "archived" ? 1 : 0); };
 sub frozen($)		{ return ($_[0]->status() eq "frozen" ? 1 : 0); };
 sub default_project($)	{ return field($_[0], "default_project"); }
 sub nocollabtools($)	{ return field($_[0], "nocollabtools"); }
+sub nonlocal_id($)	{ return field($_[0], "nonlocal_id"); }
+sub nonlocal_type($)	{ return field($_[0], "nonlocal_type"); }
+sub IsLocal($)		{ return (defined($_[0]->nonlocal_id()) ? 0 : 1); };
+sub IsNonLocal($)	{ return (defined($_[0]->nonlocal_id()) ? 1 : 0); };
 
 # Temporary data storage ... useful.
 sub GetTempData($$) { return field($_[0], "tempdata"); } 
@@ -577,8 +581,6 @@ sub Create($$$$)
     }
     return User->Lookup($uid_idx);
 }
-sub IsLocal($)		{ return (defined($_[0]->nonlocal_id()) ? 0 : 1); };
-sub IsNonLocal($)	{ return (defined($_[0]->nonlocal_id()) ? 1 : 0); };
 
 #
 # Delete the user from the users and user_stats tables.
