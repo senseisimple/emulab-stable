@@ -56,6 +56,7 @@ define("TBDB_USERSTATUS_UNAPPROVED",	"unapproved");
 define("TBDB_USERSTATUS_UNVERIFIED",	"unverified");
 define("TBDB_USERSTATUS_FROZEN",	"frozen");
 define("TBDB_USERSTATUS_ARCHIVED",	"archived");
+define("TBDB_USERSTATUS_NONLOCAL",	"nonlocal");
 
 #
 # Type of new account.
@@ -269,10 +270,10 @@ function TBValidNodeType($type)
     return 1;
 }
 
-function TBUidNodeLastLogin($uid)
+function TBUidNodeLastLogin($uid_idx)
 {
     $query_result =
-	DBQueryFatal("select * from uidnodelastlogin where uid='$uid'");
+	DBQueryFatal("select * from uidnodelastlogin where uid_idx='$uid_idx'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
@@ -306,10 +307,10 @@ function TBNodeUidLastLogin($node_id)
 #
 # Return the last login for the users node.
 # 
-function TBUsersLastLogin($uid)
+function TBUsersLastLogin($uid_idx)
 {
     $query_result =
-	DBQueryFatal("select * from userslastlogin where uid='$uid'");
+	DBQueryFatal("select * from userslastlogin where uid_idx='$uid_idx'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
