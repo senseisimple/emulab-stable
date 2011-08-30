@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -258,6 +258,8 @@ my $usr_shell   = $target_user->shell();
 my $usr_admin   = $target_user->admin();
 my $wpswd       = $target_user->w_pswd();
 my $wikionly    = $target_user->wikionly();
+my $isnonlocal  = $target_user->IsNonLocal();
+my $nocollabtools = $target_user->nocollabtools();
 
 #
 # Get the users earliest project membership to use as the default group
@@ -398,7 +400,7 @@ sub AddUser()
     $fullname =~ s/\"/\'/g;
     $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
 
-    if ($CONTROL ne $BOSSNODE) {
+    if (!$isnonlocal) {
 	print "Adding user $user ($user_number) to $CONTROL.\n";
 
 	if (system("$SSH -host $CONTROL ".
@@ -436,6 +438,9 @@ sub AddUser()
     }
     $UID = $SAVEUID;
 
+    goto skipstuff
+	if ($isnonlocal || $nocollabtools);
+    
     #
     # Do the ssh thing. Invoke as real user for auditing.
     #
@@ -473,7 +478,7 @@ sub AddUser()
 
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
-
+    
     #
     # Must update the exports file or else nodes will complain.  There
     # is a bit of race in here since this update happens after the
@@ -493,6 +498,7 @@ sub AddUser()
     if ($CONTROL ne $BOSSNODE) {
 	GenerateSFSKey();
     }
+  skipstuff:
     return 0;
 }
 
@@ -524,7 +530,7 @@ sub DelUser()
 	}
     }
 
-    if ($CONTROL ne $BOSSNODE) {
+    if (! $isnonlocal) {
 	print "Removing user $user from $CONTROL\n";
 
 	if (system("$SSH -host $CONTROL '$USERDEL $user'")) {
@@ -535,6 +541,9 @@ sub DelUser()
     }
     $UID = $SAVEUID;
 
+    goto skipstuff
+	if ($isnonlocal || $nocollabtools);
+    
     $EUID = $UID;
     #
     # Must update the exports file or else nodes will complain.  Note
@@ -565,6 +574,7 @@ sub DelUser()
     $EUID = 0;
 
     $sfsupdate = 1;
+  skipstuff:
     return 0;
 }
 
@@ -610,6 +620,10 @@ sub UpdatePassword()
     if ($target_user->SetPassword($new_pswd, $expires)) {
 	fatal("Could not update password encryption string for $target_user");
     }
+
+    # Go no further if a nonlocal user.
+    return 0
+	if ($isnonlocal);
 
     # Send auditing email before next step in case of failure.
     SENDMAIL("$fullname <$user_email>",
@@ -757,7 +771,7 @@ sub UpdateUser(;$)
     #
     # Sanity check.
     #
-    if ($webonly) {
+    if ($webonly || $isnonlocal) {
 	return 0;
     }
     if (!defined($freezeopt) && ($status ne USERSTATUS_ACTIVE)) {
@@ -866,6 +880,9 @@ sub UpdateEmail()
     if ($target_user->Update(\%args)) {
 	fatal("Could not update email address for $target_user");
     }
+
+    return 0
+	if ($isnonlocal);
 
     # Send auditing email before next step in case of failure.
     SENDMAIL("$fullname <$user_email>",
@@ -1018,6 +1035,10 @@ sub CheckDotFiles()
     my $cshrc   = "$HOMEDIR/$user/.cshrc";
     my $profile = "$HOMEDIR/$user/.profile";
 
+    # No home dirs for these.
+    return 0
+	if ($webonly || $isnonlocal);
+    
     if (! -d "$HOMEDIR/$user") {
 	return 0;
     }
