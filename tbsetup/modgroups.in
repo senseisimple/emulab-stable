@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -189,6 +189,10 @@ foreach my $token (@addlist) {
     if (! defined($group)) {
 	fatal("Cannot find group object for $pid/$gid");
     }
+    my $project = $group->GetProject();
+    if (! defined($project)) {
+	fatal("Cannot find project object for $group");
+    }
 
     #
     # Look to see if there is already an entry; this happens as the result
@@ -222,7 +226,8 @@ foreach my $token (@addlist) {
     #
     # Tell chat subsystem to change groups ...
     #
-    if ($CHATSUPPORT) {
+    if ($CHATSUPPORT &&
+	!($project->IsNonLocal() || $target_user->nocollabtools())) {
 	system("$MODBUDDIES $optarg -a $pid:$gid $user") == 0 or
 	    fatal("$MODBUDDIES '-a $pid:$gid $user' failed!");
 
@@ -233,7 +238,7 @@ foreach my $token (@addlist) {
 	}
     }
 
-    if ($sendemail) {
+    if ($sendemail && !$project->IsNonLocal()) {
 	$group->SendApprovalEmail($this_user, $target_user) == 0 or
 	    fatal("Could not send approval email to $target_user in $group");
     }
@@ -271,6 +276,10 @@ foreach my $token (@remlist) {
     if (! defined($group)) {
 	fatal("Cannot find group object for $pid/$gid");
     }
+    my $project = $group->GetProject();
+    if (! defined($project)) {
+	fatal("Cannot find project object for $group");
+    }
 
     #
     # Special case; if pid==gid then delete from the project entirely.
@@ -278,11 +287,6 @@ foreach my $token (@remlist) {
     # so we know what to hand off to the callouts.
     #
     if ($pid eq $gid) {
-	my $project = Project->LookupByPid($pid);
-	
-	if (! defined($project)) {
-	    fatal("Cannot find group object for $pid/$gid");
-	}
 	$project->DeleteUser($target_user, \@delgroups) == 0
 	    or fatal("Could not delete $user from $project");
     }
@@ -305,7 +309,8 @@ foreach my $token (@remlist) {
     #
     # Tell chat subsystem to change groups ...
     #
-    if ($CHATSUPPORT) {
+    if ($CHATSUPPORT && 
+	!($project->IsNonLocal() || $target_user->nocollabtools())) {
 	my @optlist = ();
 
 	foreach my $delgroup (@delgroups) {
@@ -342,8 +347,10 @@ if (@addlist || @modlist) {
 #
 # Finally, call setgroups to do the rest.
 #
-system("$SETGROUPS $user") == 0 or
-    fatal("$SETGROUPS $user failed!");
+if (! $target_user->nocollabtools()) {
+    system("$SETGROUPS $user") == 0 or
+	fatal("$SETGROUPS $user failed!");
+}
 
 exit(0);
 
