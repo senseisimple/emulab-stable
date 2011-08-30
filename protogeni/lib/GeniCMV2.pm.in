@@ -815,6 +815,17 @@ sub SliverAction($$$$$)
 	return 0;
     };
 
+    my $user = GeniCM::CreateUserFromCertificate($credential);
+    return $user
+	if (GeniResponse::IsResponse($user));
+
+    my $realuser = GeniCM::FlipToUser($slice, $user);
+    if (! (defined($realuser) && $realuser)) {
+	print STDERR "Error flipping to real user\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "FlipToUser Error");
+    }
+
     if (defined($slice_urn)) {
 	$response = &$CheckState($aggregate, $action);
 	goto bad
@@ -1556,6 +1567,16 @@ sub ReleaseTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This ticket is for another slice");
     }
+    my $user = GeniCM::CreateUserFromCertificate($credential);
+    return $user
+	if (GeniResponse::IsResponse($user));
+
+    my $realuser = GeniCM::FlipToUser($slice, $user);
+    if (! (defined($realuser) && $realuser)) {
+	print STDERR "Error flipping to real user\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "FlipToUser Error");
+    }
     #
     # XXX Need to do a restore backup state operation if this ticket
     # was the result of an update.
@@ -1699,9 +1720,9 @@ sub ReserveVlanTags($)
     }
     
     my $slice_experiment = GeniCM::GeniExperiment($slice);
-    if (!defined($slice_experiment)) {
+    if (GeniResponse::IsResponse($slice_experiment)) {
 	print STDERR "Could not create new Geni slice experiment!\n";
-	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	$response = $slice_experiment;
 	goto done;
     }
     my $pid = $slice_experiment->pid();

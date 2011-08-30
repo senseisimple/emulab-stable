@@ -60,6 +60,7 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $MAINSITE       = @TBMAINSITE@;
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $PROTOUSER 	   = "elabman";
 my $CREATEEXPT     = "$TB/bin/batchexp";
 my $ENDEXP         = "$TB/bin/endexp";
 my $NALLOC	   = "$TB/bin/nalloc";
@@ -80,7 +81,11 @@ my $VTOPGEN        = "$TB/bin/vtopgen";
 my $SNMPIT         = "$TB/bin/snmpit";
 my $RESERVEVLANS   = "$TB/sbin/protogeni/reservevlans";
 my $NEWGROUP       = "$TB/bin/newgroup";
+my $NEWPROJECT     = "$TB/sbin/newproj";
+my $MAKEPROJECT    = "$TB/sbin/mkproj";
 my $PRERENDER      = "$TB/libexec/vis/prerender";
+my $SUDO           = "/usr/local/bin/sudo";
+my $WAP            = "$TB/sbin/withadminprivs";
 my $XMLLINT	   = "/usr/local/bin/xmllint";
 my $ADDAUTHORITY   = "$TB/sbin/protogeni/addauthority";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
@@ -691,10 +696,17 @@ sub GetTicketAuxAux($$$$$$$$$)
     #
     # We need this now so we can form a virtual topo.
     #
-    my $slice_experiment = GeniExperiment($slice);
-    if (!defined($slice_experiment)) {
-	print STDERR "Could not create new Geni slice experiment!\n";
-	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+    my $slice_experiment = GeniExperiment($slice, $user);
+    if (GeniResponse::IsResponse($slice_experiment)) {
+	$response = $slice_experiment;
+	$slice_experiment = undef;
+	goto bad;
+    }
+    my $realuser = FlipToUser($slice, $user);
+    if (! (defined($realuser) && $realuser)) {
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "FlipToUser Error");
+	print STDERR "Error flipping to real user\n";
 	goto bad;
     }
     my $pid = $slice_experiment->pid();
@@ -2282,8 +2294,10 @@ sub SliverWorkAux($$$$$$$)
     my $response;
     my $ticket;
     my $rspec;
+    my $didpreswap  = 0;
     my $oldmanifest;
     require Interface;
+    require User;
 
     # V2 API support.
     if ($v2 && $level == 0) {
@@ -2370,23 +2384,30 @@ sub SliverWorkAux($$$$$$$)
 				    "Slice has expired");
     }
 
-    my $experiment = GeniExperiment($slice);
-    if (!defined($experiment)) {
-	$slice->UnLock();
-	$ticket->UnLock()
-	    if (defined($ticket));
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "No local experiment for slice");
-    }
-    my $pid = $experiment->pid();
-    my $eid = $experiment->eid();
-
     #
     # Create the user.
     #
     my $owner = CreateUserFromCertificate($credential);
     return $owner
 	if (GeniResponse::IsResponse($owner));
+
+    # And the experiment.
+    my $experiment = GeniExperiment($slice, $owner);
+    if (GeniResponse::IsResponse($experiment)) {
+	$slice->UnLock();
+	$ticket->UnLock()
+	    if (defined($ticket));
+	return $experiment;
+    }
+    my $realuser = FlipToUser($slice, $owner);
+    if (!defined($realuser) || !$realuser) {
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "FlipToUser Error");
+	print STDERR "Error flipping to real user\n";
+	goto bad;
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
 
     if (defined($keys)) {
 	$response = AddKeys($slice, $owner, $keys);
@@ -2397,6 +2418,9 @@ sub SliverWorkAux($$$$$$$)
 	    return $response;
 	}
     }
+
+    # We need this for accounting. 
+    $experiment->SetSwapInfo($realuser->emulab_user());
 
     #
     # Figure out what nodes to allocate or free. 
@@ -2710,6 +2734,20 @@ sub SliverWorkAux($$$$$$$)
 	goto bad;
     }
     $experiment->CleanLogFiles();
+
+    #
+    # The mapper is going to update the resource record, so we have to
+    # call PreSwap() first, since it generates a new record. 
+    #
+    if ($isupdate) {
+	$experiment->PreSwap($realuser->emulab_user(),
+			     $Experiment::EXPT_SWAPMOD, EXPTSTATE_ACTIVE());
+    }
+    else {
+	$experiment->PreSwap($realuser->emulab_user(),
+			     $Experiment::EXPT_SWAPIN, EXPTSTATE_SWAPPED());
+    }
+    $didpreswap = 1;
     
     # Add -u for update mode, but not -f (fixnode). 
     my $output = GeniUtil::ExecQuiet("$MAPPER -d -v -z -u $pid $eid");
@@ -3372,8 +3410,14 @@ sub SliverWorkAux($$$$$$$)
     }
     $sliver_credential->Store();
     
-    if (!$isupdate) {
+    if ($isupdate) {
+	$experiment->PostSwap($realuser->emulab_user(),
+			      $Experiment::EXPT_SWAPMOD);
+    }
+    else {
 	$experiment->SetState(EXPTSTATE_ACTIVE());
+	$experiment->PostSwap($realuser->emulab_user(),
+			      $Experiment::EXPT_SWAPIN);
 	
 	$ticket->Redeem()
 	    if (defined($ticket));
@@ -3406,6 +3450,16 @@ sub SliverWorkAux($$$$$$$)
     }
 
   bad:
+    if ($didpreswap) {
+	if ($isupdate) {
+	    $experiment->SwapFail($realuser->emulab_user(),
+				  $Experiment::EXPT_SWAPMOD, 1);
+	}
+	else {
+	    $experiment->SwapFail($realuser->emulab_user(),
+				  $Experiment::EXPT_SWAPIN, 1);
+	}
+    }
     foreach my $sliver (values(%slivers)) {
 	$sliver->UnProvision(1)
 	    if (! $impotent);
@@ -3644,6 +3698,17 @@ sub ReleaseTicket($)
     if (! $ticket->stored()) {
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
+
+    my $user = CreateUserFromCertificate($credential);
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
+    my $realuser = FlipToUser($slice, $user);
+    if (! (defined($realuser) && $realuser)) {
+	print STDERR "Error flipping to real user\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "FlipToUser Error");
+    }
     if ($ticket->Lock() != 0) {
 	return GeniResponse->BusyResponse("ticket");
     }
@@ -3705,6 +3770,10 @@ sub StartSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "No local slice found");
     }
+    my $user = CreateUserFromCertificate($credential);
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
@@ -3728,7 +3797,13 @@ sub StartSliver($)
 					"Could not process manifest");
 	}
     }
-    
+    my $realuser = FlipToUser($slice, $user);
+    if (! (defined($realuser) && $realuser)) {
+	print STDERR "Error flipping to real user\n";
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "FlipToUser Error");
+    }
     if (!$impotent && $sliver->Start($API_VERSION, 0) != 0) {
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -3796,6 +3871,16 @@ sub DeleteSliverAux($$$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "No slice record for slice");
     }
+    my $user = CreateUserFromCertificate($credential);
+    return $user
+	if (GeniResponse::IsResponse($user));
+
+    my $realuser = FlipToUser($slice, $user);
+    if (! (defined($realuser) && $realuser)) {
+	print STDERR "Error flipping to real user\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "FlipToUser Error");
+    }
     my $slice_uuid = $slice->uuid();
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
@@ -3851,6 +3936,7 @@ sub DeleteSliverAux($$$)
 	    # Slice still locked.
 	    return 0;
 	}
+	$experiment->SetState(EXPTSTATE_SWAPPED());
 	$experiment->RemoveVirtualState();
 	DBQueryWarn("delete from geni_manifests ".
 		    "where slice_uuid='$slice_uuid'");
@@ -4981,6 +5067,11 @@ sub CleanupDeadSlice($;$)
     $purge = 1
 	if (!defined($purge));
 
+    if (!defined(FlipToUser($slice))) {
+	print STDERR "CleanupDeadSlice: Could not flip to user\n";
+	return -1;
+    }
+
     # print "Cleaning up dead slice $slice\n";
     my $slice_uuid = $slice->uuid();
     my $experiment = $slice->GetExperiment();
@@ -5153,96 +5244,239 @@ sub CleanupDeadSlice($;$)
 # project for now. Generally, users for non-local slices do not
 # have local accounts or directories.
 #
-sub GeniExperiment($)
+sub GeniExperiment($;$)
 {
-    my ($slice) = @_;
+    my ($slice, $creator) = @_;
 
     my $uuid = $slice->uuid();
     my $needsfirewall = $slice->needsfirewall();
-    my $pid  = "GeniSlices";
-    my $gid  = $pid;
-    my $hrn  = $slice->hrn();
     my $urn  = $slice->urn();
+    my ($pid, $gid);
+    my ($project, $group);
 
     my $experiment = Experiment->Lookup($uuid);
     return $experiment
 	if (defined($experiment));
 
-    #
-    # Use the first token of the manifest for the gid of the experiment.
-    # This effectively puts slivers from each SA in their own subgroup.
-    #
-    if (1) {
-	require Project;
-	require Group;
+    # The eid is derived from the slice urn.
+    my (undef, undef, $eid) = GeniHRN::Parse($urn);
 
-	($gid) = ($hrn =~ /^([-\w]*).*$/);
-
+    require Project;
+    require Group;
+    
+    #
+    # If the slice is from this Emulab (SA), then we are going to create the
+    # experiment in the local project.
+    #
+    if (GeniHRN::Authoritative($urn, $OURDOMAIN)) {
 	#
-	# See if the group exists.
+	# If no creator, this is a placeholder slice. Since its local
+	# we can come up with a creator, but later.
 	#
-	my $group = Group->Lookup("$pid,$gid");
-	if (!defined($group)) {
-	    my $project = Project->Lookup($pid);
-	    if (!defined($project)) {
-		print STDERR "Could not get project for $pid\n";
-		return undef;
-	    }
-	    my $pid_idx = $project->pid_idx();
-	    
+	if (!defined($creator)) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				"Cannot do local placeholder slices yet");
+	}
+	
+	#
+	# For now, the creator has to be a local user and have their
+	# default project set. Until we have project signed credentials.
+	#
+	if (! $creator->IsLocal()) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+			"$creator is not a local user for local project");
+	}
+	if (!defined($creator->DefaultProject())) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"No default project for $creator");
+	}
+	$project = $creator->DefaultProject();
+	if (!defined($project)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not get local project for $slice");
+	}
+	# No sub groups for local projects. Maybe later?
+	$pid = $gid = $project->pid();
+    }
+    else {
+	#
+	# The top level domain of the SA becomes the project name, but the
+	# dots are illegal of course, and there might be sub authorities
+	# (colon separated). We use the primary for the project and the
+	# first sub-authority for the group.
+	#
+	my ($domain, undef, undef) = GeniHRN::Parse($urn);
+	my @tokens = split(":", $domain);
+	my $project_id = shift(@tokens);
+	my $group_id = shift(@tokens) if (@tokens);
+	my $project_urn = GeniHRN::Generate($project_id, "authority", "sa");
+	
+	#
+	# See if the project exists. 
+	#
+	$project = Project->LookupNonLocal($project_urn);
+	if (!defined($project)) {
 	    #
-	    # Write out a little XML file describing the group, and
+	    # For now, lets assume that the domain has legal chars, except
+	    # of course for the dots, which we transform to dashes cause
+	    # underscores are not allowed in project ids.
+	    #
+	    $project_id =~ s/\./-/g;	    
+	    if (!Project->ValidPID($project_id)) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+		    "Cannot form a valid local project name from $project_urn");
+	    }
+
+	    #
+	    # Write out a little XML file describing the project, and
 	    # let the existing backend script deal with it all.
 	    #
 	    my ($fh, $filename) = tempfile(UNLINK => 0);
 	    if (!defined($fh)) {
-		print STDERR "Could not create temp file for group $gid\n";
-		return undef;
+		print STDERR "Could not create temp file for $project_id\n";
+		return GeniResponse->Create(GENIRESPONSE_ERROR);
 	    }
-	    print $fh "<group>\n";
-	    print $fh " <attribute name=\"project\">\n";
-	    print $fh "  <value>$pid_idx</value>\n";
+	    print $fh "<project>\n";
+	    print $fh " <attribute name=\"name\">\n";
+	    print $fh "  <value>$project_id</value>\n";
 	    print $fh " </attribute>\n";
-	    print $fh " <attribute name=\"group_id\">\n";
-	    print $fh "  <value>$gid</value>\n";
+	    print $fh " <attribute name=\"short description\">\n";
+	    print $fh "  <value>$project_urn</value>\n";
 	    print $fh " </attribute>\n";
-	    print $fh " <attribute name=\"group_leader\">\n";
+	    print $fh " <attribute name=\"nonlocal_id\">\n";
+	    print $fh "  <value>$project_urn</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh " <attribute name=\"nonlocal_type\">\n";
+	    print $fh "  <value>protogeni</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh " <attribute name=\"leader\">\n";
 	    print $fh "  <value>geniuser</value>\n";
 	    print $fh " </attribute>\n";
-	    print $fh " <attribute name=\"group_description\">\n";
-	    print $fh "  <value></value>\n";
-	    print $fh " </attribute>\n";
-	    print $fh "</group>\n";
+	    print $fh "</project>\n";
 	    close($fh);
-	    my $output = GeniUtil::ExecQuiet("$NEWGROUP $filename");
+	    if (! chmod(0755, $filename)) {
+		print STDERR "Could not chmod $filename\n";
+		return GeniResponse->Create(GENIRESPONSE_ERROR);
+	    }
+	    #
+	    # This operation has to be done as an admin person. 
+	    #
+	    GeniUtil::FlipToElabMan();
+	    my $output = GeniUtil::ExecQuiet("$WAP $NEWPROJECT -l $filename");
 	    if ($?) {
+		GeniUtil::FlipToGeniUser();
 		print STDERR $output;
-		return undef;
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Internal error creating project description");
 	    }
 	    unlink($filename);
 
-	    $group = Group->Lookup("$pid,$gid");
+	    $output = GeniUtil::ExecQuiet("$WAP $MAKEPROJECT $project_id");
+	    my $ecode  = $?;
+	    GeniUtil::FlipToGeniUser();
+	    if ($ecode) {
+		print STDERR $output;
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Internal error creating project");
+	    }
+	    $project = Project->LookupNonLocal($project_urn);
+	    if (!defined($project)) {
+		print STDERR "Cannot lookup new project for $project_id\n";
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Internal error locating project after creation");
+	    }
 	}
-	if (!defined($group)) {
-	    print STDERR "Could not get group for $pid,$gid\n";
-	    return undef;
+	$pid = $gid = $project->pid();
+	
+	#
+	# If there is a sub authority, create a subgroup for it.
+	#
+	if (defined($group_id)) {
+	    if (!Group->ValidGID($group_id)) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Invalid  local group name $group_id");
+	    }
+	    $group = $project->LookupGroup($group_id);
+
+	    if (!defined($group)) {
+		my $pid_idx = $project->pid_idx();
+		
+		#
+		# Write out a little XML file describing the group, and
+		# let the existing backend script deal with it all.
+		#
+		my ($fh, $filename) = tempfile(UNLINK => 0);
+		if (!defined($fh)) {
+		    print STDERR "Could not create temp file for group $group_id\n";
+		    return GeniResponse->Create(GENIRESPONSE_ERROR);
+		}
+		print $fh "<group>\n";
+		print $fh " <attribute name=\"project\">\n";
+		print $fh "  <value>$pid_idx</value>\n";
+		print $fh " </attribute>\n";
+		print $fh " <attribute name=\"group_id\">\n";
+		print $fh "  <value>$group_id</value>\n";
+		print $fh " </attribute>\n";
+		print $fh " <attribute name=\"group_leader\">\n";
+		print $fh "  <value>geniuser</value>\n";
+		print $fh " </attribute>\n";
+		print $fh " <attribute name=\"group_description\">\n";
+		print $fh "  <value></value>\n";
+		print $fh " </attribute>\n";
+		print $fh "</group>\n";
+		close($fh);
+		my $output = GeniUtil::ExecQuiet("$NEWGROUP $filename");
+		if ($?) {
+		    print STDERR $output;
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Internal error creating group");
+		}
+		unlink($filename);
+
+		$group = $project->LookupGroup($group_id);
+		if (!defined($group)) {
+		    print STDERR "Cannot lookup new group for $group_id\n";
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			"Internal error locating group after creation");
+		}
+	    }
+	    $gid = $group->gid();
 	}
-	GeniUtil::ResetGroups($group->unix_gid());
     }
 
     #
     # Form an eid for the experiment. 
     #
-    my $eid    = "slice" . TBGetUniqueIndex('next_sliceid', 1);
+    if (! Experiment->ValidEID($eid)) {
+	# What shall we do?
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$eid is not a valid experiment ID");
+    }
     my $nsfile = "";
 
+    #
+    # If the creator is a local user, and the project is a local project,
+    # then the experiment is created as that user, since geniuser is not
+    # a member. That means we have to run as the local user.
+    #
+    if ($project->IsLocal()) {
+	$creator->FlipTo($project->unix_gid());
+    }
+    elsif (defined($group)) {
+	GeniUtil::FlipToGeniUser($group->unix_gid());
+    }
+    else {
+	GeniUtil::FlipToGeniUser($project->unix_gid());
+    }
     #
     # Need a way to can experiments.
     #
     if ($needsfirewall) {
 	$nsfile = "/tmp/$$.ns";
-	open(NS, "> $nsfile")
-	    or return undef;
+	if (! open(NS, "> $nsfile")) {
+	    print STDERR "Could not create $nsfile\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
 	print NS "source tb_compat.tcl\n";
 	print NS "set ns [new Simulator]\n";
 	print NS "tb-set-security-level Blue\n";
@@ -5253,17 +5487,105 @@ sub GeniExperiment($)
     # Note the -h option; allows experiment with no NS file.
     system("$CREATEEXPT -N -q -i -k -w ".
 	   "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	   "-E '$urn -- DO NOT SWAP OR TERMINATE' ".
+	   "-E '$urn' ".
 	   "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	   "-h '$uuid' -p $pid -g $gid -e $eid $nsfile");
-    if ($?) {
-	return undef;
+    my $saved_exitcode = $?;
+
+    # Flip back to geni user. Will reset later.
+    GeniUtil::FlipToGeniUser();
+
+    if ($saved_exitcode) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Error creating container experiment");
     }
     $experiment = Experiment->Lookup($uuid);
     $experiment->SetState(EXPTSTATE_SWAPPED());
     $experiment->Update({"geniflags" => $Experiment::EXPT_GENIFLAGS_EXPT});
+    # XXX watch for "placeholder" slices. 
+    $experiment->MarkNonlocal($urn,
+			      (defined($creator) ? $creator->urn() : undef),
+			      "protogeni");
     $slice->SetExperiment($experiment);
     return $experiment;
+}
+
+#
+# Given slice and user, flip to the proper user to operate as.
+#
+sub FlipToUser($$)
+{
+    my ($slice, $user) = @_;
+    my $debug = 1;
+
+    my $experiment = $slice->GetExperiment();
+    # No experiment, no reason to flip.
+    return 0
+	if (!defined($experiment));
+    my $project = $experiment->GetProject();
+    return undef
+	if (!defined($project));
+
+    #
+    # Nonlocal projects, operate as geniuser with added gid.
+    #
+    if ($project->IsNonLocal()) {
+	require User;
+	
+	my $group = $experiment->GetGroup();
+	return undef
+	    if (!defined($group));
+
+	my $geniuser = User->Lookup("geniuser");
+	return undef
+	    if (!defined($geniuser));
+	$geniuser = GeniUser::LocalUser->Create($geniuser);
+
+	print STDERR "FlipToUser: $geniuser, $group\n"
+	    if ($debug);
+	
+	return undef
+	    if ($geniuser->FlipTo($group->unix_gid()));
+	return $geniuser;
+    }
+
+    #
+    # Local project. If no user or if the user is nonlocal, then we need
+    # to operate as the slice (well, experiment) creator, since
+    # geniuser has no permissions in (not a member of) the project.
+    #
+    if (!defined($user) || !$user->IsLocal()) {
+      usecreator:
+	$user = $experiment->GetCreator();
+	return undef
+	    if (!defined($user));
+
+	# No subgroups yet.
+	print STDERR "FlipToUser: $user, $project\n"
+	    if ($debug);
+	return undef
+	    if ($user->FlipTo($project->unix_gid()));
+
+	return $user;
+    }
+    
+    #
+    # Local user, local project. Is the user a member of the project?
+    # If not, then like above we have to operate as the experiment
+    # creator since the user has no privs in the project. Generally,
+    # this will happen if a credential is delegated (rare) or if the
+    # creator binds a user to a slice. 
+    #
+    goto usecreator
+	if (!$experiment->AccessCheck($user->emulab_user(),
+				      $Experiment::EXPT_ACCESS_MODIFY));
+
+    print STDERR "FlipToUser: $user, $project\n"
+	if ($debug);
+    
+    return undef
+	if ($user->FlipTo($project->unix_gid()));
+    return $user;
 }
 
 #
@@ -5274,7 +5596,7 @@ sub UpdateManifest($)
     my ($slice) = @_;
     require Lan;
 
-    my $experiment = GeniExperiment($slice);
+    my $experiment = Experiment->Lookup($slice->uuid());
     if (!defined($experiment)) {
 	print STDERR "No local experiment for $slice\n";
 	return -1;
