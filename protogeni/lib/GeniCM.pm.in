@@ -59,6 +59,7 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $MAINSITE       = @TBMAINSITE@;
+my $ELABINELAB     = @ELABINELAB@;
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $PROTOUSER 	   = "elabman";
 my $CREATEEXPT     = "$TB/bin/batchexp";
@@ -91,6 +92,7 @@ my $ADDAUTHORITY   = "$TB/sbin/protogeni/addauthority";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
 my $TARINSTALL     = "/usr/local/bin/install-tarfile";
 my $API_VERSION    = 1;
+my $USELOCALPROJ   = 0;
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -5252,7 +5254,7 @@ sub GeniExperiment($;$)
     my $uuid = $slice->uuid();
     my $needsfirewall = $slice->needsfirewall();
     my $urn  = $slice->urn();
-    my ($pid, $gid);
+    my ($pid, $gid, $eid);
     my ($project, $group);
 
     my $experiment = Experiment->Lookup($uuid);
@@ -5260,7 +5262,7 @@ sub GeniExperiment($;$)
 	if (defined($experiment));
 
     # The eid is derived from the slice urn.
-    my (undef, undef, $eid) = GeniHRN::Parse($urn);
+    (undef, undef, $eid) = GeniHRN::Parse($urn);
 
     require Project;
     require Group;
@@ -5269,7 +5271,7 @@ sub GeniExperiment($;$)
     # If the slice is from this Emulab (SA), then we are going to create the
     # experiment in the local project.
     #
-    if (GeniHRN::Authoritative($urn, $OURDOMAIN)) {
+    if (GeniHRN::Authoritative($urn, $OURDOMAIN) && $USELOCALPROJ) {
 	#
 	# If no creator, this is a placeholder slice. Since its local
 	# we can come up with a creator, but later.
@@ -5453,7 +5455,6 @@ sub GeniExperiment($;$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "$eid is not a valid experiment ID");
     }
-    my $nsfile = "";
 
     #
     # If the creator is a local user, and the project is a local project,
@@ -5469,9 +5470,11 @@ sub GeniExperiment($;$)
     else {
 	GeniUtil::FlipToGeniUser($project->unix_gid());
     }
+
     #
     # Need a way to can experiments.
     #
+    my $nsfile = "";
     if ($needsfirewall) {
 	$nsfile = "/tmp/$$.ns";
 	if (! open(NS, "> $nsfile")) {
