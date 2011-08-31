@@ -345,7 +345,8 @@ TBGetSiteVar("general/firstinit/state", \$firstinitstate);
 #
 # Send the email notification.
 #
-$newproj->SendNewProjectEmail($firstinitstate eq "createproject");
+$newproj->SendNewProjectEmail($firstinitstate eq "createproject")
+    if (!$nonlocal);
 
 # Unlink this here, so that the newuser file is left behind in case of error.
 # We can then create the user by hand from the xmlfile, if desired.
