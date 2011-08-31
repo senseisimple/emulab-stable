@@ -337,7 +337,7 @@ foreach my $token (@remlist) {
 # Call genelists, but just when adding or modifying. For deletion, it
 # is handled above.
 #
-if (@addlist || @modlist) {
+if ((@addlist || @modlist) && ! $target_user->nocollabtools()) {
     print "Updating email lists for user $user\n";
     
     system("$GENELISTS $optarg -u $user") == 0 or
