@@ -116,6 +116,7 @@ function GETLOGIN() {
 function GETUID() {
     global $TBNAMECOOKIE;
     $status_archived = TBDB_USERSTATUS_ARCHIVED;
+    $status_nonlocal = TBDB_USERSTATUS_NONLOCAL;
 
     if (isset($_GET['nocookieuid'])) {
 	$uid = $_GET['nocookieuid'];
