@@ -397,21 +397,23 @@ DBQueryWarn("delete from login ".
 	    "where (unix_timestamp(now()) - timeout) > (12 * 60 * 60)");
 
 #
-# Warn users of expiring encrypted certificates.
+# Warn users of expiring encrypted certificates. Regenerate expired or
+# expiring unencrypted certificates.
 #
 $query_result =
     DBQueryWarn("select u.uid,u.uid_idx,expires,encrypted,c.idx, ".
-		"   UNIX_TIMESTAMP(expires) as stamp from user_sslcerts as c ".
+		"   UNIX_TIMESTAMP(expires) as stamp, ".
+		"   UNIX_TIMESTAMP(s.last_activity) as last_activity ".
+		" from user_sslcerts as c ".
 		"left join users as u on u.uid_idx=c.uid_idx ".
 		"left join user_stats as s on s.uid_idx=u.uid_idx ".
 		"where u.status='active' and ".
 		"     revoked is null and warned is null and ".
-		"     (s.last_activity is not null and ".
-		"      UNIX_TIMESTAMP(now()) - ".
-		"      UNIX_TIMESTAMP(s.last_activity) < (24 * 3600 * 90)) and ".
+		"     s.last_activity is not null and ".
 		"     (UNIX_TIMESTAMP(now()) > UNIX_TIMESTAMP(expires) || ".
 		"      (UNIX_TIMESTAMP(expires) - ".
-		"       UNIX_TIMESTAMP(now()) < (3600 * 48)))");
+		"       UNIX_TIMESTAMP(now()) < (24 * 3600 * 8))) ".
+		"order by expires desc limit 200");
 
 while (my $row = $query_result->fetchrow_hashref()) {
     my $uid       = $row->{'uid'};
@@ -420,11 +422,8 @@ while (my $row = $query_result->fetchrow_hashref()) {
     my $stamp     = $row->{'stamp'};
     my $serial    = $row->{'idx'};
     my $encrypted = $row->{'encrypted'};
+    my $lastactive= $row->{'last_activity'};
     
-    # Skip old certs that have expired. User likely does not care.
-    next
-	if (0 && time() > $stamp);
-
     if (!$encrypted) {
 	print STDERR 
 	"Unencrypted Certificate for $uid expires on $expires. Regenerating.\n";
@@ -440,6 +439,12 @@ while (my $row = $query_result->fetchrow_hashref()) {
 	}
 	next;
     }
+
+    # Skip encrypted certificates that exprired more then 90 days ago.
+    # User likely does not care.
+    next
+	if (time() - $lastactive > (24 * 3600 * 90));
+
     print STDERR
 	"Encrypted Certificate for $uid expires on $expires, sending mail.\n";
 
