@@ -24,7 +24,7 @@ $optargs = OptionalPageArguments("showtype",   PAGEARG_STRING);
 PAGEHEADER("Project Information List");
 
 if (! isset($showtype)) {
-    $showtype="Splitview";
+    $showtype="Active";
 }
 
 if ($isadmin) {
