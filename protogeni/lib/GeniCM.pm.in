@@ -1160,8 +1160,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    #
 		    # Support only sh and csh. Maybe perl later.
 		    #
-		    if (! ($shell eq "csh" || $shell eq "sh" ||
-			   $shell eq "/bin/csh" || $shell eq "/bin/sh")) {
+		    if (! (defined($shell) &&
+			   ($shell eq "csh" || $shell eq "sh" ||
+			    $shell eq "/bin/csh" || $shell eq "/bin/sh"))) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 						 "Invalid shell in execute");
