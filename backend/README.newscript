@@ -42,6 +42,8 @@ The xmlfile consists of a simple list of key/value pairs. Here is an example:
   </attribute>
 </newnode>
 
+Other examples can be found in the examples subdirectory.
+
 There are three special keys that are passed in the XML format which control the script:
 
 table specifies which kind of entity should be operated on. This can
