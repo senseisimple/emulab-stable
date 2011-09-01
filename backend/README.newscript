@@ -1,0 +1,75 @@
+newscript is a generalized script for adding new nodes, interfaces,
+wires, and interface types into the database. It works on a
+transactional model. First, you can add a pending node which is
+notionally the beginning of the transaction. Then you can update to
+change information about the new entity, rollback to cancel the
+addition, or commit to permanently complete the database change. There
+are also resolve and list commands to see what entities are currently
+pending.
+
+Usage:
+
+newnode [-d] [-v] [-f] <xmlfile>
+
+  -d  print debug information
+  -v  verify permissions: do not execute commands
+  -n  print out commands: do not execute commands
+
+The xmlfile consists of a simple list of key/value pairs. Here is an example:
+
+<?xml version="1.0" encoding="UTF-8"?>
+<newnode>
+  <attribute name="table">
+    <value>node</value>
+  </attribute>
+  <attribute name="command">
+    <value>add</value>
+  </attribute>
+  <attribute name="id">
+    <value>6</value>
+  </attribute>
+  <attribute name="node_id">
+    <value>t_node_id</value>
+  </attribute>
+  <attribute name="type">
+    <value>d710</value>
+  </attribute>
+  <attribute name="IP">
+    <value>5.5.5.5</value>
+  </attribute>
+  <attribute name="identifier">
+    <value>t_identifier</value>
+  </attribute>
+</newnode>
+
+There are three special keys that are passed in the XML format which control the script:
+
+table specifies which kind of entity should be operated on. This can
+be a 'node', a 'wire', an 'interface', or an 'interface_type'. Each of
+these has different parameters which are used to populate the
+database.
+
+id is the unique identifier for a particular pending entry used to
+detemine which row to use commands on.
+
+command is the action to be taken: 'add', 'update', 'rollback',
+'commit', 'list' or 'resolve'.
+
+add creates a new pending entity in the database using the other
+key/value pairs to create a new database row. A new id is generated
+for the newly-created entity.
+
+update changes the rows in a database. The 'id' field must be
+specified when updating and this determines which row of the database
+is modified. Only those key/values which are specified in the update
+are changed.
+
+rollback uses the id field to remove a row and cancel a pending insertion.
+
+commit uses the id field to complete a pending insertion. This updates
+the database and in the case of a node, also runs the newnode script.
+
+resolve returns the database row specified by id in a space-delimited format.
+
+list returns all database rows delimited by newlines.
+
