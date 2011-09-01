@@ -3971,7 +3971,7 @@ CREATE TABLE `users` (
   KEY `unix_uid` (`unix_uid`),
   KEY `status` (`status`),
   KEY `uid_uuid` (`uid_uuid`),
-  KEY `uid` (`uid`),
+  KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
