@@ -97,7 +97,7 @@ if ($asch) {
     system("$UPDATECERT $CHCERT") == 0 or
 	fatal("Could not update $CHCERT");
 
-    system("$ADDAUTHORITY -c $CHCERT ma") == 0
+    system("$ADDAUTHORITY -f -c $CHCERT ma") == 0
 	or fatal("Could not add CH certificate to CH DB");
 }
 
