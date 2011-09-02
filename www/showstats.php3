@@ -194,7 +194,7 @@ $query_result =
     DBQueryFatal("select t.exptidx,s.pid,s.eid,t.action,t.exitcode,t.uid, ".
                  "       r.pnodes,t.idx as statno,t.start_time,t.end_time, ".
 		 "       s.archive_idx,r.archive_tag,t.uid_idx ".
-		 "  from testbed_stats as t ".
+		 "  from testbed_stats as t force index (end_time, idx) ".
 		 "left join experiment_stats as s on s.exptidx=t.exptidx ".
 		 "left join experiment_resources as r on r.idx=t.rsrcidx ".
 		 "$wclause ".

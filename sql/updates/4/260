@@ -1,0 +1,18 @@
+#
+# Add key to testbed_stats
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBKeyExists("testbed_stats", "end_time")) {
+	DBQueryFatal("ALTER TABLE testbed_stats " .
+		     "ADD KEY `end_time` (`end_time`)");
+    }
+    return 0;
+}
+
+1;

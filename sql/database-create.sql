@@ -3681,7 +3681,8 @@ CREATE TABLE `testbed_stats` (
   KEY `rsrcidx` (`rsrcidx`),
   KEY `exptidx` (`exptidx`),
   KEY `uid_idx` (`uid_idx`),
-  KEY `idxdate` (`end_time`,`idx`)
+  KEY `idxdate` (`end_time`,`idx`),
+  KEY `end_time` (`end_time`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
