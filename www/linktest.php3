@@ -42,7 +42,7 @@ $isadmin   = ISADMIN();
 $pid            = "";
 $eid            = "";
 $unix_gid       = "";
-$unix_pid       = ""
+$unix_pid       = "";
 $linktest_level = 0;
 $linktest_pid   = 0;
 
