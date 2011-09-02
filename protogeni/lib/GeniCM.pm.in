@@ -2586,7 +2586,7 @@ sub SliverWorkAux($$$$$$$)
 
 	my $node = GeniUtil::LookupNode($vnode_id);
 	if (!defined($node)) {
-	    $message = "Bad vnode_id $resource_id";
+	    $message = "Bad vnode_id $vnode_id";
 	    goto bad;
 	}
 
@@ -2835,6 +2835,7 @@ sub SliverWorkAux($$$$$$$)
 	my $vnode_id      = GeniXML::GetVnodeId($ref);
 	my $virtual_id    = GeniXML::GetVirtualId($ref);
 	my $manager_id    = GeniXML::GetManagerId($ref);
+
 	my $inaggregate   = 0;
 	my $sliver;
 
@@ -2865,7 +2866,7 @@ sub SliverWorkAux($$$$$$$)
 
 	my $node = GeniUtil::LookupNode($vnode_id);
 	if (!defined($node)) {
-	    $message = "Unknown vnode_id in ticket: $resource_id";
+	    $message = "Unknown vnode_id in ticket: $vnode_id";
 	    goto bad;
 	}
 	# Must do this after mapper has run

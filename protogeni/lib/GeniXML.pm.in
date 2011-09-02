@@ -382,7 +382,7 @@ sub GetVnodeId($)
     if (IsVersion0($node)) {
 	$result = GetNodeId($node);
     } else {
-	my $vnoderef = GeniXML::FindNodesNS("vnode", $node,
+	my $vnoderef = GeniXML::FindNodesNS("n:vnode", $node,
 					    $EMULAB_NS)->pop();
 	if (defined($vnoderef)) {
 	    $result = GetText("name", $vnoderef);
