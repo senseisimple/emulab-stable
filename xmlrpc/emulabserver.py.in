@@ -3031,6 +3031,7 @@ class experiment:
                       "  and i.role='ctrl' "
                       "where r.pid=%s and r.eid=%s and nt.isvirtnode=1 and "
                       "      (n.type='pcplab' or r.sharing_mode is not null) "
+		      "      and i.IP is not null "
                       "group by n.phys_nodeid",
                       (argdict["proj"], argdict["exp"]))
 
@@ -3152,6 +3153,7 @@ class experiment:
                       "  and i.role='ctrl' "
                       "where r.pid=%s and r.eid=%s and nt.isvirtnode=1 and "
                       "      (n.type='pcplab' or r.sharing_mode is not null) "
+		      "      and i.IP is not null "
                       "group by n.phys_nodeid",
                       (argdict["proj"], argdict["exp"]))
 
