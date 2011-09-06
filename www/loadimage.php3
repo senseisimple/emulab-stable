@@ -79,7 +79,7 @@ $node_pid = $experiment->pid();
 $node_eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
 $project  = $experiment->Project();
-$unix_pid = $project->unix_gid()
+$unix_pid = $project->unix_gid();
 
 # Should check for file file_exists($image_path),
 # but too messy.
