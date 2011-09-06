@@ -647,8 +647,9 @@ sub ErrorLog($)
     return $bootlog;
 }
 
-# Return the component URN. This is how a resource is resolved.
-sub component_urn($)
+# Return the resource URN. This is how a resource is resolved.
+# Resource urns may differ from component_urns (pcvm201-1 rather than pc201).
+sub resource_urn($)
 {
     my ($self)  = @_;
 
@@ -737,6 +738,9 @@ sub AnnotateManifest($)
     my $hostname      = GeniUtil::FindHostname($node->node_id());
     my $phostname     = $hostname;
     my $vhostname     = GeniUtil::FindVHostname($experiment, $node);
+    my $component_urn = GeniHRN::Generate("@OURDOMAIN@", "node",
+					  $node->phys_nodeid())
+;
     
     if ($node->isvirtnode()) {
 	$sshdport  = $node->sshdport();
@@ -752,10 +756,10 @@ sub AnnotateManifest($)
 	    if (defined($sshdport));
 	GeniXML::SetText("sliver_uuid", $rspec, $self->uuid());
 	GeniXML::SetText("sliver_urn", $rspec, $self->sliver_urn());
-	GeniXML::SetText("component_urn", $rspec, $self->component_urn());
+	GeniXML::SetText("component_urn", $rspec, $self->resource_urn());
     } else {
 	GeniXML::SetText("sliver_id", $rspec, $self->sliver_urn());
-	GeniXML::SetText("component_id", $rspec, $self->component_urn());
+	GeniXML::SetText("component_id", $rspec, $component_urn);
 	my $host = GeniXML::FindFirst("n:host", $rspec);
 	if (! defined($host)) {
 	    $host = GeniXML::AddElement("host", $rspec);

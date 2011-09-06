@@ -980,7 +980,7 @@ sub SliverStatus($)
 	}
 
 	my $sliver_urn    = $sliver->sliver_urn();
-	my $component_urn = $sliver->component_urn();
+	my $resource_id = $sliver->resource_id();
 	my $state         = $sliver->state();
 	my $status        = $sliver->status();
 	my $error         = "";
@@ -993,7 +993,7 @@ sub SliverStatus($)
 	    $error = $sliver->ErrorLog();
 	}
 	$blob->{'details'}->{$sliver_urn} = {
-	    "component_urn" => $component_urn,
+	    "component_urn" => $resource_id,
 	    "state"  => $state,
 	    "status" => $status,
 	    "error"  => $error,
