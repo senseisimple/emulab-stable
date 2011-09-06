@@ -746,6 +746,11 @@ sub GetTicketAuxAux($$$$$$$$$)
 				      "members"  => "pc3000 d710",
 				      "weight"   => 0.5});
     }
+    # Need to move this someplace else; the parser adds a bunch.
+    $virtexperiment->NewTableRow("virt_agents",
+				 {"vnode"      => "*",
+				  "vname"      => "ns",
+				  "objecttype" => "6"});
 
     #
     # An rspec is a structure that requests specific nodes. If those
