@@ -980,7 +980,7 @@ sub SliverStatus($)
 	}
 
 	my $sliver_urn    = $sliver->sliver_urn();
-	my $resource_id = $sliver->resource_id();
+	my $resource_id   = $sliver->resource_id();
 	my $state         = $sliver->state();
 	my $status        = $sliver->status();
 	my $error         = "";

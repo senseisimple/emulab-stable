@@ -225,6 +225,7 @@ sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AGGREGATE'}->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub nickname($)		{ return field($_[0], "nickname"); }
+sub resource_id($)      { return $_[0]->nickname(); }
 sub type($)		{ return field($_[0], "type"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
