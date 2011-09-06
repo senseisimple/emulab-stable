@@ -236,6 +236,7 @@ sub Create($$$$)
 {
     my ($class, $pid, $leader, $argref) = @_;
     my $unix_gname = $pid;
+    my $nonlocal   = (exists($argref->{'nonlocal_id'}) ? 1 : 0);
 	
     #
     # The array of inserts is assumed to be safe already. Generate
@@ -313,7 +314,7 @@ sub Create($$$$)
     #
     # Now create the per-project Admin List
     #
-    if ($MAILMANSUPPORT) {
+    if ($MAILMANSUPPORT && !$nonlocal) {
 	my $res = system("$ADDPROJADMINLIST $pid");
 	if ($res != 0) {
 	    SENDMAIL($TBOPS, "Addprojadminlist failed!", 
