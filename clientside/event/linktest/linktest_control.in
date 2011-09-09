@@ -171,7 +171,7 @@ if (! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
 my $unix_gidname = $experiment->GetGroup()->unix_name();
 my $errlog       = $experiment->UserDir() . "/logs/linktest.log";
 my $project      = $experiment->GetProject();
-my $unix_pidname = $project->unix_name()
+my $unix_pidname = $project->unix_name();
 
 #
 # Lets see if there is a linktest running already.
