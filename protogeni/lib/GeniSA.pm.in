@@ -39,6 +39,7 @@ use Time::Local;
 # Configure variables
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
+my $MAINSITE 	   = @TBMAINSITE@;
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $SLICESHUTDOWN  = "$TB/sbin/protogeni/shutdownslice";
@@ -65,6 +66,10 @@ sub GetCredential($)
     my ($argref) = @_;
     my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
+
+    if ($MAINSITE) {
+	print STDERR "Debugging getslicecred()\n";
+    }
 
     #
     # No credential, then return a generic credential giving user permission
