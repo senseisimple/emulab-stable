@@ -3052,9 +3052,14 @@ sub SliverWorkAux($$$$$$$)
 	    }
 	    foreach my $tunnel_sliver (@tunnel_slivers) {
 		my $id = GeniXML::GetInterfaceId($tunnel_sliver->rspec());
-		if (!GeniXML::IsVersion0($linkref)) {
-		    GeniXML::SetText("sliver_id", $ifacexml{$id},
-				     $tunnel_sliver->sliver_urn());
+		my $ifref = $ifacexml{$id};
+		if (defined($ifref)) {
+		    if (!GeniXML::IsVersion0($linkref)) {
+			GeniXML::SetText("sliver_id", $ifref,
+					 $tunnel_sliver->sliver_urn());
+			GeniXML::SetText("component_id", $ifref,
+					 $tunnel_sliver->component_urn());
+		    }
 		}
 		# Find the right interface_ref and update the manifest
 		my $tmp = GeniXML::GetElementByVirtualId($id, 'interface_ref',
@@ -3249,6 +3254,8 @@ sub SliverWorkAux($$$$$$$)
 		}
 		GeniXML::SetText($sliverName, $ifaceref,
 				 $sliver->sliver_urn());
+		GeniXML::SetText("component_id", $outref,
+				 $sliver->component_urn());
 		GeniXML::SetText("component_id", $ifaceref,
 				 $sliver->component_urn());
 	    }
