@@ -67,7 +67,7 @@ sub GetCredential($)
     my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
 
-    if ($MAINSITE) {
+    if (0 && $MAINSITE) {
 	print STDERR "Debugging getslicecred()\n";
     }
 
