@@ -90,7 +90,11 @@ MSERVERLIBS	=
 
 # Master server based image uploader client
 UPLOADFLAGS	= $(CFLAGS)
+ifeq ($(SYSTEM),Linux)
+UPLOADLIBS	= -lrt
+else
 UPLOADLIBS	=
+endif
 UPLOADOBJS	= upload.o uploadio.o log.o network.o utils.o
 
 # Master server based image uploader server
