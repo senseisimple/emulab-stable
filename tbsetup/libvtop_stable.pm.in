@@ -3628,6 +3628,8 @@ sub solution_p2v($)       { return $_[0]->{'SOLUTION'}->{'P2V'}; }
 sub solution_v2p($)	  { return $_[0]->{'SOLUTION'}->{'V2P'}; }
 sub solution_v2v($)	  { return $_[0]->{'SOLUTION'}->{'V2V'}; }
 sub solution_plinks($)	  { return $_[0]->{'SOLUTION'}->{'PLINKS'}; }
+# A per-vlan list of ports spanned by that vlan
+sub solution_portlist($)  { return $_[0]->{'SOLUTION'}->{'PORTLIST'}; }
 sub solution_virtnodes($) { return $_[0]->{'SOLUTION'}->{'VIRTNODES'}; }
 sub solution_delaynodes($){ return $_[0]->{'SOLUTION'}->{'DELAYNODES'}; }
 sub solution_rtabmap($)	  { return $_[0]->{'SOLUTION'}->{'RTABMAP'}; }
@@ -3672,6 +3674,7 @@ sub ClearSolution($)
     $self->{'SOLUTION'}->{'P2V'}         = {};
     $self->{'SOLUTION'}->{'V2V'}         = {};
     $self->{'SOLUTION'}->{'PLINKS'}      = {};
+    $self->{'SOLUTION'}->{'PORTLIST'}    = {};
     $self->{'SOLUTION'}->{'VIRTNODES'}   = {};
     $self->{'SOLUTION'}->{'DELAYNODES'}  = {};
     $self->{'SOLUTION'}->{'RTABMAP'}     = {};
@@ -3728,7 +3731,8 @@ sub AddNodeToSolution($$$)
 
 sub AddLinkToSolution($$$$$$$$)
 {
-    my ($self, $vlink, $trivial, $direct, $nodeA, $portA, $nodeB, $portB) = @_;
+    my ($self, $vlink, $trivial, $direct, $nodeA, $portA,
+	$nodeB, $portB, $portList) = @_;
 	
     #
     # Map the solution back to our objects and store the results.
@@ -3819,6 +3823,13 @@ sub AddLinkToSolution($$$$$$$$)
 
     $self->solution_plinks()->{$vlink} =
 	[$linktag,$virtlan,$trivial,$direct,$member0,$member1];
+    if (! exists($self->solution_portlist()->{$vlink})) {
+	$self->solution_portlist()->{$vlink} = {};
+    }
+    my $porthash = $self->solution_portlist()->{$vlink};
+    foreach my $switchport (@{ $portList }) {
+	$porthash->{$switchport} = 1;
+    }
     if (!$trivial) {
 	$self->printdb("  $vlink ".
 		       (defined($nodeA) ? "A:$nodeA:$portA " : "") .
@@ -3892,6 +3903,7 @@ sub ReadTextSolution($$)
 	/^End Edges$/ && last EDGEWHILE;
         my @info = split;
 	my $line = $_;
+	my $portList = getportlist(@info);
 	$_ = $info[1]; # type
         SWITCH1: {
 	    /^intraswitch$/ && do {
@@ -3947,7 +3959,8 @@ sub ReadTextSolution($$)
 	    }
 	}
 	$self->AddLinkToSolution($vlink, $trivial, $direct,
-				 $nodeA, $portA, $nodeB, $portB);
+				 $nodeA, $portA, $nodeB, $portB,
+				 $portList);
     }
     return 0;
 }
@@ -4030,7 +4043,7 @@ sub ReadRspecSolution($$)
 	    }
 	    
 	    $self->AddLinkToSolution($vlink, $trivial, 0,
-				     $nodeA, $portA, $nodeB, $portB);
+				     $nodeA, $portA, $nodeB, $portB, []);
 	}
 	else {
 	    foreach my $iref (@ifacerefs) {
@@ -4041,7 +4054,8 @@ sub ReadRspecSolution($$)
 	    
 		my $vlink = "linklan/$virtual_id/$virtA";
 	    
-		$self->AddLinkToSolution($vlink, 0, 0, $nodeA, $portA);
+		$self->AddLinkToSolution($vlink, 0, 0, $nodeA, $portA,
+					 undef, undef, []);
 	    }
 	}
     }
@@ -4967,7 +4981,7 @@ sub InterpLinks($)
 				 $firstmember->_pnode(),
 				 $firstmember->_pport(),
 				 $lastmember->_pnode(),
-				 $lastmember->_pport());
+				 $lastmember->_pport(), []);
     }
     return -1
 	if ($self->InterpLinksAux() != 0);
@@ -7515,6 +7529,23 @@ sub getnodeport($)
 	if ($B eq "(null)");
 
     return ($A, $B);
+}
+
+# getportlist
+# Takes the list of arguments on an edges line and returns the set of
+# ports spanned by that vlan.
+sub getportlist(@)
+{
+    my @line = @_;
+    my $result = [];
+    my $i = 3;
+    for (; $i < scalar(@line); $i += 2) {
+	my $field = $line[$i];
+	if ($field =~ /^\(([^,]+),([^,]+)\)$/) {
+	    push(@{ $result }, $1, $2);
+	}
+    }
+    return $result;
 }
 
 # Get the type for an interface.
