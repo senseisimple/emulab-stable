@@ -1,11 +1,11 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007-2010 University of Utah and the Flux Group.
+# Copyright (c) 2007-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
-use Getopt::Std;
+use Getopt::Long;
 use strict;
 
 #
@@ -16,16 +16,16 @@ use strict;
 sub usage()
 {
     print STDERR "Usage: dump-descriptors [-v vers] [-m] filename\n";
+    print STDERR "       dump-descriptors -i imageid [-i imageid] filename\n";
     print STDERR "  -m      dump just the MFS descriptors.\n";
     print STDERR "  -v 1    first generation STD images (FBSD410, RHL90)\n";
     print STDERR "  -v 2    second generation STD images (FBSD62, FC6)\n";
     print STDERR "Default version is 1.\n";
     exit(-1);
 }
-
-my $optlist = "v:m";
 my $version = 1;
 my $mfsonly = 0;
+my $images;
 
 #
 # These are the images/osids we dump out. We of course get the embedded osids.
@@ -100,21 +100,27 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-my %options = ();
-if (! getopts($optlist, \%options)) {
+
+my $optlist = "v:m";
+
+if (! GetOptions("m"    => \$mfsonly,
+		 "v=i"  => \$version,
+		 "i=s@" => \$images)) {
     usage();
 }
-if (defined($options{"v"})) {
-    my $vers = $options{"v"};
-    if (!exists($imagenames{$vers})) {
-	usage();
-    }
-    $version = $vers;
+if (!exists($imagenames{$version})) {
+    usage();
 }
-if (defined($options{"m"})) {
-    $mfsonly    = 1;
+if ($mfsonly) {
     %mappings   = ();
     %imagenames = ();
+}
+elsif (defined($images)) {
+    $version    = 0;
+    $mfsonly    = 0;
+    %mappings   = ();
+    @osnames    = ();
+    %imagenames = ("$version" => $images);
 }
 usage()
     if (@ARGV != 1);
