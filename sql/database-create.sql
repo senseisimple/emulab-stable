@@ -1857,7 +1857,7 @@ DROP TABLE IF EXISTS `lan_attributes`;
 CREATE TABLE `lan_attributes` (
   `lanid` int(11) NOT NULL default '0',
   `attrkey` varchar(32) NOT NULL default '',
-  `attrvalue` tinytext NOT NULL,
+  `attrvalue` text NOT NULL,
   `attrtype` enum('integer','float','boolean','string') default 'string',
   PRIMARY KEY  (`lanid`,`attrkey`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -4606,6 +4606,7 @@ CREATE TABLE `vlans` (
   `pid` varchar(48) NOT NULL default '',
   `virtual` varchar(64) default NULL,
   `members` text NOT NULL,
+  `switchpath` text default NULL,
   `id` int(11) NOT NULL auto_increment,
   `tag` smallint(5) NOT NULL default '0',
   `stack` varchar(32) default NULL,

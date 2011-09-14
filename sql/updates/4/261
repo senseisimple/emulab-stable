@@ -1,0 +1,29 @@
+#
+# Add switch path to vlans.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    # A space separated list of switch pairs. ie: "sw1:sw2 sw2:sw3 ..."
+    if (!DBSlotExists("vlans", "switchpath")) {
+	DBQueryFatal("alter table vlans add `switchpath` ".
+		     "  text default NULL after members");
+    }
+    
+    # Changed the type of this column
+    my $type = DBSlotType("lan_attributes", "attrvalue");
+    if (!$type) {
+	Fatal("No 'attrvalue' slot in 'lan_attributes' table");
+    }
+    if ($type =~ /tinytext/) {
+        DBQueryFatal("ALTER TABLE lan_attributes MODIFY ".
+		     " `attrvalue` text NOT NULL");
+    }
+    return 0;
+}
+
+1;
