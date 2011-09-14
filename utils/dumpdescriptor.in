@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -144,13 +144,14 @@ sub DumpImage($)
 	$xmlfields{"reboot_waittime"} = $osinfo->reboot_waittime()
 	    if (defined($osinfo->reboot_waittime()));
     }
+    
     print "<image>\n";
     foreach my $key (keys(%xmlfields)) {
 	my $val = $xmlfields{$key};
 
-	print "  <attribute name=\"$key\">\n";
-	print "    <value>" . CGI::escapeHTML($val) . "</value>\n";
-	print "  </attribute>\n";
+	print " <attribute name=\"$key\">";
+	print "<value>" . CGI::escapeHTML($val) . "</value>";
+	print "</attribute>\n";
     }
     print "</image>\n";
 
@@ -196,9 +197,9 @@ sub DumpOS($)
     foreach my $key (keys(%xmlfields)) {
 	my $val = $xmlfields{$key};
 
-	print "  <attribute name=\"$key\">\n";
-	print "    <value>" . CGI::escapeHTML($val) . "</value>\n";
-	print "  </attribute>\n";
+	print " <attribute name=\"$key\">";
+	print "<value>" . CGI::escapeHTML($val) . "</value>";
+	print "</attribute>\n";
     }
     print "</osid>\n";
 
