@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniResource;
@@ -2206,13 +2206,15 @@ sub Discover($$$)
     # Do it. 
     #
     my $method_name = "DiscoverResources";
-    my $method_hash = { "available" => "true" };
+    my $method_hash = { "available"     => "true",
+			"rspec_version" => "0.2"};
     my @method_args = ($method_hash);
 
     if ($manager_api eq "AM") {
 	$method_name = "ListResources";
 	@method_args = ([$slice_credential->asString()],
-			{'geni_available' => "true"});
+			{'geni_available' => "true",
+			 'rspec_version'  => "0.2"});
     }
     elsif ($manager_version == 1.0) {
 	$method_hash->{'credential'} = $slice_credential->asString();

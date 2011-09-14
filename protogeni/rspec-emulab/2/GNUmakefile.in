@@ -1,13 +1,18 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../..
-SUBDIR		= protogeni/rspec/2
+SUBDIR		= protogeni/rspec-emulab/2
+
+#
+# Switch our VPATH over to where the actual files live.
+#
+MOSTLY_SRCDIRS  = $(subst rspec-emulab,rspec,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 

@@ -7336,10 +7336,11 @@ outfiles="$outfiles Makeconf GNUmakefile \
         protogeni/GNUmakefile protogeni/security/GNUmakefile \
         protogeni/xmlrpc/GNUmakefile protogeni/lib/GNUmakefile \
         protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
-        protogeni/test/GNUmakefile protogeni/rspec/GNUmakefile \
-        protogeni/rspec/0.1/GNUmakefile \
-	protogeni/rspec/0.2/GNUmakefile \
-	protogeni/rspec/2/GNUmakefile \
+        protogeni/test/GNUmakefile \
+	protogeni/rspec-emulab/GNUmakefile \
+        protogeni/rspec-emulab/0.1/GNUmakefile \
+	protogeni/rspec-emulab/0.2/GNUmakefile \
+	protogeni/rspec-emulab/2/GNUmakefile \
         collab/GNUmakefile \
         collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \

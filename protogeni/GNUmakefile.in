@@ -1,6 +1,6 @@
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ SUBDIR		= protogeni
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= security xmlrpc lib scripts etc rspec
+SUBDIRS	= security xmlrpc lib scripts etc rspec-emulab
 
 all:	all-subdirs
 
@@ -23,7 +23,7 @@ install:
 	@$(MAKE) -C lib install
 	@$(MAKE) -C scripts install
 	@$(MAKE) -C etc install
-	@$(MAKE) -C rspec install
+	@$(MAKE) -C rspec-emulab install
 	@$(MAKE) -C test install
 
 install-genischemacheck:
