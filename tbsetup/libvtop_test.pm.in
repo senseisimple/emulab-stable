@@ -3875,9 +3875,11 @@ sub AddNodeToSolution($$$)
     return 0;
 }
 
-sub AddLinkToSolution($$$$$$$$)
+sub AddLinkToSolution($$$$$$$$;$)
 {
-    my ($self, $vlink, $trivial, $direct, $nodeA, $portA, $nodeB, $portB) = @_;
+    my ($self,
+	$vlink, $trivial, $direct, $nodeA, $portA, $nodeB, $portB,
+	$switchpath) = @_;
 	
     #
     # Map the solution back to our objects and store the results.
@@ -3900,6 +3902,7 @@ sub AddLinkToSolution($$$$$$$$)
     }
     elsif (($lan,$virtA) =
 	   ($vlink =~ m|^linkdelaysrc/([^/]+)/(.+)$|)) {
+	# This is the link between the original node and the delay node.
 	$virtlan = $self->vlans()->{$lan};
 	$member0 = $virtlan->members()->{$virtA};
 	$member0->_pnode($nodeA);
@@ -3946,10 +3949,13 @@ sub AddLinkToSolution($$$$$$$$)
     }
     elsif (($lan,$virtA) =
 	   ($vlink =~ m|^linkdelaydst/([^/]+)/(.+)$|)) {
+	# This is the link between the delay node and lannode.
 	$virtlan = $self->vlans()->{$lan};
 	# Special case since the other side is a lannode.
 	$member0 = $virtlan->members()->{$virtA};
 	$member0->_delayportB($portB);
+	# Stash the path here. Silly, but its easier.
+	$member0->_delaypath($switchpath);
     }
     elsif (($lan,$virtA,$virtB) =
 	   ($vlink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|)) {
@@ -3960,6 +3966,8 @@ sub AddLinkToSolution($$$$$$$$)
 	$member0->_pport($portA);
 	$member0->_delaynode($nodeB);
 	$member0->_delayport($portB);
+	# Stash the path here. Silly, but its easier.
+	$member0->_delaypath($switchpath);
     }
     else {
 	tberror("Bad vlink in solution: $vlink\n");
@@ -3967,7 +3975,7 @@ sub AddLinkToSolution($$$$$$$$)
     }
 
     $self->solution_plinks()->{$vlink} =
-	[$linktag,$virtlan,$trivial,$direct,$member0,$member1];
+	[$linktag,$virtlan,$trivial,$direct,$member0,$member1,$switchpath];
     if (!$trivial) {
 	$self->printdb("  $vlink ".
 		       (defined($nodeA) ? "A:$nodeA:$portA " : "") .
@@ -4037,18 +4045,23 @@ sub ReadTextSolution($$)
 	my ($vlink,$rawA,$rawB) = undef;
 	my $trivial = 0;
 	my $direct  = 0;
+	my $swpath  = undef;
 
 	/^End Edges$/ && last EDGEWHILE;
         my @info = split;
 	my $line = $_;
-	$_ = $info[1]; # type
-        SWITCH1: {
+	my $type = $info[1];
+        SWITCH1: for ($type) {
 	    /^intraswitch$/ && do {
 		($vlink,$rawA,$rawB) = @info[0,3,5];
 		last SWITCH1;
 	    };
 	    /^interswitch$/ && do {
 		($vlink,$rawA,$rawB) = @info[0,3,$#info];
+		#
+		# We need to save the path through the switches for later.
+		#	
+		$swpath = getportlist(@info);
 		last SWITCH1;
 	    };
 	    /^direct$/ && do {
@@ -4069,7 +4082,7 @@ sub ReadTextSolution($$)
 	my ($nodeportA,$nodeportB) = undef;
 	my ($switchportA,$switchportB) = undef;
 	my ($nodeA,$portA,$nodeB,$portB) = undef;
-	
+
 	if (!$trivial) {
 	    ($nodeportA,$switchportA) = getnodeport($rawA);
 	    if (defined($nodeportA)) {
@@ -4096,7 +4109,7 @@ sub ReadTextSolution($$)
 	    }
 	}
 	$self->AddLinkToSolution($vlink, $trivial, $direct,
-				 $nodeA, $portA, $nodeB, $portB);
+				 $nodeA, $portA, $nodeB, $portB, $swpath);
     }
     return 0;
 }
@@ -5298,7 +5311,7 @@ sub InterpLinksAux($)
     while (@plinks) {
 	my $plink = shift(@plinks);
 	
-	my ($linktag,$virtlan,$trivial,$direct,$member0,$member1) =
+	my ($linktag,$virtlan,$trivial,$direct,$member0,$member1,$pathA) =
 	    @{$plinks{$plink}};
 	my $lan = $virtlan->vname();
 
@@ -5314,6 +5327,8 @@ sub InterpLinksAux($)
 	else {
 	    $self->printdb("plink $plink\n");
 	}
+	$self->printdb("  path - $pathA\n")
+	    if (defined($pathA));
 
 	# There is always a member0.
 	my $virtA  = $member0;
@@ -5343,10 +5358,13 @@ sub InterpLinksAux($)
 	    my $portB = $member0->_delayport();
 	    my $nodeD = $member1->_delaynode();
 	    my $portD = $member1->_delayport();
+	    my $pathB = $member0->_delaypath();
 
 	    $self->printdb("LINK delay: $virtA,$virtC - ".
 			   "$nodeA:$portA,$nodeB:$portB,".
 			   "$nodeD:$portD,$nodeC:$portC\n");
+	    $self->printdb(" path - $pathB\n")
+		if (defined($pathB));
 
 	    my $protolan    = ProtoLan->Create($experiment, "$lan",
 					       $self->impotent() ||
@@ -5367,6 +5385,10 @@ sub InterpLinksAux($)
 	    $protolandst->SetRole("delay");
 	    $protolansrc->SetAttribute("link/lan", $lan);
 	    $protolandst->SetAttribute("link/lan", $lan);
+	    $protolansrc->SetAttribute("switchpath", "$pathA")
+		if (defined($pathA));
+	    $protolandst->SetAttribute("switchpath", "$pathB")
+		if (defined($pathB));
 	    $protolan->SetRole("link/lan");
 	    $protolan->AddInterface($nodeC, $vnodeC, $vportC, $portC);
 	    $protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -5399,6 +5421,7 @@ sub InterpLinksAux($)
 	    # The delay node port/links
 	    my $nodeB = $member0->_delaynode();
 	    my $portB = $member0->_delayport();
+	    my $pathB = $member0->_delaypath();
 	    my $nodeD = $nodeB;
 	    my $portD = $member0->_delayportB();
 
@@ -5435,13 +5458,19 @@ sub InterpLinksAux($)
 		$protolanlan->SetAttribute("link/lan", $lan);
 	    }
 	    $protolanlan->AddMember($nodeD, $portD);
-	
+	    if (defined($pathB)) {
+		my $path = $protolanlan->GetAttribute("switchpath");
+		$protolanlan->SetAttribute("switchpath",
+					   AddToSwitchPath($path, $pathB));
+	    }
 	    my $protolanlink = ProtoLan->Create($experiment, $dlink,
 						$self->impotent(),
 						$protolan);
 	    $protolanlink->SetType("vlan");
 	    $protolanlink->SetRole("delay");
 	    $protolanlink->SetAttribute("link/lan", $lan);
+	    $protolanlink->SetAttribute("switchpath", "$pathA")
+		if (defined($pathA));
 	    $protolanlink->AddMember($nodeA, $portA);
 	    $protolanlink->AddMember($nodeB, $portB);
 
@@ -5697,6 +5726,8 @@ sub InterpLinksAux($)
 			$protovlan->SetType("vlan");
 			$protovlan->SetEncapStyle($virtlan->_encapstyle());
 			$protovlan->SetAttribute("link/lan", $lan);
+			$protovlan->SetAttribute("switchpath", "$pathA")
+			    if (defined($pathA));
 			$protovlans{$lan} = $protovlan;
 
 			$protovlan->AddMember($nodeA, $portA)
@@ -5719,6 +5750,8 @@ sub InterpLinksAux($)
 			$vlan_type = "vlan";
 			$vlan_role = "emulated";
 			$protolink->SetAttribute("link/lan", $lan);
+			$protolink->SetAttribute("switchpath", "$pathA")
+			    if (defined($pathA));
 		    }
 		    $protolink->SetType($vlan_type);
 		    $protolink->SetRole($vlan_role);
@@ -5751,6 +5784,8 @@ sub InterpLinksAux($)
 		    $protolink->SetType(($direct ? "direct" : "vlan"));
 		    $protolink->SetRole("link/lan");
 		    $protolink->SetAttribute("link/lan", $lan);
+		    $protolink->SetAttribute("switchpath", "$pathA")
+			if (defined($pathA));
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
 		    $protovlans{$lan} = $protolink;
@@ -5873,6 +5908,12 @@ sub InterpLinksAux($)
 			}
 			$protovlan->AddMember($nodeA, $portA)
 			    if (!$protovlan->IsMember($nodeA, $portA));
+
+			if (defined($pathA)) {
+			    my $path = $protolan->GetAttribute("switchpath");
+			    $protolan->SetAttribute("switchpath",
+						AddToSwitchPath($path, $pathA));
+			}
 		    }
 		
 		    #
@@ -5994,6 +6035,18 @@ sub InterpLinksAux($)
 			    ProtoLan->Lookup($experiment,
 					     $lan . "-delaylan");
 			$protolanlan->AddMember($nodeA, $portA);
+			if (defined($pathA)) {
+			    my $path = $protolanlan->GetAttribute("switchpath");
+			    $protolanlan->SetAttribute("switchpath",
+					       AddToSwitchPath($path, $pathA));
+			}
+		    }
+		    else {
+			if (defined($pathA)) {
+			    my $path = $protolan->GetAttribute("switchpath");
+			    $protolan->SetAttribute("switchpath",
+					    AddToSwitchPath($path, $pathA));
+			}
 		    }
 		}
 	    }
@@ -8066,6 +8119,36 @@ sub getnodeport($)
     return ($A, $B);
 }
 
+# getportlist
+# Takes the list of arguments on an edges line and returns the set of
+# ports spanned by that vlan.
+sub getportlist(@)
+{
+    my @info   = @_;
+    my @result = ();
+    # The beginning and end of the list are ignored for the path
+    # since we care only about the Trunk links.
+    @info = splice(@info, 4, $#info);
+    while (@info) {
+	#
+	# Traverse two at a time. We can deduce the switch pair
+	# from the first string, but thats a kludge.  The
+	# second string is supposed to be real interface info,
+	# but ignore that for now, until new ptopgen actually
+	# sets it.
+	#
+	my $field1 = shift(@info);
+	my $field2 = shift(@info);
+
+	if ($field1 =~ /^link\-/ &&
+	    $field2 eq "((null),(null))") {
+	    $field1 =~ s/^link\-//;
+	    push(@result, $field1);
+	}
+    }
+    return join(" ", @result);
+}
+
 # Get the type for an interface.
 sub physinterfacetype($$)
 {
@@ -8556,6 +8639,36 @@ sub VnameToNode($$)
 	if (!defined($nodeid));
 
     return Node->Lookup($nodeid);
+}
+
+#
+# A switchpath is "SW1:SW2 SW2:SW3 ..." This function takes an
+# existing path, and adds new ones from the list, while watching for
+# duplicates.  We assume the new path is already unique since it came
+# right out of assign. Note that assign might spit out either SW1:SW2
+# or SW2:SW1, so have to watch for that too.
+#
+sub AddToSwitchPath($$)
+{
+    my ($cur, $new) = @_;
+
+    print "N: $new\n";
+
+    return $new
+	if (!defined($cur));
+
+    my @cur = split(" ", $cur);
+    my @new = split(" ", $new);
+    foreach my $n (@new) {
+	my ($s1,$s2) = split(":", $n);
+
+	print "$n, $s1, $s2, @cur\n";
+
+	push(@cur, $n)
+	    if (! ((grep {$_ eq $n} @cur) ||
+		   (grep {$_ eq "$s2:$s1"} @cur)));
+    }
+    return join(" ", @cur);
 }
 
 1;
