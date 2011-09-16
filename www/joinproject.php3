@@ -343,10 +343,10 @@ function SPITFORM($formfields, $returning, $errors)
 	    #
 	    echo "<tr>
                      <td colspan=2>Upload your SSH Pub Key[<b>2</b>]:<br>
-                                       (1K max)</td>
+                                       (4K max)</td>
    
                      <td>
-                          <input type=hidden name=MAX_FILE_SIZE value=1024>
+                          <input type=hidden name=MAX_FILE_SIZE value=4096>
                           <input type=file
                                  size=50
                                  name=usr_keyfile ";
