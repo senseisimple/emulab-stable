@@ -126,7 +126,7 @@ sub power {
     if (not defined $output) {
 	    print STDERR $self->{DEVICENAME}, ": could not execute power command \"$op\" for ports @ports\n";
 	    $errors++;
-    } elsif ("@$output" !~ /^OK$/) {
+    } elsif ($$output[-1] !~ /^\s*OK$/) {
 	    print STDERR $self->{DEVICENAME}, ": power command \"$op\" failed with error @$output\n";
 	    $errors++;
     }
