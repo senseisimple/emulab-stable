@@ -111,7 +111,7 @@ sub new($$;$) {
     return $self;
 }
 
-sub power {
+sub _icebox_power {
     my ($self, $op, @ports) = @_;
 
     my $errors = 0;
@@ -119,7 +119,6 @@ sub power {
 
     if    ($op eq "on")  { $op = "power on";    }
     elsif ($op eq "off") { $op = "power off";   }
-    elsif ($op =~ /cyc/) { $op = "reset"; }
     
     $output = $self->_icebox_exec($self->{DEVICENAME}, $op . ' ' . join(',', @ports));
 
@@ -132,6 +131,23 @@ sub power {
     }
 
     return $errors;
+}
+
+sub power {
+	my ($self, $op, @ports) = @_;
+	my $rc;
+	
+	if ($op =~ /cyc/) {
+		$rc = $self->_icebox_power("off", @ports);
+		if (!$rc) {
+			sleep(3); # XXX Is three seconds enough?
+			$rc = $self->_icebox_power("on", @ports);
+		}
+	} else {
+		$rc = $self->_icebox_power($op, @ports);
+	}
+
+	return $rc;
 }
 
 sub status {
