@@ -143,10 +143,22 @@ sub DumpImage($)
 	    if (defined($osinfo->osfeatures()) && $osinfo->osfeatures() ne "");
 	$xmlfields{"reboot_waittime"} = $osinfo->reboot_waittime()
 	    if (defined($osinfo->reboot_waittime()));
+	# whole disk images are described differently in EZ format
+	if ($image->loadpart() == 0 && $image->loadlength() == 4) {
+	    $xmlfields{"wholedisk"} = 1;
+	    # find the partition which has an osid defined
+	    for (my $i = 1; $i <= 4; $i++) {
+		my $foo = $image->field("part${i}_osid");
+		if (defined($foo)) {
+		    $xmlfields{"loadpart"} = $i;
+		    last;
+		}
+	    }
+	}
     }
     
     print "<image>\n";
-    foreach my $key (keys(%xmlfields)) {
+    foreach my $key (sort keys(%xmlfields)) {
 	my $val = $xmlfields{$key};
 
 	print " <attribute name=\"$key\">";
@@ -194,7 +206,7 @@ sub DumpOS($)
     }
 
     print "<osid>\n";
-    foreach my $key (keys(%xmlfields)) {
+    foreach my $key (sort keys(%xmlfields)) {
 	my $val = $xmlfields{$key};
 
 	print " <attribute name=\"$key\">";
