@@ -8,12 +8,13 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= protogeni
+RSPECGENI       = $(SRCDIR)/rspec-geni/.git
 
 include $(OBJDIR)/Makeconf
 
 SUBDIRS	= security xmlrpc lib scripts etc rspec-emulab
 
-all:	all-subdirs
+all:	check-submodule all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -25,6 +26,16 @@ install:
 	@$(MAKE) -C etc install
 	@$(MAKE) -C rspec-emulab install
 	@$(MAKE) -C test install
+
+check-submodule:
+	@if [ ! -e "rspec-emulab" ]; then \
+	    echo '*** rspec-emulab does not exist; you need to reconfigure!'; \
+	    false; \
+	fi
+	@if [ ! -e "$(RSPECGENI)" ]; then \
+	    echo '*** rspec-geni has not been updated; you need to reconfigure!'; \
+	    false; \
+	fi
 
 install-genischemacheck:
 	@$(MAKE) -C lib install-genischemacheck

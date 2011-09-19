@@ -857,6 +857,20 @@ if test "$TBMAINSITE" = 1; then
 fi
 
 #
+# Check for protogeni rspec.
+#
+if test "$PROTOGENI_SUPPORT" = "1"; then
+   if test ! -e "$srcdir/protogeni/rspec-geni/.git"; then
+	AC_MSG_WARN([protogeni/rspec-geni submodule not intialized yet]);
+	echo "Please cd into your source directory and run:"
+	echo "    git submodule init"
+	echo "    git submodule update"
+	echo "Then rerun configure in your object tree"
+	exit 1;
+   fi
+fi
+
+#
 # Merge build
 #
 MERGE_BUILD=0
