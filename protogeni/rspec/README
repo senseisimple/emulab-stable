@@ -1,0 +1,52 @@
+--------
+Manifest
+--------
+
+There are four directories:
+
+0.1, 0.2, and 2 are all versions of the core rspec. These are all
+stable versions and should only be changed if there is a
+backwards-compatible bugfix.
+
+In these directories, the *.rnc files are human-readable source and
+*.xsd are generated schemas. The exception to the rule is the file
+'2/any-extension-schema.xsd' which is a hand-made conversion of
+'any-extension.rnc' because Trang imperfectly translates the rnc file.
+
+The ext directory houses extensions meant for general
+publication. Each extension is maintained by the institution described
+in the MAINTENANCE file. You should only change an extension if it is
+maintained by you or if you have the approval of the maintainer.
+
+---------
+rspeclint
+---------
+
+rspeclint is a standalone perl script which can be used to verify a
+core schema and zero or more extension schemas against an XML
+file. The command line to run it is:
+
+./rspeclint [[<namespace> <schema>] ...] <document>
+
+It will verify the XML document using the pairs of namespace, schema
+to verify particular namespaces against schema paths or URLs against a
+document. It will also use the schemaLocation tag inside of the XML
+document to verify. If the command line namespace/schema pairs do not
+match those in the schemaLocation tag, it will flag an error.
+
+--------
+Building
+--------
+
+To build the schemas, run
+
+gmake all
+
+This will create .xsd files from the .rnc files in the 0.1, 0.2, and 2
+directories. To build the .xsd files, you will need to have Trang
+installed. When running Make, the TRANG environment variable should be
+set to the Java command line that should be used to execute TRANG.
+
+The ad/request/manifest files can be removed with:
+
+gmake clean
