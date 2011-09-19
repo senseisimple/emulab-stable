@@ -1,0 +1,3 @@
+[submodule "protogeni/rspec-geni"]
+	path = protogeni/rspec-geni
+	url = git-public.flux.utah.edu:/flux/git/geni-rspec.git

@@ -12,7 +12,7 @@ SUBDIR		= protogeni/rspec-emulab/0.2
 #
 # Switch our VPATH over to where the actual files live.
 #
-MOSTLY_SRCDIRS  = $(subst rspec-emulab,rspec,$(SRCDIR))
+MOSTLY_SRCDIRS  = $(subst rspec-emulab,rspec-geni,$(SRCDIR))
 
 include $(OBJDIR)/Makeconf
 
