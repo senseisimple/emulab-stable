@@ -20,10 +20,12 @@ use libdb;
 use libptopnew;
 use GeniXML;
 
+sub usage();
 sub processArgs();
 sub consultDatabase();
 sub process();
 sub printResults();
+sub printTypeLimits($);
 
 #
 # Turn off line buffering on output
@@ -32,14 +34,75 @@ $| = 1;
 
 my $print_xml = 0;
 my $print_ns = $GeniXML::RSPEC_2_NS;
+my $typelimitfile;
 
 # Initialize permissions table for the current project
 processArgs();
 consultDatabase();
 printResults();
 
+sub usage()
+{
+    print("Usage: ptopgen [-p pid [-e eid]] [-v] [-r] [-S] [-s switch]\n".
+	  "               [-h] [-a] [-m multiplex_factor] [-u] [-d]\n".
+	  "               [-c delay_capacity] [-x] [-g (0.1 | 0.2 | 2)]\n".
+	  "               [-l type-limit-file] [-1 component_name]\n\n" .
+	  "       -p User project. May restrict nodes and osids.\n".
+	  "       -e User experiment. Nodes and bandwidth allocated to\n" .
+	  "          this experiment are reported as free.\n" .
+	  "       -v Include virtual node types\n".
+	  "       -r Include widearea nodes\n".
+	  "       -S Include simulated node types and flags\n".
+	  "       -s Switch to use (UNIMPLEMENTED)\n".
+	  "       -h Include shared nodes\n".
+	  "       -a Include reserved nodes\n".
+	  "       -m Override multiplex_factor\n".
+	  "       -u Prune unused interfaces of allocated nodes (-e)(UNIMPLEMENTED)\n".
+	  "       -d Debug mode -- prints to stderr any problems in the database".
+	  "       -c Override delay capacity\n".
+	  "       -x Output in an RSpec xml format\n".
+	  "       -g version With -x, geni version. Must be '0.1', '0.2' or '2'\n".
+	  "       -l specifies the location of the type limit file\n" .
+          "       -1 Print an rspec containing only the node component-name(UNIMPLEMENTED)");
+        exit(-1);
+}
+
 sub processArgs()
 {
+    #
+    # Parse command arguments. Once we return from getopts, all that should be
+    # left are the required arguments.
+    #
+    my $optlist = "p:e:vrSs:ham:udc:xg:l:1:";
+    my %options = ();
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+    if (@ARGV) {
+	usage();
+    }
+    if (defined($options{"x"})) {
+	$print_xml = 1;
+	if (! $libptopnew::PGENISUPPORT) {
+	    usage();
+	}
+	my $mode = $options{"g"};
+	if (defined($mode)) {
+	    if ($mode eq "0.1") {
+		$print_ns = $GeniXML::RSPEC_0_1_NS;
+	    } elsif ($mode eq "0.2") {
+		$print_ns = $GeniXML::RSPEC_0_2_NS;
+	    } elsif ($mode eq "2") {
+		$print_ns = $GeniXML::RSPEC_2_NS;
+	    } else {
+		usage();
+	    }
+	}
+    }
+    if (defined($options{"l"})) {
+	$typelimitfile = $options{"l"};
+    }
+    libptopnew::ProcessArgs(\%options);
 }
 
 sub consultDatabase()
@@ -83,6 +146,33 @@ sub printResults()
 {
     my $doc = GeniXML::CreateDocument($print_ns, "rspec");
     my $rspec = $doc->documentElement();
+    $rspec->setNamespace($GeniXML::XSI_NS, "xsi", 0);
+    if (! GeniXML::IsVersion0($rspec)) {
+	$rspec->setNamespace($GeniXML::EMULAB_NS, "emulab", 0);
+	my $ns = $GeniXML::RSPEC_2_NS;
+	my $emulabns = $GeniXML::EMULAB_NS;
+	my $emulaburl = "http://www.protogeni.net/resources/rspec/ext/emulab/1/ptop_extension.xsd";
+	$rspec->setAttributeNS($GeniXML::XSI_NS, "xsi:schemaLocation",
+			       "$ns $ns/ad.xsd $emulabns $emulaburl");
+	#	if (defined($MAINSITE) && $MAINSITE) {
+	#	    Add stitching namespace and schemaLocation
+	#	}
+    }
+    $rspec->setAttribute("type", "advertisement");
+    my @times = gmtime(time());
+    my $generated = sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ",
+			    $times[5] + 1900, $times[4] + 1, $times[3],
+			    $times[2], $times[1], $times[0]);
+    $rspec->setAttribute("generated", $generated);
+    my $expiration = sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ",
+			     $times[5] + 1900, $times[4] + 1, $times[3],
+			     $times[2], $times[1], $times[0]);
+    if (GeniXML::IsVersion0($rspec)) {
+	$rspec->setAttribute("valid_until", $expiration);
+    } else {
+	$rspec->setAttribute("expires", $expiration);
+    }
+    
     foreach my $current (values(%{ libptopnew::Nodes() })) {
 	if ($current->willPrint()) {
 	    if ($print_xml) {
@@ -101,7 +191,33 @@ sub printResults()
 	    }
 	}
     }
+    printTypeLimits($rspec);
     if ($print_xml) {
 	print GeniXML::Serialize($rspec, 1)."\n";
+    }
+}
+
+sub printTypeLimits($)
+{
+    my ($rspec) = @_;
+    if (defined($typelimitfile)) {
+	open(TYPELIMIT, "<$typelimitfile") or 
+	    die("Count not open type limit file $typelimitfile\n");
+	my @typelimits = <TYPELIMIT>;
+	close(TYPELIMIT);
+
+	foreach my $line (@typelimits) { 
+	    chomp($line);
+	    my ($typeclass, $count) = split(" ", $line);
+	    
+	    if ($print_xml && ! GeniXML::IsVersion0($rspec)) {
+		my $limit = GeniXML::AddElement("set_type_limit", $rspec,
+						$GeniXML::EMULAB_NS);
+		GeniXML::SetText("typeclass", $limit, $typeclass);
+		GeniXML::SetText("count", $limit, $count);
+	    } else {
+		print "set-type-limit $typeclass $count\n";
+	    }
+	}
     }
 }

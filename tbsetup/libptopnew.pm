@@ -20,7 +20,7 @@ sub FD_ADDITIVE  { return "FD_ADDITIVE"; }
 sub FD_FIRSTFREE { return "FD_FIRSTFREE"; }
 sub FD_ONCEONLY  { return "FD_ONCEONLY"; }
 
-my $PGENISUPPORT = 1;
+our $PGENISUPPORT = 1;
 my $OURDOMAIN = "jonlab.tbres.emulab.net";
 my $MAINSITE  = 0;
 #my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
@@ -40,14 +40,19 @@ if ($PGENISUPPORT) {
 
 my $user_project = undef;
 my $exempt_eid = undef;
-my $available_only = 0;
+my $available_only = 1;
 my $print_widearea = 0;
-my $print_shared = 1;
-my $print_virtual = 1;
-my $print_sim = 1;
-my $genimode = 1;
+my $print_shared = 0;
+my $print_virtual = 0;
+my $print_sim = 0;
+my $genimode = 0;
 my $delaycap_override = undef;
 my $multiplex_override = undef;
+my $debug = 0;
+
+my $default_longitude = undef;
+my $default_latitude = undef;
+my $default_country = undef;
 
 our %nodeList = ();
 our %linkList = ();
@@ -84,6 +89,49 @@ our %itype_bw = ();
 # exempt_eid's bandwidth added back in.
 our %sharedbw = ();
 
+sub ProcessArgs($)
+{
+    my ($optionsRef) = @_;
+    my %options = %{ $optionsRef };
+    if (defined($options{"p"})) {
+	$user_project = $options{"p"};
+    }
+    if (defined($options{"e"})) {
+	$exempt_eid = $options{"e"};
+	usage()
+	    if (!defined($user_project));
+    }
+    if (defined($options{"v"})) {
+	$print_virtual = 1;
+    }
+    if (defined($options{"r"})) {
+	$print_widearea = 1;
+    }
+    if (defined($options{"S"})) {
+	$print_sim = 1;
+    }
+    if (defined($options{"h"})) {
+	$print_shared = 1;
+    }
+    if (defined($options{"a"})) {
+	$available_only = 0;
+    }
+    if (defined($options{"m"})) {
+	$multiplex_override = $options{"m"};
+    }
+    if (defined($options{"d"})) {
+	$debug = 1;
+    }
+    if (defined($options{"c"})) {
+	$delaycap_override = $options{"c"};
+    }
+    if (defined($options{"g"})) {
+	$genimode = 1;
+	$print_shared = 1;
+	$print_virtual = 1;
+    }
+}
+
 #
 # Initialize nodes hash based on nodes, reservations, and node_status tables
 #
@@ -111,6 +159,10 @@ sub LookupNodes()
     while ($row = $dbresult->fetchrow_hashref()) {
 	$nodeList{$row->{'node_id'}}->set_widearea($row);
     }
+
+    TBGetSiteVar('general/default_longitude', \$default_longitude);
+    TBGetSiteVar('general/default_latitude', \$default_latitude);
+    TBGetSiteVar('general/default_country', \$default_country);
 }
 
 #
@@ -247,12 +299,15 @@ sub LookupOsids()
     }
     $dbresult =
 	DBQueryFatal("select distinct oi.osid, oi.type ".
-		     "from osidtoimageid as oi ".
+		     "from os_info as o ".
+		     "left join osidtoimageid as oi on o.osid=oi.osid ".
 		     "left join images as i on oi.imageid = i.imageid ".
 		     "where i.global = 1 $pidos");
     while (my ($osid, $typename) = $dbresult->fetchrow()) {
-	hashpush(\%type_osid, $typename, $osid);
-	hashpush(\%osid_type, $osid, $typename);
+	if (defined($typename)) {
+	    hashpush(\%type_osid, $typename, $osid);
+	    hashpush(\%osid_type, $osid, $typename);
+	}
     }
 
     #
@@ -321,6 +376,8 @@ sub LookupInterfaces()
 	my $key = $row->{'node_id'}.':'.$row->{'iface'};
 	my $iface = Interface->LookupRow($row, $states{$key});
 	$interfaceList{$key} = $iface;
+	my $node = $nodeList{$row->{'node_id'}};
+	$node->addInterface($row->{'iface'});
     }
 
     $dbresult =
@@ -419,37 +476,37 @@ sub LookupLinks()
 	    my $node2 = $nodeList{$node_id2};
 	    if (defined($node1)) {
 		$node1->addConnection($node_id2);
-	    } else {
+	    } elsif ($debug) {
 		print STDERR "Unknown node: $node_id1\n";
 	    }
 	    if (defined($node2)) {
 		$nodeList{$node_id2}->addConnection($node_id1);
-	    } else {
+	    } elsif ($debug) {
 		print STDERR "Unknown node: $node_id2\n";
 	    }
 	}
 	if ($type eq 'Trunk') {
 	    # This is a switch/switch link potentially trunked to other wires.
-	    if (! defined($iface1)) {
+	    if (! defined($iface1) && $debug) {
 		print STDERR "Undefined interface for ".
 		    "$node_id1:$card1:$port1\n";
 	    }
-	    if (! defined($iface2)) {
+	    if (! defined($iface2) && $debug) {
 		print STDERR "Undefined interface for ".
 		    "$node_id2:$card2:$port2\n";
 	    }
 	    my ($source, $dest, $sourcebw, $destbw);
-	    if ($node_id1 le $node_id2) {
+#	    if ($node_id1 le $node_id2) {
 		$source = $node_id1;
 		$dest = $node_id2;
 		$sourcebw = SwitchBandwidth($node_id1, $iface1);
 		$destbw = SwitchBandwidth($node_id2, $iface2);
-	    } else {
-		$source = $node_id2;
-		$dest = $node_id1;
-		$sourcebw = SwitchBandwidth($node_id2, $iface2);
-		$destbw = SwitchBandwidth($node_id1, $iface1);
-	    }
+#	    } else {
+#		$source = $node_id2;
+#		$dest = $node_id1;
+#		$sourcebw = SwitchBandwidth($node_id2, $iface2);
+#		$destbw = SwitchBandwidth($node_id1, $iface1);
+#	    }
 	    my $name = "link-$source:$dest";
 	    if (! exists($linkList{$name})) {
 		$linkList{$name} = libptop::plink->CreateTrunk($name,
@@ -522,11 +579,7 @@ sub SwitchBandwidth($$)
     # a node which doesn't exist, for instance.
     my $result = Math::BigInt->new(100000);
     if (defined($node)) {
-	my $basetype = undef;
-	$node->node()->NodeTypeAttribute("forwarding_protocols", \$basetype);
-	if (! defined($basetype)) {
-	    $basetype = "ethernet";
-	}
+	my $basetype = $node->get_basetype();
 	$result = TypeBandwidth($nodename, $iface, $basetype);
     }
     return $result;
@@ -563,6 +616,49 @@ sub ShareBandwidth($$)
     return Math::BigInt->new($result);
 }
 
+sub make_ip($)
+{
+    my ($in) = @_;
+    my @octets = split(/\./, $in);
+    my $result = 0;
+    my $i = 0;
+    for (; $i < scalar(@octets); ++$i) {
+	$result = (($result << 8) | $octets[$i]);
+    }
+    return $result;
+}
+
+sub is_routable($)
+{
+    my @privateIps   = (make_ip("10.0.0.0"), make_ip("172.16.0.0"),
+			make_ip("192.168.0.0"));
+    my @privateMasks = (8, 12, 16);
+
+    my ($in) = @_;
+    my $result = 0;
+    if (defined($in) && $in =~ /\d+\.\d+\.\d+\.\d+/) {
+	$result = 1;
+	my $ip = make_ip($in);
+	my $i = 0;
+	for ($i = 0; $i < scalar(@privateIps); ++$i) {
+	    my $mask = (0xffffffff << (32 - $privateMasks[$i]));
+	    if (($ip & $mask) == ($privateIps[$i] & $mask)) {
+		$result = 0;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub is_public_interface($)
+{
+    my ($key) = @_;
+    my $result = (exists($interfaceList{$key})
+		  && $interfaceList{$key}->role() eq "ctrl"
+		  && is_routable($interfaceList{$key}->IP()));
+    return $result;
+}
+
 # Push a value onto an array contained within a hash
 sub hashpush($$$)
 {
@@ -580,7 +676,8 @@ sub hashpush($$$)
 
 package libptop::pnode;
 
-use libdb qw(TBOSID TB_OPSPID);
+use libdb qw(TBOSID TB_OPSPID TBDB_NODESTATE_ISUP TBDB_NODESTATE_PXEWAIT
+             TBDB_NODESTATE_POWEROFF TBDB_NODESTATE_ALWAYSUP);
 
 sub Create($$)
 {
@@ -595,6 +692,7 @@ sub Create($$)
     $self->{'GLOBALCOUNT'} = undef;
     $self->{'AUXTYPES'} = {};
     $self->{'CONNECTIONS'} = {};
+    $self->{'INTERFACES'} = [];
     $self->{'STATUS'} = undef;
     $self->{'WIDEAREA'} = undef;
 
@@ -612,6 +710,23 @@ sub status($)      { return $_[0]->{'STATUS'}; }
 sub set_globalcount { $_[0]->{'GLOBALCOUNT'} = $_[1]; }
 sub set_status($)   { $_[0]->{'STATUS'} = $_[1]; }
 sub set_widearea($) { $_[0]->{'WIDEAREA'} = $_[1]; }
+
+sub get_basetype($)
+{
+    my ($self) = @_;
+    my $result = undef;
+    $self->node()->NodeTypeAttribute("forwarding_protocols", \$result);
+    if (! defined($result)) {
+	$result = "ethernet";
+    }
+    return $result;
+}
+
+sub is_exclusive($)
+{
+    my ($self) = @_;
+    return ! ($self->node()->sharing_mode());
+}
 
 sub widearea($$)
 {
@@ -808,6 +923,12 @@ sub addConnection($$)
 {
     my ($self, $name) = @_;
     $self->{'CONNECTIONS'}->{$name} = 1;
+}
+
+sub addInterface($$)
+{
+    my ($self, $name) = @_;
+    push(@{ $self->{'INTERFACES'} }, $name);
 }
 
 sub processSwitch($)
@@ -1079,6 +1200,8 @@ sub processOsFeatures($)
 	    }
 	}
     } elsif (exists($type_osid{$node->type()})) {
+#	my $default = $self->type()->default_osid();
+#	my $default_used = 0;
 	#
 	# Add in features for all of the OSes that this node (as
 	# evidenced by its type) can support
@@ -1088,7 +1211,15 @@ sub processOsFeatures($)
 	    foreach my $o2 (@{ $osid_subosid{$o1} }) {
 		$self->addFeature('OS-'.$o1.'-'.$o2, 0);
 	    }
+#	    if ($o1 eq $default) {
+#		print STDERR "Equal: OS-".$o1."\n";
+#		$default_used = 1;
+#	    }
 	}
+#	if (! $default_used) {
+#	    print STDERR "OS-".$default."\n";
+#	    $self->addFeature('OS-'.$default, 0);
+#	}
     } elsif (! $self->type()->imageable() &&
 	     defined($self->type()->default_osid())) {
 	#
@@ -1149,13 +1280,17 @@ sub processWidearea($)
     # allow people to do fix-node to down nodes
     #
     if (! defined($self->status())) {
-	print STDERR "Widearea node does not have a status: ".
-	    $node->node_id()."\n";
+	if ($debug) {
+	    print STDERR "Widearea node does not have a status: ".
+		$node->node_id()."\n";
+	}
 	return;
     }
     if (! defined($node->eid()) || ! defined($node->pid())) {
-	print STDERR "Widearea node is not reserved to an eid or pid".
-	    $node->node_id()."\n";
+	if ($debug) {
+	    print STDERR "Widearea node is not reserved to an eid or pid".
+		$node->node_id()."\n";
+	}
 	return;
     }
     if ($self->status() ne 'up' ||
@@ -1251,14 +1386,50 @@ sub toXML($$)
     my ($self, $parent) = @_;
     my $xml = GeniXML::AddElement("node", $parent);
     my $urn = GeniHRN::Generate($OURDOMAIN, "node", $self->name());
+    my $exclusive = "false";
+    if ($self->is_exclusive()) {
+	$exclusive = "true";
+    }
+    my $available = "false";
+    if ($self->available()) {
+	$available = "true";
+    }
+    my $availablexml = GeniXML::AddElement("available", $xml);
     if (GeniXML::IsVersion0($xml)) {
 	GeniXML::SetText("component_manager_uuid", $xml, $cmurn);
 	GeniXML::SetText("component_uuid", $xml, $urn);
+	my $exclusivexml = GeniXML::AddElement("exclusive", $xml);
+	$exclusivexml->appendText($exclusive);
+	$availablexml->appendText($available);
     } else {
 	GeniXML::SetText("component_manager_id", $xml, $cmurn);
 	GeniXML::SetText("component_id", $xml, $urn);
+	GeniXML::SetText("exclusive", $xml, $exclusive);
+	GeniXML::SetText("now", $availablexml, $available);
     }
     GeniXML::SetText("component_name", $xml, $self->name());
+
+    # Location
+    my ($lat, $long, $country);
+
+    if ($self->iswidearea()) {
+	$lat = $self->node()->WideAreaInfo("latitude");
+	$long = $self->node()->WideAreaInfo("longitude");
+	$country = $self->node()->WideAreaInfo("country");
+    }
+    if (! defined($lat) || ! defined($long)) {
+	$lat = $default_latitude;
+	$long = $default_longitude;
+    }
+    if (! defined($country)) {
+	$country = $default_country;
+    }
+    if (defined($lat) && defined($long) && defined($country)) {
+	my $location = GeniXML::AddElement("location", $xml);
+	GeniXML::SetText("country", $location, $country);
+	GeniXML::SetText("longitude", $location, $long);
+	GeniXML::SetText("latitude", $location, $lat);
+    }
 
     # Add types
     foreach my $type (@{ $self->{'PTYPES'} }) {
@@ -1267,6 +1438,10 @@ sub toXML($$)
     # Add features
     foreach my $feature (@{ $self->{'FEATURES'} }) {
 	$feature->toXML($xml);
+    }
+    # Add interfaces
+    foreach my $interface (@{ $self->{'INTERFACES'} }) {
+	$self->interfaceToXML($xml, $interface);
     }
 
     if (! GeniXML::IsVersion0($xml)) {
@@ -1288,6 +1463,31 @@ sub toXML($$)
 				    $GeniXML::EMULAB_NS);
 	    }
 	}
+    }
+}
+
+sub interfaceToXML($$$)
+{
+    my ($self, $parent, $name) = @_;
+    my $key = $self->node()->node_id() . ":" . $name;
+    my $role = $interfaceList{$key}->role();
+    my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $self->node()->node_id(),
+					 $name);
+    my $xml = GeniXML::AddElement("interface", $parent);
+    GeniXML::SetText("component_id", $xml, $urn);
+    if ($role eq "ctrl") {
+	GeniXML::SetText("role", $xml, "control");
+    } elsif ($role eq "expt") {
+	GeniXML::SetText("role", $xml, "experimental");
+    }
+    if (libptopnew::is_public_interface($key)) {
+	my $ip = $interfaceList{$key}->IP();
+	GeniXML::SetText("public_ipv4", $xml, $ip);
+   }
+    if (! GeniXML::IsVersion0($xml)) {
+	my $child = GeniXML::AddElement("interface", $xml,
+					$GeniXML::EMULAB_NS);
+	GeniXML::SetText("name", $child, $name);
     }
 }
 
@@ -1351,6 +1551,12 @@ sub toXML($$)
 	if ($self->isstatic()) {
 	    GeniXML::SetText("static", $xml, "true");
 	}
+	# Add OSIDs for version 0.2. These are global to the node
+	# rather than inside a particular type tag.
+	if (GeniXML::GetXmlVersion($parent) eq $GeniXML::RSPEC_0_2
+	    && $mainType eq $self->name()) {
+	    $self->osidToXML($parent, $mainType);
+	}
     } else {
 	my $sliverxml;
 	if ($self->name() eq "pc") {
@@ -1379,11 +1585,13 @@ sub osidToXML($$$)
     foreach my $osid (@{ $type_osid{$type->type()} }) {
 	my $os = $osinfo{$osid};
 	if (! defined($os)) {
-	    print STDERR "Undefined osid: ".$osid."\n";
+	    if ($debug) {
+		print STDERR "Undefined osid: ".$osid."\n";
+	    }
 	    next;
 	}
 	if ($os->protogeni_export() ||
-	    (defined($default) && $default eq $type->type())) {
+	    (defined($default) && $default eq $osid)) {
 	    # Fill out new disk image tag
 	    my $disk = GeniXML::AddElement("disk_image", $parent);
 	    GeniXML::SetText("name", $disk, $os->osname());
@@ -1552,6 +1760,7 @@ sub CreateTrunk($$$$)
     $self->set_dest($dest);
     $self->set_destif($source);
     $self->set_interconnect();
+    $self->add_type("ethernet");
     return $self;
 }
 
@@ -1629,7 +1838,6 @@ sub processLink($)
 	# This is a node/node link
 	$self->processNodeNode();
     }
-    # Add types
 }
 
 sub standardName($)
@@ -1642,8 +1850,16 @@ sub standardName($)
 sub processSwitchNode($$$$)
 {
     my ($self, $switch, $node, $nodeif) = @_;
+    my $switchRef = $nodeList{$switch};
+    my $nodeRef = $nodeList{$node};
     $self->standardName();
     $self->set_bw(libptopnew::NodeBandwidth($node, $nodeif));
+    my $basetype = $nodeRef->get_basetype();
+    $self->add_type($basetype);
+    $self->add_type($basetype."-".$switchRef->node()->node_id());
+    $self->add_type($basetype."-".$self->bw());
+    my $ifaceType = $interfaceList{"$node:$nodeif"}->type();
+    $self->add_type($basetype."-".$ifaceType);
 }
 
 sub processNodeNode($)
@@ -1658,6 +1874,7 @@ sub processNodeNode($)
 	$bw = $destbw;
     }
     $self->set_bw($bw);
+    $self->add_type("ethernet");
 }
 
 sub toString($)
@@ -1702,7 +1919,7 @@ sub toXML($$)
 			     $self->bw()->bstr(), $self->delay(),
 			     $self->loss());
     }
-    GeniXml::SetText("component_name", $xml, $self->name());
+    GeniXML::SetText("component_name", $xml, $self->name());
     $self->ifaceToXml($xml, $self->source(), $self->sourceif());
     $self->ifaceToXml($xml, $self->dest(), $self->destif());
     foreach my $type (@{ $self->types() }) {

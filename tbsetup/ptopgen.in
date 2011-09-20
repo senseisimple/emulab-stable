@@ -16,6 +16,8 @@ use libdb qw(TBGetSiteVar);
 use libadminctrl;
 use libptop;
 
+my @SAVEARGV = @ARGV;
+
 my $top = libptop->Create();
 
 my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
@@ -568,6 +570,21 @@ usage()
 	    && $genimode ne $V_0_1
 	    && $genimode ne $V_0_2
 	    && $genimode ne $V_2));
+
+if (defined($pid)) {
+    my $group = Group->Lookup($pid, $pid);
+    if (defined($group)) {
+	my $newptopgen = EmulabFeatures->FeatureEnabled("NewPtopgen", undef,
+							$group, undef);
+	if ($newptopgen) {
+	    my $newpath = "$TB/libexec/ptopgen-new";
+	    print STDERR "Invoking new ptopgen from $newpath\n";
+	    exec $newpath, @SAVEARGV;
+	    die("*** $0:\n".
+		"    Could not exec $newpath: $!");
+	}
+    }
+}
 
 $fake_inet_switch = "internet";
 $fake_inet_iface = "(null)";
