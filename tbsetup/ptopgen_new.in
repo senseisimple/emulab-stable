@@ -12,12 +12,9 @@ use strict;
 use English;
 use Getopt::Std;
 
-#use lib "@prefix@/lib";
-use lib "/usr/testbed/lib";
-use lib ".";
+use lib "@prefix@/lib";
 use libdb;
-#use libadminctrl;
-use libptopnew;
+use libptop_new;
 use GeniXML;
 
 sub usage();
@@ -83,7 +80,7 @@ sub processArgs()
     }
     if (defined($options{"x"})) {
 	$print_xml = 1;
-	if (! $libptopnew::PGENISUPPORT) {
+	if (! $libptop_new::PGENISUPPORT) {
 	    usage();
 	}
 	my $mode = $options{"g"};
@@ -102,37 +99,37 @@ sub processArgs()
     if (defined($options{"l"})) {
 	$typelimitfile = $options{"l"};
     }
-    libptopnew::ProcessArgs(\%options);
+    libptop_new::ProcessArgs(\%options);
 }
 
 sub consultDatabase()
 {
     # Bulk lookup on nodes table
-    libptopnew::LookupNodes();
+    libptop_new::LookupNodes();
 
     # Bulk lookup of permissions table for project
-    libptopnew::LookupPermissions();
+    libptop_new::LookupPermissions();
 
     # Bulk lookup of global usage counts for shared nodes
-    libptopnew::LookupGlobalCounts();
+    libptop_new::LookupGlobalCounts();
 
     # Bulk lookup of node and node_type auxtypes
-    libptopnew::LookupAuxtypes();
+    libptop_new::LookupAuxtypes();
 
     # Bulk lookup of node and node_type features
-    libptopnew::LookupFeatures();
+    libptop_new::LookupFeatures();
 
     # Bulk lookup of osids for features and genimode
-    libptopnew::LookupOsids();
+    libptop_new::LookupOsids();
 
     # Bulk lookup of interfaces
-    libptopnew::LookupInterfaces();
+    libptop_new::LookupInterfaces();
 
     # Bulk lookup of wires
-    libptopnew::LookupLinks();
+    libptop_new::LookupLinks();
 
     # Process each node adding ptypes and features
-    foreach my $current (values(%{ libptopnew::Nodes() })) {
+    foreach my $current (values(%{ libptop_new::Nodes() })) {
 	if ($current->willPrint()) {
 	    $current->processTypeFeatures();
 	    $current->processSwitch();
@@ -173,7 +170,7 @@ sub printResults()
 	$rspec->setAttribute("expires", $expiration);
     }
     
-    foreach my $current (values(%{ libptopnew::Nodes() })) {
+    foreach my $current (values(%{ libptop_new::Nodes() })) {
 	if ($current->willPrint()) {
 	    if ($print_xml) {
 		$current->toXML($rspec);
@@ -182,7 +179,7 @@ sub printResults()
 	    }
 	}
     }
-    foreach my $current (values(%{ libptopnew::Links() })) {
+    foreach my $current (values(%{ libptop_new::Links() })) {
 	if ($current->willPrint()) {
 	    if ($print_xml) {
 		$current->toXML($rspec);

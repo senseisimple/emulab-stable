@@ -15,6 +15,7 @@ use lib "@prefix@/lib";
 use libdb qw(TBGetSiteVar);
 use libadminctrl;
 use libptop;
+use EmulabFeatures;
 
 my @SAVEARGV = @ARGV;
 
@@ -577,7 +578,7 @@ if (defined($pid)) {
 	my $newptopgen = EmulabFeatures->FeatureEnabled("NewPtopgen", undef,
 							$group, undef);
 	if ($newptopgen) {
-	    my $newpath = "$TB/libexec/ptopgen-new";
+	    my $newpath = "$TBROOT/libexec/ptopgen_new";
 	    print STDERR "Invoking new ptopgen from $newpath\n";
 	    exec $newpath, @SAVEARGV;
 	    die("*** $0:\n".

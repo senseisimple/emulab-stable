@@ -4,12 +4,11 @@
 # Copyright (c) 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
-package libptopnew;
+package libptop_new;
 
 use strict;
 use Exporter;
-use lib "/usr/testbed/lib";
-#use lib "@prefix@/lib";
+use lib "@prefix@/lib";
 use Node;
 use Interface;
 use OSinfo;
@@ -20,12 +19,10 @@ sub FD_ADDITIVE  { return "FD_ADDITIVE"; }
 sub FD_FIRSTFREE { return "FD_FIRSTFREE"; }
 sub FD_ONCEONLY  { return "FD_ONCEONLY"; }
 
-our $PGENISUPPORT = 1;
-my $OURDOMAIN = "jonlab.tbres.emulab.net";
-my $MAINSITE  = 0;
-#my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
-#my $OURDOMAIN = "@OURDOMAIN@";
-#my $MAINSITE  = @TBMAINSITE@;
+our $PGENISUPPORT = @PROTOGENI_SUPPORT@;
+my $OURDOMAIN = "@OURDOMAIN@";
+my $MAINSITE  = @TBMAINSITE@;
+
 my $cmuuid = TBGetSiteVar('protogeni/cm_uuid');
 my $cmurn = "";
 if ($PGENISUPPORT) {
@@ -765,8 +762,8 @@ sub available($;$)
     my ($self, $tagRef) = @_;
     my $node = $self->node();
 
-    my $typeallowed = (libptopnew::TypeAllowed($node->class())
-		       && libptopnew::TypeAllowed($node->type()));
+    my $typeallowed = (libptop_new::TypeAllowed($node->class())
+		       && libptop_new::TypeAllowed($node->type()));
 
     # Nodes are free if they are nonlocal, or if they are up and
     # not-reserved, or if they are shared.
@@ -1140,7 +1137,7 @@ sub processVirtGoo($)
     }
     if (! $self->node()->sharing_mode()) {
 	# This number can be use for fine-tuning packing
-	$self->addFeature('virtpercent', 100, libptopnew::FD_ADDITIVE());
+	$self->addFeature('virtpercent', 100, libptop_new::FD_ADDITIVE());
     }
     # Put this silly feature in so that we can try to keep vnodes
     # on the same pnode they were before - but only if updating
@@ -1170,12 +1167,12 @@ sub processCpuRam($)
     my $cpu_speed = $self->type()->frequency();
     my $ram = $self->type()->memory();
     # Add CPU and RAM information
-    $self->addFeature('cpu', $cpu_speed, libptopnew::FD_ADDITIVE())
+    $self->addFeature('cpu', $cpu_speed, libptop_new::FD_ADDITIVE())
 	if (defined($cpu_speed));
-    $self->addFeature('ram', $ram, libptopnew::FD_ADDITIVE())
+    $self->addFeature('ram', $ram, libptop_new::FD_ADDITIVE())
 	if (defined($ram));
-    $self->addFeature('cpupercent', 92, libptopnew::FD_ADDITIVE()); # XXX Hack
-    $self->addFeature('rampercent', 80, libptopnew::FD_ADDITIVE()); # XXX Hack
+    $self->addFeature('cpupercent', 92, libptop_new::FD_ADDITIVE()); # XXX Hack
+    $self->addFeature('rampercent', 80, libptop_new::FD_ADDITIVE()); # XXX Hack
 }
 
 #
@@ -1303,7 +1300,7 @@ sub processWidearea($)
 
     my $site = $self->widearea('site');
     if ($site) {
-	$self->addFeature($site, 0.99, libptopnew::FD_FIRSTFREE());
+	$self->addFeature($site, 0.99, libptop_new::FD_FIRSTFREE());
     }
 
     #
@@ -1480,7 +1477,7 @@ sub interfaceToXML($$$)
     } elsif ($role eq "expt") {
 	GeniXML::SetText("role", $xml, "experimental");
     }
-    if (libptopnew::is_public_interface($key)) {
+    if (libptop_new::is_public_interface($key)) {
 	my $ip = $interfaceList{$key}->IP();
 	GeniXML::SetText("public_ipv4", $xml, $ip);
    }
@@ -1657,11 +1654,11 @@ sub Create($$$;$$)
 	$self->set_violatable();
     }
     if (defined($flag)) {
-	if ($flag eq libptopnew::FD_ADDITIVE()) {
+	if ($flag eq libptop_new::FD_ADDITIVE()) {
 	    $self->set_additive();
-	} elsif ($flag eq libptopnew::FD_FIRSTFREE()) {
+	} elsif ($flag eq libptop_new::FD_FIRSTFREE()) {
 	    $self->set_firstfree();
-	} elsif ($flag eq libptopnew::FD_ONCEONLY()) {
+	} elsif ($flag eq libptop_new::FD_ONCEONLY()) {
 	    $self->set_onceonly();
 	}
     }
@@ -1853,7 +1850,7 @@ sub processSwitchNode($$$$)
     my $switchRef = $nodeList{$switch};
     my $nodeRef = $nodeList{$node};
     $self->standardName();
-    $self->set_bw(libptopnew::NodeBandwidth($node, $nodeif));
+    $self->set_bw(libptop_new::NodeBandwidth($node, $nodeif));
     my $basetype = $nodeRef->get_basetype();
     $self->add_type($basetype);
     $self->add_type($basetype."-".$switchRef->node()->node_id());
@@ -1866,9 +1863,9 @@ sub processNodeNode($)
 {
     my ($self) = @_;
     $self->standardName();
-    my $sourcebw = libptopnew::NodeBandwidth($self->source(),
-					     $self->sourceif());
-    my $destbw = libptopnew::NodeBandwidth($self->dest(), $self->destif());
+    my $sourcebw = libptop_new::NodeBandwidth($self->source(),
+					      $self->sourceif());
+    my $destbw = libptop_new::NodeBandwidth($self->dest(), $self->destif());
     my $bw = $sourcebw;
     if ($destbw < $sourcebw) {
 	$bw = $destbw;
