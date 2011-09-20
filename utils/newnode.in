@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2010 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,7 +41,7 @@ my $exports_setup = "$TB/sbin/exports_setup";
 
 my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
 
-my $feature = EmulabFeatures::Lookup("ScriptNewNodes");
+my $feature = EmulabFeatures->Lookup("ScriptNewNodes");
 my $useScriptFeature = defined($feature) && $feature->enabled();
 
 #
