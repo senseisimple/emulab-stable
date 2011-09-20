@@ -133,6 +133,16 @@ if ($UID && !TBAdmin($UID)) {
     }
 }
 
+#
+# Warn them if the path doesn't actually exist.
+#
+# XXX this is not fatal because we overload the pathname to encode "special"
+# boot information like pxelinux configs in some cases.
+#
+if ($pxebootpath && ! -e "$pxebootpath") {
+    print STDERR "WARNING: '$pxebootpath' does not exist\n";
+}
+
 my $changed = 0;
 foreach my $node (@nodes) {
     my $nodeobject = Node->Lookup($node);
