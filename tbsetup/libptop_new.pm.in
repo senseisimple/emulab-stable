@@ -179,7 +179,7 @@ sub LookupPermissions()
 	}
 	$dbresult =
 	    DBQueryFatal("select type ".
-			   "from nodetypeXpid_permissions".
+			   "from nodetypeXpid_permissions ".
 			   "where pid='$user_project'");
 	while (my ($type) = $dbresult->fetchrow_array()) {
 	    $permissions{$type} = 1;
@@ -1879,8 +1879,10 @@ sub toString($)
     my ($self) = @_;
     my $result = "link ";
     $result .= $self->name() . " ";
-    $result .= $self->source() . ":" . $self->sourceif() . " ";
-    $result .= $self->dest() . ":" . $self->destif() . " ";
+    $result .= $self->source() . ":";
+    $result .= $self->source() . "/" . $self->sourceif() . " ";
+    $result .= $self->dest() . ":";
+    $result .= $self->dest() . "/" . $self->destif() . " ";
     $result .= $self->bw()->bstr() . " ";
     $result .= $self->delay() . " ";
     $result .= $self->loss() . " ";
