@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006, 2007, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -250,6 +250,12 @@ sub read_schema($) {
 		# A column definition
 		my ($name, $definition) = ($1, $2);
 		debug("Found column $name with type $definition\n");
+
+		# Canonicalize. 
+		if ($definition eq "text") {
+		    debug("  Converting to 'text default NULL'\n");
+		    $definition = "text default NULL";
+		}
 
 		# Change timestamp(14) to timestamp!
 		$definition =~ s/timestamp NOT NULL default.*/timestamp NOT NULL/g;
