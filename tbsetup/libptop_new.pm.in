@@ -45,7 +45,7 @@ my $print_sim = 0;
 my $genimode = 0;
 my $delaycap_override = undef;
 my $multiplex_override = undef;
-my $debug = 0;
+my $debug = 1;
 
 my $default_longitude = undef;
 my $default_latitude = undef;
@@ -144,17 +144,35 @@ sub LookupNodes()
     # Bulk lookup on reserved table
     $dbresult = DBQueryFatal("select * from reserved");
     while ($row = $dbresult->fetchrow_hashref()) {
-	$nodeList{$row->{"node_id"}}->node()->SetReservedRow($row);
+	my $nodeName = $row->{"node_id"};
+	my $node = $nodeList{$nodeName};
+	if (defined($node)) {
+	    $node->node()->SetReservedRow($row);
+	} elsif ($debug) {
+	    print STDERR "Node $nodeName iss in reserved but not in nodes\n";
+	}
     }
 
     $dbresult = DBQueryFatal("select node_id, status from node_status");
     while (my ($node_id, $status) = $dbresult->fetchrow()) {
-	$nodeList{$node_id}->set_status($status);
+	my $node = $nodeList{$node_id};
+	if (defined($node)) {
+	    $node->set_status($status);
+	} elsif ($debug) {
+	    print STDERR "Node $node_id is in node_status but not nodes\n";
+	}
     }
 
     $dbresult = DBQueryFatal("select * from widearea_nodeinfo");
     while ($row = $dbresult->fetchrow_hashref()) {
-	$nodeList{$row->{'node_id'}}->set_widearea($row);
+	my $nodeName = $row->{'node_id'};
+	my $node = $nodeList{$nodeName};
+	if (defined($node)) {
+	    $node->set_widearea($row);
+	} elsif ($debug) {
+	    print STDERR "Node $nodeName is in widearea_nodeinfo but ".
+		"not nodes\n";
+	}
     }
 
     TBGetSiteVar('general/default_longitude', \$default_longitude);
