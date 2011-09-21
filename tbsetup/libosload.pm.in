@@ -286,6 +286,13 @@ sub osload ($$) {
 	my @access_keys;
 
 	#
+	# Determine if we need to clear the partitions table entries.
+	# We need to do it at least once if we are "preparing".
+	# See the comment below for details.
+	#
+	my $whackit = $prepare;
+
+	#
 	# If loading an image (which is not the default) then schedule
 	# a reload for it so that when the experiment is terminated it
 	# will get a fresh default image before getting reallocated to
@@ -395,11 +402,7 @@ sub osload ($$) {
 		# cases above.
 		#
 		if ($i < $startpart || $i >= $endpart) {
-		    my $whackit = 0;
-
-		    if ($prepare) {
-			$whackit = 1;
-		    } elsif (defined($rowref->{'mbr_version'})) {
+		    if (!$whackit && defined($rowref->{'mbr_version'})) {
 			$dbresult =
 			    DBQueryWarn("select mbr_version ".
 					" from partitions as p,images as i ".
@@ -425,6 +428,17 @@ sub osload ($$) {
 			    tberror("$node: Could not update partition table");
 			    goto failednode;
 			}
+			#
+			# We may be loading multiple partition images,
+			# so we only want to whack once to avoid deleting
+			# entries we just made.
+			#
+			# Note that this will only stop the "prepare" case.
+			# If they load multiple images with incompatible
+			# MBRs, then they are going to (and should) get
+			# whacked everytime they switch MBRs.
+			#
+			$whackit = 0;
 		    }
 		    next;
 		}
