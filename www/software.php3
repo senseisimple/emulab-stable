@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -16,33 +16,9 @@ PAGEHEADER("Emulab Software Distributions");
 ?>
 
 <ul>
-<li><img src="/new.gif" alt="&lt;NEW&gt;"> The latest version of the Emulab
+<li> The latest version of the Emulab
     software is available upon request from our <a href="http://users.emulab.net/trac/emulab/wiki/GitRepository">git repository</a>
-</li>
-<li>
-    <a href="/downloads/emulab-080901.tar.gz">
-    Emulab network testbed software</a>,
-    Version 5.0, released September 1, 2008.
-    This is an update of the 4.9 source release and should be considered
-    the "official" Emulab release to be used for all fresh installs and
-    upgrades.
-    Includes source for everything except the GUI Client, which is available below.
-    See the <a href = "README">README</a> and the
-    <a href = "http://users.emulab.net/trac/emulab/wiki/InstallRoot">
-    online installation and upgrading documentation</a>.
-    If for some reason you cannot access the online documentation, there is
-    <a href="http://www.emulab.net/downloads/emulab-install-docs-080901.tar.gz">
-    a tarball of the installation documents</a>
-    that you can download and unpack locally.
-    </li><p>
-<li> <a href="/downloads/emulab-080630.tar.gz">
-    Emulab network testbed software</a>,
-    Version 4.9.0, released June 30, 2008.
-    Includes source for everything except the GUI Client, which is available below.
-    See the <a href = "README">README</a> and the
-    <a href = "http://users.emulab.net/trac/emulab/wiki/InstallDocs">
-    online installation documentation</a>.
-    </li><p>
+</li><p>
 
 <li> 
      Emulab GUI Client v0.2
