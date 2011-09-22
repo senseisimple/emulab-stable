@@ -38,6 +38,7 @@ EXTRACONF       = None
 SLICENAME       = "mytestslice"
 REQARGS         = None
 CMURI           = None
+SAURI           = None
 DELETE          = 0
 
 selfcredentialfile = None
@@ -48,30 +49,33 @@ if "Usage" not in dir():
     def Usage():
         print "usage: " + sys.argv[ 0 ] + " [option...]"
         print """Options:
+    -a file, --admincredentials=file    read admin credentials from file
     -c file, --credentials=file         read self-credentials from file
                                             [default: query from SA]
     -d, --debug                         be verbose about XML methods invoked
     -f file, --certificate=file         read SSL certificate from file
                                             [default: ~/.ssl/encrypted.pem]
-    -h, --help                          show options and usage"""
+    -h, --help                          show options and usage
+    -l uri, --sa=uri                    specify uri of slice authority
+                                            [default: local]
+    -m uri, --cm=uri                    specify uri of component manager
+                                            [default: local]"""
         if "ACCEPTSLICENAME" in globals():
             print """    -n name, --slicename=name           specify human-readable name of slice
                                             [default: mytestslice]"""
-            pass
-        print """    -m uri, --cm=uri           specify uri of component manager
-                                            [default: local]"""
         print """    -p file, --passphrase=file          read passphrase from file
                                             [default: ~/.ssl/password]
     -r file, --read-commands=file       specify additional configuration file
     -s file, --slicecredentials=file    read slice credentials from file
-                                            [default: query from SA]
-    -a file, --admincredentials=file    read admin credentials from file"""
+                                            [default: query from SA]"""
 
 try:
-    opts, REQARGS = getopt.getopt( sys.argv[ 1: ], "c:df:hn:p:r:s:m:a:",
-                                   [ "credentials=", "debug", "certificate=",
-                                     "help", "passphrase=", "read-commands=",
-                                     "slicecredentials=","admincredentials",                                     "slicename=", "cm=", "delete"] )
+    opts, REQARGS = getopt.getopt( sys.argv[ 1: ], "a:c:df:hl:m:n:p:r:s:",
+                                   [ "admincredentials=", "credentials=",
+                                     "debug", "certificate=",
+                                     "help", "sa=", "cm=", "slicename=",
+                                     "passphrase=", "read-commands=",
+                                     "slicecredentials=", "delete" ] )
 except getopt.GetoptError, err:
     print >> sys.stderr, str( err )
     Usage()
@@ -85,19 +89,21 @@ if "PROTOGENI_PASSPHRASE" in os.environ:
     PASSPHRASEFILE = os.environ[ "PROTOGENI_PASSPHRASE" ]
 
 for opt, arg in opts:
-    if opt in ( "-c", "--credentials" ):
+    if opt in ( "-a", "--admincredentials" ):
+        admincredentialfile = arg
+    elif opt in ( "-c", "--credentials" ):
         selfcredentialfile = arg
     elif opt in ( "-d", "--debug" ):
         debug = 1
-    elif opt in ( "--delete" ):
-        DELETE = 1
     elif opt in ( "-f", "--certificate" ):
         CERTIFICATE = arg
     elif opt in ( "-h", "--help" ):
         Usage()
         sys.exit( 0 )
-    elif opt in ( "-n", "--slicename" ):
-        SLICENAME = arg
+    elif opt in ( "-l", "--sa" ):
+        SAURI = arg
+        if SAURI[-2:] == "cm":
+            SAURI = SAURI[:-3]
     elif opt in ( "-m", "--cm" ):
         CMURI = arg
         if CMURI[-2:] == "cm":
@@ -106,14 +112,16 @@ for opt, arg in opts:
             CMURI = CMURI[:-5]
             pass
         pass
+    elif opt in ( "-n", "--slicename" ):
+        SLICENAME = arg
     elif opt in ( "-p", "--passphrase" ):
         PASSPHRASEFILE = arg
     elif opt in ( "-r", "--read-commands" ):
         EXTRACONF = arg
     elif opt in ( "-s", "--slicecredentials" ):
         slicecredentialfile = arg
-    elif opt in ( "-a", "--admincredentials" ):
-        admincredentialfile = arg
+    elif opt in ( "--delete" ):
+        DELETE = 1
 
 cert = X509.load_cert( CERTIFICATE )
 
@@ -186,7 +194,8 @@ def do_method(module, method, params, URI=None, quiet=False, version=None,
 
     if URI == None and CMURI and (module == "cm" or module == "cmv2"):
         URI = CMURI
-        pass
+    elif URI == None and SAURI and module == "sa":
+        URI = SAURI
 
     if URI == None:
         if module in XMLRPC_SERVER:
