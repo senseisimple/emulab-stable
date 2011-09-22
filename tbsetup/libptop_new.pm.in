@@ -145,6 +145,7 @@ sub LookupNodes()
 	my $node = libptop::pnode->Create($row);
 	if (defined($node)) {
 	    $nodeList{$node->name()} = $node;
+	    $node->set_eventstate($row->{'eventstate'});
 	    if (! defined($node->type()) && $debug) {
 		die("****Node $node had a type not in node_types table.\n");
 	}
@@ -729,6 +730,7 @@ sub Create($$)
     $self->{'EID'} = undef;
     $self->{'PID'} = undef;
     $self->{'EROLE'} = undef;
+    $self->{'EVENTSTATE'} = undef;
 
     bless($self, $class);
     return $self;
@@ -744,10 +746,12 @@ sub is_shared($)   { return $_[0]->{'SHARED'}; }
 sub eid($)         { return $_[0]->{'EID'}; }
 sub pid($)         { return $_[0]->{'PID'}; }
 sub erole($)       { return $_[0]->{'EROLE'}; }
+sub eventstate($)  { return $_[0]->{'EVENTSTATE'}; }
 
-sub set_globalcount { $_[0]->{'GLOBALCOUNT'} = $_[1]; }
-sub set_status($)   { $_[0]->{'STATUS'} = $_[1]; }
-sub set_widearea($) { $_[0]->{'WIDEAREA'} = $_[1]; }
+sub set_globalcount   { $_[0]->{'GLOBALCOUNT'} = $_[1]; }
+sub set_status($)     { $_[0]->{'STATUS'} = $_[1]; }
+sub set_widearea($)   { $_[0]->{'WIDEAREA'} = $_[1]; }
+sub set_eventstate($) { $_[0]->{'EVENTSTATE'} = $_[1]; }
 
 sub get_basetype($)
 {
@@ -893,7 +897,7 @@ sub issharedhost($)
 sub isup($)
 {
     my ($self) = @_;
-    my $eventstate = $self->node()->eventstate();
+    my $eventstate = $self->eventstate();
     return defined($eventstate)
 	&& ($eventstate eq TBDB_NODESTATE_ISUP()
 	    || $eventstate eq TBDB_NODESTATE_PXEWAIT()
