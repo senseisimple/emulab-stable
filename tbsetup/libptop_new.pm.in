@@ -138,7 +138,15 @@ sub LookupNodes()
     my $row;
     $dbresult = DBQueryFatal("select * from nodes");
     while ($row = $dbresult->fetchrow_hashref()) {
-	CreateNode($row);
+	my $node = libptop::pnode->Create($row);
+	if (defined($node)) {
+	    $nodeList{$node->name()} = $node;
+	    if (! defined($node->type()) && $debug) {
+		die("****Node $node had a type not in node_types table.\n");
+	}
+	} elsif ($debug) {
+	    print STDERR "Failed to create node $node from database row.\n";
+	}
     }
 
     # Bulk lookup on reserved table
@@ -278,9 +286,13 @@ sub LookupFeatures()
 	DBQueryFatal("select node_id, feature, weight from node_features");
     while (my ($node_id, $feature, $weight) = $dbresult->fetchrow()) {
 	my $pnode = $nodeList{$node_id};
-	if ($pnode->iswidearea()
-	    || ($pnode->islocal() && ! $pnode->node()->sharing_mode())) {
-	    $pnode->addFeatureString($feature.":".$weight);
+	if (defined($pnode)) {
+	    if ($pnode->iswidearea()
+		|| ($pnode->islocal() && ! $pnode->node()->sharing_mode())) {
+		$pnode->addFeatureString($feature.":".$weight);
+	    }
+	} elsif ($debug) {
+	    print STDERR "Node $node_id is in node_features but not nodes\n";
 	}
     }
 }
@@ -388,11 +400,17 @@ sub LookupInterfaces()
 
     $dbresult = DBQueryFatal("select * from interfaces");
     while ($row = $dbresult->fetchrow_hashref()) {
-	my $key = $row->{'node_id'}.':'.$row->{'iface'};
+	my $nodeName = $row->{'node_id'};
+	my $ifaceName = $row->{'iface'};
+	my $key = "$nodeName:$ifaceName";
 	my $iface = Interface->LookupRow($row, $states{$key});
 	$interfaceList{$key} = $iface;
-	my $node = $nodeList{$row->{'node_id'}};
-	$node->addInterface($row->{'iface'});
+	my $node = $nodeList{$nodeName};
+	if (defined($node)) {
+	    $node->addInterface($ifaceName);
+	} elsif ($debug) {
+	    print STDERR "Node $nodeName is in interfaces but not nodes\n";
+	}
     }
 
     $dbresult =
@@ -456,8 +474,8 @@ sub AddSharedBandwidth()
 	    if (! exists($interfaceList{"$node:$iface"}));
 
 	if (! exists($sharedbw{"$node:$iface"})) {
-	    $sharedbw{"$node:$iface"} =
-		$interfaceList{"$node:$iface"}->remaining_bandwidth();
+	    my $bw = $interfaceList{"$node:$iface"}->remaining_bandwidth();
+	    $sharedbw{"$node:$iface"} = Math::BigInt->new($bw);
 	}
 	$sharedbw{"$node:$iface"} += $bandwidth;
     }
@@ -489,15 +507,16 @@ sub LookupLinks()
 	if ($type ne 'Unused') {
 	    my $node1 = $nodeList{$node_id1};
 	    my $node2 = $nodeList{$node_id2};
-	    if (defined($node1)) {
+	    if (defined($node1) && defined($node2)) {
 		$node1->addConnection($node_id2);
-	    } elsif ($debug) {
-		print STDERR "Unknown node: $node_id1\n";
-	    }
-	    if (defined($node2)) {
-		$nodeList{$node_id2}->addConnection($node_id1);
-	    } elsif ($debug) {
-		print STDERR "Unknown node: $node_id2\n";
+		$node2->addConnection($node_id1);
+	    } else {
+		if (! defined($node1) && $debug) {
+		    print STDERR "Node $node_id1 is in wires but not nodes\n";
+		} elsif (! defined($node2) && $debug) {
+		    print STDERR "Node $node_id2 is in wires but not nodes\n";
+		}
+		next;
 	    }
 	}
 	if ($type eq 'Trunk') {
@@ -557,15 +576,6 @@ sub LookupLinks()
 sub Nodes() { return \%nodeList; }
 sub Links() { return \%linkList; }
 
-# Add new nodes and links
-sub CreateNode($)
-{
-    my ($row) = @_;
-    my $node = libptop::pnode->Create($row);
-    Nodes()->{$node->name()} = $node;
-    return $node;
-}
-
 sub TypeAllowed($)
 {
     my ($type) = @_;
@@ -622,7 +632,7 @@ sub TypeBandwidth($$$)
 sub ShareBandwidth($$)
 {
     my ($node, $iface) = @_;
-    my $result = new Math::BigInt->new(0);
+    my $result = Math::BigInt->new(0);
     if (exists($sharedbw{"$node:$iface"})) {
 	$result = $sharedbw{"$node:$iface"};
     } elsif (exists($interfaceList{"$node:$iface"})) {
@@ -692,7 +702,8 @@ sub hashpush($$$)
 package libptop::pnode;
 
 use libdb qw(TBOSID TB_OPSPID TBDB_NODESTATE_ISUP TBDB_NODESTATE_PXEWAIT
-             TBDB_NODESTATE_POWEROFF TBDB_NODESTATE_ALWAYSUP);
+             TBDB_NODESTATE_POWEROFF TBDB_NODESTATE_ALWAYSUP NODEDEAD_EID
+             NODEDEAD_PID);
 
 sub Create($$)
 {
@@ -748,7 +759,7 @@ sub widearea($$)
     my ($self, $key) = @_;
     my $result = undef;
     if (defined($self->{'WIDEAREA'})) {
-	$result = $self->{'WIDEARE'}->{$key};
+	$result = $self->{'WIDEAREA'}->{$key};
     }
     return $result;
 }
@@ -799,7 +810,7 @@ sub available($;$)
     # available if their parent is. The tags bit is to try to ensure
     # we don't loop forever if there is a subnode-loop. See also willPrint().
     if ($isfree && $node->issubnode()) {
-	my %tags = {};
+	my %tags = ();
 	if (defined($tagRef)) {
 	    %tags = %{ $tagRef };
 	}
@@ -880,14 +891,14 @@ sub willPrint($;$)
 		  || $self->islocal()
 		  || ($self->iswidearea() && $print_widearea)
 		  || ($self->isshared() && $print_shared))
-	&& (! $available_only || $self->available($)))
+	&& (! $available_only || $self->available())
 	&& (! $genimode || $geniok);
 
     # A bit of recursion to ensure that subnodes are only printed if
     # their parent is. The tags bit is to try to ensure we don't loop
     # forever if there is a subnode-loop. See also available()).
     if ($result && $node->issubnode()) {
-	my %tags = {};
+	my %tags = ();
 	if (defined($tagRef)) {
 	    %tags = %{ $tagRef };
 	}
@@ -1098,6 +1109,13 @@ sub processAuxtypes($)
 	    $realtypename = $auxtype;
 	}
 	my $realtype = NodeType->Lookup($realtypename);
+	if (! defined($realtype)) {
+	    if ($debug) {
+		print STDERR "NodeType->Lookup failed for $realtypename ".
+		    "on node " . $node->node_id() . "\n";
+	    }
+	    next;
+	}
 	my $is_virtual = ($realtype->isvirtnode() && $count > 0);
 	if (! $is_virtual) {
 	    $self->addPType($auxtype, $count);
@@ -1425,13 +1443,10 @@ sub toXML($$)
     GeniXML::SetText("component_name", $xml, $self->name());
 
     # Location
-    my ($lat, $long, $country);
+    my $lat = $self->widearea("latitude");
+    my $long = $self->widearea("longitude");
+    my $country = $self->widearea("country");
 
-    if ($self->iswidearea()) {
-	$lat = $self->node()->WideAreaInfo("latitude");
-	$long = $self->node()->WideAreaInfo("longitude");
-	$country = $self->node()->WideAreaInfo("country");
-    }
     if (! defined($lat) || ! defined($long)) {
 	$lat = $default_latitude;
 	$long = $default_longitude;
@@ -1755,7 +1770,7 @@ sub Create($)
     $self->{'DEST_IF'} = undef;
     $self->{'DEST_CARD'} = undef;
     $self->{'DEST_PORT'} = undef;
-    $self->{'BW'} = new Math::BigInt 0;
+    $self->{'BW'} = Math::BigInt->new(0);
     $self->{'DELAY'} = 0;
     $self->{'LOSS'} = 0.0;
     $self->{'TYPES'} = [];
