@@ -49,6 +49,9 @@ my $PXEBOOTDIR	    = "/tftpboot";
 my $PXELINUXPREFIX  = "$PXEBOOTDIR/pxelinux";
 my $PXELINUXBOOT    = "pxelinux.0";
 my $PXELINUXCONFIG  = "pxelinux.cfg";
+# XXX hack for now to support gpxelinux as well
+my $GPXELINUXPREFIX = "$PXEBOOTDIR/gpxelinux";
+my $GPXELINUXBOOT   = "gpxelinux.0";
 
 sub SetupPXEBoot($$$$);
 sub ClearPXEBoot($$);
@@ -260,11 +263,14 @@ sub fatal {
 
 #
 # Special handling of pxe_boot_path argument.
+#
 # Any specified pxeboot path must start with PXEBOOTDIR (/tftpboot).
-# If path starts with $PXELINUXPREFIX (/tftpboot/pxelinux/), then
-# the remainder of the path identifies the pxelinux configuration file
-# from $PXELINUXCONFIG (/tftpboot/pxelinux.cfg) to use. This config file
-# for the node (MAC address) will be symlinked to this config file.
+# If path starts with $PXELINUXPREFIX (/tftpboot/pxelinux/) or
+# $GPXELINUXPREFIX (/tftpboot/gpxelinux), then the remainder of the
+# path identifies the pxelinux configuration file from $PXELINUXCONFIG
+# (/tftpboot/pxelinux.cfg) to use. This config file for the node
+# (MAC address) will be symlinked to this config file. The PXE boot
+# program will be set to either $PXELINUXBOOT or $GPXELINUXBOOT.
 #
 # Returns the string to be used for the "filename" option in dhcpd.conf.
 #
@@ -287,8 +293,9 @@ sub SetupPXEBoot($$$$)
     }
 
     # if it starts with the magic pxelinux prefix, setup a config file
-    if ($str =~ /^$PXELINUXPREFIX\/(.*)$/) {
-	my $cfile = $1;
+    if ($str =~ /^($PXELINUXPREFIX|$GPXELINUXPREFIX)\/(.*)$/) {
+	my $path = $1;
+	my $cfile = $2;
 	my $cpath = "$PXEBOOTDIR/$PXELINUXCONFIG";
 
 	if (! -r "$cpath/$cfile") {
@@ -319,7 +326,11 @@ sub SetupPXEBoot($$$$)
 	}
 
 	# return the pxelinux binary
-	$str = "$PXEBOOTDIR/$PXELINUXBOOT";
+	if ($path eq $PXELINUXPREFIX) {
+	    $str = "$PXEBOOTDIR/$PXELINUXBOOT";
+	} else {
+	    $str = "$PXEBOOTDIR/$GPXELINUXBOOT";
+	}
     }
 
     return $str;
