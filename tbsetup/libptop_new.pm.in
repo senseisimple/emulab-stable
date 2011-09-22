@@ -45,7 +45,7 @@ my $print_sim = 0;
 my $genimode = 0;
 my $delaycap_override = undef;
 my $multiplex_override = undef;
-my $debug = 1;
+my $debug = 0;
 
 my $default_longitude = undef;
 my $default_latitude = undef;
