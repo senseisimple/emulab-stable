@@ -155,9 +155,9 @@ sub LookupNodes()
 	my $nodeName = $row->{"node_id"};
 	my $node = $nodeList{$nodeName};
 	if (defined($node)) {
-	    $node->node()->SetReservedRow($row);
+	    $node->set_reserved($row);
 	} elsif ($debug) {
-	    print STDERR "Node $nodeName iss in reserved but not in nodes\n";
+	    print STDERR "Node $nodeName is in reserved but not in nodes\n";
 	}
     }
 
@@ -288,7 +288,7 @@ sub LookupFeatures()
 	my $pnode = $nodeList{$node_id};
 	if (defined($pnode)) {
 	    if ($pnode->iswidearea()
-		|| ($pnode->islocal() && ! $pnode->node()->sharing_mode())) {
+		|| ($pnode->islocal() && ! $pnode->is_shared())) {
 		$pnode->addFeatureString($feature.":".$weight);
 	    }
 	} elsif ($debug) {
@@ -588,7 +588,7 @@ sub NodeBandwidth($$)
 {
     my ($nodename, $iface) = @_;
     my $node = $nodeList{$nodename};
-    if ($node->node()->sharing_mode()) {
+    if ($node->is_shared()) {
 	return ShareBandwidth($nodename, $iface);
     } else {
 	return TypeBandwidth($nodename, $iface, "ethernet");
@@ -721,6 +721,10 @@ sub Create($$)
     $self->{'INTERFACES'} = [];
     $self->{'STATUS'} = undef;
     $self->{'WIDEAREA'} = undef;
+    $self->{'SHARED'} = 0;
+    $self->{'EID'} = undef;
+    $self->{'PID'} = undef;
+    $self->{'EROLE'} = undef;
 
     bless($self, $class);
     return $self;
@@ -732,6 +736,10 @@ sub node($)        { return $_[0]->{'NODE'}; }
 sub type($)        { return $_[0]->node()->NodeTypeInfo(); }
 sub globalcount($) { return $_[0]->{'GLOBALCOUNT'}; }
 sub status($)      { return $_[0]->{'STATUS'}; }
+sub is_shared($)   { return $_[0]->{'SHARED'}; }
+sub eid($)         { return $_[0]->{'EID'}; }
+sub pid($)         { return $_[0]->{'PID'}; }
+sub erole($)       { return $_[0]->{'EROLE'}; }
 
 sub set_globalcount { $_[0]->{'GLOBALCOUNT'} = $_[1]; }
 sub set_status($)   { $_[0]->{'STATUS'} = $_[1]; }
@@ -751,7 +759,20 @@ sub get_basetype($)
 sub is_exclusive($)
 {
     my ($self) = @_;
-    return ! ($self->node()->sharing_mode());
+    return ! ($self->is_shared());
+}
+
+sub set_reserved($$)
+{
+    my ($self, $row) = @_;
+    if (defined($row)) {
+	my $node = $self->node();
+	$node->SetReservedRow($row);
+	$self->{'SHARED'} = $node->sharing_mode();
+	$self->{'EID'} = $node->eid();
+	$self->{'PID'} = $node->pid();
+	$self->{'EROLE'} = $node->erole();
+    }
 }
 
 sub widearea($$)
@@ -767,10 +788,9 @@ sub widearea($$)
 sub isreserved($)
 {
     my ($self) = @_;
-    my $node = $self->node();
-    my $pre_pid = $node->reserved_pid();
-    my $reserved_eid = $node->eid();
-    my $reserved_pid = $node->pid();
+    my $pre_pid = $self->node()->reserved_pid();
+    my $reserved_eid = $self->eid();
+    my $reserved_pid = $self->pid();
     # A node is reserved to a project if it has a reserved_pid, and
     # that pid is not the user's pid.
     my $pre_reserved = defined($pre_pid)
@@ -801,7 +821,7 @@ sub available($;$)
     # nodetypeXpid_permissions table.
     my $isfree = ((!$self->islocal()
 		   || (! $self->isreserved() && $self->isup())
-		   || $self->isshared())
+		   || $self->issharedhost())
 		  && $typeallowed);
 
     # And if they are a subnode, their parent must be available:
@@ -857,13 +877,12 @@ sub iswidearea($)
 	    && (! defined($wa_attrvalue) || $wa_attrvalue == 0));
 }
 
-sub isshared($)
+sub issharedhost($)
 {
     my ($self) = @_;
-    my $node = $self->node();
     # In shared mode, allow allocated nodes whose sharing_mode is set.
-    return (defined($node->erole())
-	    && $node->erole() eq "sharedhost"
+    return (defined($self->erole())
+	    && $self->erole() eq "sharedhost"
 	    && $self->isup());
 }
 
@@ -890,7 +909,7 @@ sub willPrint($;$)
     my $result = ($self->isswitch()
 		  || $self->islocal()
 		  || ($self->iswidearea() && $print_widearea)
-		  || ($self->isshared() && $print_shared))
+		  || ($self->issharedhost() && $print_shared))
 	&& (! $available_only || $self->available())
 	&& (! $genimode || $geniok);
 
@@ -1003,7 +1022,7 @@ sub processLocal($)
     }
 
     $self->addDelayCapacity();
-    if ($node->sharing_mode()) {
+    if ($self->is_shared()) {
 	$self->addShared();
     }
     $self->processAuxtypes();
@@ -1125,7 +1144,7 @@ sub processAuxtypes($)
 	    # If the node is shared, must subtract the current global count
 	    # from the max first, to see if there is any room left.
 	    #
-	    if ($node->sharing_mode() && defined($self->globalcount())) {
+	    if ($self->is_shared() && defined($self->globalcount())) {
 		$count -= $self->globalcount();
 	    }
 	    if (defined($multiplex_override)
@@ -1157,7 +1176,7 @@ sub processAuxtypes($)
     if ($needsim || $needvirtgoo) {
 	$self->addPType("lan", undef, 1);
     }
-    if (($needvirtgoo && ! $node->sharing_mode())
+    if (($needvirtgoo && ! $self->is_shared())
 	|| $needsim) {
 	$self->processCpuRam();
     }
@@ -1171,7 +1190,7 @@ sub processVirtGoo($)
     if ($trivspeed) {
 	$self->addFlag("trivial_bw", $trivspeed);
     }
-    if (! $self->node()->sharing_mode()) {
+    if (! $self->is_shared()) {
 	# This number can be use for fine-tuning packing
 	$self->addFeature('virtpercent', 100, libptop_new::FD_ADDITIVE());
     }
@@ -1218,7 +1237,7 @@ sub processOsFeatures($)
 {
     my ($self) = @_;
     my $node = $self->node();
-    if ($node->sharing_mode()) {
+    if ($self->is_shared()) {
 	#
 	# A shared node is running just one OS, and we put that in
 	# so that the user can specify which of the current VM types
@@ -1269,7 +1288,7 @@ sub processOsFeatures($)
 sub processConnections($)
 {
     my ($self) = @_;
-    if (! $self->node()->sharing_mode()) {
+    if (! $self->is_shared()) {
 	foreach my $name (keys(%{ $self->{'CONNECTIONS'} })) {
 	    $self->addFeature('connected-to-'.$name, 0.0);
 	}
@@ -1378,7 +1397,7 @@ sub processTypeFeatures($)
 {
     my ($self) = @_;
     if ($self->iswidearea()
-	|| ($self->islocal() && ! $self->node()->sharing_mode())) {
+	|| ($self->islocal() && ! $self->is_shared())) {
 	if (exists($typefeatures{$self->node()->type()})) {
 	    foreach my $feature (@{ $typefeatures{$self->node()->type()} }) {
 		$self->addFeatureString($feature);
