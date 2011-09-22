@@ -784,11 +784,16 @@ sub Delete($;$)
 	print "*** WARNING: Not able to remove $userdir\n";
 	print "             Someone will need to do this by hand.\n";
 
+	# Try to move the directory.
+	my $moved = (system("/bin/mv -f $userdir ${userdir}.$$") == 0);
+
 	# NFS errors usually the result. Sometimes its cause there is
 	# someone in the directory, so its being held open.
         libtestbed::SENDMAIL($TBOPS,
 			     "Experiment::Delete: Could not remove directory",
-			     "Could not remove $userdir.\n".
+			     "Could not remove $userdir. ".
+			     ($moved ?
+			      "Renamed to ${userdir}.$$ ..." : "") . "\n" .
 			     "Someone will need to do this by hand.\n");
     }
     if (system("/bin/rm -rf $workdir")) {
