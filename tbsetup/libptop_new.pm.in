@@ -35,6 +35,7 @@ if ($PGENISUPPORT) {
 @ISA = "Exporter";
 @EXPORT = qw( );
 
+my $single_node = undef;
 my $user_project = undef;
 my $exempt_eid = undef;
 my $available_only = 1;
@@ -126,6 +127,9 @@ sub ProcessArgs($)
 	$genimode = 1;
 	$print_shared = 1;
 	$print_virtual = 1;
+    }
+    if (defined($options{"1"})) {
+	$single_node = $options{"1"};
     }
 }
 
@@ -901,6 +905,10 @@ sub willPrint($;$)
 {
     my ($self, $tagRef) = @_;
     my $node = $self->node();
+
+    if (defined($single_node)) {
+	return ($single_node eq $node->node_id());
+    }
 
     # In geni mode, disallow nodes tagged protogeni_exclude from being printed.
     my $geniExclude = 0;

@@ -55,12 +55,12 @@ sub usage()
 	  "       -a Include reserved nodes\n".
 	  "       -m Override multiplex_factor\n".
 	  "       -u Prune unused interfaces of allocated nodes (-e)(UNIMPLEMENTED)\n".
-	  "       -d Debug mode -- prints to stderr any problems in the database".
+	  "       -d Debug mode prints any problems in the database".
 	  "       -c Override delay capacity\n".
 	  "       -x Output in an RSpec xml format\n".
 	  "       -g version With -x, geni version. Must be '0.1', '0.2' or '2'\n".
 	  "       -l specifies the location of the type limit file\n" .
-          "       -1 Print an rspec containing only the node component-name(UNIMPLEMENTED)");
+          "       -1 Print an rspec containing only the node component-name");
         exit(-1);
 }
 
@@ -77,6 +77,9 @@ sub processArgs()
     }
     if (@ARGV) {
 	usage();
+    }
+    if (defined($options{"s"})) {
+	die("-s (switchtouse) option is not implemented\n");
     }
     if (defined($options{"x"})) {
 	$print_xml = 1;
