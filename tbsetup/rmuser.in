@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -34,7 +34,8 @@ my $TBOPS   = "@TBOPSEMAIL@";
 my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
-
+my $OURDOMAIN    = "@OURDOMAIN@";
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $MODGROUPS	= "$TB/sbin/modgroups";
 my $DELACCT	= "$TB/sbin/tbacct del";
 
@@ -142,6 +143,25 @@ if (! $this_user->IsAdmin()) {
     if (! defined($project) ||
 	! $project->AccessCheck($this_user, TB_PROJECT_DELUSER)) {
 	fatal("You do not have permission to remove user $target_user!");
+    }
+}
+
+#
+# Check to see if user has created slices (SA).
+#
+if ($PGENISUPPORT) {
+    require GeniDB;
+    require GeniUser;
+    require GeniSlice;
+    require GeniHRN;
+    
+    # Connect to the proper DB.
+    GeniDB::DBConnect(GeniDB::GENISA_DBNAME());
+
+    my $urn = GeniHRN::Generate("@OURDOMAIN@", "user", $target_uid);
+    my $geniuser = GeniUser->Lookup($urn, 1);
+    if (defined($geniuser) && GeniSlice->LookupByCreator($geniuser)) {
+	fatal("$target_user is still heading up ProtoGENI Slices");
     }
 }
 
