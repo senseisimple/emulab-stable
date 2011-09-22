@@ -168,7 +168,17 @@ sub Lookup($$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
-    return LookupRow($class, $query_result->fetchrow_hashref());
+    #
+    # Make a copy of the array. Still fighting memory corruption error.
+    #
+    my $hash_orig = $query_result->fetchrow_hashref();
+    my $hash_copy = {};
+    foreach my $key (keys(%{ $hash_orig })) {
+	my $val = $hash_orig->{$key};
+	$hash_copy->{$key} = $val;
+    }
+
+    return LookupRow($class, $hash_copy);
 }
 
 #
@@ -177,15 +187,7 @@ sub Lookup($$)
 #
 sub LookupRow($$)
 {
-    my ($class, $hash_orig) = @_;
-    #
-    # Make a copy of the array. Still fighting memory corruption error.
-    #
-    my $hash_copy = {};
-    foreach my $key (keys(%{ $hash_orig })) {
-	my $val = $hash_orig->{$key};
-	$hash_copy->{$key} = $val;
-    }
+    my ($class, $hash_copy) = @_;
 
     my $self            = {};
     $self->{"DBROW"}    = $hash_copy;
@@ -1337,6 +1339,17 @@ sub LoadNodeAttributes($)
     }
 
     return 0;
+}
+
+# Iterate through rows adding node attributes. Each row is a hashref.
+sub PreloadNodeAttributes($$)
+{
+    my ($self, $rows) = @_;
+    $self->{"ATTRS"} = {};
+    foreach my $row (@{ $rows }) {
+	my $key = $row->{'attrkey'};
+	$self->{"ATTRS"}->{$key} = $row;
+    }
 }
 
 #

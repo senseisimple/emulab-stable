@@ -140,6 +140,7 @@ sub LookupNodes()
 {
     my $dbresult;
     my $row;
+    # Bulk lookup on nodes table
     $dbresult = DBQueryFatal("select * from nodes");
     while ($row = $dbresult->fetchrow_hashref()) {
 	my $node = libptop::pnode->Create($row);
@@ -154,6 +155,28 @@ sub LookupNodes()
 	}
     }
 
+    # Bulk lookup on node_attributes table
+    $dbresult = DBQueryFatal("select * from node_attributes order by node_id");
+    my $lastname = undef;
+    my @attributes = ();
+    while ($row = $dbresult->fetchrow_hashref()) {
+	my $name = $row->{"node_id"};
+	if (! defined ($lastname) || $name ne $lastname) {
+	    if (defined($lastname)) {
+		my $node = $nodeList{$lastname};
+		if (defined($node)) {
+		    $node->node()->PreloadNodeAttributes(\@attributes);
+		} elsif ($debug) {
+		    print STDERR "Node $lastname is in node_attributes ".
+			"but not nodes\n";
+		}
+	    }
+	    $lastname = $name;
+	    @attributes = ();
+	}
+	push(@attributes, $row);
+    }
+
     # Bulk lookup on reserved table
     $dbresult = DBQueryFatal("select * from reserved");
     while ($row = $dbresult->fetchrow_hashref()) {
@@ -166,6 +189,7 @@ sub LookupNodes()
 	}
     }
 
+    # Bulk lookup on node_status table
     $dbresult = DBQueryFatal("select node_id, status from node_status");
     while (my ($node_id, $status) = $dbresult->fetchrow()) {
 	my $node = $nodeList{$node_id};
@@ -176,6 +200,7 @@ sub LookupNodes()
 	}
     }
 
+    # Bulk lookup on widearea_nodeinfo table
     $dbresult = DBQueryFatal("select * from widearea_nodeinfo");
     while ($row = $dbresult->fetchrow_hashref()) {
 	my $nodeName = $row->{'node_id'};
@@ -731,6 +756,7 @@ sub Create($$)
     $self->{'PID'} = undef;
     $self->{'EROLE'} = undef;
     $self->{'EVENTSTATE'} = undef;
+    $self->{'WILL_PRINT'} = undef;
 
     bless($self, $class);
     return $self;
@@ -905,7 +931,16 @@ sub isup($)
 	    || $eventstate eq TBDB_NODESTATE_ALWAYSUP());
 }
 
-sub willPrint($;$)
+sub willPrint($)
+{
+    my ($self) = @_;
+    if (! defined($self->{'WILL_PRINT'})) {
+	$self->{'WILL_PRINT'} = $self->calculateWillPrint();
+    }
+    return $self->{'WILL_PRINT'};
+}
+
+sub calculateWillPrint($;$)
 {
     my ($self, $tagRef) = @_;
     my $node = $self->node();
@@ -936,7 +971,7 @@ sub willPrint($;$)
 	$tags{$self->name()} = 1;
 	my $parent = $node->phys_nodeid();
 	if (! exists($tags{$parent})) {
-	    $result = $result && $nodeList{$parent}->willPrint(\%tags);
+	    $result = $result && $nodeList{$parent}->calculateWillPrint(\%tags);
 	}
     }
     return $result;
