@@ -8652,8 +8652,6 @@ sub AddToSwitchPath($$)
 {
     my ($cur, $new) = @_;
 
-    print "N: $new\n";
-
     return $new
 	if (!defined($cur));
 
@@ -8661,8 +8659,6 @@ sub AddToSwitchPath($$)
     my @new = split(" ", $new);
     foreach my $n (@new) {
 	my ($s1,$s2) = split(":", $n);
-
-	print "$n, $s1, $s2, @cur\n";
 
 	push(@cur, $n)
 	    if (! ((grep {$_ eq $n} @cur) ||
