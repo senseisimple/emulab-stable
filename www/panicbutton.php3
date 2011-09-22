@@ -18,7 +18,9 @@ $isadmin   = ISADMIN();
 #
 $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 $optargs = OptionalPageArguments("canceled",   PAGEARG_BOOLEAN,
-				 "confirmed",  PAGEARG_BOOLEAN);
+				 "confirmed",  PAGEARG_BOOLEAN,
+				 "level",      PAGEARG_INTEGER,
+				 "clear",      PAGEARG_BOOLEAN);
 
 # Need these below.
 $pid = $experiment->pid();
@@ -42,8 +44,19 @@ PAGEHEADER("Press the Panic Button!");
 # Verify permissions.
 #
 if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to press the panic button for ".
-	      "experiment $eid!", 1);
+    USERERROR("You do not have permission to press/clear the panic button.", 1);
+}
+
+if (isset($level)) {
+    if ($level < 1 || $level > 2) {
+	USERERROR("Improper level argument", 1);
+    }
+}
+else {
+    $level = 1;
+}
+if (!isset($clear)) {
+    $clear = 0;
 }
 
 echo $experiment->PageHeader();
@@ -58,7 +71,8 @@ echo "<br>\n";
 if (!isset($confirmed)) {
     echo "<center><h3><br>
           Are you <b>REALLY</b>
-          sure you want to press the panic button for Experiment '$eid?'
+          sure you want to " . ($clear ? "clear" : "press") .
+	  " the panic button for Experiment '$eid?'
           </h3>\n";
 
     $experiment->Show(1);
@@ -68,6 +82,10 @@ if (!isset($confirmed)) {
     echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
+    echo "<b><input type=hidden name=level value=$level></b>\n";
+    if ($clear) {
+	echo "<b><input type=hidden name=clear value=$clear></b>\n";
+    }
     echo "</form>\n";
     echo "</center>\n";
 
@@ -78,8 +96,19 @@ if (!isset($confirmed)) {
 #
 # We run a wrapper script that does all the work.
 #
-STARTBUSY("Pressing the panic button");
-$retval = SUEXEC($uid, "$unix_pid,$unix_gid", "webpanic $pid $eid",
+if ($clear) {
+    STARTBUSY("Clearing the panic button");
+}
+else {
+    STARTBUSY("Pressing the panic button");
+}
+if ($clear) {
+    $opt = "-r";
+}
+else {
+    $opt = "-l $level";
+}
+$retval = SUEXEC($uid, "$unix_pid,$unix_gid", "webpanic $opt $pid $eid",
 		 SUEXEC_ACTION_IGNORE);
 
 #
@@ -105,8 +134,13 @@ if ($retval) {
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    echo "<h3>The panic button has been pressed!</h3><br>
-              You will need to contact testbed operations to continue.\n";
+    if ($clear) {
+	echo "<h3>The panic situation has been cleared!</h3><br>\n";
+    }
+    else {
+	echo "<h3>The panic button has been pressed!</h3><br>
+                You will need to contact testbed operations to continue.\n";
+    }
 }
 
 #

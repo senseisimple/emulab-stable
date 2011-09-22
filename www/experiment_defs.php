@@ -731,6 +731,8 @@ class Experiment
 	$dpdbname    = $exprow["dpdbname"];
 	$dpdbpassword= $exprow["dpdbpassword"];
 	$uuid        = $exprow["eid_uuid"];
+	$paniced     = $exprow["paniced"];
+	$panic_date  = $exprow["panic_date"];
 
 	$autoswap_hrs= ($autoswap_timeout/60.0);
 	$idleswap_hrs= ($idleswap_timeout/60.0);
@@ -932,6 +934,14 @@ class Experiment
                     <td>Last Error: </td>
                     <td class=\"left\"><a href=\"showlasterror.php3?pid=$pid&eid=$eid\">$err_cause</a></td>
                   </tr>\n";
+	    }
+
+	    if ($paniced) {
+		echo "<tr>
+                    <td>Paniced on: </td>
+                    <td class=left>$panic_date</td>
+                  </tr>\n";
+
 	    }
 
 	    if ($linktest_pid) {

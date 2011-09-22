@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -556,8 +556,10 @@ if (isset($classes['mote']) && $expstate == $TB_EXPTSTATE_ACTIVE) {
 }
 
 if ($isadmin) {
-    if ($expstate == $TB_EXPTSTATE_ACTIVE) {
-	if (!$geniflags) {
+    if ($expstate == $TB_EXPTSTATE_ACTIVE ||
+	$expstate == $TB_EXPTSTATE_PANICED) {
+
+	if ($expstate == $TB_EXPTSTATE_ACTIVE && !$geniflags) {
 	    SUBMENUSECTION("Beta-Test Options");
 	    WRITESUBMENUBUTTON("Restart Experiment",
 			       CreateURL("swapexp", $experiment,
@@ -568,17 +570,30 @@ if ($isadmin) {
 
 	SUBMENUSECTION("Admin Options");
 
-	if (!$geniflags) {
+	if ($expstate == $TB_EXPTSTATE_ACTIVE && !$geniflags) {
 	    WRITESUBMENUBUTTON("Send an Idle Info Request",
 			       CreateURL("request_idleinfo", $experiment));
 	
 	    WRITESUBMENUBUTTON("Send a Swap Request",
 			       CreateURL("request_swapexp", $experiment));
 	}
-	WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
-			   CreateURL("swapexp", $experiment,
-				     "inout", "out", "force", 1));
-	
+	if ($expstate == $TB_EXPTSTATE_PANICED) {
+	    WRITESUBMENUBUTTON("Clear Panic Mode",
+			       CreateURL("panicbutton", $experiment,
+					 "clear", 1));
+	}
+	else {
+	    WRITESUBMENUBUTTON("Panic Mode (level 1)",
+			       CreateURL("panicbutton", $experiment,
+					 "level", 1));
+	    WRITESUBMENUBUTTON("Panic Mode (level 2)",
+			       CreateURL("panicbutton", $experiment,
+					 "level", 2));
+
+	    WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
+			       CreateURL("swapexp", $experiment,
+					 "inout", "out", "force", 1));
+	}
 	SUBMENUSECTIONEND();
     }
 }

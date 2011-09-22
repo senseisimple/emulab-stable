@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -15,17 +15,22 @@ use POSIX qw(isatty setsid);
 sub usage()
 {
     print(STDERR
-	  "Usage: panicbutton [-r] <pid> <eid>\n".
+	  "Usage: panic [-l level] <pid> <eid>\n".
+	  "       panic -r <pid> <eid>\n".
 	  "switches and arguments:\n".
+	  "-l level - Level 1; reboot nodes into the admin MFS\n".
+	  "         - Level 2; disable the control network\n".
 	  "-r       - Reset panic state (admin people only)\n".
 	  "<pid>    - The project the experiment belongs to\n".
 	  "<eid>    - The experiment name (id)\n");
     exit(-1);
 }
-my $optlist = "r";
+my $optlist = "rl:";
 my $reset   = 0;
+my $level   = 1;
 
 sub fatal($);
+sub DoIt();
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -63,6 +68,7 @@ my $TBOPS  = "@TBOPSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Firewall;
 use Experiment;
 use User;
 
@@ -93,6 +99,11 @@ if (@ARGV != 2) {
 if (defined($options{"r"})) {
     $reset = 1;
 }
+if (defined($options{"l"})) {
+    $level = 1;
+    usage()
+	if ($level < 1 || $level > 2);
+}
 
 my $this_user = User->ThisUser();
 if (! defined($this_user)) {
@@ -109,21 +120,13 @@ my $pid = $experiment->pid();
 my $eid = $experiment->eid();
 
 #
-# See if the experiment is firewalled. Error if not.
-#
-if (!$experiment->IsFirewalled()) {
-    die("*** $0:\n".
-	"    $experiment is not firewalled!\n");
-}
-
-#
 # Verify that this person is allowed to press the panic button.
 # Note that any script down the line has to do an admin check also. 
 #
 if ($UID && !$this_user->IsAdmin() &&
     !$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
     die("*** $0:\n".
-	"    You do not have permission to end this experiment!\n");
+	"    You do not have permission for this experiment!\n");
 }
 
 #
@@ -152,7 +155,10 @@ $experiment->LockTables() == 0
 #
 if ($reset) {
     ExitWithStatus(1, "Experiment $pid/$eid is not paniced!\n")
-	if ($experiment->state() ne EXPTSTATE_PANICED);
+	if ($experiment->state() ne EXPTSTATE_PANICED &&
+	    $experiment->paniced());
+
+    $level = $experiment->paniced();
 }
 else {
     ExitWithStatus(1, "Experiment $pid/$eid is not active!\n")
@@ -167,42 +173,23 @@ else {
 $experiment->Lock(($reset ? EXPTSTATE_ACTIVE : EXPTSTATE_PANICED), 1) == 0
     or fatal("Could not lock $experiment");
 
+# Force level 2 for firewalled experiments.
+if ($experiment->IsFirewalled()) {
+    $level = 2
+	if (!$reset);
+}
+
 #
 # XXX - At this point a failure is going to leave things in an
-# inconsistent state. Be sure to call fatal() only since we are
-# going into the background, and we have to send email since no
-# one is going to see printed error messages (output goes into the
-# log file, which will be sent along in the email). 
+# inconsistent state.
 #
-
-#
-# Get firewall node and port info
-#
-my ($firewall, $port);
-if ($experiment->FirewallAndPort(\$firewall, \$port) != 0) {
-    fatal("Could not determine firewall port for $experiment");
-}
-
-#
-# Call snmpit.
-#
-if ($reset) {
-    system("$snmpit -e ${firewall}:${port}");
-    if ($?) {
-	fatal("snmpit exited with $?!");
-    }
-    $experiment->SetPanicBit(0);
-    print "Panic situation has been cleared!\n";
-}
-else {
-    system("$snmpit -d ${firewall}:${port}");
-    if ($?) {
-	fatal("snmpit exited with $?!");
-    }
-    $experiment->SetPanicBit(1);
-    print "Panic Button has been pressed!\n";
+if (Firewall::Panic($experiment, $level,
+		    ($reset ?
+		     Firewall::PANIC_RESET() : Firewall::PANIC_PANIC()))) {
+    fatal("Failure in Firewall::Panic()");
 }
 $experiment->Unlock();
+print "Panic Button has been ". ($reset ? "cleared" : "pressed") . "\n";
 
 #
 # Send email notification to user *and* to tbops.
@@ -215,8 +202,7 @@ SENDMAIL("$user_name <$user_email>",
 	 "$user_name <$user_email>",
 	 "Cc:  $swapper_name <$swapper_email>\n".
 	 "Bcc: $TBOPS");
-
-exit 0;
+exit(0);
 
 sub fatal($)
 {

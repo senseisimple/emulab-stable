@@ -649,8 +649,15 @@ sub doSwapout($) {
 	# Nodes behind a firewall are treated special.
 	# See undoFWNodes for details.
 	#
+	# Non-firewalled experiments can now be paniced, and the swapout
+	# action is similar. 
+	#
 	if ($firewalled && undoFWNodes($experiment)) {
 	    tblog_set_cleanup(0);
+	    return 1;
+	}
+	elsif ($experiment->paniced() &&
+	       Firewall::Panic($experiment, 0, Firewall::PANIC_ZAP())) {
 	    return 1;
 	}
 

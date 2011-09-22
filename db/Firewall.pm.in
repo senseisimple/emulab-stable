@@ -566,3 +566,185 @@ done:
     return 0;
 }
 
+#
+# The guts of "panic", which is also used for non-firewalled experiments.
+#
+# Flags.
+sub PANIC_PANIC()		{ return 1; }
+sub PANIC_CLEAR()		{ return 2; }
+sub PANIC_ZAP()			{ return 3; }
+
+sub Panic($$$)
+{
+    my ($experiment, $level, $which) = @_;
+
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    my $firewalled = $experiment->IsFirewalled();
+    my ($firewall, $port);
+    if ($firewalled) {
+	if ($experiment->FirewallAndPort(\$firewall, \$port) != 0) {
+	    print STDERR "Could not determine firewall port for $experiment\n";
+	    return -1;
+	}
+    }
+    my @nodes = ();
+    $experiment->LocalNodeListNames(\@nodes, 1);
+	
+    if ($which == PANIC_ZAP()) {
+	$level = $experiment->paniced();
+	print STDERR "Powering down paniced nodes.\n";
+	system("$POWER off @nodes");
+	if ($?) {
+	    print STDERR "Failed to power off all nodes!\n";
+	    print STDERR "Nodes NOT switched to admin MFS\n";
+	    goto badzap;
+	}
+
+	#
+	# Force all nodes into admin mode.
+	#
+	my %myargs;
+	$myargs{'name'}     = "$0";
+	$myargs{'on'}       = 1;
+	$myargs{'clearall'} = 1;
+	if (TBAdminMfsSelect(\%myargs, undef, @nodes)) {
+	    print STDERR "Failed to force all nodes into admin mode!\n";
+	    goto badzap;
+	}
+
+	#
+	# This code is not used for firewalled experiments, so we only
+	# have to worry about the control network.
+	#
+	if ($level == 2) {
+	    system("$SNMPIT -R $pid $eid");
+	    if ($?) {
+		goto badzap;
+	    }
+	}
+
+	#
+	# Now we power on the nodes and let them boot into the MFS,
+	# where they will run the disk bootblock zapper.
+	#
+	# If this fails, we power off all the nodes again and get a
+	# little edgy in our error messages to emphasize the gravity
+	# of the situation.  Someday we could just move the failed
+	# nodes into a special firewalled holding experiment, and
+	# let the experiment swapout finish, freeing up the nodes that
+	# did succeed.
+	#
+	print STDERR "Booting nodes into admin MFS and zapping bootblocks.\n";
+	my @failed = ();
+	%myargs = ();
+	$myargs{'name'}    = "$0";
+	$myargs{'command'} = "sudo /usr/local/bin/diskzap";
+	$myargs{'poweron'} = 1;
+	$myargs{'retry'}   = 1;
+	if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
+	    print STDERR "Failed to invalidate bootblocks on @failed!\n";
+	  badzap:
+	    print STDERR "Powering nodes off again ...\n";
+	    system("$POWER off @nodes");
+	    if ($?) {
+		print STDERR "Some nodes may NOT be powered off.\n";
+	    } else {
+		print STDERR "All nodes are powered off.\n";
+	    }
+	    print STDERR "MAKE SURE THESE NODES DO NOT BOOT FROM DISK!\n";
+
+	    SENDMAIL($TBOPS,
+		     "Failed to invalidate boot blocks for $pid/$eid\n",
+		     "Failed to invalidate boot blocks while swapping out\n".
+		     "paniced experiment $pid/$eid.\n");
+	    goto bad;
+	}
+    }
+    elsif ($which == PANIC_CLEAR()) {
+	$level = $experiment->paniced();
+	
+	if ($level == 1) {
+	    #
+	    # Turn admin mode back off and reboot back to the old OS
+	    #
+	    print "Allowing all nodes to reboot out of admin mode ...\n";
+
+	    my %myargs;
+	    $myargs{'name'}     = "$0";
+	    $myargs{'on'}       = 0;
+	    $myargs{'clearall'} = 0;
+	    if (TBAdminMfsSelect(\%myargs, undef, @nodes)) {
+		print STDERR "Could not turn admin mode off for nodes\n";
+		goto bad;
+	    }
+	    $myargs{'reboot'} = 1;
+	    $myargs{'wait'}   = 0;
+	    if (TBAdminMfsBoot(\%myargs, undef, @nodes)) {
+		print STDERR "Failed to reboot nodes out of admin mode\n";
+		goto bad;
+	    }
+	}
+	else {
+	    print "Enabling the control network ...\n";
+	    if ($firewalled) {
+		system("$SNMPIT -e ${firewall}:${port}");
+	    }
+	    else {
+		system("$SNMPIT -R $pid $eid");
+	    }
+	    if ($?) {
+		print STDERR "snmpit exited with $?\n";
+		goto bad;
+	    }
+	}
+	$experiment->SetPanicBit(0);
+    }
+    elsif ($which == PANIC_PANIC()) {
+	if ($level == 1) {
+	    #
+	    # Boot into the admin MFS
+	    #
+	    print "Booting all nodes into admin mode and waiting ...\n";
+	    
+	    my %myargs;
+	    $myargs{'name'} = "$0";
+	    $myargs{'on'}   = 1;
+	    if (TBAdminMfsSelect(\%myargs, undef, @nodes)) {
+		print STDERR "Failed to force all nodes into admin mode!\n";
+		print STDERR "Falling back to control network disable\n";
+		$level = 2;
+		goto level2;
+	    }
+	    $myargs{'reboot'} = 1;
+	    $myargs{'wait'}   = 1;
+	    $myargs{'retry'}  = 1;
+	    if (TBAdminMfsBoot(\%myargs, undef, @nodes)) {
+		print STDERR "Failed to boot all nodes into admin mode!\n";
+		print STDERR "Falling back to control network disable\n";
+		$level = 2;
+		goto level2;
+	    }
+	}
+	else {
+	  level2:
+	    print "Disabling the control network ...\n";
+	    if ($firewalled) {
+		system("$SNMPIT -d ${firewall}:${port}");
+	    }
+	    else {
+		system("$SNMPIT -D $pid $eid");
+	    }
+	    if ($?) {
+		print STDERR "snmpit exited with $?\n";
+		goto bad;
+	    }
+	}
+	$experiment->SetPanicBit($level);
+    }
+    return 0;
+
+  bad:
+    return -1;
+}
