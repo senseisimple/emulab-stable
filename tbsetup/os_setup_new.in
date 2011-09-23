@@ -659,6 +659,11 @@ if ($exit_code == 0) {
 	    my ($node_history_id) 
 		= DBQuerySingleFatal("select max(history_id) ".
 				     "  from node_history where node_id = '$node_id'");
+	    if (! defined $node_history_id) {
+		tbwarn("No node_history for $node_id, can't log image usage for node.");
+		next;
+	    }
+
 	    my ($erole, $osname, $req_type, $phys_type) 
 		= DBQuerySingleFatal("select r.erole, v.osname, v.type, n.type ".
 				     "  from reserved as r ".
@@ -668,7 +673,7 @@ if ($exit_code == 0) {
 	    my $req_os = defined $osname ? ($osname ? 1 : 0) : 'NULL';
 	    $erole = 'delay' if $erole eq 'delaynode';
 	    $req_type = $erole unless defined $req_type;
-	    
+
 	    DBQueryFatal("insert into image_history ".
 			 "(stamp, node_history_id, node_id, ".
 			 " action, newly_alloc, rsrcidx, log_session, ".
