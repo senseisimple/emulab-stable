@@ -65,6 +65,10 @@ our %auxtypemap = ();
 
 # Map from type names to lists of features
 our %typefeatures = ();
+# Mapping from types to the 'forwarding_protocols' node_type_attribute
+our %type_forwarding = ();
+# Mapping from types to the 'dedicated_widearea' node_type_attribute
+our %type_dedicatedwa = ();
 
 # Keyed by osids. Contains OsInfo structures
 our %osinfo = ();
@@ -141,7 +145,7 @@ sub LookupNodes()
     my $dbresult;
     my $row;
     # Bulk lookup on nodes table
-    $dbresult = DBQueryFatal("select * from nodes");
+    $dbresult = DBQueryFatal("select * from nodes where role='testnode' or role='testswitch' or role='widearea_switch' or role='testnodefoo'");
     while ($row = $dbresult->fetchrow_hashref()) {
 	my $node = libptop::pnode->Create($row);
 	if (defined($node)) {
@@ -149,7 +153,7 @@ sub LookupNodes()
 	    $node->set_eventstate($row->{'eventstate'});
 	    if (! defined($node->type()) && $debug) {
 		die("****Node $node had a type not in node_types table.\n");
-	}
+	    }
 	} elsif ($debug) {
 	    print STDERR "Failed to create node $node from database row.\n";
 	}
@@ -213,6 +217,19 @@ sub LookupNodes()
 	}
     }
 
+    # Bulk lookup on node_type_attributes
+    $dbresult = DBQueryFatal("select type, attrkey, attrvalue ".
+			     "from node_type_attributes ".
+			     "where attrkey='forwarding_protocols' ".
+			     "or attrkey='dedicated_widearea'");
+    while (my ($type, $key, $value) = $dbresult->fetchrow_array()) {
+	if ($key eq "forwarding_protocols") {
+	    $type_forwarding{$type} = $value;
+	} elsif ($key eq "dedicated_widearea") {
+	    $type_dedicatedwa{$type} = $value
+	}
+    }
+
     TBGetSiteVar('general/default_longitude', \$default_longitude);
     TBGetSiteVar('general/default_latitude', \$default_latitude);
     TBGetSiteVar('general/default_country', \$default_country);
@@ -229,14 +246,14 @@ sub LookupPermissions()
         # projects which it is attached to.
 	my $dbresult =
 	    DBQueryFatal("select distinct type ".
-			   "from nodetypeXpid_permissions");
+			 "from nodetypeXpid_permissions");
 	while (my ($type) = $dbresult->fetchrow_array()) {
 	    $permissions{$type} = 0;
 	}
 	$dbresult =
 	    DBQueryFatal("select type ".
-			   "from nodetypeXpid_permissions ".
-			   "where pid='$user_project'");
+			 "from nodetypeXpid_permissions ".
+			 "where pid='$user_project'");
 	while (my ($type) = $dbresult->fetchrow_array()) {
 	    $permissions{$type} = 1;
 	}
@@ -284,7 +301,12 @@ sub LookupAuxtypes()
     #
     $dbresult = DBQueryFatal("select node_id, type, count from node_auxtypes");
     while (my ($node_id, $type, $count) = $dbresult->fetchrow_array()) {
-	$nodeList{$node_id}->addAuxtype($type, $count);
+	my $node = $nodeList{$node_id};
+	if (defined($node)) {
+	    $node->addAuxtype($type, $count);
+	} elsif ($debug) {
+	    print STDERR "Node $node_id in node_auxtypes but not in nodes\n";
+	}
     }
 }
 
@@ -505,7 +527,7 @@ sub AddSharedBandwidth()
 
 	if (! exists($sharedbw{"$node:$iface"})) {
 	    my $bw = $interfaceList{"$node:$iface"}->remaining_bandwidth();
-	    $sharedbw{"$node:$iface"} = Math::BigInt->new($bw);
+	    $sharedbw{"$node:$iface"} = $bw;
 	}
 	$sharedbw{"$node:$iface"} += $bandwidth;
     }
@@ -632,7 +654,7 @@ sub SwitchBandwidth($$)
     # Default to 100 MBit. The default should never be used unless
     # there is an error in the database. If the wires table references
     # a node which doesn't exist, for instance.
-    my $result = Math::BigInt->new(100000);
+    my $result = 100000;
     if (defined($node)) {
 	my $basetype = $node->get_basetype();
 	$result = TypeBandwidth($nodename, $iface, $basetype);
@@ -656,19 +678,19 @@ sub TypeBandwidth($$$)
 	    }
 	}
     }
-    return Math::BigInt->new($result);
+    return $result;
 }
 
 sub ShareBandwidth($$)
 {
     my ($node, $iface) = @_;
-    my $result = Math::BigInt->new(0);
+    my $result = 0;
     if (exists($sharedbw{"$node:$iface"})) {
 	$result = $sharedbw{"$node:$iface"};
     } elsif (exists($interfaceList{"$node:$iface"})) {
 	$result = $interfaceList{"$node:$iface"}->remaining_bandwidth();
     }
-    return Math::BigInt->new($result);
+    return $result;
 }
 
 sub make_ip($)
@@ -782,8 +804,7 @@ sub set_eventstate($) { $_[0]->{'EVENTSTATE'} = $_[1]; }
 sub get_basetype($)
 {
     my ($self) = @_;
-    my $result = undef;
-    $self->node()->NodeTypeAttribute("forwarding_protocols", \$result);
+    my $result = $type_forwarding{$self->node()->type()};
     if (! defined($result)) {
 	$result = "ethernet";
     }
@@ -800,12 +821,11 @@ sub set_reserved($$)
 {
     my ($self, $row) = @_;
     if (defined($row)) {
-	my $node = $self->node();
-	$node->SetReservedRow($row);
-	$self->{'SHARED'} = $node->sharing_mode();
-	$self->{'EID'} = $node->eid();
-	$self->{'PID'} = $node->pid();
-	$self->{'EROLE'} = $node->erole();
+#	$self->node()->SetReservedRow($row);
+	$self->{'SHARED'} = $row->{'sharing_mode'};
+	$self->{'EID'} = $row->{'eid'};
+	$self->{'PID'} = $row->{'pid'};
+	$self->{'EROLE'} = $row->{'erole'};
     }
 }
 
@@ -879,6 +899,14 @@ sub available($;$)
 
 sub isswitch($)
 {
+    if (! defined($_[0]->{'IS_SWITCH'})) {
+	$_[0]->{'IS_SWITCH'} = $_[0]->calculateSwitch();
+    }
+    return $_[0]->{'IS_SWITCH'};
+}
+
+sub calculateSwitch($)
+{
     my ($self) = @_;
     my $role = $self->node()->role();
     return ($role eq 'testswitch' || $role eq 'widearea_switch'
@@ -887,10 +915,18 @@ sub isswitch($)
 
 sub islocal($)
 {
+    if (! defined($_[0]->{'IS_LOCAL'})) {
+	$_[0]->{'IS_LOCAL'} = $_[0]->calculateLocal();
+    }
+    return $_[0]->{'IS_LOCAL'};
+}
+
+sub calculateLocal($)
+{
     my ($self) = @_;
     my $node = $self->node();
     my $isremotenode = $node->isremotenode();
-    my $wa_attrvalue = $node->NodeTypeAttribute('dedicated_widearea');
+    my $wa_attrvalue = $type_dedicatedwa{$node->type()};
     return ( $node->role() eq 'testnode'
 	     && ((! defined($isremotenode) || $isremotenode == 0)
 		 || (defined($wa_attrvalue) && $wa_attrvalue == 1)));
@@ -898,11 +934,19 @@ sub islocal($)
 
 sub iswidearea($)
 {
+    if (! defined($_[0]->{'IS_WIDEAREA'})) {
+	$_[0]->{'IS_WIDEAREA'} = $_[0]->calculateWidearea();
+    }
+    return $_[0]->{'IS_WIDEAREA'};
+}
+
+sub calculateWidearea($)
+{
     my ($self) = @_;
     my $node = $self->node();
     my $isremotenode = $node->isremotenode();
     my $isvirtnode = $node-> isvirtnode();
-    my $wa_attrvalue = $node->NodeTypeAttribute('dedicated_widearea');
+    my $wa_attrvalue = $type_dedicatedwa{$node->type()};
     return ($node->role() eq 'testnode'
 	    && defined($isremotenode)
 	    && $isremotenode == 1
@@ -1078,7 +1122,7 @@ sub processLocal($)
     # This is for the case that we are modifying an existing experiment - tell
     # assign to prefer nodes the user has already allocated
     if (defined($exempt_eid) && $available_only
-	&& defined($node->eid()) && defined($node->pid())) {
+	&& defined($self->eid()) && defined($self->pid())) {
 	$self->addFeature('already_reserved', 0);
     }
     $self->processSubnode();
@@ -1385,7 +1429,7 @@ sub processWidearea($)
 	}
 	return;
     }
-    if (! defined($node->eid()) || ! defined($node->pid())) {
+    if (! defined($self->eid()) || ! defined($self->pid())) {
 	if ($debug) {
 	    print STDERR "Widearea node is not reserved to an eid or pid".
 		$node->node_id()."\n";
@@ -1393,7 +1437,7 @@ sub processWidearea($)
 	return;
     }
     if ($self->status() ne 'up' ||
-	($node->eid() eq NODEDEAD_EID() || $node->pid() eq NODEDEAD_PID())) {
+	($self->eid() eq NODEDEAD_EID() || $self->pid() eq NODEDEAD_PID())) {
 	if ($genimode) {
 	    return;
 	}
@@ -1820,7 +1864,6 @@ sub toXML($$)
 package libptop::plink;
 
 use libdb qw(TBOSID TB_OPSPID);
-use Math::BigInt;
 
 sub Create($)
 {
@@ -1836,7 +1879,7 @@ sub Create($)
     $self->{'DEST_IF'} = undef;
     $self->{'DEST_CARD'} = undef;
     $self->{'DEST_PORT'} = undef;
-    $self->{'BW'} = Math::BigInt->new(0);
+    $self->{'BW'} = 0;
     $self->{'DELAY'} = 0;
     $self->{'LOSS'} = 0.0;
     $self->{'TYPES'} = [];
@@ -1982,7 +2025,7 @@ sub toString($)
     $result .= $self->source() . "/" . $self->sourceif() . " ";
     $result .= $self->dest() . ":";
     $result .= $self->dest() . "/" . $self->destif() . " ";
-    $result .= $self->bw()->bstr() . " ";
+    $result .= $self->bw() . " ";
     $result .= $self->delay() . " ";
     $result .= $self->loss() . " ";
     $result .= "1 " . join(" ", @{ $self->types() });
@@ -1999,7 +2042,7 @@ sub toXML($$)
 	GeniXML::SetText("component_manager_uuid", $xml, $cmurn);
 	GeniXML::SetText("component_uuid", $xml, $urn);
 	my $bw = GeniXML::AddElement("bandwidth", $xml);
-	$bw->appendText($self->bw()->bstr());
+	$bw->appendText($self->bw());
 	my $latency = GeniXML::AddElement("latency", $xml);
 	$latency->appendText($self->delay());
 	my $loss = GeniXML::AddElement("packet_loss", $xml);
@@ -2010,11 +2053,11 @@ sub toXML($$)
 	GeniXML::SetText("component_id", $xml, $urn);
 	$self->propertyToXml($xml, $self->source(), $self->sourceif(),
 			     $self->dest(), $self->destif(),
-			     $self->bw()->bstr(), $self->delay(),
+			     $self->bw(), $self->delay(),
 			     $self->loss());
 	$self->propertyToXml($xml, $self->dest(), $self->destif(),
 			     $self->source(), $self->sourceif(),
-			     $self->bw()->bstr(), $self->delay(),
+			     $self->bw(), $self->delay(),
 			     $self->loss());
     }
     GeniXML::SetText("component_name", $xml, $self->name());
