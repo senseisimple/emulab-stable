@@ -1050,7 +1050,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    } else {
 		my $usertype = GeniXML::FindFirst("n:hardware_type", $ref);
 		if (defined($usertype)) {
-		    $pctype = GeniXML::GetText("name", $usertype);
+		    #
+		    # Watch for pcvm type set above. If the user specified
+		    # a hardware type for their VMs, then form a proper
+		    # hardware specific pcvm type. 
+		    #
+		    my $pt = GeniXML::GetText("name", $usertype);
+		    $pctype = ($pctype eq "pcvm" ? "${pt}-vm" : $pt);
 		}
 	    }
 	}
