@@ -25,6 +25,7 @@ use Node;
 use NodeType;
 use Lan;
 use OSinfo;
+use Port;
 use English;
 use Data::Dumper;
 use Carp;
@@ -5199,6 +5200,35 @@ sub InterpLinks($)
 		next
 		    if ($interface->role() ne TBDB_IFACEROLE_EXPERIMENT() ||
 			!$wiredup);
+
+		#
+		# Gack. We need to make sure that we are connected to an
+		# ethernet switch, not something like an apcon or another
+		# node. Use the Port library for this.
+		#
+		my $port = Port->GetOtherEndByIface($pnodename, $iface);
+		if (!defined($port)) {
+		    tberror("Could not get Port other end for $interface\n");
+		    return -1;
+		}
+		next
+		    if (! $port->is_switch_side());
+		my $switchname = $port->node_id();
+		my $switch = Node->Lookup($switchname);
+		if (!defined($switch)) {
+		    tberror("Could not lookup node object for $switchname\n");
+		    return -1;
+		}
+		my $forwarding_protocols;
+		if ($switch->NodeTypeAttribute("forwarding_protocols",
+					       \$forwarding_protocols) ||
+		    !defined($forwarding_protocols) ||
+		    $forwarding_protocols eq "") {
+		    tberror("No forwarding_protocols set for $switch\n");
+		    return -1;
+		}
+		next
+		    if ($forwarding_protocols ne "ethernet");
 
 		my $speed = $self->interfacespeedmbps($type, "ethernet");
 		DBQueryWarn("update interfaces set " .
