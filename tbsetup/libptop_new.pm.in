@@ -10,6 +10,7 @@ use strict;
 use Exporter;
 use lib "@prefix@/lib";
 use Node;
+use NodeType;
 use Interface;
 use OSinfo;
 use libdb qw(TBGetSiteVar DBQueryFatal TBResolveNextOSID);
@@ -53,8 +54,9 @@ my $default_latitude = undef;
 my $default_country = undef;
 
 our %nodeList = ();
+our %nodeTypeList = ();
 our %linkList = ();
-our %interfaceList = ();
+#our %interfaceList = ();
 
 # Table of which types the user project is allowed to have.
 # Keyed by type where 1 = allowed, 0 = denied, and ! exists = allowed
@@ -84,6 +86,11 @@ our %osid_subosid = ();
 # interface_capabilities table. 'base' is the capkey prefix to one of
 # the defspeed keys.
 our %itype_bw = ();
+
+# Mapping between interfaces and columns
+our %iface_type = ();
+our %iface_role = ();
+our %iface_ip = ();
 
 # Keyed by $node:$iface, this is the amount of shared bandwidth
 # available on that interface. Overrides the remaining_bandwidth from
@@ -144,12 +151,20 @@ sub LookupNodes()
 {
     my $dbresult;
     my $row;
+    # Bulk lookup on node types
+    $dbresult = DBQueryFatal("select * from node_types");
+    while ($row = $dbresult->fetchrow_hashref()) {
+	my $name = $row->{'type'};
+	$nodeTypeList{$name} = NodeType->LookupRow($name, $row);
+    }
+
     # Bulk lookup on nodes table
     $dbresult = DBQueryFatal("select * from nodes where role='testnode' or role='testswitch' or role='widearea_switch' or role='testnodefoo'");
     while ($row = $dbresult->fetchrow_hashref()) {
 	my $node = libptop::pnode->Create($row);
 	if (defined($node)) {
-	    $nodeList{$node->name()} = $node;
+	    $nodeList{$row->{"node_id"}} = $node;
+	    $node->node()->PreloadNodeAttributes([]);
 	    $node->set_eventstate($row->{'eventstate'});
 	    if (! defined($node->type()) && $debug) {
 		die("****Node $node had a type not in node_types table.\n");
@@ -339,8 +354,9 @@ sub LookupFeatures()
     while (my ($node_id, $feature, $weight) = $dbresult->fetchrow()) {
 	my $pnode = $nodeList{$node_id};
 	if (defined($pnode)) {
-	    if ($pnode->iswidearea()
-		|| ($pnode->islocal() && ! $pnode->is_shared())) {
+#	    if ($pnode->iswidearea()
+#		|| ($pnode->islocal() && ! $pnode->is_shared())) {
+	    if ($pnode->willPrint()) {
 		$pnode->addFeatureString($feature.":".$weight);
 	    }
 	} elsif ($debug) {
@@ -441,22 +457,21 @@ sub LookupInterfaces()
 {
     my $dbresult;
     my $row;
-    my %states = ();
-
-    
-    $dbresult = DBQueryFatal("select * from interface_state");
-    while ($row = $dbresult->fetchrow_hashref()) {
-	my $key = $row->{'node_id'}.':'.$row->{'iface'};
-	$states{$key} = $row;
-    }
-
-    $dbresult = DBQueryFatal("select * from interfaces");
-    while ($row = $dbresult->fetchrow_hashref()) {
-	my $nodeName = $row->{'node_id'};
-	my $ifaceName = $row->{'iface'};
+    $dbresult = DBQueryFatal("select i.node_id, i.iface, i.IP, i.role, ".
+			     "i.interface_type, s.remaining_bandwidth ".
+			     "from interfaces as i ".
+			     "left join interface_state as s ".
+			     "on i.node_id=s.node_id and i.iface=s.iface");
+    while (my ($nodeName, $ifaceName, $ip, $role,
+	       $type, $bw) = $dbresult->fetchrow_array()) {
 	my $key = "$nodeName:$ifaceName";
-	my $iface = Interface->LookupRow($row, $states{$key});
-	$interfaceList{$key} = $iface;
+	if (defined($bw)) {
+	    $sharedbw{$key} = $bw;
+	}
+	$iface_ip{$key} = $ip;
+	$iface_role{$key} = $role;
+	$iface_type{$key} = $type;
+
 	my $node = $nodeList{$nodeName};
 	if (defined($node)) {
 	    $node->addInterface($ifaceName);
@@ -523,12 +538,12 @@ sub AddSharedBandwidth()
 	next
 	    if (!defined($iface) || $bandwidth <= 0);
 	next
-	    if (! exists($interfaceList{"$node:$iface"}));
+	    if (! exists($iface_type{"$node:$iface"}));
 
-	if (! exists($sharedbw{"$node:$iface"})) {
-	    my $bw = $interfaceList{"$node:$iface"}->remaining_bandwidth();
-	    $sharedbw{"$node:$iface"} = $bw;
-	}
+#	if (! exists($sharedbw{"$node:$iface"})) {
+#	    my $bw = $interfaceList{"$node:$iface"}->remaining_bandwidth();
+#	    $sharedbw{"$node:$iface"} = $bw;
+#	}
 	$sharedbw{"$node:$iface"} += $bandwidth;
     }
 }
@@ -602,24 +617,29 @@ sub LookupLinks()
 	    $linkList{$name}->addTrunk($sourcebw, $destbw);
 	} elsif ($type eq 'Node') {
 	    # Add a switch/node or node/node link.
-	    my $link = libptop::plink->Create();
-	    $link->set_source($node_id1);
-	    $link->set_sourceif($iface1);
-	    if (! defined($iface1)) {
-		$link->set_sourceif($card1.".".$port1);
-	    }
-	    $link->set_sourcecard($card1);
-	    $link->set_sourceport($port1);
-	    $link->set_dest($node_id2);
-	    $link->set_destif($iface2);
-	    if (! defined($iface2)) {
-		$link->set_destif($card2.".".$port2);
-	    }
-	    $link->set_destcard($card2);
-	    $link->set_destport($port2);
+	    my $node1 = $nodeList{$node_id1};
+	    my $node2 = $nodeList{$node_id2};
+	    if (defined($node1) && defined($node2)
+		&& $node1->willPrint() && $node2->willPrint()) {
 
-	    $link->processLink();
-	    $linkList{$link->name()} = $link;
+		my $link = libptop::plink->Create();
+		$link->set_source($node_id1);
+		$link->set_sourceif($iface1);
+		if (! defined($iface1)) {
+		    $link->set_sourceif($card1.".".$port1);
+		}
+		$link->set_sourcecard($card1);
+		$link->set_sourceport($port1);
+		$link->set_dest($node_id2);
+		$link->set_destif($iface2);
+		if (! defined($iface2)) {
+		    $link->set_destif($card2.".".$port2);
+		}
+		$link->set_destcard($card2);
+		$link->set_destport($port2);
+		$link->processLink();
+		$linkList{$link->name()} = $link;
+	    }
 	}
     }
 }
@@ -671,8 +691,8 @@ sub TypeBandwidth($$$)
     # instance.
     my $result = 100000;
     if (defined($iface)) {
-	if (exists($interfaceList{"$node:$iface"})) {
-	    my $type = $interfaceList{"$node:$iface"}->type();
+	if (exists($iface_type{"$node:$iface"})) {
+	    my $type = $iface_type{"$node:$iface"};
 	    if (exists($itype_bw{"$type:$base"})) {
 		$result = $itype_bw{"$type:$base"};
 	    }
@@ -687,8 +707,6 @@ sub ShareBandwidth($$)
     my $result = 0;
     if (exists($sharedbw{"$node:$iface"})) {
 	$result = $sharedbw{"$node:$iface"};
-    } elsif (exists($interfaceList{"$node:$iface"})) {
-	$result = $interfaceList{"$node:$iface"}->remaining_bandwidth();
     }
     return $result;
 }
@@ -730,9 +748,9 @@ sub is_routable($)
 sub is_public_interface($)
 {
     my ($key) = @_;
-    my $result = (exists($interfaceList{$key})
-		  && $interfaceList{$key}->role() eq "ctrl"
-		  && is_routable($interfaceList{$key}->IP()));
+    my $result = (exists($iface_role{$key})
+		  && $iface_role{$key} eq "ctrl"
+		  && is_routable($iface_ip{$key}));
     return $result;
 }
 
@@ -761,33 +779,36 @@ sub Create($$)
 {
     my ($class, $row) = @_;
 
+    my $typename = $row->{'type'};
     my $self = {};
 
     $self->{'NODE'} = Node->LookupRow($row);
+    $self->{'TYPE'} = $nodeTypeList{$typename};
     $self->{'PTYPES'} = [];
     $self->{'FEATURES'} = [];
     $self->{'FLAGS'} = {};
-    $self->{'GLOBALCOUNT'} = undef;
+#    $self->{'GLOBALCOUNT'} = undef;
     $self->{'AUXTYPES'} = {};
     $self->{'CONNECTIONS'} = {};
     $self->{'INTERFACES'} = [];
-    $self->{'STATUS'} = undef;
-    $self->{'WIDEAREA'} = undef;
+#    $self->{'STATUS'} = undef;
+#    $self->{'WIDEAREA'} = undef;
     $self->{'SHARED'} = 0;
-    $self->{'EID'} = undef;
-    $self->{'PID'} = undef;
-    $self->{'EROLE'} = undef;
-    $self->{'EVENTSTATE'} = undef;
-    $self->{'WILL_PRINT'} = undef;
+#    $self->{'EID'} = undef;
+#    $self->{'PID'} = undef;
+#    $self->{'EROLE'} = undef;
+#    $self->{'EVENTSTATE'} = undef;
+#    $self->{'WILL_PRINT'} = undef;
 
     bless($self, $class);
+    $self->node()->SetNodeTypeInfo($self->type());
     return $self;
 }
 
 # Accessors
 sub name($)        { return $_[0]->{'NODE'}->node_id(); }
 sub node($)        { return $_[0]->{'NODE'}; }
-sub type($)        { return $_[0]->node()->NodeTypeInfo(); }
+sub type($)        { return $_[0]->{'TYPE'}; }
 sub globalcount($) { return $_[0]->{'GLOBALCOUNT'}; }
 sub status($)      { return $_[0]->{'STATUS'}; }
 sub is_shared($)   { return $_[0]->{'SHARED'}; }
@@ -873,10 +894,10 @@ sub available($;$)
     #
     # And they must also be allowed for the current project by the
     # nodetypeXpid_permissions table.
-    my $isfree = ((!$self->islocal()
-		   || (! $self->isreserved() && $self->isup())
-		   || $self->issharedhost())
-		  && $typeallowed);
+    my $isfree = ($typeallowed
+		  && (!$self->islocal()
+		      || (! $self->isreserved() && $self->isup())
+		      || $self->issharedhost()));
 
     # And if they are a subnode, their parent must be available:
 
@@ -944,15 +965,26 @@ sub calculateWidearea($)
 {
     my ($self) = @_;
     my $node = $self->node();
+    return 0
+	if ($node->role() ne 'testnode');
     my $isremotenode = $node->isremotenode();
-    my $isvirtnode = $node-> isvirtnode();
+    return 0
+	if (! defined($isremotenode) || ! $isremotenode);
+    my $isvirtnode = $node->isvirtnode();
+    return 0
+	if (defined($isvirtnode) && $isvirtnode);
+    return 0
+	if $node->type() eq 'pcfedphys';
     my $wa_attrvalue = $type_dedicatedwa{$node->type()};
-    return ($node->role() eq 'testnode'
-	    && defined($isremotenode)
-	    && $isremotenode == 1
-	    && (! defined($isvirtnode) || $isvirtnode == 0)
-	    && $node->type() ne 'pcfedphys'
-	    && (! defined($wa_attrvalue) || $wa_attrvalue == 0));
+    return 0
+	if (defined($wa_attrvalue) && $wa_attrvalue);
+    return 1;
+#    return ($node->role() eq 'testnode'
+#	    && defined($isremotenode)
+#	    && $isremotenode == 1
+#	    && (! defined($isvirtnode) || $isvirtnode == 0)
+#	    && $node->type() ne 'pcfedphys'
+#	    && (! defined($wa_attrvalue) || $wa_attrvalue == 0));
 }
 
 sub issharedhost($)
@@ -997,12 +1029,13 @@ sub calculateWillPrint($;$)
     my $geniExclude = 0;
     $node->NodeAttribute("protogeni_exclude", \$geniExclude);
     my $geniok = (! defined($geniExclude) || $geniExclude == 0);
-    my $result = ($self->isswitch()
-		  || $self->islocal()
-		  || ($self->iswidearea() && $print_widearea)
-		  || ($self->issharedhost() && $print_shared))
-	&& (! $available_only || $self->available())
-	&& (! $genimode || $geniok);
+    my $result = 
+	(! $available_only || $self->available())
+	&& (! $genimode || $geniok)
+	&& ($self->isswitch()
+	    || $self->islocal()
+	    || ($print_widearea && $self->iswidearea())
+	    || ($print_shared && $self->issharedhost()));
 
     # A bit of recursion to ensure that subnodes are only printed if
     # their parent is. The tags bit is to try to ensure we don't loop
@@ -1070,7 +1103,7 @@ sub addInterface($$)
 sub processSwitch($)
 {
     my ($self) = @_;
-    if (! $self->isswitch()) {
+    if (! $self->isswitch()) {# || ! $self->willPrint()) {
 	return;
     }
 
@@ -1087,7 +1120,7 @@ sub processSwitch($)
 sub processLocal($)
 {
     my ($self) = @_;
-    if (! $self->islocal()) {
+    if (! $self->islocal()) {# || ! $self->willPrint()) {
 	return;
     }
     my $node = $self->node();
@@ -1399,7 +1432,7 @@ sub processWidearea($)
 {
     my ($self) = @_;
     my $node = $self->node();
-    if (! $self->iswidearea()) {
+    if (! $self->iswidearea()) {# || ! $self->willPrint()) {
 	return;
     }
 
@@ -1610,7 +1643,7 @@ sub interfaceToXML($$$)
 {
     my ($self, $parent, $name) = @_;
     my $key = $self->node()->node_id() . ":" . $name;
-    my $role = $interfaceList{$key}->role();
+    my $role = $iface_role{$key};
     my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $self->node()->node_id(),
 					 $name);
     my $xml = GeniXML::AddElement("interface", $parent);
@@ -1621,7 +1654,7 @@ sub interfaceToXML($$$)
 	GeniXML::SetText("role", $xml, "experimental");
     }
     if (libptop_new::is_public_interface($key)) {
-	my $ip = $interfaceList{$key}->IP();
+	my $ip = $iface_ip{$key};
 	GeniXML::SetText("public_ipv4", $xml, $ip);
    }
     if (! GeniXML::IsVersion0($xml)) {
@@ -1870,15 +1903,15 @@ sub Create($)
     my ($class) = @_;
 
     my $self = {};
-    $self->{'NAME'} = undef;
-    $self->{'SOURCE'} = undef;
-    $self->{'SOURCE_IF'} = undef;
-    $self->{'SOURCE_CARD'} = undef;
-    $self->{'SOURCE_PORT'} = undef;
-    $self->{'DEST'} = undef;
-    $self->{'DEST_IF'} = undef;
-    $self->{'DEST_CARD'} = undef;
-    $self->{'DEST_PORT'} = undef;
+#    $self->{'NAME'} = undef;
+#    $self->{'SOURCE'} = undef;
+#    $self->{'SOURCE_IF'} = undef;
+#    $self->{'SOURCE_CARD'} = undef;
+#    $self->{'SOURCE_PORT'} = undef;
+#    $self->{'DEST'} = undef;
+#    $self->{'DEST_IF'} = undef;
+#    $self->{'DEST_CARD'} = undef;
+#    $self->{'DEST_PORT'} = undef;
     $self->{'BW'} = 0;
     $self->{'DELAY'} = 0;
     $self->{'LOSS'} = 0.0;
@@ -1997,7 +2030,7 @@ sub processSwitchNode($$$$)
     $self->add_type($basetype);
     $self->add_type($basetype."-".$switchRef->node()->node_id());
     $self->add_type($basetype."-".$self->bw());
-    my $ifaceType = $interfaceList{"$node:$nodeif"}->type();
+    my $ifaceType = $iface_type{"$node:$nodeif"};
     $self->add_type($basetype."-".$ifaceType);
 }
 

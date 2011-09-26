@@ -1428,6 +1428,14 @@ sub NodeTypeInfo($)
     return $nodetype;
 }
 
+sub SetNodeTypeInfo($$)
+{
+    my ($self, $nodetype) = @_;
+    if ($self->type() eq $nodetype->type()) {
+	$self->{"TYPEINFO"} = $nodetype;
+    }
+}
+
 #
 # Lookup a specific attribute in the nodetype info. 
 #

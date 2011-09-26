@@ -55,10 +55,17 @@ sub Lookup($$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
+    return LookupRow($class, $type, $query_result->fetchrow_hashref());
+}
+
+sub LookupRow($$$)
+{
+    my ($class, $type, $row) = @_;
+
     my $self         = {};
     # Do not use the embedded type field, cause of auxtypes.
     $self->{"TYPE"}  = $type;
-    $self->{"DBROW"} = $query_result->fetchrow_hashref();
+    $self->{"DBROW"} = $row;
     $self->{"ATTRS"} = undef;
 
     bless($self, $class);
@@ -67,6 +74,7 @@ sub Lookup($$)
     $nodetypes{$type} = $self;
     return $self;
 }
+
 # accessors
 sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
 # Do not use the embedded type field, cause of auxtypes.
