@@ -1167,12 +1167,14 @@ sub addDelayCapacity($)
     my $delay = $self->type()->delay_capacity();
     if (defined($delaycap_override) &&
 	$delaycap_override > 0 &&
-	$delaycap_override < $delay) {
+	(! defined($delay) ||
+	 $delaycap_override < $delay)) {
 	$delay = $delaycap_override
     }
-    $self->addPType("delay", $delay);
-    $self->addPType("delay-".$self->node()->type(), $delay);
-    
+    if (defined($delay) && $delay > 0) {
+	$self->addPType("delay", $delay);
+	$self->addPType("delay-".$self->node()->type(), $delay);
+    }
 }
 
 #

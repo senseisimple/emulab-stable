@@ -6,14 +6,13 @@
 # All rights reserved.
 #
 
-# TODO: USER_COMPONENT --> No caching, willPrint, available, etc.
-
 use strict;
 use English;
 use Getopt::Std;
 
 use lib "@prefix@/lib";
 use libdb;
+use emdbi;
 use libptop_new;
 use GeniXML;
 
@@ -32,11 +31,16 @@ $| = 1;
 my $print_xml = 0;
 my $print_ns = $GeniXML::RSPEC_2_NS;
 my $typelimitfile;
+my $debug = 0;
 
 # Initialize permissions table for the current project
+emdbi::ClearQueryCount();
 processArgs();
 consultDatabase();
 printResults();
+if ($debug) {
+    print STDERR "# of Queries: " . emdbi::GetQueryCount() . "\n";
+}
 
 sub usage()
 {
@@ -101,6 +105,9 @@ sub processArgs()
     }
     if (defined($options{"l"})) {
 	$typelimitfile = $options{"l"};
+    }
+    if (defined($options{"d"})) {
+	$debug = 1;
     }
     libptop_new::ProcessArgs(\%options);
 }
