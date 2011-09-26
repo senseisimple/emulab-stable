@@ -352,6 +352,8 @@ $DBErrorString     = "";
 @EXPORT            = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT $DBErrorString
 			$DBCONN_EXITONERR $DBCONN_MAXTRIES $DBQUERY_DEBUG);
 
+my $queryCount = 0;
+
 sub TBDBConnect($$)
 {
     my ($dbnum, $dbname) = @_;
@@ -497,6 +499,9 @@ sub DBQueryN($$)
     my($dbnum, $query)   = @_;
     my $maxtries = $DBQUERY_MAXTRIES;
     my $result;
+
+    # Update query count total for debugging purposes
+    $queryCount += 1;
 
     # Not really forever :-)
     if (!$maxtries) {
@@ -786,6 +791,16 @@ END {
     # This error is probably due to some object being destroyed too
     # soon somewhere in the DBI/DBD modules.
     TBDBDisconnect();
+}
+
+sub ClearQueryCount()
+{
+    $queryCount = 0;
+}
+
+sub GetQueryCount()
+{
+    return $queryCount;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
