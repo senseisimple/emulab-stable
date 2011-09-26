@@ -4087,17 +4087,26 @@ sub ReadTextSolution($$)
 	if (!$trivial) {
 	    ($nodeportA,$switchportA) = getnodeport($rawA);
 
-	    if (! defined($nodeportA) || ! defined($switchportA)) {
-		tberror("Malformed interface pair A: $rawA\n");
-		return -1;
-	    }
+	    # TODO: Add this error checking code in once ptopgen_new
+	    # becomes standard
+#	    if (! defined($nodeportA) || ! defined($switchportA)) {
+#		tberror("Malformed interface pair A: $rawA\n");
+#		return -1;
+#	    }
 
 	    # Convert back to node:iface format.
-	    $nodeportA =~ s/\//:/;
-	    ($nodeA,$portA) = split(":", $nodeportA);
+	    if (defined($nodeportA)) {
+		$nodeportA =~ s/\//:/;
+		($nodeA,$portA) = split(":", $nodeportA);
+	    }
 
-	    $switchportA =~ s/\//:/;
-	    my ($switchA, $swportA) = split(":", $switchportA);
+	    my $isswitch = 1;
+	    if (defined($switchportA)) {
+		$switchportA =~ s/\//:/;
+		my ($switchA, $swportA) = split(":", $switchportA);
+		my $noderef = Node->Lookup($switchA);
+		$isswitch = $noderef->isswitch();
+	    }
 
 	    #
 	    # If the link is direct and switchA is not a switch, this is
@@ -4105,9 +4114,7 @@ sub ReadTextSolution($$)
 	    #
 	    # $rawA hold both sides of the link (switchportA is really
 	    # $nodeportB).
-	    my $noderef = Node->Lookup($switchA);
-
-	    if ($direct && ! $noderef->isswitch()) {
+	    if ($direct && ! $isswitch) {
 		$nodeportB   = $switchportA;
 		$switchportB = undef;
 	    }
@@ -4115,13 +4122,18 @@ sub ReadTextSolution($$)
 		($nodeportB,$switchportB) = getnodeport($rawB);
 	    }
 
-	    if (! defined($nodeportA)) {
-		tberror("Malformed interface pair B: $rawB\n");
-		return -1;
+	    # TODO: Add this error checking code in once ptopgen_new
+	    # become standard
+#	    if (! defined($nodeportA)) {
+#		tberror("Malformed interface pair B: $rawB\n");
+#		return -1;
+#	    }
+
+	    if (defined($nodeportB)) {
+		# Convert back to node:iface format.
+		$nodeportB =~ s/\//:/;
+		($nodeB,$portB) = split(":", $nodeportB);
 	    }
-	    # Convert back to node:iface format.
-	    $nodeportB =~ s/\//:/;
-	    ($nodeB,$portB) = split(":", $nodeportB);
 	}
 	$self->AddLinkToSolution($vlink, $trivial, $direct,
 				 $nodeA, $portA, $nodeB, $portB, $swpath);
@@ -8154,6 +8166,11 @@ sub getnodeport($)
 {
     my $macstring=$_[0];
     my ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
+
+    $A = undef
+	if ($A eq "(null)");
+    $B = undef
+	if ($B eq "(null)");
 
     return ($A, $B);
 }

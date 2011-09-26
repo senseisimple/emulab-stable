@@ -392,12 +392,13 @@ sub usage()
 	  "       -x Output into the new xml ptop format\n".
 	  "       -g version With -x, geni version. Must be '0', '0.1' or '2'\n".
 	  "       -l specifies the location of the type limit file\n" .
-          "       -1 Print an rspec containing only the node component-name" .
-	  "       -z Randomize node output order");
+          "       -1 Print an rspec containing only the node component-name\n" .
+	  "       -z Randomize node output order\n" .
+	  "       -Z Force old ptopgen\n");
         exit(-1);
 }
 
-my $optlist = "s:e:m:vp:rSan:c:uxg:h1:l:z";
+my $optlist = "s:e:m:vp:rSan:c:uxg:h1:l:zZ";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -572,7 +573,7 @@ usage()
 	    && $genimode ne $V_0_2
 	    && $genimode ne $V_2));
 
-if (defined($pid)) {
+if (defined($pid) && ! defined($options{"Z"})) {
     my $group = Group->Lookup($pid, $pid);
     if (defined($group)) {
 	my $newptopgen = EmulabFeatures->FeatureEnabled("NewPtopgen", undef,

@@ -49,10 +49,11 @@ sub usage ()
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
     print STDERR " -l   - Use rspec v2 instead of the text file format\n";
-    print STDERR " -z   - Randomize node order printed by ptopgen\n";
+    print STDERR " -z   - Force new ptopgen\n";
+    print STDERR " -Z   - Force old ptopgen\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:altz";
+my $optlist    = "dvunfprqczxm:ko:altzZ";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
@@ -74,7 +75,7 @@ my $warnings   = 0;
 my $maxrun     = 3;  # Maximum number of times we run assign.
 my $gotlock    = 0;
 my $userspec   = 0;
-my $randomize  = 0;
+my $use_old_ptopgen  = 0;
 my $vtop;
 
 #
@@ -86,6 +87,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $ASSIGN      = "$TB/libexec/assign";
 my $WRAPPER2    = "$TB/libexec/assign_wrapper2";
 my $PTOPGEN     = "$TB/libexec/ptopgen";
+my $PTOPGEN_NEW = "$TB/libexec/ptopgen_new";
 my $VTOPGEN     = "$TB/bin/vtopgen";
 my $NFREE       = "$TB/bin/nfree";
 my $XERCES	= "@HAVE_XERCES@";
@@ -201,8 +203,12 @@ if (defined($options{"l"})) {
 	fatal("Rspec v2 support requires that Xerces be installed");
     }
 }
+if (defined($options{"Z"})) {
+    $use_old_ptopgen = 1;
+}
 if (defined($options{"z"})) {
-    $randomize = 1;
+    $use_old_ptopgen = 0;
+    $PTOPGEN = $PTOPGEN_NEW;
 }
 
 my $pid = $ARGV[0];
@@ -567,8 +573,8 @@ sub RunAssign($$)
     if ($userspec == 1) {
 	$ptopargs .= "-x -g 2 ";
     }
-    if ($randomize == 1) {
-	$ptopargs .= "-z ";
+    if ($use_old_ptopgen == 1) {
+	$ptopargs .= "-Z ";
     }
     $ptopargs .= "-l $typelimitfile"
 	if (scalar(keys(%admission_control)));
