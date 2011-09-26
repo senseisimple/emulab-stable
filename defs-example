@@ -11,6 +11,9 @@ THISHOMEBASE=Example.Emulab.Net
 #
 # Various domain and host names
 #
+# NOTE: If a fully qualified hostname is used as an example, then
+# be sure to use a fully qualified hostname! Do not use an IP. 
+#
 
 # Host name of our web server (or host:port)
 # This name should resolve to boss's IP address - though it can be a CNAME
