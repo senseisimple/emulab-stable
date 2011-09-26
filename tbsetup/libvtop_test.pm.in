@@ -4086,28 +4086,42 @@ sub ReadTextSolution($$)
 
 	if (!$trivial) {
 	    ($nodeportA,$switchportA) = getnodeport($rawA);
-	    if (defined($nodeportA)) {
-		# Convert back to node:iface format.
-		$nodeportA =~ s/\//:/;
-		($nodeA,$portA) = split(":", $nodeportA);
+
+	    if (! defined($nodeportA) || ! defined($switchportA)) {
+		tberror("Malformed interface pair A: $rawA\n");
+		return -1;
 	    }
 
+	    # Convert back to node:iface format.
+	    $nodeportA =~ s/\//:/;
+	    ($nodeA,$portA) = split(":", $nodeportA);
+
+	    $switchportA =~ s/\//:/;
+	    my ($switchA, $swportA) = split(":", $switchportA);
+
 	    #
-	    # A direct link between two nodes; $rawA holds both sides
-	    # of the link (switchportA is really $nodeportB). 
+	    # If the link is direct and switchA is not a switch, this is
+	    # a link directly between two nodes:
 	    #
-	    if ($direct && defined($switchportA)) {
+	    # $rawA hold both sides of the link (switchportA is really
+	    # $nodeportB).
+	    my $noderef = Node->Lookup($switchA);
+
+	    if ($direct && ! $noderef->isswitch()) {
 		$nodeportB   = $switchportA;
 		$switchportB = undef;
 	    }
 	    else {
 		($nodeportB,$switchportB) = getnodeport($rawB);
 	    }
-	    if (defined($nodeportB)) {
-		# Convert back to node:iface format.
-		$nodeportB =~ s/\//:/;
-		($nodeB,$portB) = split(":", $nodeportB);
+
+	    if (! defined($nodeportA)) {
+		tberror("Malformed interface pair B: $rawB\n");
+		return -1;
 	    }
+	    # Convert back to node:iface format.
+	    $nodeportB =~ s/\//:/;
+	    ($nodeB,$portB) = split(":", $nodeportB);
 	}
 	$self->AddLinkToSolution($vlink, $trivial, $direct,
 				 $nodeA, $portA, $nodeB, $portB, $swpath);
@@ -8140,11 +8154,6 @@ sub getnodeport($)
 {
     my $macstring=$_[0];
     my ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
-
-    $A = undef
-	if ($A eq "(null)");
-    $B = undef
-	if ($B eq "(null)");
 
     return ($A, $B);
 }
