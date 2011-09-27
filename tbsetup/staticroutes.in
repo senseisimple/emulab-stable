@@ -37,7 +37,7 @@ my $TB		= "@prefix@";
 my $NETMASK	= "255.255.255.0";
 my $EXPTNETMASK = "255.255.0.0";
 
-my $debug       = 1;
+my $debug       = 0;
 my $memdebug    = 0;
 my $routecalc   = "$TB/libexec/routecalc";
 my $impotent    = 0;
