@@ -66,18 +66,18 @@ function SPITFORM($formfields, $returning, $errors)
     global $usr_keyfile, $FirstInitState;
     global $ACCOUNTWARNING, $EMAILWARNING;
     global $WIKISUPPORT, $WIKIHOME, $USERSELECTUIDS;
-    global $WIKIDOCURL;
+    global $WIKIDOCURL, $TBMAINSITE;
     
     PAGEHEADER("Start a New Testbed Project");
 
     #
     # First initialization gets different text
     #
-    if ($FirstInitState == "createproject") {
+    if ($FirstInitState) {
 	echo "<center><font size=+1>
 	      Please create your initial project.<br> A good Project Name
               for your first project is probably 'testbed', but you can
-              choose anything you like.
+              choose anything you like. 
               </font></center><br>\n";
     }
     else {
@@ -175,7 +175,7 @@ function SPITFORM($formfields, $returning, $errors)
         #
         # UID:
         #
-	if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+	if ($USERSELECTUIDS || $FirstInitState) {
 	    echo "<tr>
                       <td colspan=2>*<a
                              href='$WIKIDOCURL/SecReqs'
@@ -338,7 +338,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# SSH public key
 	#
 	echo "<tr>
-                 <td colspan=2>Upload your SSH Pub Key[<b>2</b>]:<br>
+                 <td colspan=2>Upload your SSH Pub Key[<b>3</b>]:<br>
                                    (4K max)</td>
    
                  <td>
@@ -484,7 +484,7 @@ function SPITFORM($formfields, $returning, $errors)
     # Nodes and PCs and Users
     #
     echo "<tr>
-              <td colspan=2>*Estimated #of Project Members:</td>
+              <td colspan=2>*Estimated #of Project Members[<b>2</b>]:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_members]\" 
@@ -496,7 +496,7 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<tr>
               <td colspan=2>*Estimated #of
         <a href=\"$TBDOCBASE/hardware.php#tbpcs\" target='_blank'>
-                             PCs</a>:</td>
+                             PCs</a>[<b>2</b>]:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_pcs]\"
@@ -505,7 +505,8 @@ function SPITFORM($formfields, $returning, $errors)
               </td>
           </tr>\n";
 
-    echo "<tr>
+    if ($TBMAINSITE) {
+	echo "<tr>
               <td colspan=2>Request Access to 
                   <a href=\"$WIKIDOCURL/widearea\"
                       target='_blank'>Planetlab PCs</a>:</td>
@@ -528,6 +529,7 @@ function SPITFORM($formfields, $returning, $errors)
 			   $formfields["proj_ronpcs"] : "") . ">Yes &nbsp
               </td>
           </tr>\n";
+    }
 
     #
     # Why!
@@ -555,12 +557,14 @@ function SPITFORM($formfields, $returning, $errors)
     echo "</form>
           </table>\n";
 
-    echo "<h4><blockquote><blockquote>
+    echo "<h4><blockquote><blockquote><blockquote>
           <ol>
             <li> Please consult our
                  <a href = '$WIKIDOCURL/SecReqs' target='_blank'>
                  security policies</a> for information
-                 regarding passwords and email addresses.\n";
+                 regarding passwords and email addresses.
+            <li> These estimates are for site planning purposes only,
+                 and are not actual limits on your project.\n";
     if (! $returning) {
 	echo "<li> If you want us to use your existing ssh public key,
                    then please specify the path to your
@@ -575,7 +579,7 @@ function SPITFORM($formfields, $returning, $errors)
                    for you.\n";
     }
     echo "</ol>
-          </blockquote></blockquote>
+          </blockquote></blockquote></blockquote>
           </h4>\n";
 }
 
@@ -641,7 +645,7 @@ if (! isset($submit)) {
     $defaults["proj_plabpcs"]   = "";
     $defaults["proj_why"]       = "";
 
-    if ($FirstInitState == "createproject") {
+    if ($FirstInitState) {
 	$defaults["pid"]          = "testbed";
 	$defaults["proj_pcs"]     = "256";
 	$defaults["proj_members"] = "256";
@@ -672,7 +676,7 @@ $errors = array();
 # These fields are required!
 #
 if (! $returning) {
-    if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+    if ($USERSELECTUIDS || $FirstInitState) {
 	if (!isset($formfields["proj_head_uid"]) ||
 	    strcmp($formfields["proj_head_uid"], "") == 0) {
 	    $errors["Username"] = "Missing Field";
@@ -748,6 +752,7 @@ if (! $returning) {
     if (isset($formfields["usr_URL"]) &&
 	strcmp($formfields["usr_URL"], "") &&
 	strcmp($formfields["usr_URL"], $HTTPTAG) &&
+	! $FirstInitState &&
 	! CHECKURL($formfields["usr_URL"], $urlerror)) {
 	$errors["Home Page URL"] = $urlerror;
     }
@@ -809,8 +814,7 @@ if (! $returning) {
     elseif (strcmp($formfields["password1"], $formfields["password2"])) {
 	$errors["Confirm Password"] = "Does not match Password";
     }
-    elseif (! CHECKPASSWORD((($USERSELECTUIDS ||
-			     $FirstInitState == "createproject") ?
+    elseif (! CHECKPASSWORD((($USERSELECTUIDS || $FirstInitState) ?
 			     $formfields["proj_head_uid"] : "ignored"),
 			    $formfields["password1"],
 			    $formfields["usr_name"],
@@ -850,7 +854,8 @@ if (!isset($formfields["proj_URL"]) ||
     strcmp($formfields["proj_URL"], $HTTPTAG) == 0) {    
     $errors["Project URL"] = "Missing Field";
 }
-elseif (! CHECKURL($formfields["proj_URL"], $urlerror)) {
+elseif (! $FirstInitState &&
+	! CHECKURL($formfields["proj_URL"], $urlerror)) {
     $errors["Project URL"] = $urlerror;
 }
 if (!isset($formfields["proj_funders"]) ||
@@ -940,7 +945,7 @@ if (!$returning) {
 	$formfields["usr_URL"] != $HTTPTAG && $formfields["usr_URL"] != "") {
 	$args["URL"] = $formfields["usr_URL"];
     }
-    if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+    if ($USERSELECTUIDS || $FirstInitState) {
 	$args["login"] = $formfields["proj_head_uid"];
     }
 
