@@ -15,18 +15,18 @@ THISHOMEBASE=Example.Emulab.Net
 # be sure to use a fully qualified hostname! Do not use an IP. 
 #
 
-# Host name of our web server (or host:port)
+# Fully-qualified hostname of the our web server.
 # This name should resolve to boss's IP address - though it can be a CNAME
 WWWHOST=www.example.emulab.net
 
-# Fully-quailified hostname of the boss node
+# Fully-qualified hostname of the boss node
 BOSSNODE=boss.example.emulab.net
 
-# Fully-quailified hostname of the ops (also called users) node
+# Fully-qualified hostname of the ops (also called users) node
 USERNODE=ops.example.emulab.net
 
-# Fully-quailified hostname of the fileserver (will probably be the same
-# as the ops node)
+# Fully-qualified hostname of the fileserver (will typically be the same
+# as the ops node; ops.example.emulab.net)
 FSNODE=fs.example.emulab.net
 
 #
