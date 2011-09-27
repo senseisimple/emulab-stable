@@ -67,6 +67,25 @@ sub dbh($)	{ return $_[0]->{'DBH'}; };
 sub dbname($)	{ return $_[0]->{'DBNAME'}; };
 
 #
+# Check for existence of DB
+#
+sub DBExists($$)
+{
+    my ($class, $dbname) = @_;
+    
+    require Mysql;
+    $Mysql::QUIET = 1;
+    my $dbh = Mysql->connect("localhost");
+    return undef
+	if (!defined($dbh));
+
+    my @dbs = $dbh->listdbs();
+    return 1
+	if (grep {$_ eq $dbname} @dbs);
+    return 0;
+}
+
+#
 # Need to wrap the return value. See below.
 #
 sub query($$)
@@ -134,6 +153,21 @@ sub Wrap($$$)
 sub pid($)	{ return $_[0]->{'PID'}; };
 sub dbh($)	{ return $_[0]->{'DBH'}; };
 sub dbname($)	{ return $_[0]->{'DBNAME'}; };
+
+#
+# Check for existence of DB
+#
+sub DBExists($$)
+{
+    my ($class, $dbname) = @_;
+    
+    require DBI;
+
+    my @dbs = DBI->data_sources("mysql");
+    return 1
+	if (grep {$_ eq "DBI:mysql:$dbname"} @dbs);
+    return 0;
+}
 
 #
 # Wrap query for proper DBI syntax.
@@ -353,6 +387,21 @@ $DBErrorString     = "";
 			$DBCONN_EXITONERR $DBCONN_MAXTRIES $DBQUERY_DEBUG);
 
 my $queryCount = 0;
+
+#
+# Does DB exist yet.
+#
+sub DBExists($)
+{
+    my ($dbname) = @_;
+
+    if ($DBCONN_USEDBI) {
+	return emdbi_wrapper::DBI->DBExists($dbname);
+    }
+    else {
+	return emdbi_wrapper::Mysql->DBExists($dbname);
+    }
+}
 
 sub TBDBConnect($$)
 {
