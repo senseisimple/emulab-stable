@@ -4839,6 +4839,7 @@ CREATE TABLE `wires` (
   `card2` tinyint(3) unsigned NOT NULL default '0',
   `port2` tinyint(3) unsigned NOT NULL default '0',
   `logical` tinyint(1) unsigned NOT NULL default '0',
+  `trunkid` mediumint(4) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id1`,`card1`,`port1`),
   KEY `node_id2` (`node_id2`,`card2`),
   KEY `dest` (`node_id2`,`card2`,`port2`),

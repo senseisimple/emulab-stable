@@ -915,6 +915,7 @@ sub port1($)           { return $_[0]->field('port1'); }
 sub port2($)           { return $_[0]->field('port2'); }
 sub type($)            { return $_[0]->field('type'); }
 sub logical($)         { return $_[0]->field('logical'); }
+sub trunkid($)         { return $_[0]->field('trunkid'); }
 sub IsActive($)        { return ($_[0]->type() eq "Unused" ? 0 : 1); }
 
 #

@@ -1,0 +1,113 @@
+#
+# Bundle Trunk links into actual bundles with assigned trunkid. This is part
+# of an upcoming change to make Trunk links explicit in the DB.
+#
+use strict;
+use libdb;
+
+my $impotent = 0;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("wires", "trunkid")) {
+	DBQueryFatal("alter table wires add `trunkid` ".
+		     "  mediumint(4) unsigned NOT NULL default '0'");
+    }
+
+    #
+    # Bundle existing trunks together and assign a trunkid.
+    #
+    my $query_result =
+	DBQueryFatal("select * from wires ".
+		     "where type='Trunk' ".
+		     "order by node_id1,node_id2");
+    if ($query_result->numrows) {
+	my %trunks   = ();
+	my %trunkids = ();
+	my $maxid    = 0;
+
+	#
+	# Collect all the wires together. We assume that all wires
+	# between two switches form a single trunk and will be
+	# bundled under the same trunkid.
+	#
+	while (my $row = $query_result->fetchrow_hashref()) {
+	    my $node_id1 = $row->{'node_id1'};
+	    my $node_id2 = $row->{'node_id2'};
+	    my $trunkid  = $row->{'trunkid'};
+
+	    #
+	    # Watch for mixed order on the entries.
+	    # This is not supposed to happen and will confuse things
+	    # below.
+	    #
+	    if (exists($trunks{"$node_id1:$node_id2"})) {
+		push(@{ $trunks{"$node_id1:$node_id2"} }, $row);
+	    }
+	    elsif (exists($trunks{"$node_id2:$node_id1"})) {
+		print STDERR "Mixed ordering on Trunk links between ".
+		    "$node_id1 and $node_id2\n";
+		return -1;
+	    }
+	    else {
+		$trunks{"$node_id1:$node_id2"} = [$row];
+		$trunkids{"$node_id1:$node_id2"} = $trunkid;
+		$maxid = $trunkid
+		    if ($trunkid > $maxid);
+	    }
+	}
+	foreach my $id (keys(%trunks)) {
+	    my ($node_id1,$node_id2) = split(":", $id);
+	    my @wires   = @{ $trunks{$id} };
+	    my $trunkid = $trunkids{$id};
+
+	    #
+	    # See if there is an existing Trunk between these two switches,
+	    # as might happen if we got an error partway through this script.
+	    #
+	    if ($trunkid) {
+		print STDERR
+		    "Reusing trunkid $trunkid for $node_id1:$node_id2 trunk.\n";
+	    }
+	    else {
+		#
+		# Get the current max trunk id.
+		#
+		$maxid++;
+		$trunkid = $maxid;
+
+		print STDERR
+		    "Using trunkid $trunkid for $node_id1:$node_id2 trunk.\n";
+	    }
+
+	    #
+	    # Now set the trunkid on the wires.
+	    #
+	    foreach my $row (@wires) {
+		my $node_id1 = $row->{'node_id1'};
+		my $card1    = $row->{'card1'};
+		my $port1    = $row->{'port1'};
+		my $node_id2 = $row->{'node_id2'};
+		my $card2    = $row->{'card2'};
+		my $port2    = $row->{'port2'};
+
+		if ($impotent) {
+		    print STDERR
+			"  $trunkid: $node_id1,$card1,$port1 $node_id2,$card2,$port2\n";
+		}
+		else {
+		    DBQueryFatal("update wires set trunkid=$trunkid ".
+				 "where node_id1='$node_id1' and ".
+				 "      card1='$card1' and port1='$port1' and ".
+				 "      node_id2='$node_id2' and ".
+				 "      card2='$card2' and port2='$port2'");
+		}
+	    }
+	}
+    }
+    return 0;
+}
+
+1;
