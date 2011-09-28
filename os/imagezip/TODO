@@ -23,10 +23,11 @@ Things to do for image*:
 5. Imageunzip could be triple-threaded like frisbee, i.e., split the
    file reading and decompression that are currently one in imageunzip.
 
-6. Create a "signature" file for an image using a collision-resistant hash
-   like MD5 or SHA-1.  See TODO.hash for more. [DONE -- as a separate
-   program, imagehash.  It would be more efficient to have imagezip create
-   the signature as it does. ]
+6. Image hashing.
+   [ DONE -- as a separate program, imagehash.  It would be more efficient
+     to have imagezip create the signature as it does. ]
+   Create a "signature" file for an image using a collision-resistant hash
+   like MD5 or SHA-1.  See TODO.hash for more.
 
 7. Add an option to exclude (skip) disk blocks outside of any DOS partition.
    By default, we want to include these blocks in the image since some
@@ -46,6 +47,8 @@ Things to do for image*:
    special.
 
 8. Encrypted images or encrypted transfer of images.
+   [ DONE. See:
+     http://www.cs.utah.edu/flux/papers/frisbeesec-cset08-base.html ]
    Depends on what we want.  By encrypting the image itself, we protect
    confidentiality while on disk and lessen the CPU usage of the frisbee
    server.  A possible concern is that, once a user has received an image,
@@ -93,6 +96,9 @@ Things to do for image*:
    them to the disk writer.
 
 9. Recognize unused filesystem metadata blocks.
+   [ DONE -- sorta, for UFS2 using the -M option. In imagezip, we identify
+     free inodes and zero them except for the generation number. So they
+     are still in the image, but mostly zero. ]
    Right now we pretty much leave FS metadata structures alone and thus
    consider them allocated, we might be able to improve on that.  In
    particular, free UNIX-like inode data structures consume a lot of space.
@@ -129,6 +135,9 @@ Things to do for image*:
    compress really well!)
 
 11. Death to bubble sort and singly-linked lists.
+   [ DONE -- for bubble sort, in a wicked hacky way. If USE_HACKSORT is
+     defined we keep a seperate array of pointers to range data structures
+     that we can call qsort on. ]
    We represent the set of free and allocated blocks with a singly-linked
    list.  The process is:
 
@@ -178,3 +187,38 @@ Things to do for image*:
    library which could apply here:
    http://www.cs.utah.edu/flux/oskit/html/oskit-wwwch26.html#x40-213400026
    but that was still implemented with singly-linked lists.
+
+12. Better handling of "insignificant" free ranges.
+   The -F option in imagezip let's you say that free ranges below a
+   certain size should be "forgotten", effectively making that range
+   allocated. This promotes longer sequential writes at the expense of
+   some garbage data in the image. It also reduces the total number of
+   ranges in an image, but that is secondary. This option can make a
+   HUGE difference to imageunzip by reducing the number of seeks, so
+   this is a really worthwhile option. Two mutually exclusive tasks
+   related to -F:
+
+   One is to make sure that any free blocks included in the image as a result
+   of -F are zeroed. Since we cannot know if the consumer of the image is
+   going to want to zero free space (imageunzip -z) we have to assume they
+   will. This will also reduce the size impact of including free blocks in
+   the image. I think this can be done easily using a fixup function in
+   imagezip. Note that this change ties in with #10 above, if we do that one,
+   we would just mark -F indentified blocks as zero-ranges.
+
+   Alternatively, we eliminate -F entirely and let imageunzip handle it.
+   This is more complex. When processing a chunk, imageunzip would look
+   at the free space between consecutive ranges (say, A and B) and determine
+   if that range of free space (C) should be "ignored." If so, it would
+   allocate a buffer of length A+C+B and zero out the middle part before
+   decompressing into the A and B parts. Or, if we were to do #13 below,
+   we would instead just add a "write-zero" writebuf describing the free
+   range to the queue and the DiskWriter would do a gather-style write
+   of A, C, and B.
+
+13. Re-order writes in the DiskWriter.
+   Right now we just have a FIFO queue which the disk writer thread
+   slavishly processes in order. We could allow the writer (or the
+   decompresser that queues writs) to re-order the queue with an elevator
+   algorithm. More importantly, it could combine consecutive requests
+   so that we could use "writev" to do them all in one operation.
