@@ -78,8 +78,19 @@ static long		outputmaxsec	= 0;
 #define sectobytes(s)	((off_t)(s) * SECSIZE)
 #define bytestosec(b)	(uint32_t)((b) / SECSIZE)
 
+/*
+ * Sector alignment is required for buffers used with read/write on
+ * files opened with O_DIRECT (at least under Linux). So in several places
+ * we allocate +SECSIZE bytes to data buffers so that we can ensure this
+ * alignment. We could do this just when the -f (directio) command line
+ * is specified, but we just do it all the time right now as the space
+ * cost is generally small.
+ */
+#define SECALIGN(p)	(void *)(((uintptr_t)(p) + (SECSIZE-1)) & ~(SECSIZE-1))
+#define ISSECALIGNED(p)	(((uintptr_t)(p) & (SECSIZE-1)) == 0)
+
 #define OUTSIZE (256 * 1024)
-char		zeros[OUTSIZE];
+static char	 zeros[OUTSIZE+SECSIZE];
 
 static int	 dostype = -1;
 static int	 slice = 0;
@@ -91,6 +102,7 @@ static int	 rdycount;
 static int	 imageversion = 1;
 static int	 dots   = 0;
 static int	 dotcol;
+static int	 directio = 0;
 static struct timeval stamp;
 #ifndef FRISBEE
 static int	 infd;
@@ -349,7 +361,9 @@ alloc_writebuf(off_t offset, off_t size, int allocbuf, int dowait)
 			    curwritebufmem + bufsize > maxwritebufmem)
 				buf = NULL;
 			else
-				buf = malloc(sizeof(buffer_t) + bufsize);
+				/* +SECSIZE is for O_DIRECT alignement */
+				buf = malloc(sizeof(buffer_t) + bufsize
+					     + SECSIZE);
 
 			if (buf == NULL) {
 				if (!dowait) {
@@ -393,7 +407,7 @@ alloc_writebuf(off_t offset, off_t size, int allocbuf, int dowait)
 	wbuf->offset = offset;
 	wbuf->size = size;
 	wbuf->buf = buf;
-	wbuf->data = buf ? buf->data : NULL;
+	wbuf->data = buf ? SECALIGN(buf->data) : NULL;
 
 	return wbuf;
 }
@@ -552,6 +566,7 @@ usage(void)
 		" -d              Turn on progressive levels of debugging\n"
 		" -r retries      Number of image read retries to attempt\n"
 		" -W size         MB of memory to use for write buffering\n"
+		" -f              Force use of direct IO (O_DIRECT) to reduce system cache effects.\n"
 		" -c              Check per-chunk checksum\n"
 		" -a keyfile      File containing pubkey used to sign checksum (implies -c)\n"
 		" -e cipher       Decrypt the image with the given cipher\n"
@@ -571,7 +586,7 @@ main(int argc, char *argv[])
 #ifdef NOTHREADS
 	nothreads = 1;
 #endif
-	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:Na:ck:eu:")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:Na:ck:eu:f")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
 		case 'F':
@@ -634,6 +649,15 @@ main(int argc, char *argv[])
 			maxwritebufmem *= (1024 * 1024);
 			break;
 #endif
+
+		case 'f':
+#ifdef O_DIRECT
+			directio++;
+#else
+			fprintf(stderr, "WARNING: O_DIRECT not supported\n");
+#endif
+			break;
+
 #ifdef WITH_CRYPTO
 		case 'c':
 #ifndef SIGN_CHECKSUM
@@ -730,6 +754,8 @@ main(int argc, char *argv[])
 	if (docrconly)
 		outfd = -1;
 	else if (argc == 2 && strcmp(argv[1], "-")) {
+		int flags;
+
 		/*
 		 * XXX perform seek and MBR checks before we truncate
 		 * the output file.  If they have their input/output
@@ -752,9 +778,17 @@ main(int argc, char *argv[])
 		/*
 		 * Open the output file for writing.
 		 */
+		flags = O_RDWR|O_CREAT|O_TRUNC;
+#ifdef O_DIRECT
+		if (directio)
+		    flags |= O_DIRECT;
+#endif
+
 		if ((outfd =
-		     open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
+		     open(argv[1], flags, 0666)) < 0) {
 			perror("opening output file");
+			if (directio && errno == EINVAL)
+				fprintf(stderr, "Try again without -f\n");
 			exit(1);
 		}
 	}
@@ -974,15 +1008,27 @@ ImageUnzipInitKeys(char *uuidstr, char *sig_keyfile, char *enc_keyfile)
 int
 ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 	       int _nothreads, int _dostype, int _dodots,
-	       unsigned long _writebufmem)
+	       unsigned long _writebufmem, int _directio)
 {
+	int flags;
+
 	gettimeofday(&stamp, 0);
 
 	if (outfd >= 0)
 		close(outfd);
 
-	if ((outfd = open(filename, O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
+	flags = O_RDWR|O_CREAT|O_TRUNC;
+	if (_directio)
+#ifdef O_DIRECT
+		flags |= O_DIRECT;
+#else
+		fprintf(stderr, "WARNING: O_DIRECT not supported\n");
+#endif
+
+	if ((outfd = open(filename, flags, 0666)) < 0) {
 		perror("opening output file");
+		if (_directio && errno == EINVAL)
+			fprintf(stderr, "Try again without -f\n");
 		exit(1);
 	}
 	slice     = _slice;
@@ -991,6 +1037,7 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 	nothreads = _nothreads;
 	dostype   = _dostype;
 	dots      = _dodots;
+	directio  = _directio;
 #ifndef NOTHREADS
 	maxwritebufmem = _writebufmem;
 #endif
@@ -1677,6 +1724,7 @@ writezeros(off_t offset, off_t zcount)
 {
 	size_t	zcc, wcc;
 	off_t ozcount;
+	char *zbuf;
 
 	assert((offset & (SECSIZE-1)) == 0);
 
@@ -1704,6 +1752,7 @@ writezeros(off_t offset, off_t zcount)
 		exit(1);
 	}
 
+	zbuf = SECALIGN(zeros);
 	ozcount = zcount;
 	while (zcount) {
 		if (zcount <= OUTSIZE)
@@ -1713,10 +1762,10 @@ writezeros(off_t offset, off_t zcount)
 
 #ifndef FRISBEE
 		if (docrconly)
-			compute_crc((u_char *)zeros, zcc, &crc);
+			compute_crc((u_char *)zbuf, zcc, &crc);
 		else
 #endif
-		if ((wcc = write(outfd, zeros, zcc)) != zcc) {
+		if ((wcc = write(outfd, zbuf, zcc)) != zcc) {
 			if (wcc < 0) {
 				perror("Writing Zeros");
 			} else if ((wcc & (SECSIZE-1)) != 0) {
@@ -1750,7 +1799,7 @@ writedata(off_t offset, size_t size, void *buf)
 {
 	ssize_t	cc;
 
-	/*	fprintf(stderr, "Writing %d bytes at %qd\n", size, offset); */
+	assert(ISSECALIGNED(buf));
 
 	if (offset != nextwriteoffset)
 		totalseekops++;
@@ -1839,6 +1888,36 @@ zero_remainder()
 static long long outputmaxsize = 0;
 
 /*
+ * XXX Argh! We have a problem.
+ *
+ * The definition of the DOS boot block (doslabel struct) has an embedded
+ * struct (parts) that is at a non-word boundary according to the on-disk
+ * layout of the boot block. Left to its own devices, the compiler will
+ * offset the parts struct inserting an implicit 2 bytes of padding before
+ * it, so that word accesses within the struct (in particular, dp_start
+ * and dp_size) are aligned. (Once upon a time, such unaligned accesses
+ * were fatal. Now they are not on most x86-en, but we try to avoid it
+ * anyway.) The problem is that the implicit padding means the struct
+ * doesn't line up with the on-disk structure. So, struct doslabel inserts
+ * 2 bytes of padding at the beginning of the struct ("align") so that the
+ * "parts" struct does fall on a word boundary without padding. The price
+ * we pay is that now whenever we read or write such a struct, we do so at
+ * an offset 2 bytes in (the "pad2" field).
+ *
+ * That was all fine until we started using the O_DIRECT flag on open of
+ * a device. O_DIRECT requires that the data buffer we pass be 512-byte
+ * aligned, at least on Linux. But there is no way we can have both the
+ * read-buffer aligned and the "parts" struct within the doslabel aligned.
+ * One solution is to align the read buffer and just use the "packed"
+ * attribute for the struct so that the compiler won't try to align it
+ * and we would wind up doing unaligned word accesses. However, this would
+ * be way too simple. Instead, we retain the obscure structure definition
+ * and COPY the data from the read/write buffer into a properly (mis)aligned
+ * doslabel struct for access!
+ */
+static char mbrbuf[DOSPARTSIZE+SECSIZE];
+
+/*
  * Parse the DOS partition table to set the bounds of the slice we
  * are writing to.
  */
@@ -1847,13 +1926,14 @@ readmbr(int slice)
 {
 	struct doslabel doslabel;
 	int		cc;
+	char		*mbr = SECALIGN(mbrbuf);
 
 	if (slice < 1 || slice > 4) {
 		fprintf(stderr, "Slice must be 1, 2, 3, or 4\n");
 		return 1;
 	}
 
-	if ((cc = devread(outfd, doslabel.pad2, DOSPARTSIZE)) < 0) {
+	if ((cc = devread(outfd, mbr, DOSPARTSIZE)) < 0) {
 		perror("Could not read DOS label");
 		return 1;
 	}
@@ -1861,6 +1941,7 @@ readmbr(int slice)
 		fprintf(stderr, "Could not get the entire DOS label\n");
 		return 1;
 	}
+	memcpy(&doslabel.pad2, mbr, DOSPARTSIZE);
 	if (doslabel.magic != BOOT_MAGIC) {
 		fprintf(stderr, "Wrong magic number in DOS partition table\n");
 		return 1;
@@ -1883,12 +1964,13 @@ fixmbr(int slice, int dtype)
 {
 	struct doslabel doslabel;
 	int		cc;
+	char		*mbr = SECALIGN(mbrbuf);
 
 	if (lseek(outfd, (off_t)0, SEEK_SET) < 0) {
 		perror("Could not seek to DOS label");
 		return 1;
 	}
-	if ((cc = devread(outfd, doslabel.pad2, DOSPARTSIZE)) < 0) {
+	if ((cc = devread(outfd, mbr, DOSPARTSIZE)) < 0) {
 		perror("Could not read DOS label");
 		return 1;
 	}
@@ -1896,6 +1978,7 @@ fixmbr(int slice, int dtype)
 		fprintf(stderr, "Could not get the entire DOS label\n");
 		return 1;
 	}
+	memcpy(&doslabel.pad2, mbr, DOSPARTSIZE);
 	if (doslabel.magic != BOOT_MAGIC) {
 		fprintf(stderr, "Wrong magic number in DOS partition table\n");
 		return 1;
@@ -1907,7 +1990,8 @@ fixmbr(int slice, int dtype)
 			perror("Could not seek to DOS label");
 			return 1;
 		}
-		cc = write(outfd, doslabel.pad2, DOSPARTSIZE);
+		memcpy(mbr, &doslabel.pad2, DOSPARTSIZE);
+		cc = write(outfd, mbr, DOSPARTSIZE);
 		if (cc != DOSPARTSIZE) {
 			perror("Could not write DOS label");
 			return 1;
