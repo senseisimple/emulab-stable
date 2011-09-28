@@ -156,6 +156,9 @@ static void	 threadinit(void);
 static void	 threadwait(void);
 static void	 threadquit(void);
 static void	*DiskWriter(void *arg);
+#ifdef FRISBEE
+extern void (*DiskStatusCallback)(int);
+#endif
 
 static int	writeinprogress; /* XXX */
 static pthread_t child_pid;
@@ -1070,12 +1073,19 @@ ImageUnzipFlush(void)
 	threadwait();
 
 	if (outfd >= 0) {
+		if (DiskStatusCallback)
+			(*DiskStatusCallback)(3);
+
 		/* can return EINVAL if device doesn't support fsync */
 		if (fsync(outfd) < 0 && errno != EINVAL) {
 			perror("fsync");
 			rv = -1;
 		}
-		close(outfd);
+
+		if (DiskStatusCallback)
+			(*DiskStatusCallback)(4);
+
+		/* XXX don't close it here, wait til UnzipQuit */
 	}
 
 	return(rv);
@@ -1089,6 +1099,10 @@ ImageUnzipQuit(void)
 	/* Set the MBR type if necesary */
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
+
+	/* Now we can close it */
+	if (outfd >= 0)
+		close(outfd);
 
 #ifdef WITH_CRYPTO
 #ifdef SIGN_CHECKSUM
@@ -1167,10 +1181,6 @@ threadquit(void)
 	pthread_cancel(child_pid);
 	pthread_join(child_pid, &ignored);
 }
-
-#ifdef FRISBEE
-extern void (*DiskStatusCallback)(int);
-#endif
 
 void *
 DiskWriter(void *arg)
