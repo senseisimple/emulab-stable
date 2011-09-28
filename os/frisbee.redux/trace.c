@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -114,7 +114,7 @@ TraceDump(int serverrel, int level)
 				fprintf(fd, "%d of %d events, "
 					"start=%ld.%03ld, level=%d:\n",
 					evcount > NEVENTS ? NEVENTS : evcount,
-					evcount, (long)startt.tv_sec,
+					evcount, startt.tv_sec,
 					startt.tv_usec/1000, level);
 				/*
 				 * Make all event stamps relative to the
@@ -142,7 +142,7 @@ TraceDump(int serverrel, int level)
 			fprintf(fd, "%c: ", evisclient ? 'C' : 'S');
 			switch (ptr->event) {
 			case EV_JOINREQ:
-				fprintf(fd, "%s: JOIN request, ID=%lx, vers=%lu\n",
+				fprintf(fd, "%s: JOIN request, ID=%x, vers=%u\n",
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1]);
 				break;
@@ -152,25 +152,25 @@ TraceDump(int serverrel, int level)
 				bytes = (unsigned long long)ptr->args[2] << 32;
 				bytes |= ptr->args[3];
 				fprintf(fd, "%s: JOIN reply, "
-					"chunksize=%lu, blocksize=%lu, "
+					"chunksize=%u, blocksize=%u, "
 					"imagebytes=%llu\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1], bytes);
 				break;
 			}
 			case EV_LEAVEMSG:
-				fprintf(fd, "%s: LEAVE msg, ID=%lx, time=%lu\n",
+				fprintf(fd, "%s: LEAVE msg, ID=%x, time=%u\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_REQMSG:
-				fprintf(fd, "%s: REQUEST msg, %lu[%lu-%lu]\n",
+				fprintf(fd, "%s: REQUEST msg, %u[%u-%u]\n",
 					inet_ntoa(ptr->srcip), 
 					ptr->args[0], ptr->args[1],
 					ptr->args[1]+ptr->args[2]-1);
 				break;
 			case EV_PREQMSG:
-				fprintf(fd, "%s: PREQUEST msg, %lu(%lu)%s\n",
+				fprintf(fd, "%s: PREQUEST msg, %u(%u)%s\n",
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1],
 					ptr->args[2] ? " [RETRY]" : "");
@@ -179,38 +179,38 @@ TraceDump(int serverrel, int level)
 				stamp.tv_sec = ptr->args[0];
 				stamp.tv_usec = ptr->args[1];
 				timersub(&ptr->tstamp, &stamp, &stamp);
-				fprintf(fd, "overrun by %lu.%03lu "
-					"after %lu[%lu]\n",
+				fprintf(fd, "overrun by %ld.%03ld "
+					"after %u[%u]\n",
 					stamp.tv_sec, stamp.tv_usec/1000,
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_LONGBURST:
-				fprintf(fd, "finished long burst %lu (>%lu) "
-					"after %lu[%lu]\n",
+				fprintf(fd, "finished long burst %u (>%u) "
+					"after %u[%u]\n",
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_BLOCKMSG:
-				fprintf(fd, "sent block, %lu[%lu], retry=%lu\n",
+				fprintf(fd, "sent block, %u[%u], retry=%u\n",
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
 				break;
 			case EV_WORKENQ:
-				fprintf(fd, "enqueues, %lu(%lu), "
-					"%lu ents\n",
+				fprintf(fd, "enqueues, %u(%u), "
+					"%u ents\n",
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
 				break;
 			case EV_WORKDEQ:
-				fprintf(fd, "dequeues, %lu[%lu-%lu], "
-					"%lu ents\n",
+				fprintf(fd, "dequeues, %u[%u-%u], "
+					"%u ents\n",
 					ptr->args[0], ptr->args[1],
 					ptr->args[1]+ptr->args[2]-1,
 					ptr->args[3]);
 				break;
 			case EV_WORKOVERLAP:
 				fprintf(fd, "queue overlap, "
-					"old=[%lu-%lu], new=[%lu-%lu]\n",
+					"old=[%u-%u], new=[%u-%u]\n",
 					ptr->args[0],
 					ptr->args[0]+ptr->args[1]-1,
 					ptr->args[2],
@@ -218,23 +218,23 @@ TraceDump(int serverrel, int level)
 				break;
 			case EV_WORKMERGE:
 				if (ptr->args[3] == ~0)
-					fprintf(fd, "merged %lu with current\n",
+					fprintf(fd, "merged %u with current\n",
 						ptr->args[0]);
 				else
-					fprintf(fd, "merged %lu at ent %lu, "
-						"added %lu to existing %lu\n",
+					fprintf(fd, "merged %u at ent %u, "
+						"added %u to existing %u\n",
 						ptr->args[0], ptr->args[3],
 						ptr->args[2], ptr->args[1]);
 				break;
 			case EV_DUPCHUNK:
-				fprintf(fd, "possible dupchunk %lu\n",
+				fprintf(fd, "possible dupchunk %u\n",
 					ptr->args[0]);
 				break;
 			case EV_READFILE:
 				stamp.tv_sec = ptr->args[2];
 				stamp.tv_usec = ptr->args[3];
 				timersub(&ptr->tstamp, &stamp, &stamp);
-				fprintf(fd, "readfile, %lu@%lu, %lu.%03lus\n",
+				fprintf(fd, "readfile, %u@%u, %ld.%03lds\n",
 					ptr->args[1], ptr->args[0],
 					stamp.tv_sec, stamp.tv_usec/1000);
 				break;
@@ -261,7 +261,7 @@ TraceDump(int serverrel, int level)
 
 				fprintf(fd, "%s: saw REQUEST for ",
 					inet_ntoa(ptr->srcip));
-				fprintf(fd, "%lu[%lu-%lu], ip=%s\n",
+				fprintf(fd, "%u[%u-%u], ip=%s\n",
 					ptr->args[1], ptr->args[2],
 					ptr->args[2]+ptr->args[3]-1,
 					inet_ntoa(ipaddr));
@@ -273,98 +273,98 @@ TraceDump(int serverrel, int level)
 
 				fprintf(fd, "%s: saw PREQUEST for ",
 					inet_ntoa(ptr->srcip));
-				fprintf(fd, "%lu, ip=%s\n",
+				fprintf(fd, "%u, ip=%s\n",
 					ptr->args[1], inet_ntoa(ipaddr));
 				break;
 			}
 			case EV_CLINOROOM:
-				fprintf(fd, "%s: block %lu[%lu], no room "
-					"(full=%lu filling=%lu)\n",
+				fprintf(fd, "%s: block %u[%u], no room "
+					"(full=%u filling=%u)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIFOUNDROOM:
-				fprintf(fd, "%s: block %lu[%lu], marked dubious"
-					" (missed %lu blocks)\n",
+				fprintf(fd, "%s: block %u[%u], marked dubious"
+					" (missed %u blocks)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
 				break;
 			case EV_CLIREUSE:
-				fprintf(fd, "%s: block %lu[%lu], displaces "
-					"%lu blocks of dubious chunk %lu from chunk buffer\n",
+				fprintf(fd, "%s: block %u[%u], displaces "
+					"%u blocks of dubious chunk %u from chunk buffer\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIDUBPROMO:
-				fprintf(fd, "%s: block %lu[%lu], no longer "
+				fprintf(fd, "%s: block %u[%u], no longer "
 					"dubious\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_CLIDUPCHUNK:
-				fprintf(fd, "%s: block %lu[%lu], dup chunk\n",
+				fprintf(fd, "%s: block %u[%u], dup chunk\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_CLIDUPBLOCK:
-				fprintf(fd, "%s: block %lu[%lu], dup block\n",
+				fprintf(fd, "%s: block %u[%u], dup block\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_CLIBLOCK:
-				fprintf(fd, "%s: block %lu[%lu], remaining=%lu\n",
+				fprintf(fd, "%s: block %u[%u], remaining=%u\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
 				break;
 			case EV_CLISCHUNK:
-				fprintf(fd, "%s: start chunk %lu, block %lu, "
-					"%lu chunks in progress (goodblks=%lu)\n",
+				fprintf(fd, "%s: start chunk %u, block %u, "
+					"%u chunks in progress (goodblks=%u)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIECHUNK:
-				fprintf(fd, "%s: end chunk %lu, block %lu, "
-					"%lu chunks in progress (goodblks=%lu)\n",
+				fprintf(fd, "%s: end chunk %u, block %u, "
+					"%u chunks in progress (goodblks=%u)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLILCHUNK:
 				fprintf(fd, "%s: switched from incomplete "
-					"chunk %lu at block %lu "
-					"(%lu blocks to go)\n",
+					"chunk %u at block %u "
+					"(%u blocks to go)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
 				break;
 			case EV_CLIREQ:
-				fprintf(fd, "%s: send REQUEST, %lu[%lu-%lu]\n",
+				fprintf(fd, "%s: send REQUEST, %u[%u-%u]\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[1]+ptr->args[2]-1);
 				break;
 			case EV_CLIPREQ:
-				fprintf(fd, "%s: send PREQUEST, %lu(%lu)\n",
+				fprintf(fd, "%s: send PREQUEST, %u(%u)\n",
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1]);
 				break;
 			case EV_CLIREQCHUNK:
-				fprintf(fd, "%s: request chunk, timeo=%lu\n",
+				fprintf(fd, "%s: request chunk, timeo=%u\n",
 					inet_ntoa(ptr->srcip), ptr->args[0]);
 				break;
 			case EV_CLIREQRA:
 				fprintf(fd, "%s: issue readahead, "
-					"empty=%lu, filling=%lu\n",
+					"empty=%u, filling=%u\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_CLIJOINREQ:
-				fprintf(fd, "%s: send JOIN, ID=%lx\n",
+				fprintf(fd, "%s: send JOIN, ID=%x\n",
 					inet_ntoa(ptr->srcip), ptr->args[0]);
 				break;
 			case EV_CLIJOINREP:
@@ -373,7 +373,7 @@ TraceDump(int serverrel, int level)
 				bytes = (unsigned long long)ptr->args[2] << 32;
 				bytes |= ptr->args[3];
 				fprintf(fd, "%s: got JOIN reply, "
-					"chunksize=%lu, blocksize=%lu, "
+					"chunksize=%u, blocksize=%u, "
 					"imagebytes=%llu\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1], bytes);
@@ -384,33 +384,33 @@ TraceDump(int serverrel, int level)
 				unsigned long long bytes;
 				bytes = (unsigned long long)ptr->args[2] << 32;
 				bytes |= ptr->args[3];
-				fprintf(fd, "%s: send LEAVE, ID=%lx, "
-					"time=%lu, bytes=%llu\n",
+				fprintf(fd, "%s: send LEAVE, ID=%x, "
+					"time=%u, bytes=%llu\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1], bytes);
 				break;
 			}
 			case EV_CLISTAMP:
-				fprintf(fd, "%s: update chunk %lu, stamp %lu.%06lu\n",
+				fprintf(fd, "%s: update chunk %u, stamp %u.%06u\n",
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1], ptr->args[2]);
 				break;
 			case EV_CLIREDO:
-				fprintf(fd, "%s: redo needed on chunk %lu, "
-					"lastreq at %lu.%06lu\n",
+				fprintf(fd, "%s: redo needed on chunk %u, "
+					"lastreq at %u.%06u\n",
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1], ptr->args[2]);
 				break;
 			case EV_CLIDCSTART:
-				fprintf(fd, "%s: decompressing chunk %lu, "
-					"idle=%lu, (dblock=%lu, widle=%lu)\n",
+				fprintf(fd, "%s: decompressing chunk %u, "
+					"idle=%u, (dblock=%u, widle=%u)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIDCDONE:
-				fprintf(fd, "%s: chunk %lu (%lu bytes) "
-					"decompressed, %lu left\n",
+				fprintf(fd, "%s: chunk %u (%u bytes) "
+					"decompressed, %u left\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
@@ -421,7 +421,7 @@ TraceDump(int serverrel, int level)
 				bytes = (unsigned long long)ptr->args[0] << 32;
 				bytes |= ptr->args[1];
 				fprintf(fd, "%s: decompressed %llu bytes total"
-					" (dblock=%lu, widle=%lu)\n",
+					" (dblock=%u, widle=%u)\n",
 					inet_ntoa(ptr->srcip), bytes,
 					ptr->args[2], ptr->args[3]);
 				break;
@@ -437,16 +437,22 @@ TraceDump(int serverrel, int level)
 
 				switch (ptr->args[0]) {
 				case 0:
-					str = "IDLE";
+					str = "writer STARTED";
 					break;
 				case 1:
-					str = "STARTED";
+					str = "writer IDLE";
 					break;
 				case 2:
-					str = "RUNNING";
+					str = "writer RUNNING";
+					break;
+				case 3:
+					str = "fsync STARTED";
+					break;
+				case 4:
+					str = "fsync ENDED";
 					break;
 				}
-				fprintf(fd, "%s: writer %s",
+				fprintf(fd, "%s: %s",
 					inet_ntoa(ptr->srcip), str);
 
 				bytes = (unsigned long long)ptr->args[1] << 32;
@@ -460,7 +466,7 @@ TraceDump(int serverrel, int level)
 				stamp.tv_usec = ptr->args[1];
 				timersub(&ptr->tstamp, &stamp, &stamp);
 				fprintf(fd, "%s: got block, wait=%03ld.%03ld"
-					", %lu good blocks recv (%lu total)\n",
+					", %u good blocks recv (%u  total)\n",
 					inet_ntoa(ptr->srcip),
 					stamp.tv_sec, stamp.tv_usec/1000,
 					ptr->args[2], ptr->args[3]);

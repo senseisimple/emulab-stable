@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -909,7 +909,7 @@ char *usagestr =
 void
 usage()
 {
-	fprintf(stderr, usagestr);
+	fprintf(stderr, "%s", usagestr);
 	exit(1);
 }
 
@@ -953,6 +953,10 @@ main(int argc, char **argv)
 			break;
 		case 'R':
 			readsize = atoi(optarg);
+			if (readsize == 0 || readsize > MAXCHUNKSIZE) {
+				warning("readsize set to %d", MAXCHUNKSIZE);
+				readsize = MAXCHUNKSIZE;
+			}
 			break;
 		case 'B':
 			burstsize = atoi(optarg);

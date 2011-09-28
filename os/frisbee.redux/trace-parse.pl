@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,6 +32,7 @@ my ($c_firstrecv, $c_lastrecv, $c_recvbytes);
 my ($c_firstdecomp, $c_lastdecomp, $c_decompbytes);
 my ($c_firstwrite, $c_lastwrite, $c_writebytes);
 my ($c_prevstamp, $c_prevrbytes, $c_prevdbytes, $c_prevwbytes);
+my ($c_fsyncstart, $c_fsyncend);
 
 #
 # Parse command arguments.
@@ -212,8 +213,8 @@ processclient($$$)
 	}
     }
 
-    if ($msg =~ /^got JOIN reply, blocks=(\d+), blocksize=(\d+)/) {
-	$c_blocks = $1;
+    if ($msg =~ /^got JOIN reply, chunksize=(\d+), blocksize=(\d+), imagebytes=(\d+)/) {
+	$c_blocks = int($3 / $2);
 	$c_blocksize = $2;
     }
 
@@ -246,7 +247,7 @@ processclient($$$)
 	$c_firstdecomp = $stamp
 	    if (!defined($c_firstdecomp));
     }
-    if ($msg =~ /^chunk (\d+) decompressed, (\d+) left, \(dblock=(\d+), widle=(\d+)\)/) {
+    if ($msg =~ /^chunk (\d+) \(\d+ bytes\) decompressed, (\d+) left/) {
 	$c_lastdecomp = $stamp;
     }
     if ($msg =~ /^decompressed (\d+) bytes total/) {
@@ -266,6 +267,12 @@ processclient($$$)
     if ($msg =~ /^writer IDLE, (\d+) bytes written/) {
 	$c_lastwrite = $stamp;
 	$c_writebytes = $1;
+    }
+    if ($msg =~ /^fsync START/) {
+	$c_fsyncstart = $stamp;
+    }
+    if ($msg =~ /^fsync END/) {
+	$c_fsyncend = $stamp;
     }
 }
 
@@ -312,6 +319,10 @@ finishclient($)
     my ($stamp) = @_;
     my $etime;
 
+    if ($c_decompbytes == 0) {
+	print STDERR "WARNING: no decompression count, try -tt\n";
+    }
+
     if ($nextplot >= 0) {
 	while (($stamp * 1000000) > $nextplot) {
 	    plotclient($nextplot);
@@ -330,6 +341,9 @@ finishclient($)
 	   $c_decompbytes / nz($etime) / 1000000.0,
 	   $rbytes, $c_decompbytes, $etime, $c_firstdecomp, $c_lastdecomp);
 
+    if (($c_fsyncend - $c_fsyncstart) * 1000 >= 1) {
+	$c_lastwrite = $c_fsyncend;
+    }
     $etime = $c_lastwrite - $c_firstwrite;
     printf("Write:      %.2f MB/sec: %d bytes in %.3f sec (%.3f to %.3f)\n",
 	   $c_writebytes / nz($etime) / 1000000.0,

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -13,7 +13,7 @@ struct event {
 	struct timeval	tstamp;
 	struct in_addr	srcip;
 	int		event;
-	unsigned long	args[4];
+	uint32_t	args[4];
 };
 
 extern struct event eventlog[];
@@ -27,10 +27,10 @@ if (evlogging >= (l)) { \
 	gettimeofday(&evptr->tstamp, 0); \
 	evptr->event = (e); \
 	evptr->srcip = (ip); \
-	evptr->args[0] = (unsigned long)(a1); \
-	evptr->args[1] = (unsigned long)(a2); \
-	evptr->args[2] = (unsigned long)(a3); \
-	evptr->args[3] = (unsigned long)(a4); \
+	evptr->args[0] = (uint32_t)(a1); \
+	evptr->args[1] = (uint32_t)(a2); \
+	evptr->args[2] = (uint32_t)(a3); \
+	evptr->args[3] = (uint32_t)(a4); \
 	if (++evptr == evend) evptr = eventlog; \
 	evcount++; \
 	pthread_mutex_unlock(&evlock); \
@@ -43,10 +43,10 @@ if (evlogging >= (l)) { \
 	gettimeofday(&evptr->tstamp, 0); \
 	evptr->event = (e); \
 	evptr->srcip = myipaddr; \
-	evptr->args[0] = (unsigned long)(a1); \
-	evptr->args[1] = (unsigned long)(a2); \
-	evptr->args[2] = (unsigned long)(a3); \
-	evptr->args[3] = (unsigned long)(a4); \
+	evptr->args[0] = (uint32_t)(a1); \
+	evptr->args[1] = (uint32_t)(a2); \
+	evptr->args[2] = (uint32_t)(a3); \
+	evptr->args[3] = (uint32_t)(a4); \
 	if (++evptr == evend) evptr = eventlog; \
 	evcount++; \
 	pthread_mutex_unlock(&evlock); \

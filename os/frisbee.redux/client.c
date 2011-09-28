@@ -159,6 +159,7 @@ char *usagestr =
  " -n              Do not use extra threads in diskwriter\n"
  " -q              Quiet mode (no dots)\n"
  " -N              Do not decompress the received data, just write to output.\n"
+ " -D DOS-ptype    Set the DOS partition type in slice mode.\n"
  " -S server-IP    Specify the IP address of the server to use.\n"
  " -p portnum      Specify a port number.\n"
  " -m mcastaddr    Specify a multicast address in dotted notation.\n"
@@ -192,7 +193,7 @@ char *usagestr =
 void
 usage()
 {
-	fprintf(stderr, usagestr);
+	fprintf(stderr, "%s", usagestr);
 	exit(1);
 }
 
@@ -209,7 +210,7 @@ WriterStatusCallback(int isbusy)
 		hi = (totalrdata >> 32);
 		lo = totalrdata;
 	}
-	CLEVENT((isbusy < 2) ? 1 : 3, EV_CLIWRSTATUS, isbusy, hi, lo, 0);
+	CLEVENT((isbusy != 2) ? 1 : 3, EV_CLIWRSTATUS, isbusy, hi, lo, 0);
 }
 
 int
@@ -1732,7 +1733,8 @@ PlayFrisbee(void)
 					MAXBLOCKSIZE;
 			}
 			CLEVENT(1, EV_CLIJOINREP,
-				CHUNKSIZE, BLOCKSIZE,
+				p->msg.join2.chunksize,
+				p->msg.join2.blocksize,
 				(p->msg.join2.bytecount >> 32),
 				p->msg.join2.bytecount);
 			break;
