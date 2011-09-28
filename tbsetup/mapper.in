@@ -51,15 +51,17 @@ sub usage ()
     print STDERR " -l   - Use rspec v2 instead of the text file format\n";
     print STDERR " -z   - Force new ptopgen\n";
     print STDERR " -Z   - Force old ptopgen\n";
+    print STDERR " -A   - Tell ptopgen all nodes are free; only with -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:altzZ";
+my $optlist    = "dvunfprqczxm:ko:altzZA";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
 my $updating   = 0;
 my $impotent   = 0;
 my $precheck   = 0;
+my $allnodesfree = 0;
 my $toponly    = 0;
 my $prepass    = 0;
 my $alloconly  = 0;
@@ -148,6 +150,9 @@ if (defined($options{"v"})) {
 if (defined($options{"a"})) {
     $alloconly++;
 }
+if (defined($options{"A"})) {
+    $allnodesfree++;
+}
 if (defined($options{"d"})) {
     $debug++;
 }
@@ -209,6 +214,9 @@ if (defined($options{"Z"})) {
 if (defined($options{"z"})) {
     $use_old_ptopgen = 0;
     $PTOPGEN = $PTOPGEN_NEW;
+}
+if ($allnodesfree && !$impotent) {
+    fatal("Not allowed to use -A without -n (impotent) option");
 }
 
 my $pid = $ARGV[0];
@@ -567,7 +575,7 @@ sub RunAssign($$)
     $ptopargs   .= "-h "
 	if ($vtop->sharednodecount());
     $ptopargs	.= "-a "
-    	if ($precheck);
+    	if ($precheck || $allnodesfree);
     $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
     	if (defined($experiment->delay_capacity()));
     if ($userspec == 1) {
