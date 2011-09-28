@@ -74,7 +74,8 @@ sub commonTail($$)
     # over again.
     #
     my $args  = {"op"    => $op, "args"   => $arg};
-    my ($obj) = RPC::XML::smart_encode($args);
+    my $xs = RPC::XML::struct->new($args);
+    my $obj = RPC::XML::request->new('passthrough', $xs);
 
     my $response = libxmlrpc::CallMethod0("elabinelab", "vlansv3",
 					  {"xmldoc" => $obj->as_string()});
