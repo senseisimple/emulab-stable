@@ -60,7 +60,7 @@ my $SHAREROOT	= "@SHAREROOT_DIR@";
 my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 
 # True if we are also the FS node
-my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
+my $ISFS	= ($USERNODE_IP eq $FSNODE_IP) ? 1 : 0;
 
 # Are we a VM on boss?
 my $OPSVM_ENABLE = @OPSVM_ENABLE@;
