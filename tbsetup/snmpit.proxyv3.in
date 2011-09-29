@@ -187,7 +187,7 @@ my $goo      = $parser->parse(*XMLDOC);
 if (! ref($goo)) {
     fatal("$xmldoc could not be parsed!");
 }
-my $opargs  = $goo->value();
+my $opargs  = (@{$goo->args()}[0])->value();
 if (! (exists($opargs->{'op'}) && exists($opargs->{'args'}))) {
     fatal("missing arguments in xmlgoo");
 }
