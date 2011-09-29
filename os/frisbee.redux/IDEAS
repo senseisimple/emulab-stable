@@ -47,7 +47,31 @@ Sources of info for the following include (from the testbed source repo):
    where large-scale duplication is happening (e.g., typically not on
    production networks).
 
-1. Frisbee of regular files.
+   Peer-to-peer?  Another of our early assumptions was that the server was
+   vastly more powerful (more CPU cycles, more net BW, more and faster disks)
+   than the clients. So a client-server or hierarchical client-server model
+   made sense. But nowadays, our main server is actually slower than many
+   of the clients. So what about a peer-to-peer frisbee, doing to frisbee
+   what Srikanth C. did for tmcd?
+
+   Frisbee isn't just for disk images any more. One of our original
+   assumptions was that we can use all the resources we want on the client
+   since its sole purpose at that point in time is to get the disk loaded,
+   nothing else is going on. But now we do distribute arbitrary files with
+   Frisbee (see #1 below) from the context of a running system. So what
+   aspects of Frisbee, driven by our assumption, might cause problems?
+   Well, the protocol is definitely not friendly to other network users
+   on the machine. But there is only so much one client can do here when
+   multiple clients are MC'ing a file. Is it appropriate for one client
+   to tell everyone else: "slow down"? How about resource consumption?
+   Frisbee was touted as aggressively using client resources, but the
+   defaults of the time seem quaint now: using half of the available
+   128MB of memory for buffering, fully using one processor, two
+   outstanding network requests at a time... Even if the defaults were
+   more aggressive by today's standard, I think we have enough knobs
+   to compensate.
+
+1. Frisbee of regular files. [ Been here, did this. }
    From the TODO file:
    Another potential use of frisbee is for distributing arbitrary files.
    In the Emulab context this would be useful for implementing the features
@@ -86,13 +110,30 @@ Sources of info for the following include (from the testbed source repo):
    and those where they are not.
 
    - RAM caching.  Using a dedicated caching proxy server, we should be
-     able to trick out a freakish machine with lots of RAM (24GB or so)
+     able to trick out a freakish machine with lots of RAM (64GB or more)
      and use that to cache images.  To make most efficient use of that RAM,
      we don't just want to mimic a filesystem with discrete images.  We
      might want to use it for a "block pool" (ala #8 below) where we
      cache unique blocks independent of their images.  There are also a
      variety of RAM compression tricks that might be usable, see for example:
           http://cseweb.ucsd.edu/~vahdat/papers/osdi08-de.pdf
+
+   - Pre-fetching image data.  Given that you have a big honkin' cache,
+     we could start aggresively pre-fetching data. There are two obvious
+     characteristics of frisbee data that we can leverage for our cache
+     and pre-fetch behavior. One is that we know that every chunk of the
+     image will be needed at least once, so one simple strategy if we have
+     a big enough cache is to just suck the whole image into cache in the
+     most efficient way. Couple this with some changes that Kevin made
+     long ago that allow the server to provide hints to the clients as
+     to which chunks they should request. Second is that we know that most
+     of the time each chunk of the image will be needed exactly once,
+     at least if we stay on-message with the "fast, low-latency, reliable
+     network" assumption. This could lead to something whacky like a
+     "most recently used" replacement algorithm. But even with the network
+     assumption above, the "exactly once" assumption is questionable when
+     you have clients joining at different times. Okay, maybe I retract
+     this one...
 
    - Optimize disk bandwidth.  Even in a dedicated server environment we
      might not be able to keep up, as feeding multiple images may imply
@@ -109,7 +150,7 @@ Sources of info for the following include (from the testbed source repo):
 
    - Multi vs. single instances.  Serve all images from a single,
      multi-threaded server.  Makes use of disk and network easier, no
-     need for coordiation (implicit or explicit) between servers.
+     need for coordination (implicit or explicit) between servers.
 
    - Multi-level image distribution.  To achieve large-scale, particularly
      in environments where a flat multicast distribution is not possible,
@@ -207,7 +248,7 @@ Sources of info for the following include (from the testbed source repo):
 
 Immediate goals:
 
-1. The "master" server.
+1. The "master" server. [ Been here, did this ].
    Create a frisbeed master server that runs all the time.  It will accept
    requests on a known port.  These requests will contain the name of the
    file which is desired and some optional authentication data.  Initially,
@@ -244,10 +285,10 @@ Immediate goals:
    control and limiting resource usage.  Also, multithread the server for
    efficiency as mentioned above.
 
-3. Regular file distribution.  We could use this immediately for tarball
-   and RPM distribution as well as TMCD "fullconfig" distribution.
-   Again, the master server mechanism, with its client-initiated requests
-   should make this much easier.
+3. Regular file distribution.  [ Been here, did this ].
+   We could use this immediately for tarball and RPM distribution as well
+   as TMCD "fullconfig" distribution. Again, the master server mechanism,
+   with its client-initiated requests should make this much easier.
 
 4. Better integrity checks.  At the very least, need to put an image
    version/serial number in each chunk so we can detect the case where
@@ -263,6 +304,7 @@ Immediate goals:
 (the following are strictly imagezip):
 
 5. Support for ext4 and LVM.  These are coming sooner, rather than later.
+   [ Raghuveer did ext4 and partial LVM support. ]
 
 6. Revisit imagezip data structures.  Just imaging my modest 1TB disk at
    home (re-)revealed an issue.  It took more than 30 minutes just to get

@@ -136,7 +136,7 @@ Things to do for image*:
 
 11. Death to bubble sort and singly-linked lists.
    [ DONE -- for bubble sort, in a wicked hacky way. If USE_HACKSORT is
-     defined we keep a seperate array of pointers to range data structures
+     defined we keep a separate array of pointers to range data structures
      that we can call qsort on. ]
    We represent the set of free and allocated blocks with a singly-linked
    list.  The process is:
@@ -180,7 +180,7 @@ Things to do for image*:
    Note 1: there is also a "reloc" list, which identifies ranges of
    allocated blocks for which relocations must be performed in order to
    keep imagezip data "position independent" so that, e.g., a Linux partition
-   image can be layed down anywhere on a disk.  However, relocations are
+   image can be laid down anywhere on a disk.  However, relocations are
    infrequent enough that we don't necessarily have to optimize this list.
 
    Note 2: back in ye ole OSKIT days, we created an "address map manager"
@@ -204,7 +204,7 @@ Things to do for image*:
    will. This will also reduce the size impact of including free blocks in
    the image. I think this can be done easily using a fixup function in
    imagezip. Note that this change ties in with #10 above, if we do that one,
-   we would just mark -F indentified blocks as zero-ranges.
+   we would just mark -F identified blocks as zero-ranges.
 
    Alternatively, we eliminate -F entirely and let imageunzip handle it.
    This is more complex. When processing a chunk, imageunzip would look
@@ -220,5 +220,9 @@ Things to do for image*:
    Right now we just have a FIFO queue which the disk writer thread
    slavishly processes in order. We could allow the writer (or the
    decompresser that queues writs) to re-order the queue with an elevator
-   algorithm. More importantly, it could combine consecutive requests
-   so that we could use "writev" to do them all in one operation.
+   algorithm or some such. More importantly, it could combine consecutive
+   requests so that we could use "writev" to do them all in one operation.
+   One could argue that the queue is often not long enough for this to help,
+   and that is true. But in those cases the disk is clearly fast enough to
+   keep up and it doesn't need any help! So it will benefit the cases that
+   matter.
