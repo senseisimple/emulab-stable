@@ -294,7 +294,25 @@ sub Resolve($)
 		     "name"     => $geniuser->name(),
 		     "slices"   => \@sliceURNs
 		    };
-	
+
+	if ($geniuser->IsLocal()) {
+	    my @projects = ();
+	    my %subsas   = ();
+	    if ($geniuser->emulab_user()->ProjectMembershipList(\@projects)) {
+		print STDERR "Could not get project membership for $geniuser\n";
+	    }
+	    else {
+		foreach my $project (@projects) {
+		    my $pid = $project->pid();
+		    my $urn = GeniHRN::Generate("$OURDOMAIN:$pid",
+						"authority", "sa");
+		    my $url = "@TBBASE@/protogeni/xmlrpc/project/$pid/sa";
+		    $subsas{$urn} = $url;
+		}
+		$blob->{'subauthorities'} = \%subsas;
+	    }
+	}
+
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "slice") {
