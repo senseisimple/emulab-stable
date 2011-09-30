@@ -1,0 +1,184 @@
+This is what I did to convert a real ops to a VM on boss. This also
+moves the NFS server from ops to boss since its silly to do that
+from a VM that is on boss. 
+
+Need a single patition to hold the ops VM. This is for what is
+currenty on ops in /, /usr and /var. About 6GB should do it.
+Mount this new partition as /ops.
+
+Need a single large partition for /proj, /users, /groups, and
+/share. Mount this new partition as /q.
+
+Once you have /ops mounted, copy over the existing ops:
+
+	boss> sudo rsync -a -H ops:/ /ops
+
+You also want to move ops:/proj, etc over to boss since that is now
+going to be the file server. The easiest thing to do is make a single
+partition and call it /q, and then move them over, either from ops or
+from the copy of ops you made above. How you do this depends on how
+big ops is and how much space is already consumed. Ditto for /share.
+
+Be sure to add the new filesystems to boss:/etc/fstab
+
+OPS is no longer the NFS server, so it needs to see the filesystems
+that have moved to boss. We could do that as an NFS client, but that
+would be silly. Instead, lets use nullfs mounts. First unmount the
+existing NFS mounts:
+
+	boss> cd /
+	boss> sudo umount /proj
+	boss> sudo umount /users
+	boss> sudo umount /groups
+	boss> sudo umount /share
+	boss> sudo rmdir /proj /users /groups /share
+	boss> sudo ln -s /q/proj proj
+	boss> sudo ln -s /q/users users
+	boss> sudo ln -s /q/groups groups
+	boss> sudo ln -s /q/share share
+
+Then in boss:/etc/fstab add these:
+
+	/q/groups	/ops/groups nullfs rw 0 0
+	/q/users	/ops/users nullfs rw 0 0
+	/q/proj		/ops/proj nullfs rw 0 0
+	/q/share	/ops/share nullfs rw 0 0
+
+Note: you might need to remove existing symlinks in /ops.
+
+	boss> cd /ops
+	boss> sudo rm proj share users groups
+	boss> sudo mkdir proj share users groups
+	boss> sudo mount /ops/users
+	boss> sudo mount /ops/proj
+	boss> sudo mount /ops/share
+	boss> sudo mount /ops/groups
+
+Boss NFS mounts ops:/usr/testbed and ops:/mnt/var, but we do not
+need to do this since we have those filesystems right on boss. We
+can just use symlinks. Note that there are currently NFS mounts on
+these twho dirs, so will have to unmount them first (and remove them
+from boss:/etc/fstab) and rmdir the existing directories.
+
+	boss> cd /usr/testbed
+	boss> sudo umount /usr/testbed/usersvar
+	boss> sudo umount /usr/testbed/opsdir
+	boss> sudo rmdir opsdir usersvar
+	boss> sudo ln -s /ops/usr/testbed opsdir
+	boss> sudo ln -s /ops/var usersvar
+
+Clear out /etc/fstab inside the VM.
+
+	boss> sudo cp /dev/null /ops/etc/fstab
+
+One both boss and ops, change /etc/hosts so that "fs" is an alias to
+boss instead of ops.
+
+Create /etc/exports.head on boss since it now the NFS server. Be sure
+to change the networkk appropriately; see ops:/etc/exports.head.
+
+	/q/share -network 155.98.36 -mask 255.255.252.0 -maproot=root -ro -alldirs
+
+Do this to get the mounts initialized, for exports_setup later:
+
+	boss> sudo cp /etc/exports.head /etc/exports
+	boss> sudo killall mountd
+	boss> sudo mountd
+
+Need this magic for X11 forwarding into a jail.
+
+	boss> sudo csh
+	boss> echo 'X11UseLocalhost no' >> /ops/etc/ssh/sshd_config
+	boss> exit
+
+Make sure boss:/root/.ssh/authorized_keys allows root login from boss.
+
+	boss> sudo csh
+	boss> cd /root/.ssh
+	boss> cat id_rsa.pub >> authorized_keys
+	boss> exit
+
+Completely replace /ops/etc/rc.conf with the following. Be sure to set
+the hostname in the following:
+
+	hostname="ops.mini.emulab.net"
+	linux_enable="YES"
+	sendmail_enable="YES"
+	sshd_enable="YES"
+	rpcbind_enable="NO"
+	mountd_enable="NO"
+	smbd_enable="NO"
+	apache_enable="YES"
+	syslogd_flags=""
+	pubsubd_flags="-T 10"
+	ntpd_enable="NO"
+	ntpdate_enable="NO"
+	background_fsck="NO"
+	nfs_client_enable="YES"
+	nfs_client_flags="-n 8"
+	accounting_enable="YES"
+
+Then add the jail config boss:/etc/rc.conf. Be sure to get the
+hostname and IP address correct. Also the interface.
+
+	jail_enable="YES"
+	jail_list="ops"
+	jail_ops_hostname="ops.mini.emulab.net"
+	jail_ops_ip="155.98.47.3"
+	jail_ops_rootdir="/ops"
+	jail_ops_interface="bge0"
+	jail_procfs_enable="YES"
+	jail_devfs_enable="YES"
+
+Make sure the old ops has been turned off, and then start the jail.
+
+	boss> sudo /etc/rc.d/jail start ops
+
+You should now be able to log into your ops VM.
+
+On both boss and ops, change /etc/hosts so that "fs" is an alias to
+boss instead of ops.
+
+On boss, edit /etc/named/*.head and change the CNAMES for fs so that
+they oint to boss instead of ops.
+
+So now we have to rebuild and install the Emulab source code, but first
+we have to make some changes to the defs file. First add these:
+
+	OPSVM_ENABLE=1
+	OPSVM_MOUNTPOINT=/ops
+
+Make sure that the FSDIR variables are set properly. Since we put
+everything on /q:
+
+	FSDIR_GROUPS=/q/groups
+	FSDIR_PROJ=/q/proj
+	FSDIR_USERS=/q/users
+	FSDIR_SHARE=/q/share
+
+Also need to make sure that FSNODE is set to boss:
+
+	FSNODE=boss.mini.emulab.net
+
+Turn off WINDOWS; not supported yet.
+
+	WINSUPPORT=0
+	
+Time to rebuild the source.
+
+	boss> cd /your/obj/tree
+	boss> gmake clean
+	boss> configure ....
+	boss> gmake
+	boss> sudo gmake boss-install
+
+Make sure these work:
+
+	boss> exports_setup
+	boss> named_setup
+
+If so, then turn things on:
+
+	boss> sudo testbed-control boot
+
+
