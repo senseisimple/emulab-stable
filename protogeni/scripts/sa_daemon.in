@@ -191,7 +191,7 @@ sub WarnSlices()
 	}
 
 	my $geniuser  = GeniUser->Lookup($slice->creator_uuid(), 1);
-	my $emailaddr = (defined($geniuser) ? geniuser->email() : undef);
+	my $emailaddr = (defined($geniuser) ? $geniuser->email() : undef);
 	if (!defined($geniuser)) {
 	    #
 	    # No user to warn
@@ -302,7 +302,7 @@ sub ExpireSlices()
 	    goto skip;
 	}
 	my $geniuser  = GeniUser->Lookup($slice->creator_uuid(), 1);
-	my $emailaddr = (defined($geniuser) ? geniuser->email() : undef);
+	my $emailaddr = (defined($geniuser) ? $geniuser->email() : undef);
 	my $urn       = $slice->urn();
 	my $hrn       = $slice->hrn();
 	
