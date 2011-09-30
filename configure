@@ -731,6 +731,7 @@ FSDIR_SCRATCH
 FS_WITH_QUOTAS
 TRACK_INTERSWITCH_BANDWIDTH
 TIMESTAMPS
+OURTIMEZONE
 UNIFIED_BOSS_AND_OPS
 DISABLE_NSE
 DISABLE_NAMED_SETUP
@@ -860,6 +861,7 @@ ASSIGN
 SSH_ARGS
 INSTALL_RCDIR
 INSTALL_APACHE_CONFIG
+APACHE_VERSION
 BRAINSTEM_DIR
 OPT_CFLAGS
 EVENTSYS
@@ -4954,6 +4956,7 @@ done
 
 
 
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -5050,6 +5053,7 @@ SELFLOADER_DATA="__DATA__"
 NEEDMROUTED=0
 OPSVM_ENABLE=0
 OPSVM_MOUNTPOINT="/ops"
+OURTIMEZONE="America/Denver"
 
 #
 # XXX You really don't want to change these!
@@ -5574,9 +5578,17 @@ if test "${with_apache_config_dir+set}" = set; then
 
 else
 
-    INSTALL_APACHE_CONFIG="/usr/local/etc/apache"
+    foo=`httpd -V | grep SERVER_CONFIG_FILE | grep 'apache2'`
+    if test "$foo" = ""; then
+        INSTALL_APACHE_CONFIG="/usr/local/etc/apache"
+	APACHE_VERSION="1.3"
+    else
+        INSTALL_APACHE_CONFIG="/usr/local/etc/apache22"
+	APACHE_VERSION="22"
+    fi
 
 fi
+
 
 
 
@@ -7145,9 +7157,26 @@ $as_echo "$as_me: WARNING: protogeni/rspec-geni submodule not intialized yet" >&
 	echo "Please cd into your source directory and run:"
 	echo "    git submodule init"
 	echo "    git submodule update"
-	echo "Then rerun configure"
+	echo "Then rerun configure in your object tree"
 	exit 1;
    fi
+fi
+
+#
+# Determine the timezone (stupidity in PHP5, see apache/php.ini)
+#
+if test -e "$srcdir/utils/gettimezone.pl"; then
+    echo -n "Checking to see what timezone we are ... ";
+    ZONE=`$srcdir/utils/gettimezone.pl`
+    if test $? -ne 0; then
+        { $as_echo "$as_me:$LINENO: WARNING: Cannot find gettimezone script; defaulting to $OURTIMEZONE" >&5
+$as_echo "$as_me: WARNING: Cannot find gettimezone script; defaulting to $OURTIMEZONE" >&2;};
+    fi
+    OURTIMEZONE=$ZONE
+    echo "$OURTIMEZONE"
+else
+    { $as_echo "$as_me:$LINENO: WARNING: Cannot find gettimezone script; defaulting to $OURTIMEZONE" >&5
+$as_echo "$as_me: WARNING: Cannot find gettimezone script; defaulting to $OURTIMEZONE" >&2;};
 fi
 
 #
@@ -7312,7 +7341,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	$pelabfiles \
-	apache/GNUmakefile apache/httpd.conf \
+	apache/GNUmakefile apache/httpd.conf-v1 apache/httpd.conf-v2 apache/php.ini \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
 	xmlrpc/sslxmlrpc_client.py xmlrpc/sslxmlrpc_server.py \

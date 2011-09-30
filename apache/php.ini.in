@@ -1,0 +1,30 @@
+[PHP]
+
+;
+; So that quotes are not escaped. Needed for netbuild application.
+; 
+magic_quotes_gpc	=	Off
+
+;
+; Our scripts depend on this!
+;
+register_globals	=	On
+
+;
+; Turn off the feature of php that kills programs after a set execution time
+;
+max_execution_time = 0
+
+;
+; Redirect php errors someplace easier to see
+;
+display_errors		=	Off
+log_errors		=	On
+error_log		=       "@prefix@/log/php-errors.log"
+
+;
+; Starting at some point, PHP5 refuses to trust the system timezone
+; and requires it be set. Otherwise it prints out warnings like crazy.
+; How stupid is this?
+;
+date.timezone		=	@OURTIMEZONE@

@@ -823,6 +823,12 @@ Phase "apache", "Installing apache config file", sub {
     ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install");
 };
 
+Phase "php.ini", "Installing php.ini file", sub {
+    DoneIfEdited($PHP_INI);
+    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install-php-ini");
+    AppendToFileFatal($PHP_INI, "# This file created by Emulab installaton");
+};
+
 Phase "rc.d", "Setting up rc.d scripts", sub {
     Phase "my-client", "Moving $RCDIR/mysql-client.sh", sub {
 	DoneIfDoesntExist("$RCDIR/mysql-client.sh");
@@ -1392,20 +1398,6 @@ Phase "sudoers", "Editing $SUDOERS", sub {
     AppendToFileFatal($SUDOERS,
 		      "%wheel    ALL=(ALL) NOPASSWD: ALL",
 		      "Defaults  logfile=/var/log/sudo.log");
-};
-
-Phase "php.ini", "Creating php.ini file", sub {
-    DoneIfExists($PHP_INI);
-    CreateFileFatal($PHP_INI,
-	"[PHP]","",
-	";",
-	"; So that quotes are not escaped. Needed for netbuild application.",
-	";", 
-	"magic_quotes_gpc        =       Off","",
-	";",
-	"; Our scripts depend on this!",
-	";",
-	"register_globals        =       On");
 };
 
 Phase "ssh", "Setting up root ssh from boss to ops", sub {

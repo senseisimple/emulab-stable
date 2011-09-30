@@ -241,6 +241,7 @@ my $SMBCONF_FILE    = "/usr/local/etc/smb.conf";
 my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
 my $APACHE_ETCDIR   = "/usr/local/etc/apache";
 my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
+my $PHP_INI         = "/usr/local/etc/php.ini";
 my $WWWDIR          = "/usr/local/www/data";
 
 # For installing mysqld
@@ -1160,6 +1161,11 @@ Phase "apache", "Installing apache config file", sub {
     DoneIfEdited("$HTTPD_CONF");
     ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache control-install");
 };
+Phase "php.ini", "Installing php.ini file", sub {
+    DoneIfEdited($PHP_INI);
+    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install-php-ini");
+    AppendToFileFatal($PHP_INI, "# This file created by Emulab installaton");
+};
 Phase "wikidocs", "Installing wikidocs redirect", sub {
     PhaseSkip("wikidocs not supported on ops")
 	if ($FBSD_MAJOR == 4);
@@ -1392,7 +1398,7 @@ if ($BUGDBSUPPORT) {
     my $FLYSPRAYDIR   = "/usr/local/www/data/flyspray";
     my $FLYSPRAYURL   = "http://$OUTER_BOSS/downloads/flyspray-0.9.9.tgz";
     my $FLYSPRAYCONF  = "$ETCDIR/flyspray.conf.php";
-    my $PHPCONFIG     = "/usr/local/etc/php.ini";
+    my $PHPCONFIG     = $PHP_INI;
     my $localtarfile  = "/tmp/flyspray.tgz";
     my $ADODBPATH     = "/usr/local/share/adodb/adodb.inc.php";
 

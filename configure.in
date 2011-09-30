@@ -129,6 +129,7 @@ AC_SUBST(FSDIR_SCRATCH)
 AC_SUBST(FS_WITH_QUOTAS)
 AC_SUBST(TRACK_INTERSWITCH_BANDWIDTH)
 AC_SUBST(TIMESTAMPS)
+AC_SUBST(OURTIMEZONE)
 AC_SUBST(UNIFIED_BOSS_AND_OPS)
 AC_SUBST(DISABLE_NSE)
 AC_SUBST(DISABLE_NAMED_SETUP)
@@ -324,6 +325,7 @@ SELFLOADER_DATA="__DATA__"
 NEEDMROUTED=0
 OPSVM_ENABLE=0
 OPSVM_MOUNTPOINT="/ops"
+OURTIMEZONE="America/Denver"
 
 #
 # XXX You really don't want to change these!
@@ -664,9 +666,17 @@ AC_ARG_WITH(apache-config-dir,
 [
     INSTALL_APACHE_CONFIG="$withval"
 ],[
-    INSTALL_APACHE_CONFIG="/usr/local/etc/apache"
+    foo=`httpd -V | grep SERVER_CONFIG_FILE | grep 'apache2'`
+    if test "$foo" = ""; then
+        INSTALL_APACHE_CONFIG="/usr/local/etc/apache"
+	APACHE_VERSION="1.3"
+    else
+        INSTALL_APACHE_CONFIG="/usr/local/etc/apache22"
+	APACHE_VERSION="22"
+    fi
 ])
 AC_SUBST(INSTALL_APACHE_CONFIG)
+AC_SUBST(APACHE_VERSION)
 
 #
 # Path to garcia installation
@@ -871,6 +881,21 @@ if test "$PROTOGENI_SUPPORT" = "1"; then
 fi
 
 #
+# Determine the timezone (stupidity in PHP5, see apache/php.ini)
+#
+if test -e "$srcdir/utils/gettimezone.pl"; then
+    echo -n "Checking to see what timezone we are ... ";
+    ZONE=`$srcdir/utils/gettimezone.pl`
+    if test $? -ne 0; then
+        AC_MSG_WARN([Cannot find gettimezone script; defaulting to $OURTIMEZONE]);
+    fi
+    OURTIMEZONE=$ZONE
+    echo "$OURTIMEZONE"
+else
+    AC_MSG_WARN([Cannot find gettimezone script; defaulting to $OURTIMEZONE]);
+fi
+
+#
 # Merge build
 #
 MERGE_BUILD=0
@@ -1032,7 +1057,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	$pelabfiles \
-	apache/GNUmakefile apache/httpd.conf \
+	apache/GNUmakefile apache/httpd.conf-v1 apache/httpd.conf-v2 apache/php.ini \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
 	xmlrpc/sslxmlrpc_client.py xmlrpc/sslxmlrpc_server.py \

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2010 University of Utah and the Flux Group.
+# Copyright (c) 2002-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -22,7 +22,18 @@ endif
 
 include $(OBJDIR)/Makeconf
 
-CONFIG_FILES	= httpd.conf httpd.conf-ops
+CONFIG_FILES	= httpd.conf-ops php.ini
+
+#
+# Move to Apache 22 ...
+#
+ifeq ($(APACHE_VERSION),22)
+CONFIG_FILES   += httpd.conf-v2
+SCRIPT_HACK     = 0
+else
+CONFIG_FILES   += httpd.conf-v1
+endif
+INSTALL_PHP_CONFIG = /usr/local/etc
 
 #
 # Force dependencies to make sure configure regenerates if the .in file
@@ -46,8 +57,10 @@ $(INSTALL_APACHE_CONFIG)/%: %
 #
 # XXX ugh, do the same thing to detect php5...
 #
-httpd.conf.fixed: httpd.conf
-	-@cp httpd.conf httpd.conf.fixed
+# Note that ths is not needed for apache22.
+#
+httpd.conf.fixed: httpd.conf-v1
+	-@cp httpd.conf-v1 httpd.conf.fixed
 	@if [ -x /usr/local/libexec/apache/mod_auth_mysql.so ]; then \
             sed -i "" -e '/^LoadModule auth_mysql/s/libauth/mod_auth/' httpd.conf.fixed; \
 	    echo "Updated httpd.conf for auth_mysql"; \
@@ -92,14 +105,22 @@ ifeq ($(SCRIPT_HACK),1)
 	$(INSTALL) -m 755 $(SRCDIR)/apache-emulab /usr/local/etc/rc.d/apache.sh
 endif
 
+ifeq ($(APACHE_VERSION),22)
+install: install-dirs install-scripts httpd.conf-v2
+	$(INSTALL_DATA) httpd.conf-v2 $(INSTALL_APACHE_CONFIG)/httpd.conf
+else
 install: install-dirs install-scripts httpd.conf.fixed
 	$(INSTALL_DATA) httpd.conf.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
-
+endif
 control-install: install-dirs install-scripts httpd.conf-ops.fixed
 	$(INSTALL_DATA) httpd.conf-ops.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
+
+install-php-ini: php.ini
+	$(INSTALL_DATA) php.ini $(INSTALL_PHP_CONFIG)/php.ini
 else
 install-scripts install control-install:
 	@echo "Cannot install Apache config in dev tree"
 endif
 
 clean:
+	rm -f $(CONFIG_FILES) *.fixed php.ini
