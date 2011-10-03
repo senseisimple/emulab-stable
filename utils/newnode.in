@@ -41,8 +41,8 @@ my $exports_setup = "$TB/sbin/exports_setup";
 
 my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
 
-my $feature = EmulabFeatures->Lookup("ScriptNewNodes");
-my $useScriptFeature = defined($feature) && $feature->enabled();
+my $useScriptFeature = EmulabFeatures->FeatureEnabled("ScriptNewNodes", undef,
+						      undef, undef);
 
 #
 # MFS to boot the nodes into initially
