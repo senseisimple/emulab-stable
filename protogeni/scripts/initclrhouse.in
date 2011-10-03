@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -52,6 +52,7 @@ my $MYSQLSHOW     = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP     = "/usr/local/bin/mysqldump";
 my $PKG_INFO      = "/usr/sbin/pkg_info";
 my $FETCH	  = "/usr/bin/fetch";
+my $APACHE_START  = "@APACHE_START_COMMAND@";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';

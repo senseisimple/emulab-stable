@@ -30,6 +30,7 @@ my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $TBBASE        = "@TBBASE@";
 my $WWWBUNDLE	  = "$TB/www/genica.bundle";
 my $BUNDLE	  = "$TB/etc/genica.bundle";
+my $APACHE_START  = "@APACHE_START_COMMAND@";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -77,7 +78,7 @@ if ($?) {
     system("/bin/mv /tmp/cabundle.$$ $BUNDLE") == 0
 	or fatal("Could not copy to $BUNDLE!");
 
-    system("/usr/local/etc/rc.d/apache.sh restart") == 0
+    system("$APACHE_START restart") == 0
 	or fatal("Could not restart apache!");
 }
 
