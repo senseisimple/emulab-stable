@@ -12,7 +12,7 @@ oid_section		= protogeni_oids
 [ protogeni_oids ]
 xmlrpc = 2.25.305821105408246119474742976030998643995
 
+# Modifed for update 5.21
 # This will be appended to by mksyscert.
 [ request_extensions ]
 subjectKeyIdentifier=hash
-subjectAltName=@req_altname

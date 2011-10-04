@@ -218,6 +218,9 @@ system("cp -f $TEMPLATE syscert.cnf") == 0
 open(TEMP, ">>syscert.cnf")
     or fatal("Could not open $TEMPLATE for append: $!");
 
+if (defined($urn)) {
+    print TEMP "subjectAltName=\@req_altname\n";
+}
 print TEMP "basicConstraints=critical,CA:" .
     ( $is_ca ? "TRUE" : "FALSE" ) . "\n\n";
 
@@ -241,10 +244,12 @@ print TEMP "OU\t\t= \"$orgunit\"\n";
 print TEMP "CN\t\t= $uuid\n";
 print TEMP "emailAddress\t= $email\n";
 
-print TEMP "\n";
-print TEMP "[ req_altname ]\n";
-print TEMP "URI=$urn\n" if defined( $urn );
-print TEMP "\n";
+if (defined($urn)) {
+    print TEMP "\n";
+    print TEMP "[ req_altname ]\n";
+    print TEMP "URI=$urn\n";
+    print TEMP "\n";
+}
 
 close(TEMP)
     or fatal("Could not close syscert.cnf: $!");
