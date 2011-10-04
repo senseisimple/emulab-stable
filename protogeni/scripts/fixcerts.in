@@ -27,6 +27,7 @@ my $UPDATECERT	  = "$TB/sbin/protogeni/updatecert";
 my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
 my $REREGISTER    = "$TB/sbin/protogeni/reregister";
 my $REGRESOURCES  = "$TB/sbin/protogeni/register_resources";
+my $PROTOGENI_URL = "@PROTOGENI_URL@";
 my $SUDO	  = "/usr/local/bin/sudo";
 my $FETCH	  = "/usr/bin/fetch";
 my $CMCERT	  = "$TB/etc/genicm.pem";
@@ -43,6 +44,9 @@ sub fatal($)
 
     die("*** $0:\n".
 	"    $msg\n");
+}
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
 }
 
 #
@@ -81,20 +85,20 @@ if (!$asch) {
 # Update our local certs. Certs are updated in place, old one saved. 
 #
 print "Updating $SESCERT\n";
-system("$UPDATECERT $SESCERT") == 0 or
+system("$UPDATECERT -u $PROTOGENI_URL/ses $SESCERT") == 0 or
     fatal("Could not update $SESCERT");
 
 print "Updating $CMCERT\n";
-system("$UPDATECERT $CMCERT") == 0 or
+system("$UPDATECERT -u $PROTOGENI_URL/cm $CMCERT") == 0 or
     fatal("Could not update $CMCERT");
 
 print "Updating $SACERT\n";
-system("$UPDATECERT $SACERT") == 0 or
+system("$UPDATECERT -u $PROTOGENI_URL/sa $SACERT") == 0 or
     fatal("Could not update $SACERT");
 
 if ($asch) {
     print "Updating $CHCERT\n";
-    system("$UPDATECERT $CHCERT") == 0 or
+    system("$UPDATECERT -u $PROTOGENI_URL/ch $CHCERT") == 0 or
 	fatal("Could not update $CHCERT");
 
     system("$ADDAUTHORITY -f -c $CHCERT ma") == 0
