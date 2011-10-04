@@ -1,6 +1,6 @@
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -125,11 +125,33 @@ for opt, arg in opts:
 
 cert = X509.load_cert( CERTIFICATE )
 
-# XMLRPC server: use www.emulab.net for the clearinghouse, and
-# the issuer of the certificate we'll identify with for everything else
-XMLRPC_SERVER   = { "ch" : "www.emulab.net",
-                    "default" : cert.get_issuer().CN }
-SERVER_PATH     = { "default" : ":443/protogeni/xmlrpc/" }
+# XMLRPC server: use www.emulab.net for the clearinghouse.
+XMLRPC_SERVER   = { "ch" : "www.emulab.net" }
+
+try:
+    extension = cert.get_ext("authorityInfoAccess")
+    val = extension.get_value()
+    if val.find('URI:') > 0:
+        url = val[val.find('URI:')+4:]
+	url = url.rstrip()
+	# strip trailing sa
+	if url.endswith('/sa') > 0:
+	    url = url[:-2]
+    	    pass
+	scheme, netloc, path, query, fragment = urlsplit(url)
+        host,port = splitport(netloc)
+	XMLRPC_SERVER["default"] = host
+        if port:
+	    path = ":" + port + path
+            pass
+        SERVER_PATH = { "default" : path }
+except LookupError, err:
+    pass
+
+if "default" not in XMLRPC_SERVER:
+    XMLRPC_SERVER["default"] = cert.get_issuer().CN
+    SERVER_PATH = { "default" : ":443/protogeni/xmlrpc/" }
+pass
 
 if os.path.exists( GLOBALCONF ):
     execfile( GLOBALCONF )
