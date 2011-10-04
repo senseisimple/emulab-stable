@@ -27,7 +27,6 @@ my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
-my $TBBASE        = "@TBBASE@";
 my $WWWBUNDLE	  = "$TB/www/genica.bundle";
 my $BUNDLE	  = "$TB/etc/genica.bundle";
 my $APACHE_START  = "@APACHE_START_COMMAND@";

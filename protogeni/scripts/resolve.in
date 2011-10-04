@@ -69,9 +69,9 @@ if (!defined($certificate)) {
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
-my $component = GeniComponent->Lookup($urn);
+my $component = GeniComponent->CreateFromRegistry($urn);
 if (!defined($component)) {
-    $component = GeniComponent->CreateFromRegistry($urn);
+    fatal("Could not create local component object");
 }
 my $blob = $component->Resolve();
 if (!defined($blob)) {
