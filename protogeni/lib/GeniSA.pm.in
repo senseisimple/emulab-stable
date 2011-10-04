@@ -43,6 +43,7 @@ my $MAINSITE 	   = @TBMAINSITE@;
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $SLICESHUTDOWN  = "$TB/sbin/protogeni/shutdownslice";
+my $PROTOGENI_URL  = "@PROTOGENI_URL@";
 my $RegisterNow    = 0;
 my $API_VERSION    = 1.01;
 
@@ -306,7 +307,7 @@ sub Resolve($)
 		    my $pid = $project->pid();
 		    my $urn = GeniHRN::Generate("$OURDOMAIN:$pid",
 						"authority", "sa");
-		    my $url = "@TBBASE@/protogeni/xmlrpc/project/$pid/sa";
+		    my $url = "$PROTOGENI_URL/project/$pid/sa";
 		    $subsas{$urn} = $url;
 		}
 		$blob->{'subauthorities'} = \%subsas;
