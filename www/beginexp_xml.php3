@@ -64,6 +64,7 @@ $uid = $this_user->uid();
 
 # Need this below;
 $idleswaptimeout = TBGetSiteVar("idle/threshold");
+$autoswap_max    = TBGetSiteVar("general/autoswap_max");
 
 # Convert the xml into PHP datatypes; an array of arguments. We ignore the
 # the method for now. 
@@ -274,8 +275,8 @@ else {
 	$errors["Max. Duration"] = "No or invalid time provided";
     }
     # The user can override autoswap timeout, but limit unless an admin.
-    if ($formfields["exp_autoswap_timeout"] > 24 * 5 && !ISADMIN()) {
-	$errors["Max. Duration"] = "5 days maximum - ".
+    if ($formfields["exp_autoswap_timeout"] > $autoswap_max && !ISADMIN()) {
+	$errors["Max. Duration"] = "$autoswap_max hours maximum - ".
 	    "you must ask testbed operations for more";
     }
 }

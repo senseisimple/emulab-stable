@@ -17,6 +17,7 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 $idleswaptimeout = TBGetSiteVar("idle/threshold");
+$autoswap_max    = TBGetSiteVar("general/autoswap_max");
 
 #
 # Verify page arguments.
@@ -43,6 +44,7 @@ function SPITFORM($experiment, $formfields, $errors)
 {
     global $isadmin, $TBDOCBASE, $linktest_levels, $EXPOSELINKTEST;
     global $WIKIDOCURL, $TBMAILADDR;
+    global $autoswap_max;
 
     #
     # Standard Testbed Header
@@ -310,7 +312,7 @@ function SPITFORM($experiment, $formfields, $errors)
             <ol type=1 start=1>
 	     <li> You may not turn off Maximum Duration, but you are allowed
                   to change the
-                  the number of hours, up to five days (5 * 24 hours).
+                  the number of hours, up to $autoswap_max hours.
                   Contact " . $TBMAILADDR . " if you need more time.
              </li>
             </ol>

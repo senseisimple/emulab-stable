@@ -390,13 +390,14 @@ if (exists($editexp_args{"autoswap"})) {
 	$editexp_args{"autoswap"} = 0;
     }
 }
+my $autoswap_max = TBGetSiteVar("general/autoswap_max");
 if (exists($editexp_args{"autoswap_timeout"})) {
     if ($editexp_args{"autoswap_timeout"} <= 0) {
 	UserError("Max Duration: Invalid time provided");
     }
-    if ($editexp_args{"autoswap_timeout"} > (24 * 5) &&
+    if ($editexp_args{"autoswap_timeout"} > $autoswap_max &&
 	!$this_user->IsAdmin()) {
-	UserError("Max Duration: 5 days maximum - ".
+	UserError("Max Duration: $autoswap_max hours maximum - ".
 		  "you must ask testbed operations for more");
     }
 }

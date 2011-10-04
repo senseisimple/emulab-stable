@@ -1,0 +1,20 @@
+#
+# Add sitevar to control how long the user is allowed to the autoswap
+# out field to
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 " ('general/autoswap_max',NULL,'120', ".
+		 "  'Maximum number of hours for the ".
+		 "experiment autoswap limit.', 0)")
+	if (!TBSiteVarExists("idle/autoswap_max"));
+
+    return 0;
+}
+1;
