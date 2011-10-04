@@ -287,6 +287,7 @@ handle_loadinfo()
 
 	local ACPI=`get_value "$LOADINFO" ACPI`
 	local ASF=`get_value "$LOADINFO" ASF`
+	local NOCLFLUSH=`get_value "$LOADINFO" NOCLFLUSH`
 	local MBR=`get_value "$LOADINFO" MBRVERS`
 	local PREPARE=`get_value "$LOADINFO" PREPARE`
 	local PTYPE=''
@@ -395,6 +396,7 @@ handle_loadinfo()
 	echo "Adjusting slice-related files"
 	export SLICEFIX_ACPI=$ACPI
 	export SLICEFIX_ASF=$ASF
+	export SLICEFIX_NOCLFLUSH=$NOCLFLUSH
 	$BINDIR/slicefix $PARTITION $FREEBSD_DISK
 	echo "Image load complete at `date`"
 }

@@ -153,6 +153,7 @@ loadone() {
     ZFILL=""
     ACPI=""
     ASF=""
+    NOCLFLUSH=""
     MBRVERS=""
     PREPARE=""
     IMAGEID=""
@@ -165,6 +166,7 @@ loadone() {
 	DISK=*|\
 	ZFILL=*|\
 	ACPI=*|\
+	NOCLFLUSH=*|\
 	MBRVERS=*|\
 	ASF=*|\
 	PREPARE=*|\
@@ -188,6 +190,7 @@ loadone() {
     ZFILL=${ZFILL:-'0'}
     ACPI=${ACPI:-'unknown'}
     ASF=${ASF:-'unknown'}
+    NOCLFLUSH=${NOCLFLUSH:-'unknown'}
     MBRVERS=${MBRVERS:-'1'}
     PREPARE=${PREPARE:-'0'}
 
@@ -424,6 +427,7 @@ loadone() {
 	echo "Adjusting slice-related files"
 	export SLICEFIX_ACPI=$ACPI
 	export SLICEFIX_ASF=$ASF
+	export SLICEFIX_NOCLFLUSH=$NOCLFLUSH
 	$BINDIR/slicefix $PART $DISK
 	echo "Image #$_NUM load complete at `date`"
 	return 0

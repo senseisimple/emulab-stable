@@ -4477,7 +4477,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 	MYSQL_ROW	row, row2;
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
-	char		*disktype, *useacpi, *useasf, address[MYBUFSIZE];
+	char		*disktype, *useacpi, *useasf, *noclflush;
+	char		address[MYBUFSIZE];
 	char            server_address[MYBUFSIZE];
 	char		mbrvers[51];
 	char            *loadpart, *OS, *prepare;
@@ -4663,6 +4664,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 		disknum = DISKNUM;
 		useacpi = "unknown";
 		useasf = "unknown";
+		noclflush = "unknown";
 
 		res2 = mydb_query("select a.attrkey,a.attrvalue,na.attrvalue "
 				  "from nodes as n "
@@ -4674,7 +4676,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 				  "where (a.attrkey='bootdisk_unit' or "
 				  "       a.attrkey='disktype' or "
 				  "       a.attrkey='use_acpi' or "
-				  "       a.attrkey='use_asf') and "
+				  "       a.attrkey='use_asf' or "
+				  "       a.attrkey='no_clflush') and "
 				  "      n.node_id='%s'", 3, reqp->nodeid);
 
 		if (!res2) {
@@ -4712,6 +4715,9 @@ COMMAND_PROTOTYPE(doloadinfo)
 					else if (strcmp(row2[0], "use_asf") == 0) {
 						useasf = attrstr;
 					}
+					else if (strcmp(row2[0], "no_clflush") == 0) {
+						noclflush = attrstr;
+					}
 				}
 				nrows2--;
 			}
@@ -4720,8 +4726,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 		mysql_free_result(res2);
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
-			       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%s ASF=%s PREPARE=%s",
-			       disktype, disknum, zfill, useacpi, mbrvers, useasf, prepare);
+			       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%s ASF=%s PREPARE=%s NOCLFLUSH=%s",
+			       disktype, disknum, zfill, useacpi, mbrvers, useasf, prepare, noclflush);
 
 		/*
 		 * Vnodes (and post v32 local nodes) get additional image

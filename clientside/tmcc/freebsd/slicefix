@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -30,7 +30,7 @@ esac
 
 #
 # Handle pseudo arguments in the environment.
-#   
+#
 ACPI=${SLICEFIX_ACPI:-'unknown'}
 case $ACPI in
 0|no|NO)
@@ -54,6 +54,19 @@ case $ASF in
     ;;
 *)
     ASF=unknown
+    ;;
+esac
+
+NOCLFLUSH=${SLICEFIX_NOCLFLUSH:-'unknown'}
+case $NOCLFLUSH in
+0|no|NO)
+    NOCLFLUSH=0
+    ;;
+1|yes|YES)
+    NOCLFLUSH=1
+    ;;
+*)
+    NOCLFLUSH=unknown
     ;;
 esac
 
@@ -134,6 +147,7 @@ dofreebsd() {
 	changeentropy=0
 	changeacpi=0
 	changeasf=0
+	changeclflush=0
 
 	fixit=0
 
@@ -226,6 +240,10 @@ dofreebsd() {
 	    esac
 	fi
 
+	if [ $NOCLFLUSH != "unknown" ]; then
+	    fixit=1
+	fi
+
         # check to see if we need to download any postconfig scripts:
 	doosconfig=0
 	if [ -x $BINDIR/osconfig ]; then
@@ -261,13 +279,13 @@ dofreebsd() {
 
 	if [ $changedisk -eq 1 ]; then
 	    echo "  updating /etc/fstab"
-	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/fstab || {
+	    sed -E -i .preemulab -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
 	    }
 	    echo "  updating /etc/dumpdates"
-	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/dumpdates || {
+	    sed -E -i .preemulab -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/dumpdates || {
 		echo "Failed to update /etc/dumpdates"
 		umount $rootdev
 		return 1
@@ -279,6 +297,7 @@ dofreebsd() {
 	    dd if=/dev/random of=/mnt/entropy bs=4096 count=1 >/dev/null 2>&1
 	fi
 
+	lcbak=".preemulab"
 	if [ $changeacpi -eq 1 ]; then
 	    if [ $ACPI = "no" ]; then
 		on="dis"
@@ -286,11 +305,12 @@ dofreebsd() {
 		on="en"
 	    fi
 	    echo "  ${on}abling ACPI"
-	    sed -E -i .orig -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
+	    sed -E -i $lcbak -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
 		echo "Failed to update /boot/loader.conf"
 		umount $rootdev
 		return 1
 	    }
+	    lcbak=""
 	    if [ $ACPI = "no" ]; then
 		cat <<EOF1 >>/mnt/boot/loader.conf
 # disable ACPI
@@ -314,11 +334,12 @@ EOF2
 		on="en"
 	    fi
 	    echo "  ${on}abling ASF"
-	    sed -E -i .orig -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
+	    sed -E -i $lcbak -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
 		echo "Failed to update /boot/loader.conf"
 		umount $rootdev
 		return 1
 	    }
+	    lcbak=""
 	    if [ $ASF = "no" ]; then
 		cat <<EOF1 >>/mnt/boot/loader.conf
 # disable ASF
@@ -330,6 +351,29 @@ EOF1
 hw.bge.allow_asf=1
 EOF2
 	    fi
+	fi
+
+	#
+	# See if we need to change the use of NOCLFLUSH.
+	# If explicitly specified, we override any previous setting.
+	#
+	if [ $NOCLFLUSH != "unknown" ]; then
+	    if [ $NOCLFLUSH = "1" ]; then
+		on="dis"
+	    else
+		on="en"
+	    fi
+	    echo "  ${on}abling use of CLFLUSH"
+	    sed -E -i $lcbak -e "/clflush_disable/d" /mnt/boot/loader.conf || {
+		echo "Failed to update /boot/loader.conf"
+		umount $rootdev
+		return 1
+	    }
+	    lcbak=""
+	    cat <<EOF1 >>/mnt/boot/loader.conf
+# ${on}able CLFLUSH (hw.clflush_disable)
+hw.clflush_disable=$NOCLFLUSH
+EOF1
 	fi
 
 	# actually run any postconfig scripts if we're supposed to:
@@ -428,7 +472,7 @@ dolinux() {
 	fi
 
 	# change the swap devices in fstab
-	sed -i .orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${ldisk}\1;" /mnt/etc/fstab || {
+	sed -i .preemulab -e "s;^/dev/[hs]d.\([0-7]\);/dev/${ldisk}\1;" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
@@ -446,7 +490,7 @@ dolinux() {
 	fi
 	if [ -r $gconf ]; then
 	    echo "  updating $fgconf"
-	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $gconf || {
+	    sed -i .preemulab -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $gconf || {
 		echo "Failed to update $fgconf"
 	    }
 
@@ -477,7 +521,7 @@ dolinux() {
 	lconf=/mnt/etc/lilo.conf
 	if [ -r $lconf ]; then
 	    echo "  updating /etc/lilo.conf"
-	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $lconf || {
+	    sed -i .preemulab -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $lconf || {
 		    echo "Failed to update /etc/lilo.conf"
 		    umount $rootdev
 		    return 1
