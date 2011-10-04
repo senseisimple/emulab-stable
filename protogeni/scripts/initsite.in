@@ -30,7 +30,8 @@ my $TBLOGS        = "@TBLOGSEMAIL@";
 my $OURDOMAIN     = "@OURDOMAIN@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
-my $TBBASE        = "@TBBASE@";
+my $PROTOGENI_RPCNAME = "@PROTOGENI_RPCNAME@";
+my $PROTOGENI_URL = "@PROTOGENI_URL@";
 my $geniuserid    = "geniuser";
 my $geniprojid    = "GeniSlices";
 my $PROTOUSER	  = "elabman";
@@ -51,6 +52,7 @@ my $SACERT	  = "$TB/etc/genisa.pem";
 my $CMCERT	  = "$TB/etc/genicm.pem";
 my $CHCERT	  = "$TB/etc/genich.pem";
 my $SESCERT	  = "$TB/etc/genises.pem";
+my $RPCCERT	  = "$TB/etc/genirpc.pem";
 my $SUDO	  = "/usr/local/bin/sudo";
 my $MYSQL         = "/usr/local/bin/mysql";
 my $MYSQLADMIN    = "/usr/local/bin/mysqladmin";
@@ -479,7 +481,7 @@ require GeniRegistry;
 if (! -e $CMCERT) {
     print "Creating CM certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $CMCERT ".
-	   "  -u $TBBASE/protogeni/xmlrpc/cm " .
+	   "  -u $PROTOGENI_URL/cm " .
 	   "  -i urn:publicid:IDN+${OURDOMAIN}+authority+cm " .
 	   "$PGENIDOMAIN.cm") == 0
 	   or fatal("Could not generate $CMCERT");
@@ -487,7 +489,7 @@ if (! -e $CMCERT) {
 if (! -e $SACERT) {
     print "Creating SA certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $SACERT ".
-	   "  -u $TBBASE/protogeni/xmlrpc/sa " .
+	   "  -u $PROTOGENI_URL/sa " .
 	   "  -i urn:publicid:IDN+${OURDOMAIN}+authority+sa " .
 	   "$PGENIDOMAIN.sa") == 0
 	   or fatal("Could not generate $SACERT");
@@ -495,21 +497,27 @@ if (! -e $SACERT) {
 if (! -e $SESCERT) {
     print "Creating SES certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $SESCERT ".
-	   "  -u $TBBASE/protogeni/xmlrpc/ses " .
+	   "  -u $PROTOGENI_URL/ses " .
 	   "  -i urn:publicid:IDN+${OURDOMAIN}+authority+ses " .
 	   "$PGENIDOMAIN.ses") == 0
+	   or fatal("Could not generate $SESCERT");
+}
+if (! -e $RPCCERT) {
+    print "Creating RPC server certificate ...\n";
+    system("$SUDO -u $PROTOUSER $MKSYSCERT -o $RPCCERT ".
+	   "'ProtoGENI RPC Server' $PROTOGENI_RPCNAME") == 0
 	   or fatal("Could not generate $SESCERT");
 }
 if ($asch) {
     if (! -e $CHCERT) {
 	print "Creating CH certificate ...\n";
 	system("$SUDO -u $PROTOUSER $MKSYSCERT -o $CHCERT ".
-	       "  -u $TBBASE/protogeni/xmlrpc/ch " .
+	       "  -u $PROTOGENI_URL/ch " .
 	       "  -i urn:publicid:IDN+${OURDOMAIN}+authority+ch " .
 	       "$PGENIDOMAIN.ch") == 0
 	       or fatal("Could not generate $CHCERT");
     }
-    UpdateCert( $CHCERT, "$TBBASE/protogeni/xmlrpc/ch",
+    UpdateCert( $CHCERT, "$PROTOGENI_URL/ch",
 		"urn:publicid:IDN+${OURDOMAIN}+authority+ch",
 		"$PGENIDOMAIN.ch" );
     #
@@ -546,13 +554,13 @@ else {
 #
 # Update obsolete (pre-URN) certificates.
 #
-UpdateCert( $CMCERT, "$TBBASE/protogeni/xmlrpc/cm",
+UpdateCert( $CMCERT, "$PROTOGENI_URL/cm",
 	    "urn:publicid:IDN+${OURDOMAIN}+authority+cm",
 	    "$PGENIDOMAIN.cm" );
-UpdateCert( $SACERT, "$TBBASE/protogeni/xmlrpc/sa",
+UpdateCert( $SACERT, "$PROTOGENI_URL/sa",
 	    "urn:publicid:IDN+${OURDOMAIN}+authority+sa",
 	    "$PGENIDOMAIN.sa" );
-UpdateCert( $SESCERT, "$TBBASE/protogeni/xmlrpc/ses",
+UpdateCert( $SESCERT, "$PROTOGENI_URL/ses",
 	    "urn:publicid:IDN+${OURDOMAIN}+authority+ses",
 	    "$PGENIDOMAIN.ses" );
 
