@@ -35,9 +35,12 @@ SUBDIRS = \
 	db assign www @optional_subdirs@ clientside ipod security sensors \
 	pxe tbsetup account tmcd utils backend tip capture ipod vis \
 	sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-	tools/svn wiki bugdb collab protogeni node_usage install
+	tools/svn wiki bugdb collab node_usage install
 ifeq ($(ISMAINSITE),1)
 SUBDIRS += tools/rmanage
+endif
+ifeq ($(PGENISUPPORT),1)
+SUBDIRS = protogeni
 endif
 else
 SUBDIRS = db tbsetup account protogeni
