@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2010 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -15,14 +15,16 @@ use vars qw(@EXPORT $TOP_OBJDIR $TOP_SRCDIR
 	    $PORTSDIR $VARRUN $RCDIR $MYSQL $DBNAME
 	    $PROJROOT $PROTOUSER $WAP
 	    $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION
-	    $HAVE_XERCES);
+	    $HAVE_XERCES $PROTOGENI_RPCNAME
+	    $INSTALL_APACHE_CONFIG $APACHE_VERSION $APACHE_START_COMMAND);
 
 @EXPORT = qw($TOP_OBJDIR $TOP_SRCDIR
 	     $TBROOT $LOGDIR $MAINSITE $PGENISUPPORT $GMAKE $PKG_INFO
 	     $PORTSDIR $VARRUN $RCDIR $MYSQL $DBNAME
 	     $PROJROOT $PROTOUSER $WAP
 	     $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION
-	     $HAVE_XERCES);
+	     $HAVE_XERCES $PROTOGENI_RPCNAME
+	     $INSTALL_APACHE_CONFIG $APACHE_VERSION $APACHE_START_COMMAND);
 
 # Configure variables
 
@@ -43,6 +45,11 @@ $PROTOUSER     = "elabman";
 $DBNAME        = "@TBDBNAME@";
 $MYSQL         = "/usr/local/bin/mysql";
 $HAVE_XERCES   = "@HAVE_XERCES@";
+
+$INSTALL_APACHE_CONFIG = "@INSTALL_APACHE_CONFIG@";
+$APACHE_VERSION        = "@APACHE_VERSION@";
+$APACHE_START_COMMAND  = "@APACHE_START_COMMAND@";
+$PROTOGENI_RPCNAME     = "@PROTOGENI_RPCNAME@";
 
 # Change these if the major numbers in sql/updates or install/updates
 # are changed.
