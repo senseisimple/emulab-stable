@@ -185,6 +185,7 @@ sub Create($$;$)
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'COMPONENT'}->{$_[1]}); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub expires($)		{ return field($_[0], "expires"); }
+sub created($)		{ return field($_[0], "created"); }
 sub manager_uuid($)	{ return field($_[0], "manager_uuid"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub url($)		{ return field($_[0], "url"); }
@@ -198,14 +199,18 @@ sub GetManager($)       { return $_[0]->{'MANAGER'}; }
 sub IsExpired($)
 {
     my ($self)  = @_;
-    my $expires = $self->expires();
+    my $created = $self->created();
+
+    #
+    # We are not storing an expires field yet, so lets just age things
+    # out periodically.
+    #
+    return 1
+	if (!defined($created) || $created eq "");
 
     return 1
-	if (!defined($expires) || $expires eq "");
-    
-    my $when = strptime($expires);
-
-    return ($when < time());
+	if (str2time($created) < (time() - (14 * 24 * 3600)));
+    return 0;
 }
 
 #
@@ -315,10 +320,19 @@ sub CreateFromRegistry($$)
 
     my $component = GeniComponent->Lookup($token);
     # We want to reload if urn/uuid not set properly
-    return $component
-	if (defined($component) &&
-	    $component->urn() && $component->manager_uuid());
-
+    if (defined($component)) {
+	#
+	# Check for expiration. 
+	#
+	if (!($component->urn() && $component->manager_uuid()) ||
+	    $component->IsExpired()) {
+	    print STDERR "Aging out stale or expired $component ...\n";
+	    $component->Delete();
+	    $component = undef;
+	}
+	return $component
+	    if (defined($component));
+    }
     my $registry = GeniRegistry->Create($token);
     return undef
 	if (!defined($registry));

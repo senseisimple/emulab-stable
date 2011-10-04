@@ -38,6 +38,7 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
+my $PROTOGENI_URL  = "@PROTOGENI_URL@";
 
 # Cache of instances to avoid regenerating them.
 my %authorities    = ();
@@ -73,7 +74,7 @@ sub Lookup($$)
 		my $project = Project->Lookup($pid);
 		return undef if (!defined($project));
 
-		my $url = "@TBBASE@/protogeni/xmlrpc/project/$pid/$id";
+		my $url = "$PROTOGENI_URL/project/$pid/$id";
 
 		my $cert = GeniCertificate->Create(
 		    { "urn" => GeniHRN::Generate( "@OURDOMAIN@:$pid",
@@ -201,6 +202,7 @@ sub Create($$$$)
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AUTHORITY'}->{$_[1]}); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub expires($)		{ return field($_[0], "expires"); }
+sub created($)		{ return field($_[0], "created"); }
 sub uuid_prefix($)	{ return field($_[0], "uuid_prefix"); }
 sub urn($)		{ return field($_[0], "urn"); }
 sub url($)		{ return field($_[0], "url"); }
@@ -224,14 +226,18 @@ sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 sub IsExpired($)
 {
     my ($self)  = @_;
-    my $expires = $self->expires();
+    my $created = $self->created();
+
+    #
+    # We are not storing an expires field yet, so lets just age things
+    # out periodically.
+    #
+    return 1
+	if (!defined($created) || $created eq "");
 
     return 1
-	if (!defined($expires) || $expires eq "");
-    
-    my $when = strptime($expires);
-
-    return ($when < time());
+	if (str2time($created) < (time() - (14 * 24 * 3600)));
+    return 0;
 }
 
 #
@@ -306,9 +312,18 @@ sub CreateFromRegistry($$$)
     my ($class, $type, $name) = @_;
 
     my $authority = GeniAuthority->Lookup($name);
-    return $authority
-	if (defined($authority) && $authority->urn());
-
+    if (defined($authority)) {
+	#
+	# Check for expiration.
+	#
+	if (!$authority->urn() || $authority->IsExpired()) {
+	    print STDERR "Aged out stale or expired $authority ...\n";
+	    $authority->Delete();
+	    $authority = undef;
+	}
+	return $authority
+	    if (defined($authority));
+    }
     my $clearinghouse = GeniRegistry::ClearingHouse->Create();
     return undef
 	if (!defined($clearinghouse));
