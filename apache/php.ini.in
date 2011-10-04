@@ -1,4 +1,5 @@
 [PHP]
+; Added for update 5.21
 
 ;
 ; So that quotes are not escaped. Needed for netbuild application.
