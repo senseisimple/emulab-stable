@@ -13,13 +13,14 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-o output_file] <certfile>\n";
+    print STDERR "Usage: $0 [-o output_file] [-u url] <certfile>\n";
     exit(-1);
 }
-my $optlist = "i:o:";
+my $optlist = "i:o:u:";
 my $ascm    = 0;
 my $outfile;
 my $tmpfile;
+my $url;
 
 # Configure ...
 my $TB		  = "@prefix@";
@@ -54,6 +55,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"o"})) {
     $outfile = 1;
 }
+if (defined($options{"u"})) {
+    $url = $options{"u"};
+}
 usage()
     if (@ARGV != 1);
 my $infile = $ARGV[0];
@@ -75,9 +79,9 @@ my $keyfile = $certificate->WriteKeyToFile() or
 
 my $urn  = $certificate->urn();
 my $uuid = $certificate->uuid();
-my $url  = $certificate->URL();
 my $hrn  = $certificate->hrn();
 my $arg  = "-o ";
+$url  = $certificate->URL() if (!defined($url));
 
 if (defined($outfile)) {
     $arg .= $outfile;
