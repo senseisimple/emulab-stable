@@ -819,6 +819,9 @@ REMOTEWIKIDOCS
 PROTOGENI_SUPPORT
 PROTOGENI_CLEARINGHOUSE
 PROTOGENI_DOMAIN
+PROTOGENI_RPCPORT
+PROTOGENI_RPCNAME
+PROTOGENI_URL
 STANDALONE_CLEARINGHOUSE
 GMAP_API_KEY
 NODE_USAGE_SUPPORT
@@ -4958,6 +4961,9 @@ done
 
 
 
+
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -5044,6 +5050,9 @@ REMOTEWIKIDOCS=1
 PROTOGENI_SUPPORT=0
 PROTOGENI_CLEARINGHOUSE=0
 PROTOGENI_DOMAIN="unknown"
+# Will default to standard https port and host
+PROTOGENI_RPCPORT=""
+PROTOGENI_RPCNAME=""
 STANDALONE_CLEARINGHOUSE=0
 NODE_USAGE_SUPPORT=0
 EXP_VIS_SUPPORT=0
@@ -7164,6 +7173,19 @@ $as_echo "$as_me: WARNING: protogeni/rspec-geni submodule not intialized yet" >&
 	echo "Then rerun configure in your object tree"
 	exit 1;
    fi
+fi
+
+#
+# Set the Protogeni URL, which depends on the the port and name.
+#
+if test -z "$PROTOGENI_RPCNAME"; then
+    PROTOGENI_RPCNAME=$WWW
+fi
+
+if test -z "$PROTOGENI_RPCPORT"; then
+    PROTOGENI_URL="https://$PROTOGENI_RPCNAME/protogeni/xmlrpc"
+else
+    PROTOGENI_URL="https://$PROTOGENI_RPCNAME:$PROTOGENI_RPCPORT/protogeni/xmlrpc"
 fi
 
 #
