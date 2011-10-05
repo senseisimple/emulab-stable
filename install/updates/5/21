@@ -1,0 +1,94 @@
+#
+#
+use strict;
+use libinstall;
+use emutil;
+
+my $SSL_USERCONF    = "$TBROOT/lib/ssl/usercert.cnf";
+my $SSL_SYSCONF     = "$TBROOT/lib/ssl/syscert.cnf";
+my $APACHECONF      = "$INSTALL_APACHE_CONFIG/httpd.conf";
+my $APACHESTART     = $APACHE_START_COMMAND;
+my $PHP_INIT        = "/usr/local/etc/php.ini";
+my $RPCCERT	    = "$TBROOT/etc/genirpc.pem";
+my $SUDO            = "/usr/local/bin/sudo";
+my $MKSYSCERT       = "$TBROOT/sbin/mksyscert";
+my $FIXCERTS	    = "$TBROOT/sbin/protogeni/fixcerts";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "ssl.cnf", "Updating ssl usercert/syscert config file", sub {
+	    PhaseSkip("Already updated")
+		if (`grep 'Modified for update 5.21' $SSL_USERCONF` &&
+		    `grep 'Modified for update 5.21' $SSL_SYSCONF`);
+
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl usercert.cnf syscert.cnf");
+
+	    BackUpFileFatal($SSL_USERCONF);
+	    BackUpFileFatal($SSL_SYSCONF);
+
+	    # For impotent mode. 
+	    DiffFiles("$TOP_OBJDIR/ssl/usercert.cnf", $SSL_USERCONF);
+	    DiffFiles("$TOP_OBJDIR/ssl/syscert.cnf", $SSL_SYSCONF);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl install-conf");
+	};
+	Phase "php.ini", "Updating php init config file", sub {
+	    PhaseSkip("Already updated")
+		if (`grep 'Added for update 5.21' $PHP_INIT`);
+
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache php.ini");
+
+	    BackUpFileFatal($PHP_INIT);
+	    # For impotent mode. 
+	    DiffFiles("$TOP_OBJDIR/apache/php.ini", $PHP_INIT);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install-php-ini");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+	if ($PGENISUPPORT) {
+	    Phase "genicerts", "Updating Protogeni certificates", sub {
+		my $update = emutil::VersionInfo("protogeni_fixcerts");
+		PhaseSkip("Already updated")
+		    if (defined($update) && !$update);
+		ExecQuietFatal("$FIXCERTS -n");
+		emutil::UpdateVersionInfo("protogeni_fixcerts", "0");
+		emutil::UpdateVersionInfo("protogeni_reregister", "1");
+	    };
+	    Phase "genirpc", "Creating certificate for Protogeni server", sub {
+		DoneIfExists($RPCCERT);
+		ExecQuietFatal("$SUDO -u $PROTOUSER $MKSYSCERT -o $RPCCERT ".
+			       "'ProtoGENI RPC Server' $PROTOGENI_RPCNAME");
+	    };
+	    Phase "httpd.conf", "Updating apache config file", sub {
+		#
+		# This might be a rare case.
+		#
+		my $srcfile = ("$APACHE_VERSION" eq "22"
+			       ? "httpd.conf-v2" : "httpd.conf-v1");
+
+		DoneIfIdentical("$TOP_OBJDIR/apache/$srcfile", $APACHECONF);
+
+		PhaseSkip("Already updated")
+		    if (`grep 'Added for update 5.21' $APACHECONF`);
+		
+		BackUpFileFatal($APACHECONF);
+		ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install");
+	    };
+	    Phase "httpd", "Restarting apache", sub {
+		DoneIfDoesntExist("$VARRUN/httpd.pid");
+		ExecQuietFatal("$APACHESTART restart");
+	    };
+	}
+    }
+    return 0;
+}
+1;
