@@ -191,8 +191,7 @@ sub ListResources()
 	if (! defined($version)) {
 	    $pgversion = "0.2";
 	} elsif (defined($version->{'type'}) &&
-		 ($version->{'type'} eq "ProtoGENI" ||
-		  $version->{'type'} eq "protogeni")) {
+		 lc($version->{'type'}) eq "protogeni") {
 	    $pgversion = $version->{'version'};
 	} else {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
