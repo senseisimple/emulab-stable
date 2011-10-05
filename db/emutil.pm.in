@@ -14,7 +14,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter SelfLoader);
 @EXPORT = qw(TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
 	     TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
-	     TBGetUniqueIndex ParRun VersionInfo);
+	     TBGetUniqueIndex ParRun VersionInfo UpdateVersionInfo);
 
 use emdb;
 use English;
@@ -477,6 +477,21 @@ sub VersionInfo($)
 
     my ($value) = $query_result->fetchrow_array();
     return $value;
+}
+
+#
+# Version Info
+#
+sub UpdateVersionInfo($$)
+{
+    my ($name, $value) = @_;
+    my $safe_name  = DBQuoteSpecial($name);
+    my $safe_value = DBQuoteSpecial($value);
+
+    return -1
+	if (!DBQueryWarn("replace into version_info set ".
+			 "  name=$safe_name, value=$safe_value"));
+    return 0;
 }
 
 #
