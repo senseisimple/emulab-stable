@@ -4,7 +4,7 @@
 # Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
-package libvtop_test;
+package libvtop_stable;
 
 use strict;
 use Exporter;
@@ -727,7 +727,7 @@ sub doesimplement($$)
 #############################################################################
 # Back to the main package.
 #
-package libvtop_test;
+package libvtop_stable;
 
 #
 # Load some physical info (for types, interfaces, speeds).
