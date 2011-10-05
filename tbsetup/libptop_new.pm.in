@@ -1028,7 +1028,7 @@ sub calculateWillPrint($;$)
     # In geni mode, disallow nodes tagged protogeni_exclude from being printed.
     my $geniExclude = 0;
     $node->NodeAttribute("protogeni_exclude", \$geniExclude);
-    my $geniok = (! defined($geniExclude) || $geniExclude == 0);
+    my $geniok = (! defined($geniExclude) || ! $geniExclude);
     my $result = 
 	(! $available_only || $self->available())
 	&& (! $genimode || $geniok)
