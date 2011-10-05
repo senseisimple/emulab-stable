@@ -49,7 +49,7 @@ sub usage ()
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
     print STDERR " -l   - Use rspec v2 instead of the text file format\n";
-    print STDERR " -z   - Force new ptopgen\n";
+#    print STDERR " -z   - Force new ptopgen\n";
     print STDERR " -Z   - Force old ptopgen\n";
     print STDERR " -A   - Tell ptopgen all nodes are free; only with -n\n";
     exit($WRAPPER_FAILED);
@@ -212,8 +212,8 @@ if (defined($options{"Z"})) {
     $use_old_ptopgen = 1;
 }
 if (defined($options{"z"})) {
-    $use_old_ptopgen = 0;
-    $PTOPGEN = $PTOPGEN_NEW;
+#    $use_old_ptopgen = 0;
+#    $PTOPGEN = $PTOPGEN_NEW;
 }
 if ($allnodesfree && !$impotent) {
     fatal("Not allowed to use -A without -n (impotent) option");
