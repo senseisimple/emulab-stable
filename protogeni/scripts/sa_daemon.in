@@ -33,7 +33,16 @@ my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
 my $LOGFILE       = "$TB/log/sa_daemon.log";
 my $EMULAB_PEMFILE = "$TB/etc/genisa.pem";
 my $CLEANUPSLICE  = "$TB/sbin/cleanupslice";
+my $REREGISTER    = "$TB/sbin/protogeni/reregister";
+my $REGRESOURCES  = "$TB/sbin/protogeni/register_resources";
+my $SLEEP_INTERVAL  = 60;
+my $UPDATE_INTERVAL = (60 * 60 * 24);
 
+#
+# Update interval countdown. Set to zero so it runs right away.
+#
+my $update_countdown = 0;
+	  
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
@@ -478,10 +487,43 @@ while (1) {
     RegisterSlices();
 #    RenewSlices();
 
+    #
+    # Look for update orders
+    #
+    $update_countdown -= $SLEEP_INTERVAL;
+    if ($update_countdown <= 0) {
+	$update_countdown = $UPDATE_INTERVAL;
+    
+	my $register = emutil::VersionInfo("protogeni_reregister");
+	if (!defined($register) || $register) {
+	    #
+	    # ReRegister our certs at the CH.
+	    #
+	    print "Registering certificates at Clearinghouse.\n";
+	    if (system("$REREGISTER")) {
+		SENDMAIL($TBOPS,
+			 "SA daemon reregister failure",
+			 "Could not reregister certificates at the Clearing House\n",
+			 $TBOPS);
+	    }
+	    #
+	    # ReRegister our resources at the CH.
+	    #
+	    print "Registering resources at Clearinghouse. \n";
+	    if (system("$REGRESOURCES -r")) {
+		SENDMAIL($TBOPS,
+			 "SA daemon reregister failure",
+			 "Could not reregister resources at the Clearing House\n",
+			 $TBOPS);
+	    }
+	    emutil::UpdateVersionInfo("protogeni_reregister", "1");
+	}
+    }
+
     # Be certain stale info is gone.
     GeniUtil::FlushCaches();
 
-    sleep(60);
+    sleep($SLEEP_INTERVAL);
 }
 exit(0);
 
