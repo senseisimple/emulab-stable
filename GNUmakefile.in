@@ -40,7 +40,7 @@ ifeq ($(ISMAINSITE),1)
 SUBDIRS += tools/rmanage
 endif
 ifeq ($(PGENISUPPORT),1)
-SUBDIRS = protogeni
+SUBDIRS += protogeni
 endif
 else
 SUBDIRS = db tbsetup account protogeni
