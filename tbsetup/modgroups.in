@@ -347,10 +347,8 @@ if ((@addlist || @modlist) && ! $target_user->nocollabtools()) {
 #
 # Finally, call setgroups to do the rest.
 #
-if (! $target_user->nocollabtools()) {
-    system("$SETGROUPS $user") == 0 or
-	fatal("$SETGROUPS $user failed!");
-}
+system("$SETGROUPS $user") == 0 or
+    fatal("$SETGROUPS $user failed!");
 
 exit(0);
 
