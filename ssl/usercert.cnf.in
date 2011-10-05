@@ -17,5 +17,5 @@ basicConstraints=critical,CA:FALSE
 subjectKeyIdentifier=hash
 subjectAltName=@req_altname
 
-# Modifed for update 5.21
+# Modified for update 5.21
 # This will be appended to by mkusercert.
