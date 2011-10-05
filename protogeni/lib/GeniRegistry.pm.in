@@ -64,7 +64,7 @@ sub Create($$;$$)
     my ($class, $authority, $context, $credential) = @_;
 
     if (!defined($credential)) {
-	$credential = GeniRegistry::Client->GetCredential($authority);
+	$credential = GeniRegistry::Client->GetCredential($authority, $context);
 	return undef
 	    if (!defined($credential));
     }
@@ -85,22 +85,6 @@ sub GetCredential($;$$)
 {
     my ($class, $authority, $context) = @_;
 
-    my $credential =
-	GeniCredential->Lookup($authority->uuid(), $ENV{'MYUUID'});
-
-    if (defined($credential) &&
-	defined($credential->expires())) {
-	my $expires = str2time($credential->expires());
-	
-	# Some buffer.
-	if ($expires > time() + 3600) {
-	    #print STDERR "Reusing clearinghouse credential\n";
-	    return $credential;
-	}
-	$credential->Delete();
-    }
-    #print STDERR "Getting new clearinghouse credential\n";
-
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
     
@@ -108,6 +92,24 @@ sub GetCredential($;$$)
 	print STDERR "Need a context to create a registry credential\n";
 	return undef;
     }
+    my $credential =
+	GeniCredential->Lookup($authority->uuid(),
+			       $context->certificate()->uuid());
+
+    if (defined($credential) &&
+	defined($credential->expires())) {
+	my $expires = str2time($credential->expires());
+	
+	# Some buffer.
+	if (time() > $expires - 3600) {
+	    $credential->Delete();
+	}
+	else {
+	    print STDERR "Reusing $authority credential $credential\n";
+	    return $credential;
+	}
+    }
+    print STDERR "Getting new credential for $authority\n";
 
     my $url = $authority->url();
     if (!defined($url)) {
@@ -132,7 +134,7 @@ sub GetCredential($;$$)
 	return undef;
     }
     $credential->Store();
-    
+    print STDERR "Got new credential for $authority: $credential\n";
     return $credential;
 }
 
@@ -452,6 +454,14 @@ use Time::Local;
 sub Create($;$$)
 {
     my ($class, $context, $credential) = @_;
+
+    $context = Genixmlrpc->GetContext()
+	if (!defined($context));
+
+    if (!defined($context)) {
+	print STDERR "Need a context to create clearinghouse credential\n";
+	return undef;
+    }
     
     if (!defined($credential)) {
 	$credential = GeniRegistry::ClearingHouse->GetCredential($context);
@@ -459,13 +469,6 @@ sub Create($;$$)
 	    print STDERR "Could not create clearinghouse credential\n";
 	    return undef;
 	}
-    }
-    $context = Genixmlrpc->GetContext()
-	if (!defined($context));
-
-    if (!defined($context)) {
-	print STDERR "Need a context to create clearinghouse credential\n";
-	return undef;
     }
     return GeniRegistry::Client->Create($credential->target_cert(),
 					$context, $credential);
@@ -503,41 +506,34 @@ sub GetCredential($;$$)
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
 
-    #
-    # If there is no UUID in the environment, then try to figure it
-    # out from the context.
-    #
-    my $myuuid = (exists($ENV{'MYUUID'}) ? $ENV{'MYUUID'} : undef);
-    if (!defined($myuuid) && defined($context)) {
-	$myuuid = $context->certificate()->uuid();
-    }
-    if (!defined($myuuid)) {
-	print STDERR "*** GeniRegistry::ClearingHouse::GetCredential: ".
-	    "No context or MYUUID for RPC\n";
+    if (!defined($context)) {
+	print STDERR "Need a context to create a registry credential\n";
 	return undef;
     }
-
     my $clearinghousecert = GeniRegistry::ClearingHouse->GetCertificate();
     if (!defined($clearinghousecert)) {
 	return undef;
     }
     my $clearinghousecred =
-	GeniCredential->Lookup($clearinghousecert->uuid(), $myuuid);
+	GeniCredential->Lookup($clearinghousecert->uuid(),
+			       $context->certificate()->uuid());
 
-    #print "$clearinghousecred\n" if (defined($clearinghousecred));
+    print "$clearinghousecred\n" if (defined($clearinghousecred));
 
     if (defined($clearinghousecred) &&
 	defined($clearinghousecred->expires())) {
 	my $expires = str2time($clearinghousecred->expires());
 	
 	# Some buffer.
-	if ($expires > time() + 3600) {
-	    #print STDERR "Reusing clearinghouse credential\n";
+	if (time() > $expires - 3600) {
+	    $clearinghousecred->Delete();
+	}
+	else {
+	    print STDERR "Reusing clearinghouse credential\n";
 	    return $clearinghousecred;
 	}
-	$clearinghousecred->Delete();
     }
-    #print STDERR "Getting new clearinghouse credential\n";
+    print STDERR "Getting new clearinghouse credential\n";
 
     my $url = $clearinghousecert->URL();
     if (!defined($url)) {
