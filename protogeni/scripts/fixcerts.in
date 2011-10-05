@@ -13,11 +13,12 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-c]\n";
+    print STDERR "Usage: $0 [-c] [-n]\n";
     exit(-1);
 }
-my $optlist = "c";
-my $asch    = 0;
+my $optlist    = "cn";
+my $asch       = 0;
+my $noregister = 0;
 
 # Configure ...
 my $TB		  = "@prefix@";
@@ -59,6 +60,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"c"})) {
     $asch  = 1;
+}
+if (defined($options{"n"})) {
+    $noregister  = 1;
 }
 usage()
     if (@ARGV);
@@ -125,19 +129,21 @@ system("$ADDAUTHORITY -a $SACERT sa") == 0
 system("$ADDAUTHORITY -a $CMCERT cm") == 0
     or fatal("Could not add CM certificate to CM DB");
 
-#
-# ReRegister our certs at the CH.
-#
-system("$REREGISTER") == 0
-    or fatal("Could not reregister certificates at the Clearinghouse");
+if (!$noregister) {
+    #
+    # ReRegister our certs at the CH.
+    #
+    print "Registering certificates at Clearinghouse.\n";
+    system("$REREGISTER") == 0
+	or fatal("Could not reregister certificates at the Clearinghouse");
 
-#
-# ReRegister our resources at the CH.
-#
-print "Registering resources at Clearinghouse\n";
-system("$SUDO -u $PROTOUSER $REGRESOURCES -r") == 0
-    or fatal("Could not reregister resources at the Clearinghouse");
-
+    #
+    # ReRegister our resources at the CH.
+    #
+    print "Registering resources at Clearinghouse. This might take a while!\n";
+    system("$SUDO -u $PROTOUSER $REGRESOURCES -r") == 0
+	or fatal("Could not reregister resources at the Clearinghouse");
+}
 exit(0);
 
 
