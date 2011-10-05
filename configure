@@ -5050,8 +5050,7 @@ REMOTEWIKIDOCS=1
 PROTOGENI_SUPPORT=0
 PROTOGENI_CLEARINGHOUSE=0
 PROTOGENI_DOMAIN="unknown"
-# Will default to standard https port and host
-PROTOGENI_RPCPORT=""
+PROTOGENI_RPCPORT=12369
 PROTOGENI_RPCNAME=""
 STANDALONE_CLEARINGHOUSE=0
 NODE_USAGE_SUPPORT=0
@@ -7182,8 +7181,10 @@ if test -z "$PROTOGENI_RPCNAME"; then
     PROTOGENI_RPCNAME=$WWW
 fi
 
-if test -z "$PROTOGENI_RPCPORT"; then
-    PROTOGENI_URL="https://$PROTOGENI_RPCNAME/protogeni/xmlrpc"
+if test $PROTOGENI_RPCPORT -eq 443; then
+    { { $as_echo "$as_me:$LINENO: error: The ProtoGENI RPC port cannot be 443 (https)" >&5
+$as_echo "$as_me: error: The ProtoGENI RPC port cannot be 443 (https)" >&2;}
+   { (exit 1); exit 1; }; };
 else
     PROTOGENI_URL="https://$PROTOGENI_RPCNAME:$PROTOGENI_RPCPORT/protogeni/xmlrpc"
 fi
