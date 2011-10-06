@@ -31,6 +31,7 @@ my $OURDOMAIN     = "@OURDOMAIN@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PROTOGENI_RPCNAME = "@PROTOGENI_RPCNAME@";
+my $PROTOGENI_RPCPORT = "@PROTOGENI_RPCPORT@";
 my $PROTOGENI_URL = "@PROTOGENI_URL@";
 my $geniuserid    = "geniuser";
 my $geniprojid    = "GeniSlices";
@@ -64,7 +65,7 @@ my $OPENSSL       = "/usr/bin/openssl";
 my $APACHE_START  = "@APACHE_START_COMMAND@";
 my $APACHE_CONF   = "@INSTALL_APACHE_CONFIG@/httpd.conf";
 my $APACHE_FLAGS  = ("@APACHE_VERSION@" == "22" ?
-		     "apache22_flags" ? "apache_flags");
+		     "apache22_flags" : "apache_flags");
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -269,6 +270,22 @@ close CROSS_OUT;
 
 chmod(0644, "$TB/www/protogeni/crossdomain.xml");
 
+my $FLASH_LINE = "flashpolicy stream tcp  nowait          root    /bin/echo               /bin/echo '<cross-domain-policy> <site-control permitted-cross-domain-policies=\"master-only\"/> <allow-access-from domain=\"*\" to-ports=\"80,443,$PROTOGENI_RPCPORT\"/> </cross-domain-policy>'";
+
+my $restartinetd = 0;
+
+if (system("egrep -q -s 'flashpolicy' /etc/services")) {
+    print "Please add 'flashpolicy     843/tcp' to /etc/services\n";
+    $restartinetd++;
+}
+if (system("egrep -q -s 'flashpolicy' /etc/inetd.conf")) {
+    print "Please add \n$FLASH_LINE\n to /etc/services\n";
+    $restartinetd++;
+}
+if ($restartinetd) {
+    print "Then restart inetd and rerun this script.\n";
+    exit(1);
+}
 #
 # The web server needs to do client authentication, for the geni xmlrpc
 # interface. A bundle of CA certs from the trusted roots (emulabs) will
