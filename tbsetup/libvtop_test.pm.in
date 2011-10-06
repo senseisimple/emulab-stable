@@ -27,6 +27,7 @@ use Lan;
 use OSinfo;
 use Port;
 use English;
+use emutil qw(SpanningTree);
 use Data::Dumper;
 use Carp;
 use POSIX;
@@ -7572,11 +7573,45 @@ sub UploadVlans($)
 			    }
 			}
 			$self->printdb("Merged $protolanB into $protolanA\n");
+			if (defined($protolanA->GetAttribute("switchpath")) ||
+			    defined($protolanB->GetAttribute("switchpath"))) {
+			    $protolanA->SetAttribute("switchpath",
+			     AddToSwitchPath($protolanA->GetAttribute("switchpath"),
+					     $protolanB->GetAttribute("switchpath")));
+			}
 			$protolanB->Destroy();
 			goto again;
 		    }
 		}
 	    }
+	}
+    }
+
+    #
+    # Compute spanning tree for lan switch paths.
+    #
+    foreach my $protolan (ProtoLan->ProtoLanList()) {
+	my $swpath = $protolan->GetAttribute("switchpath");
+	if (defined($swpath) && $swpath ne "") {
+	    my @edges  = ();
+	    # Convert from string to [[], []]
+	    foreach my $edge (split(" ", $swpath)) {
+		my ($a,$b) = split(":", $edge);
+		push(@edges, [$a, $b]);
+	    }
+	    @edges  = SpanningTree(\@edges);
+	    # Convert back to string.
+	    my @swpath = ();
+	    foreach my $edge (@edges) {
+		my ($a, $b) = @$edge;
+		push(@swpath, "$a:$b");
+	    }
+	    $swpath = join(" ", @swpath);
+	    
+	    if ($self->verbose()) {
+		print STDERR "$protolan Spanning Tree: @swpath\n";
+	    }
+	    $protolan->SetAttribute("switchpath", $swpath);
 	}
     }
     
@@ -8710,6 +8745,8 @@ sub AddToSwitchPath($$)
 
     return $new
 	if (!defined($cur));
+    return $cur
+	if (!defined($new));
 
     my @cur = split(" ", $cur);
     my @new = split(" ", $new);
