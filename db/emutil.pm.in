@@ -14,7 +14,8 @@ use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter SelfLoader);
 @EXPORT = qw(TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
 	     TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
-	     TBGetUniqueIndex ParRun VersionInfo UpdateVersionInfo);
+	     TBGetUniqueIndex ParRun VersionInfo UpdateVersionInfo
+	     SpanningTree);
 
 use emdb;
 use English;
@@ -511,6 +512,91 @@ sub ExecQuiet($)
     }
     close(PIPE);
     return $output;
+}
+
+#
+# Given a set of edges: [[cisco1, cisco3], [cisco3, cisco4]].
+# Return a spanning tree. Deadly simple algorithm. 
+#
+sub SpanningTree($)
+{
+    my ($edges)  = @_;
+    my %vertices = ();
+    my %edges    = ();
+
+    #
+    # Get the unique set of vertices. Also form a hash of edges we can mark.
+    #
+    foreach my $edge (@$edges) {
+	my ($a, $b) = @$edge;
+	$vertices{$a} = 0
+	    if (!exists($vertices{$a}));
+	$vertices{$b} = 0
+	    if (!exists($vertices{$b}));
+	$edges{"$a:$b"} = 0;
+    }
+    #print Dumper(\%vertices);
+    #print Dumper(\%edges);
+    
+    #
+    # Pick the first vertex and mark it.
+    #
+    $vertices{(keys(%vertices))[0]} = 1;
+
+    #
+    # Loop according to Prims algorithm.
+    #
+    while (1) {
+	#
+	# Get the set of marked vertices;
+	#
+	my %marked = ();
+	foreach my $vertex (keys(%vertices)) {
+	    $marked{$vertex} = 1
+		if ($vertices{$vertex});
+	}
+	# Done if all vertices are marked.
+	last
+	    if (scalar(keys(%marked)) == scalar(keys(%vertices)));
+
+	#
+	# Find the first unmarked vertex that connects to any of the
+	# marked ones. Mark that edge; that is an edge we want in the
+	# final set.
+	#
+	foreach my $vertex (keys(%vertices)) {
+	    next
+		if ($marked{$vertex});
+
+	    foreach my $marked (keys(%marked)) {
+		if (exists($edges{"$vertex:$marked"})) {
+		    $edges{"$vertex:$marked"} = 1;
+		    $vertices{$vertex} = 1;
+		    goto loop;
+		}
+		elsif (exists($edges{"$marked:$vertex"})) {
+		    $edges{"$marked:$vertex"} = 1;
+		    $vertices{$vertex} = 1;
+		    goto loop;
+		}
+	    }
+	}
+      loop:
+	#print Dumper(\%edges);
+	#sleep(1);
+    }
+    #
+    # Return a new set of *marked* edges.
+    #
+    my @newedges = ();
+    foreach my $edge (keys(%edges)) {
+	next
+	    if (!$edges{$edge});
+	
+	my ($a, $b) = split(":", $edge);
+	push(@newedges, [$a, $b]);
+    }
+    return @newedges;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
