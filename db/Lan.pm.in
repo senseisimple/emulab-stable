@@ -738,6 +738,29 @@ sub SetAttribute($$$;$)
 }
 
 #
+# Delete an attribute.
+#
+sub DelAttribute($$)
+{
+    my ($self, $key) = @_;
+
+    return -1
+	if (!ref($self));
+
+    if (exists($self->{'ATTRS'}->{$key})) {
+	delete($self->{'ATTRS'}->{$key});
+    }
+    my $lanid    = $self->lanid();
+    my $safe_key = DBQuoteSpecial($key);
+
+    return -1
+	if (!DBQueryWarn("delete from lan_attributes ".
+			 "where lanid='$lanid' and attrkey=$safe_key"));
+
+    return 0;
+}
+
+#
 # Shorthand
 #
 sub SetRole($$)
@@ -2678,6 +2701,11 @@ sub SetSwitchPath($$) {
 
     return $self->GetLan()->SetAttribute("switchpath", $path);
 }
+sub ClrSwitchPath($) {
+    my ($self) = @_;
+
+    return $self->GetLan()->DelAttribute("switchpath");
+}
 
 # VLan reservation for a specific lan in an experiment.
 sub ReserveVlanTag($$;$$)
@@ -3104,9 +3132,9 @@ sub GetVlanSwitchPath($)
     my ($class, $vlan) = @_;
 
     if (!ref($vlan)) {
-	$vlan   = VLan->Lookup($vlan);
+	$vlan = VLan->Lookup($vlan);
     }
-    return -1
+    return undef
 	if (!defined($vlan));
 
     my $lanid = $vlan->lanid();
@@ -3201,7 +3229,6 @@ sub RecordVlanInsertion($$$)
     # addition, internal, manual, elabinelab, etc. do not have a path.
     #
     $path = (defined($path) ? ", switchpath='$path'" : "");
-    $path = "";
 
     DBQueryWarn("replace into vlans set ".
 		"  id='$lanid', pid='$pid', eid='$eid', exptidx='$exptidx', ".
