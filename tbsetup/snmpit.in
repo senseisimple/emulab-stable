@@ -182,7 +182,7 @@ GetOptions(\%opt,
     'N=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'Z', 'vlan_tag=i', 
     'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
-    'o=s@{1,1}', 'redirect-err', 'blockmode');
+    'o=s@{1,1}', 'redirect-err', 'blockmode', 'whol-magic');
 
 if ($opt{h}) {
     exit &usage;
