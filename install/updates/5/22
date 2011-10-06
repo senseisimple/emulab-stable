@@ -1,0 +1,41 @@
+#
+# Update Flash policy server implemented via inetd
+#
+use strict;
+use libinstall;
+
+my $SERVICES_CONF = "/etc/services";
+my $INETD_CONF  = "/etc/inetd.conf";
+my $INET_LINE = "'flashpolicy stream tcp  nowait          root    /bin/echo               /bin/echo '\\''<cross-domain-policy> <site-control permitted-cross-domain-policies=\"master-only\"/> <allow-access-from domain=\"*\" to-ports=\"80,443,$PROTOGENI_RPCPORT\"/> </cross-domain-policy>'\\'";
+my $SERVICES_LINE = "'flashpolicy     843/tcp'";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+    if ($PGENISUPPORT) {
+    	#
+	# If something should run in the pre-install phase.
+	# 
+	if ($phase eq "pre") {
+	    Phase "services", "Updating $SERVICES_CONF", sub {
+		PhaseSkip("Already updated")
+		    if `grep 'flashpolicy' $SERVICES_CONF`;
+		BackUpFileFatal($SERVICES_CONF);
+		ExecQuietFatal("echo $SERVICES_LINE >> $SERVICES_CONF");
+	    };
+	    Phase "inetd", "Updating inetd services", sub {
+		Phase "inetd.conf", "Updating $INETD_CONF", sub {
+		    BackUpFileFatal($INETD_CONF);
+		    ExecQuietFatal("sed -i .orig -e '/^flashpolicy/d' $INETD_CONF");
+		    ExecQuietFatal("echo $INET_LINE >> $INETD_CONF");
+		};
+		Phase "inetd", "Restarting inetd", sub {
+		    HUPDaemon("inetd");
+		};
+	    };
+	}
+    }
+
+    return 0;
+}
+1;
