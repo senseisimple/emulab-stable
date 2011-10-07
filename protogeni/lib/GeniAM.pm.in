@@ -114,8 +114,7 @@ sub GetVersion()
 	"version" => $coder->string("3"),
 	"schema" => "http://www.geni.net/resources/rspec/3/request.xsd",
         "namespace" => "http://www.geni.net/resources/rspec/3",
-        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1\
-"]
+        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
     };
     my $ad_0_1 = {
         "type" => "ProtoGENI",
