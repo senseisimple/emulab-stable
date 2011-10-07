@@ -319,7 +319,8 @@ sub setPortVlan($$@) {
         # Find out every switch which might have to transit this VLAN through
         # its trunks
         #
-        @trunks = getTrunksFromSwitches(\%trunks, keys %switches);
+        @trunks = getTrunksForVlan($vlan_id, keys(%switches));
+
         foreach my $trunk (@trunks) {
             my ($src,$dst) = @$trunk;
             $switches{$src} = $switches{$dst} = 1;
@@ -779,6 +780,8 @@ sub removeVlan($@) {
     if (!@vlan_ids) {
 	return 1;
     }
+    # First, get a list of all trunks
+    my %trunks = getTrunks();
 
     my %vlan_numbers = $self->findVlans(@vlan_ids);
     foreach my $vlan_id (@vlan_ids) {
@@ -792,15 +795,30 @@ sub removeVlan($@) {
 	}
 
 	#
+	# Next, figure out which switches this VLAN exists on.
+	#
+
+	# Since this may be a hand-created (not from the database) VLAN, the
+	# only way we can figure out which swtiches this VLAN spans is to
+	# ask them all.
+	#
+	my @switches = $self->switchesWithPortsInVlan($vlan_number);
+
+	#
+	# Next, get a list of the trunks that are used to move between these
+	# switches
+	#
+        my @trunks = getExperimentTrunksForVlan($vlan_id, @switches);
+	
+	#
 	# Prevent the VLAN from being sent across trunks.
 	#
-	if (!$self->setVlanOnTrunks($vlan_number,0)) {
+	if (!$self->setVlanOnTrunks2($vlan_number, 0, \%trunks, @trunks)) {
 	    warn "ERROR: Unable to remove VLAN $vlan_number from trunks!\n";
 	    #
 	    # We can keep going, 'cause we can still remove the VLAN
 	    #
 	}
-	
     }
 
     #
@@ -1111,21 +1129,24 @@ sub disableTrunking($$) {
 }
 
 #
-# Not a 'public' function - only needs to get called by other functions in
-# this file, not external functions.
+# Now a public function; for a vlan, add or remove it from the trunks
+# it needs to span the switches. 
+# 
+# Enables or disables (depending on $value).
+# Returns 1 on success, 0 on failure.
 #
-# Enables or disables (depending on $value) a VLAN on all appropriate
-# switches in a stack. Returns 1 on sucess, 0 on failure.
-#
-# ONLY pass in @ports if you're SURE that they are the only ports in the
-# VLAN - basically, only if you just created it. This is a shortcut, so
-# that we don't have to ask all switches if they have any ports in the VLAN.
-#
-sub setVlanOnTrunks($$$;@) {
-    my $self = shift;
-    my $vlan_number = shift;
-    my $value = shift;
-    my @ports = @_;
+sub setVlanOnSwitchTrunks($$$) {
+    my $self    = shift;
+    my $vlan_id = shift;
+    my $enable  = shift;
+
+    my $vlan_number = $self->findVlan($vlan_id);
+    if (!$vlan_number) {
+	print STDERR
+	"ERROR: VLAN with identifier $vlan_id does not exist on stack " .
+	$self->{STACKID} . "\n" ;
+	return 0;
+    }
 
     #
     # First, get a list of all trunks
@@ -1135,30 +1156,19 @@ sub setVlanOnTrunks($$$;@) {
     #
     # Next, figure out which switches this VLAN exists on
     #
-    my @switches;
-    if (@ports) {
-	#
-	# I'd rather not have to go out to the switches to ask which ones
-	# have ports in the VLAN. So, if they gave me ports, I'll just 
-	# trust that those are the only ones in the VLAN
-	#
-	@switches = getDeviceNames(@ports);
-    } else {
-	#
-	# Since this may be a hand-created (not from the database) VLAN, the
-	# only way we can figure out which swtiches this VLAN spans is to
-	# ask them all.
-	#
-        @switches = $self->switchesWithPortsInVlan($vlan_number);
-    }
+    my @switches = $self->switchesWithPortsInVlan($vlan_number);
 
     #
     # Next, get a list of the trunks that are used to move between these
-    # switches
+    # switches. When disabling, we want the list from the DB if it exsists.
     #
-    my @trunks = getTrunksFromSwitches(\%trunks,@switches);
-    return $self->setVlanOnTrunks2($vlan_number,$value,\%trunks,@trunks);
+    my @trunks = ($enable ?
+		  getTrunksForVlan($vlan_id, @switches) :
+		  getExperimentTrunksForVlan($vlan_id, @switches));
+	
+    return $self->setVlanOnTrunks2($vlan_number,$enable,\%trunks,@trunks);
 }
+
 #
 # Enables or disables (depending on $value) a VLAN on all the supplied
 # trunks. Returns 1 on sucess, 0 on failure.

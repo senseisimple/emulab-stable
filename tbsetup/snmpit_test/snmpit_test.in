@@ -27,6 +27,7 @@ use EmulabFeatures;
 use Lan;
 use English;
 use Getopt::Long;
+use emutil;
 use strict;
 
 # Optional alternate version of libraries.
@@ -190,7 +191,7 @@ GetOptions(\%opt,
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'Z', 'vlan_tag=i', 
     'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
     'o=s@{1,1}', 'redirect-err', 'blockmode', 'syncvlans', 'impotent',
-    'shadow', 'skip-supplied');
+    'shadow', 'skip-supplied', 'whol-magic', 'backtraceonwarning');
 
 if ($opt{h}) {
     exit &usage;
@@ -203,7 +204,9 @@ if ($opt{h}) {
 if ($opt{'redirect-err'}) {
     open(STDERR, ">&STDOUT");
 }
-
+if ($opt{'backtraceonwarning'}) {
+    BackTraceOnWarning(1);
+}
 if ($opt{'impotent'}) {
     $impotent = 1;
 }
@@ -1677,13 +1680,16 @@ sub doRestorePortStatus($@) {
     $errors += $stack->setPortVlan($vlan_id, $port);
     if ($errors) { return $errors; }
 
+    #
+    # Do not worry about mucking with the switch trunk paths.
+    # This call exists to temporarily move ports back and forth.
+    #
     if (defined($source_vlan) && $source_vlan->KeepInSync()) {
 	if ($source_vlan->DelPort($port)) {
 	    print "Could not yank $port from $source_vlan\n";
 	    $errors++;
 	}
-	my @tmp = ($port->toIfaceString());
-	VLan->RecordVLanModification($source_vlan->id(), undef, \@tmp);
+	VLan->RecordVlanInsertion($source_vlan->id(), $stack->{STACKID});
     }
     if (defined($target_vlan) && $target_vlan->KeepInSync()) {
 	if ($target_vlan->AddPort($port)) {
@@ -1967,11 +1973,6 @@ sub CreateOneVlan($$$@)
 	if ($stack->setPortVlan($vlanid,@ports)) {
 	    $errors++;
 	}
-	else {
-	    # Convert the ports to node:iface for the next call.
-	    my @conports = map {$_->toIfaceString()} @ports; 
-	    VLan->RecordVLanModification($vlanid, \@conports, undef);
-	}
     }
     else {
 	my $vlan_number = $stack->createVlan($vlanid, $vlanid, \@ports);
@@ -1984,12 +1985,15 @@ sub CreateOneVlan($$$@)
 	    #
 	    $errors++;
 	}
-	else {
-	    VLan->RecordVlanInsertion($vlanid, $stack->{STACKID});
-	}
     }
     return $errors
 	if ($errors);
+
+    #
+    # Record an insertion to make sure the DB reflects the current state
+    # of the vlan. 
+    #
+    VLan->RecordVlanInsertion($vlanid, $stack->{STACKID});
 
     #
     # Set the speed and duplex of each interface depending on the
@@ -2233,12 +2237,6 @@ sub syncVlansFromTables($$) {
 		    if (@trunkports) {
 			$stack->removeSomePortsFromTrunk($vlanid, @trunkports)
 			    or goto bad;
-
-			# Convert the ports to node:iface for the next call.
-			@trunkports = map {$_->toIfaceString()} @trunkports; 
-			VLan->RecordVLanModification($vlanid,
-						     undef, \@trunkports)
-			    == 0 or goto bad;
 		    }
 		    if (!$stack->removeVlan($vlanid)) {
 			print STDERR "Could not remove vlan: $vlanid\n";
@@ -2283,16 +2281,17 @@ sub syncVlansFromTables($$) {
 	next
 	    if (! (@staleports || @staletrunks));
 	    
+	#
+	# Clear the switch trunks since we are removing ports, which
+	# changes that set. 
+	#
+	$stack->setVlanOnSwitchTrunks($vlanid, 0);
+	
 	if (@staleports) {
 	    debug("Removing stale ports from vlan $vlanid: ".Port->toStrings(@staleports)."\n");
 
 	    if (!$impotent) {
 		$stack->removeSomePortsFromVlan($vlanid, @staleports)
-		    or goto bad;
-
-		# Convert the ports to node:iface for the next call.
-		@staleports = map {$_->toIfaceString()} @staleports; 
-		VLan->RecordVLanModification($vlanid, undef, \@staleports) == 0
 		    or goto bad;
 	    }
 	}
@@ -2303,13 +2302,14 @@ sub syncVlansFromTables($$) {
 	    if (!$impotent) {
 		$stack->removeSomePortsFromTrunk($vlanid, @staletrunks)
 		    or goto bad;
-
-		# Convert the ports to node:iface for the next call.
-		@staletrunks = map {$_->toIfaceString()} @staletrunks; 
-		VLan->RecordVLanModification($vlanid, undef, \@staletrunks) == 0
-		    or goto bad;
 	    }
 	}
+	#
+	# We can optimize this slightly by looking to see if this
+	# vlan is going to get new ports below, and waiting till then.
+	#
+	$stack->setVlanOnSwitchTrunks($vlanid, 1);
+	VLan->RecordVlanInsertion($vlanid, $stack->{STACKID});
     }
 
     #
@@ -2430,6 +2430,12 @@ sub syncVlansFromTables($$) {
 	next
 	    if ($impotent);
 	
+	#
+	# Clear the switch trunks since we are adding ports, which
+	# changes that set. The trunks are added back in CreateOneVlan.
+	#
+	$stack->setVlanOnSwitchTrunks($vlanid, 0);
+ 	
 	if (CreateOneVlan($experiment, $stack, $vlanid, @newports)) {
 	    goto bad;
 	}
@@ -2909,7 +2915,7 @@ sub doSyncVlansWithDB($) {
 	    if (!@dbports) {
 		print "  Making it consistent\n";
 		foreach my $port (@swports) {
-		    if ($vlan->AddPort($port)) {
+		    if (!defined($vlan->AddPort($port))) {
 			print "Could not add $port to $vlan\n";
 			$errors++;
 		    }
@@ -2931,8 +2937,10 @@ sub doMakeVlan($$@) {
     my $vlan_name = shift;
     my @ports = @_;
     my $errors = 0;
+    my $vlanexists = 0;
     my $target_vlan;
     my $source_vlan;
+    my ($old_target_swpath, $old_source_swpath);
 
     if (@$stacks > 1) {
 	die "VLAN creation across multiple stacks is not yet supported\n" .
@@ -3011,9 +3019,6 @@ sub doMakeVlan($$@) {
 		$target_vlan->MarkInternal();
 	    }
 	}
-	foreach my $port (@ports) {
-	    $target_vlan->AddPort($port);
-	}
     }
     else {
 	#
@@ -3027,6 +3032,9 @@ sub doMakeVlan($$@) {
     # Pass to outer boss.
     #
     if ($ELABINELAB) {
+	foreach my $port (@ports) {
+	    $target_vlan->AddPort($port);
+	}
 	return RemoteDoVlansFromTables($experiment, $target_vlan->id());
     }
 
@@ -3070,10 +3078,67 @@ sub doMakeVlan($$@) {
     my $device_id = ($target_vlan->IsInternal() ?
 		     $target_vlan->vname() : $target_vlan->id());
 
+    # Save for error recovery.
+    $vlanexists = $stack->vlanExists($device_id);
+
+    #
+    # Remove the current set of switch trunks since we have to generate
+    # a new set anyway. Do this for experiment vlans only though.
+    #
+    if (!$opt{'whol-magic'}) {
+	if (! $target_vlan->IsManual()) {
+	    print STDERR "Disabling switch trunks on $target_vlan\n";
+	    if (!$stack->setVlanOnSwitchTrunks($target_vlan->lanid(), 0)) {
+		print STDERR
+		    "Could not disable switch trunks on $target_vlan\n";
+		goto bad;
+	    }
+	}
+	# This causes fallback to snmpit switch path generation.
+	$old_target_swpath = $target_vlan->GetSwitchPath();
+	$target_vlan->ClrSwitchPath();
+    }
+
+    #
+    # Same goes for the source vlan, but worse since once we forget
+    # the port, there is no way to recover the path.
+    #
+    if (defined($source_vlan) &&
+	!$source_vlan->SameVlan($target_vlan) &&
+	$source_vlan->KeepInSync()) {
+
+	if (!$opt{'whol-magic'}) {
+	    if (!$stack->setVlanOnSwitchTrunks($source_vlan->lanid(), 0)) {
+		print STDERR
+		    "Could not disable switch trunks on $source_vlan\n";
+		goto bad;
+	    }
+
+	    # This causes fallback to snmpit switch path generation.
+	    $old_source_swpath = $source_vlan->GetSwitchPath();
+	    $source_vlan->ClrSwitchPath();
+	}
+
+	# Yank the ports out of the old vlan now.
+	foreach my $port (@ports) {
+	    if ($source_vlan->DelPort($port)) {
+		print STDERR "Could not yank $port from $source_vlan\n";
+		goto bad;
+	    }
+	}
+    }
+    # And add ports to new vlan so the path can be generated. 
+    foreach my $port (@ports) {
+	if (!defined($target_vlan->AddPort($port))) {
+	    print STDERR "Could not add $port to $target_vlan\n";
+	    goto bad;
+	}
+    }
+
     #
     # Create/Update
     #
-    if ($stack->vlanExists($device_id)) {
+    if ($vlanexists) {
 	print "VLAN $target_vlan already exists\n"
 	    if (!$quiet);
 
@@ -3104,22 +3169,27 @@ sub doMakeVlan($$@) {
 	}
 
     }
-    if (!$errors) {
+    if ($errors) {
+      bad:
+	$errors++;
+    }
+    else {
 	if (defined($source_vlan) && !$source_vlan->SameVlan($target_vlan) &&
 	    $source_vlan->KeepInSync()) {
-	    # Yank the ports out of the old vlan.
-	    foreach my $port (@ports) {
-		if ($source_vlan->DelPort($port)) {
-		    print "Could not yank $port from $source_vlan\n";
-		    $errors++;
-		}
+	    # Have to do this cause setPortVlan does not.
+	    if (!$opt{'whol-magic'} &&
+		!$stack->setVlanOnSwitchTrunks($source_vlan->lanid(), 1)) {
+		print STDERR "Could not enable switch trunks on $source_vlan\n";
+		$errors++;
 	    }
-	    my @tports = map {$_->toIfaceString()} @ports;
-	    VLan->RecordVLanModification($source_vlan->id(), undef, \@tports);
+	    # This stores the newly computed switch trunk path in the lans
+	    # table entry. 
+	    setSwitchTrunkPath($source_vlan);
+	    VLan->RecordVlanInsertion($source_vlan, $stack->{STACKID});
 	}
 	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
-	    # This updates the port list, so always call it.
-	    VLan->RecordVlanInsertion($target_vlan->id(), $stack->{STACKID});
+	    setSwitchTrunkPath($source_vlan);
+	    VLan->RecordVlanInsertion($target_vlan, $stack->{STACKID});
 	}
     }
     return $errors;
