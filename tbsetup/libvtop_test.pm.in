@@ -8220,6 +8220,7 @@ sub getportlist(@)
     # The beginning and end of the list are ignored for the path
     # since we care only about the Trunk links.
     @info = splice(@info, 4, $#info);
+
     while (@info) {
 	#
 	# Traverse two at a time. We can deduce the switch pair
@@ -8235,6 +8236,15 @@ sub getportlist(@)
 	    $field2 eq "((null),(null))") {
 	    $field1 =~ s/^link\-//;
 	    push(@result, $field1);
+	}
+	elsif ($field1 =~ /^link\-([-\w]*):([-\w]*)/) {
+	    my $sw1 = $1;
+	    my $sw2 = $2;
+	    
+	    if ($field2 eq "($sw1/$sw2,$sw2/$sw1)" ||
+		$field2 eq "($sw2/$sw1,$sw1/$sw2)") {
+		push(@result, "$sw1:$sw2");
+	    }
 	}
     }
     return join(" ", @result);
