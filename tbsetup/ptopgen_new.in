@@ -98,6 +98,8 @@ sub processArgs()
 		$print_ns = $GeniXML::RSPEC_0_2_NS;
 	    } elsif ($mode eq "2") {
 		$print_ns = $GeniXML::RSPEC_2_NS;
+	    } elsif ($mode eq "3") {
+		$print_ns = $GeniXML::RSPEC_3_NS;
 	    } else {
 		usage();
 	    }

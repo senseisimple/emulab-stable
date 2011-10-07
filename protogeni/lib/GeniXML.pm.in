@@ -29,17 +29,19 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2 $RSPEC_3
             $RSPEC_0_1_NS $RSPEC_0_2_NS $RSPEC_2_NS
             $EMULAB_NS $XSI_NS $STITCH_NS
             $REQUEST_URL $MANIFEST_URL);
 $RSPEC_0_1 = "0.1";
 $RSPEC_0_2 = "0.2";
 $RSPEC_2 = "2";
+$RSPEC_3 = "3";
 
 our $RSPEC_0_1_NS = "http://www.protogeni.net/resources/rspec/0.1";
 our $RSPEC_0_2_NS = "http://www.protogeni.net/resources/rspec/0.2";
 our $RSPEC_2_NS = "http://www.protogeni.net/resources/rspec/2";
+our $RSPEC_3_NS = "http://www.geni.net/resources/rspec/3";
 our $EMULAB_NS = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
 our $XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
 our $STITCH_NS = "http://hpn.east.isi.edu/rspec/ext/stitch/0.1/";
@@ -101,6 +103,8 @@ sub GetXmlVersion($)
 	    $result = $RSPEC_0_2;
 	} elsif ($ns =~ /protogeni.net\/resources\/rspec\/2$/) {
 	    $result = $RSPEC_2;
+	} elsif ($ns =~ /geni.net\/resources\/rspec\/3$/) {
+	    $result = $RSPEC_3;
 	} else {
 	    carp("Unknown rspec namespace: " . $ns);
 	    $result = $RSPEC_0_1;

@@ -27,6 +27,7 @@ $NO_GENI = "0";
 $V_0_1 = "0.1";
 $V_0_2 = "0.2";
 $V_2 = "2";
+$V_3 = "3";
 
 $emulabns = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
 # XXX: This needs to be changed
@@ -571,7 +572,8 @@ usage()
 	|| ($genimode ne $NO_GENI
 	    && $genimode ne $V_0_1
 	    && $genimode ne $V_0_2
-	    && $genimode ne $V_2));
+	    && $genimode ne $V_2
+	    && $genimode ne $V_3));
 
 if (defined($pid) && ! defined($options{"Z"})) {
     my $group = Group->Lookup($pid, $pid);
@@ -2041,9 +2043,12 @@ sub print_header {
 	    } elsif ($genimode eq $V_2) {
 		$ns = "http://www.protogeni.net/resources/rspec/2";
 		$url = "http://www.protogeni.net/resources/rspec/2/ad.xsd";
+	    } elsif ($genimode eq $V_3) {
+		$ns = "http://www.geni.net/resources/rspec/3";
+		$url = "http://www.geni.net/resources/rspec/3/ad.xsd";
 	    }
 	    print "xmlns=\"$ns\" ";
-	    if ($genimode eq $V_2) {
+	    if ($genimode eq $V_2 || $genimode eq $V_3) {
 		print "xmlns:emulab=\"$emulabns\" ";
 		print "xsi:schemaLocation=\"$ns $url $emulabns $emulaburl ";
 		if (defined($MAINSITE) && $MAINSITE) {
@@ -2059,7 +2064,7 @@ sub print_header {
 	    printf("generated=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
 		   $times[5] + 1900, $times[4] + 1, $times[3],
 		   $times[2], $times[1], $times[0]);
-	    if ($genimode eq $V_2) {
+	    if ($genimode eq $V_2 || $genimode eq $V_3) {
 		print "expires=";
 	    } else {
 		print "valid_until=";
@@ -2079,7 +2084,7 @@ sub print_footer {
     if ($do_xml && $genimode eq $NO_GENI) {
 	print "</ptop>\n";
     } elsif ($do_xml && $genimode ne $NO_GENI) {
-	if ($genimode eq $V_2) {
+	if ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print_type_limits();
 	    if (defined($MAINSITE) && $MAINSITE) {
 		print $stitchxml;
@@ -2150,17 +2155,17 @@ sub print_node
 	print "<node ";
 	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "component_manager_uuid=\"$cmurn\" ";
-	} elsif ($genimode eq $V_2) {
+	} elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print "component_manager_id=\"$cmurn\" ";
 	}
 	print "component_name=\"$name\" ";
 	my $urn = GeniHRN::Generate($OURDOMAIN, "node", $name);
 	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print " component_uuid=\"$urn\" ";
-	} elsif ($genimode eq $V_2) {
+	} elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print " component_id=\"$urn\" ";
 	}
-	if ($genimode eq $V_2) {
+	if ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print " exclusive=\"$exclusive\" ";
 	}
 	print ">\n";
@@ -2177,7 +2182,7 @@ sub print_node
 	if ($genimode eq $V_0_1 || $genimode eq $V_0_2)
 	{
 	    print "  <available>$avail</available>\n";
-	} elsif ($genimode eq $V_2)
+	} elsif ($genimode eq $V_2 || $genimode eq $V_3)
 	{
 	    print "  <available now=\"$avail\" />\n";
 	}
@@ -2252,7 +2257,7 @@ sub print_type_limits
 		print "set-type-limit $typeclass $count\n";
 	    }
 	    else {
-		if ($genimode eq $V_2) {
+		if ($genimode eq $V_2 || $genimode eq $V_3) {
 		    print "<emulab:set_type_limit ";
 		    print "typeclass=\"$typeclass\" ";
 		    print "count=\"$count\"";
@@ -2288,7 +2293,7 @@ sub print_node_types
 		print "static=\"true\"\n";
 	    }
 	    print "  />\n";
-	} elsif ($genimode eq $V_2) {
+	} elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 	    if ($name eq "pc") {
 		print "  <sliver_type name=\"raw-pc\">\n";
 		if (defined($mainType)) {
@@ -2335,7 +2340,7 @@ sub print_node_features
 	    $flags .= " global_operator=\"OnceOnly\" ";
 	    $name = substr($name, 2);
 	}
-	if ($genimode eq $V_2) {
+	if ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print "  <emulab:fd name=\"$name\" weight=\"$value\" ";
 	    if ($flags ne "") {
 		print $flags;
@@ -2363,7 +2368,7 @@ sub print_node_flags
 	    if ($genimode eq $NO_GENI) {
 		print "  <trivial_bandwidth>$value</trivial_bandwidth>\n";
 	    }
-	    elsif ($genimode eq $V_2) {
+	    elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 		print "  <emulab:trivial_bandwidth value=\"$value\" />\n";
 	    }
 	}
@@ -2371,7 +2376,7 @@ sub print_node_flags
 	    if ($genimode eq $NO_GENI) {
 		print "  <subnode_of>$value</subnode_of>\n";
 	    }
-	    elsif ($genimode eq $V_2) {
+	    elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 		$value = GeniHRN::Generate($OURDOMAIN, "node", $value);
 		print "  <relation type=\"subnode_of\" ";
 		print "component_id=\"$value\" />\n";
@@ -2381,7 +2386,7 @@ sub print_node_flags
 	    if ($genimode eq $NO_GENI) {
 		print "  <unique/>\n";
 	    }
-	    elsif ($genimode eq $V_2) {
+	    elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 		print "  <emulab:unique />\n";
 	    }
 	}
@@ -2389,7 +2394,7 @@ sub print_node_flags
 	    if ($genimode eq $NO_GENI) {
 		print "  <disallow_trivial_mix/>\n";
 	    }
-	    elsif ($genimode eq $V_2) {
+	    elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 		print "  <emulab:disallow_trivial_mix /> \n";
 	    }
 	}
@@ -2466,7 +2471,7 @@ sub print_node_interfaces
 	    print "public_ipv4=\"$ip\" ";
 	}
 	print ">\n";
-	if ($genimode eq $V_2)
+	if ($genimode eq $V_2 || $genimode eq $V_3)
 	{
 	    print "    <emulab:interface name=\"$name\"/>\n";
 	}
@@ -2523,11 +2528,11 @@ sub print_named_link_xml
 	my $urn = GeniHRN::Generate($OURDOMAIN, "link", $name);
 	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "component_uuid=\"$urn\" ";
-	} elsif ($genimode eq $V_2) {
+	} elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print "component_id=\"$urn\" ";
 	}
 	print ">\n";
-	if ($genimode eq $V_2) {
+	if ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print "<component_manager name=\"$cmurn\" />\n";
 	}
 	print_interface($source, $source_if);
@@ -2546,7 +2551,7 @@ sub print_named_link_xml
 	print "  <bandwidth>$bw</bandwidth>\n";
 	print "  <latency>$delay</latency>\n";
 	print "  <packet_loss>$loss</packet_loss>\n";
-    } elsif ($genimode eq $V_2) {
+    } elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 	print_property($source, $source_if, $dest, $dest_if,
 		       $bw, $delay, $loss);
 	print_property($dest, $dest_if, $source, $source_if,
@@ -2559,7 +2564,7 @@ sub print_named_link_xml
 		. "</type_name></link_type>\n";
 	} elsif ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "  <link_type type_name=\"" . $proto[$i] . "\" />\n";
-	} elsif ($genimode eq $V_2) {
+	} elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 	    print "  <link_type name=\"" . $proto[$i] . "\" />\n";
 	}
     }
@@ -2577,7 +2582,7 @@ sub print_interface
     if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	print "component_node_uuid=\"$nodeUrn\" ";
 	print "component_interface_id=\"" . $interfaceUrn . "\"";
-    } elsif ($genimode eq $V_2) {
+    } elsif ($genimode eq $V_2 || $genimode eq $V_3) {
 	print "component_id=\"$interfaceUrn\"";
     }
     print "/>\n";

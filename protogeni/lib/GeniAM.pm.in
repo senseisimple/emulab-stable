@@ -87,7 +87,7 @@ sub GetVersion()
 
     my $default_ad = {
 	"type" => "ProtoGENI",
-	"version" => $coder->string("0.2") };
+	"version" => $coder->string("2") };
     my $request_0_1 = {
 	"type" => "ProtoGENI",
 	"version" => $coder->string("0.1"),
@@ -108,6 +108,14 @@ sub GetVersion()
 	"schema" => "http://www.protogeni.net/resources/rspec/2/request.xsd",
 	"namespace" => "http://www.protogeni.net/resources/rspec/2",
 	"extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
+    };
+    my $request_3 = {
+	"type" => "GENI",
+	"version" => $coder->string("3"),
+	"schema" => "http://www.geni.net/resources/rspec/3/request.xsd",
+        "namespace" => "http://www.geni.net/resources/rspec/3",
+        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1\
+"]
     };
     my $ad_0_1 = {
         "type" => "ProtoGENI",
@@ -130,6 +138,13 @@ sub GetVersion()
         "namespace" => "http://www.protogeni.net/resources/rspec/2",
         "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
     };
+    my $ad_3 = {
+	"type" => "GENI",
+	"version" => $coder->string("3"),
+	"schema" => "http://www.geni.net/resources/rspec/3/ad.xsd",
+        "namespace" => "http://www.geni.net/resources/rspec/3",
+        "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
+    };
 
     my $blob = {
 	"geni_api"   => $API_VERSION,
@@ -140,8 +155,9 @@ sub GetVersion()
 	"code_tag"   => $commithash,
 	# XXX
 	"hostname"   => $hostname,
-	"request_rspec_versions" => [$request_0_1, $request_0_2, $request_2],
-	"ad_rspec_versions" => [$ad_0_1, $ad_0_2, $ad_2],
+	"request_rspec_versions" => [$request_0_1, $request_0_2, $request_2,
+				     $request_3],
+	"ad_rspec_versions" => [$ad_0_1, $ad_0_2, $ad_2, $ad_3],
 	"default_ad_rspec" => $default_ad
     };
     $blob->{"peers"} = $peers
@@ -189,9 +205,10 @@ sub ListResources()
     } else {
 	my $pgversion = undef;
 	if (! defined($version)) {
-	    $pgversion = "0.2";
+	    $pgversion = "2";
 	} elsif (defined($version->{'type'}) &&
-		 lc($version->{'type'}) eq "protogeni") {
+		 (lc($version->{'type'}) eq "protogeni"
+		  || lc($version->{'type'}) eq "geni")) {
 	    $pgversion = $version->{'version'};
 	} else {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
