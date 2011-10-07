@@ -15,10 +15,11 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw(TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
 	     TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
 	     TBGetUniqueIndex ParRun VersionInfo UpdateVersionInfo
-	     SpanningTree);
+	     SpanningTree BackTraceOnWarning);
 
 use emdb;
 use English;
+use Carp;
 
 #
 # Support for checking field values against what is specified.
@@ -597,6 +598,21 @@ sub SpanningTree($)
 	push(@newedges, [$a, $b]);
     }
     return @newedges;
+}
+
+#
+# Toggle backtrace on warning.
+#
+sub BackTraceOnWarning($)
+{
+    my ($enable) = @_;
+
+    if ($enable) {
+	$SIG{__WARN__} = sub { Carp::cluck(@_); };
+    }
+    else {
+	$SIG{__WARN__} = 'DEFAULT';
+    }
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
