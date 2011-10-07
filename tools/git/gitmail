@@ -175,6 +175,13 @@ my $showcommit_extra = get_config("showcommitextra",undef);
 #
 my $exclude_repo = get_config("excluderepo",undef);
 
+#
+# If set, these values will be used to create 'X-Git-Repo-Keyword' headers, one
+# for each value.  This is to facilitate filtering of commit mails for those only
+# interested in certain projects.
+#
+my @repo_keywords = get_config("keyword",undef);
+
 ######################################################################
 # Constants
 ######################################################################
@@ -910,6 +917,10 @@ sub send_mail($$$@) {
         if (defined($reponame)) {
             print MAIL "X-Git-Repo: $reponame\n";
         }
+	if (@repo_keywords) {
+		@repo_keywords = map { split /\s+/ } @repo_keywords;
+		print MAIL "X-Git-Repo-Keyword: $_\n" for (@repo_keywords);
+	}
         print MAIL "X-Git-Ref: $refname\n";
 
         #
