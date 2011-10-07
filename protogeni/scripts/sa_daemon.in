@@ -516,7 +516,7 @@ while (1) {
 			 "Could not reregister resources at the Clearing House\n",
 			 $TBOPS);
 	    }
-	    emutil::UpdateVersionInfo("protogeni_reregister", "1");
+	    emutil::UpdateVersionInfo("protogeni_reregister", "0");
 	}
     }
 
