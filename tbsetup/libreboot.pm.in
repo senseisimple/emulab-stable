@@ -585,7 +585,7 @@ sub RebootNode {
     # stated is controlling the timeouts. Eventually stated gives up and uses
     # the -k option to force a power cycle.
     #
-    if (! TBGetNodeEventState($pc, \$nodestate)) {
+    if ($nodeobject->GetEventState(\$nodestate)) {
 	info("$pc has no event state: power cycle");
 	print STDERR "*** reboot ($pc): no event state; will power cycle.\n"
 	    if $debug;
