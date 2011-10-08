@@ -61,6 +61,18 @@ $isfednode= $row["isfednode"];
 #
 $unroutable = ($ELABINELAB || !strncmp($CONTROL_NETWORK, "192.168.", 8));
 
+#
+# If we need a proxy host, determine whether it is ops or boss.
+# Normally it is ops, unless ops is a VM and it is in an inner elab.
+# In that case, there is no external DNS alias ("myops.eid.pid.emulab.net")
+# created for the inner ops so it cannot be the proxy.
+#
+if ($ELABINELAB && $OPS_VM) {
+    $PROXYNODE = $BOSSNODE;
+} else {
+    $PROXYNODE = $USERNODE;
+}
+
 if (!isset($pid)) {
     USERERROR("$node_id is not allocated to an experiment!", 1);
 }
@@ -93,14 +105,14 @@ if ($isvirt) {
 	# bounce through ops node to get there. They run sshd on
 	# on the standard port, but on a private IP.
 	#
-	echo "gateway: $USERNODE\n";
+	echo "gateway: $PROXYNODE\n";
     }
 }
 elseif ($unroutable) {
     #
     # If nodes are unroutable, gateway via the user node
     #
-    echo "gateway: $USERNODE\n";
+    echo "gateway: $PROXYNODE\n";
 }
 elseif ($issubnode && $class == 'ixp') {
     #
