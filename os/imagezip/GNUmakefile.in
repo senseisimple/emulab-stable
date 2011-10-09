@@ -72,10 +72,10 @@ endif
 #
 WITH_FFS	= 1
 WITH_EXTFS	= 1
+WITH_EXT4FS	= 0
 WITH_NTFS	= @WINSUPPORT@
 WITH_FAT	= @WINSUPPORT@
 WITH_HASH	= 0
-WITH_EXT4FS	= 0
 
 include $(OBJDIR)/Makeconf
 
@@ -153,7 +153,8 @@ endif
 # Once proven, switch to 2.0.0.
 #
 ifndef NTFSVER
-NTFSVER		= 1.7.1
+#NTFSVER		= 1.7.1
+NTFSVER		= 2.0.0
 endif
 export		NTFSVER
 

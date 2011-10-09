@@ -703,6 +703,11 @@ sub check_progress($$)
 {
     my (undef, $statusp) = @_;
 
+    if ($runticks == 0) {
+	print "$node_id: started image capture, ".
+	    "waiting up to " . int($maxwait/60) . " minutes\n";
+    }
+
     #
     # XXX frisbee uploader uploads into a temporary file and then moves
     # it into place. So track that tmp file here.
@@ -717,7 +722,7 @@ sub check_progress($$)
     #
     if (defined($statusp) && $statusp->{$node_id} ne "none") {
 	$result = $statusp->{$node_id};
-	print "$node_id: image capture has completed\n";
+	print "$node_id: image capture has completed: status='$result'\n";
 	return 0;
     }
 
@@ -727,6 +732,7 @@ sub check_progress($$)
     $runticks++;
     if ($runticks >= $maxticks) {
 	$result = "timeout";
+	print "$node_id: image capture has completed: timeout\n";
 	return 0;
     }
 
@@ -749,12 +755,14 @@ sub check_progress($$)
     }
     if ($cursize > $maximagesize) {
 	$result = "toobig";
+	print "$node_id: image capture has completed: image too big\n";
 	return 0;
     }
     if ($cursize == $lastsize) {
 	$idleticks++;
 	if ($idleticks >= $maxidleticks) {
 	    $result = "timeout";
+	    print "$node_id: image capture has completed: idle timeout\n";
 	    return 0;
 	}
     } else {
@@ -764,7 +772,8 @@ sub check_progress($$)
     
     if (($runticks % $reportticks) == 0) {
 	my $curtdiff = int($runticks * $checkwait / 60);
-	print "Still waiting ... its been ". $curtdiff ." minutes.".
+	print "$node_id: still waiting ...".
+	    " it has been ". $curtdiff ." minutes.".
 	    " Current image size: $cursize bytes.\n";
     }
 

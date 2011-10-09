@@ -371,8 +371,6 @@ if ($PGENISUPPORT) {
   require GeniHRN;
 }
 
-use GeniHRN;
-
 sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
