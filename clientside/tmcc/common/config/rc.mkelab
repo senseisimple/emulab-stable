@@ -1830,17 +1830,19 @@ sub SetupBossNode($)
     #
     CreateDefsFile("$TBDIR/src/testbed/defs-elabinelab");
 
-    if ($emulabconfig{"CONFIG_SINGLECNET"}) {
-	#
-	# Hack dhcpd.conf.template to ignore the rest of emulab.
-	# This precludes dynamic node addition 
-	# Might think about allowing back if the experiment is firewalled.
-	#
-	mysystem("cd $TBDIR/src/testbed/dhcpd ; ".
-		 " sed -E -i .orig -e " .
-		 "   's;range .DHCPD_DYNRANGE.;ignore unknown-clients;' ".
-		 "  dhcpd.conf.template.in");
-    }
+    #
+    # Hack dhcpd.conf.template to ignore the rest of emulab.
+    # This precludes dynamic node addition 
+    # Might think about allowing back if the experiment is firewalled.
+    #
+    # Note: we have to do this even when the experiment has a private cnet
+    # (!CONFIG_SINGLECNET) since our dhcpd has to respond to PXE boots on
+    # the real control net.
+    #
+    mysystem("cd $TBDIR/src/testbed/dhcpd ; ".
+	     " sed -E -i .orig -e " .
+	     "   's;range .DHCPD_DYNRANGE.;ignore unknown-clients;' ".
+	     "  dhcpd.conf.template.in");
 
     #
     # Time to set up the ops VM (Jail). 
