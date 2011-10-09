@@ -286,7 +286,7 @@ if ($MAILMANSUPPORT && !$isnonlocal) {
 }
 
 # Skip if user was already an active user; lots of work avoided.
-if (1 || !$wasactive) {
+if (!$wasactive) {
     system("$MKACCT $leader_uid") == 0 or
 	fatal("$MKACCT $leader_uid failed!");
 }

@@ -6,12 +6,6 @@
 
 /*
  * Network routines.
- *
- * WINDOWS specific hacks (according to
- * http://support.microsoft.com/default.aspx?scid=kb;en-us;131978):
- *
- * - cannot disable local echo with IP_MULTICAST_LOOP
- *
  */
 #include <sys/types.h>
 #include <sys/socket.h>

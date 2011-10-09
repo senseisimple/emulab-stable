@@ -32,6 +32,7 @@ use Carp;
 use POSIX;
 use XML::LibXML;
 use XML::Simple;
+use GeniHRN;
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -44,12 +45,7 @@ my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user.
 my $DELAYTHRESH   = @DELAYTHRESH@;
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $OURDOMAIN     = "@OURDOMAIN@";
-my $mycmurn;
-
-if ($PGENISUPPORT) {
-    require GeniHRN;
-    $mycmurn = GeniHRN::Generate("@OURDOMAIN@", "authority", "cm");
-}
+my $mycmurn       = GeniHRN::Generate("@OURDOMAIN@", "authority", "cm");
 
 # Flags.
 $VTOP_FLAGS_VERBOSE	= 0x01;
