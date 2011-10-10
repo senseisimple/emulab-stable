@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -49,11 +49,18 @@ if ($isadmin) {
 }
 else {
     $uid_idx = $this_user->uid_idx();
-    
+
     $query_result =
 	DBQueryFatal("select distinct o.* from os_info as o ".
-		     "left join group_membership as g on g.pid=o.pid ".
-		     "where (g.uid_idx='$uid_idx' or o.shared=1) ".
+		     "left join image_permissions as p1 on ".
+		     "     p1.imageid=o.osid and p1.permission_type='group' ".
+		     "left join image_permissions as p2 on ".
+		     "     p2.imageid=o.osid and p2.permission_type='user' ".
+		     "left join group_membership as g on ".
+		     "     g.pid_idx=o.pid_idx or ".
+		     "     g.gid_idx=p1.permission_idx ".
+		     "where (g.uid_idx='$uid_idx' or o.shared=1 or".
+		     "       p2.permission_idx='$uid_idx') ".
 		     "$extraclause ".
 		     "order by o.osname");
 }

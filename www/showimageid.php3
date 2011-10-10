@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -13,6 +13,7 @@ include("imageid_defs.php");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+$showperms = 1;
 
 #
 # Verify page arguments.
@@ -58,7 +59,7 @@ SUBMENUEND();
 #
 # Dump record.
 # 
-$image->Show();
+$image->Show($showperms);
 
 echo "<br>\n";
 

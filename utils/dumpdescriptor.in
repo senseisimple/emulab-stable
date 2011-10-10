@@ -15,11 +15,12 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print("Usage: dumpimage [-d] [-i <imageid>] | [-o <osid>] \n");
+    print("Usage: dumpimage [-d] [-i <imageid> [-t]] | [-o <osid>] \n");
     exit(-1);
 }
-my $optlist = "di:o:";
+my $optlist = "di:o:t";
 my $debug   = 0;
+my $dotypes = 0;
 
 #
 # Configure variables
@@ -67,6 +68,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"t"})) {
+    $dotypes = 1;
 }
 if (@ARGV) {
     usage();
@@ -154,6 +158,14 @@ sub DumpImage($)
 		    last;
 		}
 	    }
+	}
+    }
+    if ($dotypes) {
+	my @typelist = $image->TypeList();
+	foreach my $nodetype (@typelist) {
+	    my $type = $nodetype->type();
+	    
+	    $xmlfields{"mtype_$type"} = "1";
 	}
     }
     

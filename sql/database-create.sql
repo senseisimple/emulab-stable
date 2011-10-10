@@ -1662,6 +1662,21 @@ CREATE TABLE `image_history` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `image_permissions`
+--
+
+DROP TABLE IF EXISTS `image_permissions`;
+CREATE TABLE `image_permissions` (
+  `imageid` int(8) unsigned NOT NULL default '0',
+  `imagename` varchar(30) NOT NULL default '',
+  `permission_type` enum('user','group') NOT NULL default 'user',
+  `permission_id` varchar(128) NOT NULL default '',
+  `permission_idx` mediumint(8) unsigned NOT NULL default '0',
+  `allow_write` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`imageid`,`permission_type`,`permission_idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `images`
 --
 

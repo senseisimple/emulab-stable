@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2009, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -255,7 +255,50 @@ class OSinfo
 	if (! ($project = Project::Lookup($pid))) {
 	    TBERROR("Could not map project $pid to its object", 1);
 	}
-	return TBMinTrust($project->UserTrust($user), $mintrust);
+	if (TBMinTrust($project->UserTrust($user), $mintrust)) {
+	    return 1;
+	}
+	elseif (!$this->ezid()) {
+	    return 0;
+	}
+	#
+	# If this is an ez image, look in the image permissions.
+        # First look for a user permission, then look for a group permission. 
+	#
+	$osid = $this->osid();
+	$uid_idx = $user->uid_idx();
+	$trust_none = TBDB_TRUSTSTRING_NONE;
+	 
+	$query_result = 
+	    DBQueryFatal("select allow_write from image_permissions ".
+			 "where imageid='$osid' and ".
+			 "      permission_type='user' and ".
+			 "      permission_idx='$uid_idx'");
+	
+	if (mysql_num_rows($query_result)) {
+	    $row  = mysql_fetch_array($query_result);
+
+            # Only allowed to read.
+	    if ($access_type == $TB_OSID_READINFO) 
+		return 1;
+	}
+	$trust_none = TBDB_TRUSTSTRING_NONE;
+	$query_result = 
+	    DBQueryFatal("select allow_write from group_membership as g ".
+			 "left join image_permissions as p on ".
+			 "     p.permission_type='group' and ".
+			 "     p.permission_idx=g.gid_idx ".
+			 "where g.uid_idx='$uid_idx' and ".
+			 "      p.imageid='$osid' and ".
+			 "      trust!='$trust_none'");
+
+	if (mysql_num_rows($query_result)) {
+            # Only allowed to read.
+	    if ($access_type == $TB_OSID_READINFO)
+		return 1;
+	}
+	return 0;
+	
     }
 
     #

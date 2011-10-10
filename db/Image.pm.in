@@ -15,6 +15,7 @@ use vars qw(@ISA @EXPORT);
 
 # Must come after package declaration!
 use libdb;
+use EmulabConstants;
 use libtestbed;
 use English;
 use Data::Dumper;
@@ -576,10 +577,12 @@ sub AccessCheck($$$)
 	print "*** Invalid access type $access_type!\n";
 	return 0;
     }
+    my $isadmin = ((defined($user) && $user->IsAdmin()) ||
+		   ($UID == 0 || $UID eq "root") ? 1 : 0);
+	
     # Admins and root do whatever they want.
     return 1
-	if ((defined($user) && $user->IsAdmin()) ||
-	    ($UID == 0 || $UID eq "root"));
+	if ($isadmin);
 
     my $mintrust;
     
@@ -588,6 +591,9 @@ sub AccessCheck($$$)
     #
     if ($self->global()) {
 	if ($access_type == TB_IMAGEID_READINFO) {
+	    return 1;
+	}
+	if ($access_type == TB_IMAGEID_EXPORT && $isadmin) {
 	    return 1;
 	}
 	return 0;
@@ -612,6 +618,15 @@ sub AccessCheck($$$)
 	    $group = $project->GetProjectGroup();
 	}
     }
+    elsif ($access_type == TB_IMAGEID_EXPORT) {
+	#
+	# Owner or root in the project.
+	#
+	return 1
+	    if ($user->uid_idx() == $self->creator_idx());
+
+	$mintrust = PROJMEMBERTRUST_GROUPROOT;
+    }
     else {
 	$mintrust = PROJMEMBERTRUST_LOCALROOT;
     }
@@ -621,8 +636,64 @@ sub AccessCheck($$$)
     # This lets group_roots muck with other people's experiments, including
     # those in groups they do not belong to.
     #
-    return TBMinTrust($group->Trust($user), $mintrust) ||
-	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT);
+    return 1
+	if (TBMinTrust($group->Trust($user), $mintrust) ||
+	    TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT));
+
+    # No point in looking further; never allowed.
+    return 0
+	if ($access_type == TB_IMAGEID_EXPORT);
+
+    #
+    # Look in the image permissions. First look for a user permission,
+    # then look for a group permission.
+    #
+    my $uid_idx = $user->uid_idx();
+    my $imageid = $self->imageid();
+    
+    my $query_result = 
+	DBQueryWarn("select allow_write from image_permissions ".
+		    "where imageid='$imageid' and ".
+		    "      permission_type='user' and ".
+		    "      permission_idx='$uid_idx'");
+    return 0
+	if (!$query_result);
+    
+    if ($query_result->numrows) {
+	# READINFO is read-only access to the image and its contents.
+	return 1
+	    if ($access_type == TB_IMAGEID_READINFO());
+	
+	if ($access_type == TB_IMAGEID_ACCESS()) {
+	    my ($allow_write) = $query_result->fetchrow_array();
+
+	    return 1
+		if ($allow_write);
+	}
+    }
+    my $trust_none = TBDB_TRUSTSTRING_NONE();
+    $query_result = 
+	DBQueryFatal("select allow_write from group_membership as g ".
+		     "left join image_permissions as p on ".
+		     "     p.permission_type='group' and ".
+		     "     p.permission_idx=g.gid_idx ".
+		     "where g.uid_idx='$uid_idx' and ".
+		     "      p.imageid='$imageid' and ".
+		     "      trust!='$trust_none'");
+
+    if ($query_result->numrows) {
+	# READINFO is read-only access to the image and its contents.
+	return 1
+	    if ($access_type == TB_IMAGEID_READINFO());
+	
+	if ($access_type == TB_IMAGEID_ACCESS()) {
+	    my ($allow_write) = $query_result->fetchrow_array();
+
+	    return 1
+		if ($allow_write);
+	}
+    }
+    return 0;
 }
 
 #
@@ -678,6 +749,87 @@ sub MarkUpdateTime($)
     return 0;
 }
 
+#
+# Get the type list.
+#
+sub TypeList($)
+{
+    my ($self) = @_;
+    require NodeType;
+
+    my @result  = ();
+    my $imageid = $self->imageid();
+
+    my $query_result =
+	DBQueryWarn("select distinct type from osidtoimageid ".
+		    "where imageid='$imageid'");
+    return undef
+	if (!defined($query_result));
+
+    while (my ($type) = $query_result->fetchrow_array()) {
+	my $typeinfo = NodeType->Lookup($type);
+	push(@result, $typeinfo)
+	    if (defined($typeinfo));
+    }
+    return @result;
+}
+
+#
+# Grant/Revoke permission to access an image.
+#
+sub GrantAccess($$$)
+{
+    my ($self, $target, $writable) = @_;
+    $writable = ($writable ? 1 : 0);
+
+    my $imageid   = $self->imageid();
+    my $imagename = $self->imagename();
+    my ($perm_idx, $perm_id, $perm_type);
+
+    if (ref($target) eq "User") {
+	$perm_idx  = $target->uid_idx();
+	$perm_id   = $target->uid();
+	$perm_type = "user";
+    }
+    if (ref($target) eq "Group") {
+	$perm_idx  = $target->gid_idx();
+	$perm_id   = $target->pid() . "/" . $target->gid();
+	$perm_type = "group";
+    }
+
+    return -1
+	if (!DBQueryWarn("replace into image_permissions set ".
+			 "  imageid='$imageid', imagename='$imagename', ".
+			 "  permission_type='$perm_type', ".
+			 "  permission_id='$perm_id', ".
+			 "  permission_idx='$perm_idx', ".
+			 "  allow_write='$writable'"));
+    return 0;
+}
+
+sub RevokeAccess($$)
+{
+    my ($self, $target) = @_;
+
+    my $imageid   = $self->imageid();
+    my ($perm_idx, $perm_type);
+
+    if (ref($target) eq "User") {
+	$perm_idx  = $target->uid_idx();
+	$perm_type = "user";
+    }
+    if (ref($target) eq "Group") {
+	$perm_idx  = $target->gid_idx();
+	$perm_type = "group";
+    }
+
+    return -1
+	if (!DBQueryWarn("delete from image_permissions ".
+			 "where imageid='$imageid' and ".
+			 "  permission_type='$perm_type' and ".
+			 "  permission_idx='$perm_idx'"));
+    return 0;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

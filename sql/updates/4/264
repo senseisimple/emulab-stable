@@ -1,0 +1,24 @@
+#
+# New table to allow cross-project image access.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (! DBTableExists("image_permissions")) {
+	DBQueryFatal("CREATE TABLE `image_permissions` ( ".
+	     " `imageid` int(8) unsigned NOT NULL default '0', ".
+	     " `imagename` varchar(30) NOT NULL default '', ".
+	     " `permission_type` enum('user','group') NOT NULL default 'user', ".
+	     " `permission_id` varchar(128) NOT NULL default '', ".
+	     " `permission_idx` mediumint(8) unsigned NOT NULL default '0', ".
+	     " `allow_write` tinyint(1) NOT NULL default '0', ".
+	     " PRIMARY KEY  (`imageid`,`permission_type`,`permission_idx`) ".
+	     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    return 0;
+}
+1;

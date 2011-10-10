@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -61,8 +61,15 @@ else {
     
     $query_result =
 	DBQueryFatal("select distinct i.* from images as i ".
-		     "left join group_membership as g on g.pid=i.pid ".
-		     "where (g.uid_idx='$uid_idx' or i.global) ".
+		     "left join image_permissions as p1 on ".
+		     "     p1.imageid=i.imageid and p1.permission_type='group' ".
+		     "left join image_permissions as p2 on ".
+		     "     p2.imageid=i.imageid and p2.permission_type='user' ".
+		     "left join group_membership as g on ".
+		     "     g.pid_idx=i.pid_idx or ".
+		     "     g.gid_idx=p1.permission_idx ".
+		     "where (g.uid_idx='$uid_idx' or i.global or".
+		     "       p2.permission_idx='$uid_idx') ".
 		     "$extraclause ".
 		     "order by i.imagename");
 }

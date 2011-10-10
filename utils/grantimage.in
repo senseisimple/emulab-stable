@@ -1,0 +1,177 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Grant and revoke permission to use specific images.
+#
+sub usage()
+{
+    print STDERR "Usage: grantimage [-r] [-w] [-g <gid> | -u <uid>] <imageid>\n";
+    print STDERR "       grantimage -l <imageid>\n";
+    print STDERR "	-h   This message\n";
+    print STDERR "	-l   List permissions\n";
+    print STDERR "	-w   Grant write permission; defaults to read only\n";
+    print STDERR "	-r   Revoke access instead of grant\n";
+    exit(-1);
+}
+my $optlist  = "hg:dnru:wl";
+my $impotent = 0;
+my $debug    = 0;
+my $revoke   = 0;
+my $writable = 0;
+my $listonly = 0;
+my $gid;
+my $uid;
+my $target;
+
+# Protos
+sub fatal($);
+
+#
+# Please do not run as root. Hard to track what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Configure variables
+#
+my $TB		 = "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use emdb;
+use EmulabConstants;
+use libtestbed;
+use Experiment;
+use Project;
+use Group;
+use User;
+use Image;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{h})) {
+    usage();
+}
+if (defined($options{l})) {
+    $listonly = 1;
+}
+if (defined($options{n})) {
+    $impotent = 1;
+}
+if (defined($options{r})) {
+    $revoke = 1;
+}
+if (defined($options{d})) {
+    $debug = 1;
+}
+if (defined($options{w})) {
+    $writable = 1;
+}
+if (defined($options{g})) {
+    $gid = $options{g};
+}
+if (defined($options{u})) {
+    $uid = $options{u};
+}
+usage()
+    if (@ARGV != 1);
+usage()
+    if (! ($listonly || defined($gid) || defined($uid)));
+
+my $imageid = $ARGV[0];
+
+#
+# Verify user.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+if (defined($gid)) {
+    $target = Group->Lookup($gid);
+    if (!defined($target)) {
+	fatal("No such project or group $gid\n");
+    }
+}
+elsif (defined($uid)) {
+    $target = User->Lookup($uid);
+    if (!defined($target)) {
+	fatal("No such user $uid\n");
+    }
+}
+my $image = Image->Lookup($imageid);
+if (!defined($image)) {
+    fatal("No such image exists");
+}
+$imageid = $image->imageid();
+    
+# User must have permission.
+if (! $image->AccessCheck($this_user, TB_IMAGEID_EXPORT())) {
+    fatal("You do not have permission to change the external permissions");
+}
+
+if ($listonly) {
+    my $query_result =
+	DBQueryFatal("select * from image_permissions ".
+		     "where imageid='$imageid'");
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $perm_type = $row->{'permission_type'};
+	my $perm_id   = $row->{'permission_id'};
+	my $perm_idx  = $row->{'permission_idx'};
+	my $write     = $row->{'allow_write'};
+
+	print "$perm_type: $perm_id ($perm_idx) ";
+	print "writable" if ($write);
+	print "\n";
+    }
+    exit(0);
+}
+elsif ($revoke) {
+    $image->RevokeAccess($target) == 0
+	or fatal("Could not revoke permission for $target");
+}
+else {
+    $image->GrantAccess($target, $writable) == 0
+	or fatal("Could not grant permission for $target");
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+

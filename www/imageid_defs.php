@@ -340,9 +340,13 @@ class Image
 
 	$shared = $this->shared();
 	$global = $this->isglobal();
+	$imageid= $this->imageid();
 	$pid    = $this->pid();
 	$gid    = $this->gid();
 	$uid    = $user->uid();
+	$uid_idx= $user->uid_idx();
+	$pid_idx= $user->uid_idx();
+	$gid_idx= $user->uid_idx();
 
         #
         # Global ImageIDs can be read by anyone but written by Admins only.
@@ -369,8 +373,50 @@ class Image
 	    $mintrust = $TBDB_TRUST_LOCALROOT;
 	}
 
-	return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	    TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
+	if (TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
+	    TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
+	    return 1;
+	}
+        # No point in looking further; never allowed.
+	if ($access_type == $TB_IMAGEID_EXPORT) {
+	    return 0;
+	}
+	
+	#
+	# Look in the image permissions. First look for a user permission,
+	# then look for a group permission.
+	#
+	$query_result = 
+	    DBQueryFatal("select allow_write from image_permissions ".
+			 "where imageid='$imageid' and ".
+			 "      permission_type='user' and ".
+			 "      permission_idx='$uid_idx'");
+	
+	if (mysql_num_rows($query_result)) {
+	    $row  = mysql_fetch_array($query_result);
+
+            # Only allowed to read.
+	    if ($access_type == $TB_IMAGEID_READINFO ||
+		$access_type == $TB_IMAGEID_ACCESS)
+		return 1;
+	}
+	$trust_none = TBDB_TRUSTSTRING_NONE;
+	$query_result = 
+	    DBQueryFatal("select allow_write from group_membership as g ".
+			 "left join image_permissions as p on ".
+			 "     p.permission_type='group' and ".
+			 "     p.permission_idx=g.gid_idx ".
+			 "where g.uid_idx='$uid_idx' and ".
+			 "      p.imageid='$imageid' and ".
+			 "      trust!='$trust_none'");
+
+	if (mysql_num_rows($query_result)) {
+            # Only allowed to read.
+	    if ($access_type == $TB_IMAGEID_READINFO ||
+		$access_type == $TB_IMAGEID_ACCESS)
+		return 1;
+	}
+	return 0;
     }
 
     #
@@ -404,7 +450,7 @@ class Image
 	return $this->group;
     }
 
-    function Show() {
+    function Show($showperms = 0) {
 	$imageid	= $this->imageid();
 	$imagename	= $this->imagename();
 	$pid		= $this->pid();
@@ -574,6 +620,58 @@ class Image
                 <td>UUID: </td>
                 <td class=left>$uuid</td>
               </tr>\n";
+
+	#
+	# Show who all can access this image outside the project.
+	#
+	if ($showperms) {
+	    $query_result =
+		DBQueryFatal("select * from image_permissions ".
+			     "where imageid='$imageid' ".
+			     "order by permission_type,permission_id");
+	    if (mysql_num_rows($query_result)) {
+		echo "<tr>
+                      <td align=center colspan=2>
+                      External permissions
+                      </td>
+                  </tr>\n";
+
+		while ($row = mysql_fetch_array($query_result)) {
+		    $perm_type = $row['permission_type'];
+		    $perm_idx  = $row['permission_idx'];
+		    $writable  = $row['allow_write'];
+
+		    if ($writable) {
+			$writable = "(read/write)";
+		    }
+		    else {
+			$writable = "(read only)";
+		    }
+
+		    if ($perm_type == "user") {
+			$user = User::Lookup($perm_idx);
+			if (isset($user)) {
+			    $uid = $user->uid();
+			    echo "<tr>
+                                    <td>User: </td>
+                                    <td class=left>$uid $writable</td>
+                                  </tr>\n";
+			}
+		    }
+		    elseif ($perm_type == "group") {
+			$group = Group::Lookup($perm_idx);
+			if (isset($group)) {
+			    $pid = $group->pid();
+			    $gid = $group->gid();
+			    echo "<tr>
+                                    <td>Group: </td>
+                                    <td class=left>$pid/$gid $writable</td>
+                                  </tr>\n";
+			}
+		    }
+		}
+	    }
+	}
 
 	echo "</table>\n";
     }
