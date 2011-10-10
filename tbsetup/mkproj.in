@@ -285,8 +285,16 @@ if ($MAILMANSUPPORT && !$isnonlocal) {
 	fatal("$ADDMMLIST -a ${pid}-users failed!");
 }
 
+#
 # Skip if user was already an active user; lots of work avoided.
-if (!$wasactive) {
+#
+# XXX cannot do this for elabinelab since DB has been pre-loaded with
+# state that will make it appear that the initial project leader is active
+# when in fact the account has not been created. This is only during
+# elabinelab setup and when the swapper is the project leader, so a more
+# precise fix is possible.
+#
+if ($ELABINELAB || !$wasactive) {
     system("$MKACCT $leader_uid") == 0 or
 	fatal("$MKACCT $leader_uid failed!");
 }
