@@ -42,12 +42,19 @@ endif
 endif
 endif
 
+#ifndef WITH_MSERVER_NULL
 WITH_MSERVER_NULL	= 1
+#endif
+#ifndef WITH_MSERVER_EMULAB
 WITH_MSERVER_EMULAB	= 1
+#endif
 
 include $(OBJDIR)/Makeconf
 
 all:	frisbee frisbeed mfrisbeed frisupload frisuploadd
+
+subboss:
+	$(MAKE) WITH_MSERVER_EMULAB=0 all
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -188,10 +195,8 @@ frisuploadd-debug: $(UPLOADDOBJS)
 #	cp frisuploadd frisuploadd.debug
 #	strip frisuploadd
 
-mfrisbeed: $(MSERVEROBJS)
-	$(CC) $(LDFLAGS) $(MSERVERFLAGS) $(MSERVEROBJS) $(MSERVERLIBS) -o mfrisbeed
-	cp mfrisbeed mfrisbeed.debug
-	strip mfrisbeed
+mfrisbeed-debug: $(MSERVEROBJS)
+	$(CC) $(LDFLAGS) $(MSERVERFLAGS) $(MSERVEROBJS) $(MSERVERLIBS) -o $@
 
 frisuploader.o: $(SRCDIR)/frisuploader.c decls.h uploadio.h
 	$(CC) -c $(UPLOADDFLAGS) $(SRCDIR)/frisuploader.c
@@ -233,6 +238,9 @@ network.o:	decls.h utils.h
 trace.o:	decls.h trace.h log.h
 
 install:	$(INSTALL_SBINDIR)/mfrisbeed $(INSTALL_SBINDIR)/frisbeed $(INSTALL_SBINDIR)/frisbee $(INSTALL_SBINDIR)/frisuploadd
+
+subboss-install: subboss
+	$(MAKE) WITH_MSERVER_EMULAB=0 install
 
 client: frisbee frisupload
 

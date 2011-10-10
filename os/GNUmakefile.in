@@ -49,13 +49,13 @@ endif
 	$(MAKE) -C frisbee.redux client-install
 
 subboss: client
-	$(MAKE) -C frisbee.redux all
+	$(MAKE) -C frisbee.redux subboss
 
 subboss-install: subboss client-install
 ifeq ($(SYSTEM),FreeBSD)
-	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux install
+	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux subboss-install
 else
-	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C frisbee.redux install
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C frisbee.redux subboss-install
 endif
 
 mfs:
