@@ -13,20 +13,25 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: grantimage [-r] [-w] [-g <gid> | -u <uid>] <imageid>\n";
+    print STDERR "Usage: grantimage [-r] [-w] ";
+    print STDERR "[-g <gid> | -u <uid> | -a] <imageid>\n";
     print STDERR "       grantimage -l <imageid>\n";
     print STDERR "	-h   This message\n";
     print STDERR "	-l   List permissions\n";
     print STDERR "	-w   Grant write permission; defaults to read only\n";
     print STDERR "	-r   Revoke access instead of grant\n";
+    print STDERR "	-u   Grant access to a specific user\n";
+    print STDERR "	-g   Grant access to a specific group (project)\n";
+    print STDERR "	-a   Grant global read-only access\n";
     exit(-1);
 }
-my $optlist  = "hg:dnru:wl";
+my $optlist  = "hg:dnru:wla";
 my $impotent = 0;
 my $debug    = 0;
 my $revoke   = 0;
 my $writable = 0;
 my $listonly = 0;
+my $global   = 0;
 my $gid;
 my $uid;
 my $target;
@@ -59,6 +64,7 @@ use Project;
 use Group;
 use User;
 use Image;
+use OSinfo;
 
 #
 # Turn off line buffering on output
@@ -87,6 +93,9 @@ if (defined($options{l})) {
 if (defined($options{n})) {
     $impotent = 1;
 }
+if (defined($options{a})) {
+    $global = 1;
+}
 if (defined($options{r})) {
     $revoke = 1;
 }
@@ -105,7 +114,7 @@ if (defined($options{u})) {
 usage()
     if (@ARGV != 1);
 usage()
-    if (! ($listonly || defined($gid) || defined($uid)));
+    if (! ($listonly || $global || defined($gid) || defined($uid)));
 
 my $imageid = $ARGV[0];
 
@@ -156,6 +165,22 @@ if ($listonly) {
 	print "\n";
     }
     exit(0);
+}
+elsif ($global) {
+    my $val = ($revoke ? 0 : 1);
+    $image->Update({"global" => $val}) == 0
+	or fatal("Could not update global flag");
+    
+    if ($image->ezid()) {
+	my $osinfo = OSinfo->Lookup($image->imageid());
+	if (defined($osinfo)) {
+	    $osinfo->Update({"shared" => $val}) == 0
+		or fatal("Could not update shared flag");
+	}
+	else {
+	    fatal("Could not lookup OSinfo for $image");
+	}
+    }
 }
 elsif ($revoke) {
     $image->RevokeAccess($target) == 0

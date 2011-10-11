@@ -596,7 +596,6 @@ sub AccessCheck($$$)
 	if ($access_type == TB_IMAGEID_EXPORT && $isadmin) {
 	    return 1;
 	}
-	return 0;
     }
 
     my $project = $self->GetProject();
