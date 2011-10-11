@@ -912,17 +912,6 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "Malformed image URN: $dname");
 		    goto bad;
 		}
-		#
-		# For now, the project has to be emulab-ops or the
-		# the current project.
-		#
-		if (! ($ospid eq TBOPSPID() ||
-		       $ospid eq $slice_experiment->pid())) {
-		    $response =
-			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				 "Illegal project name in URN: $dname");
-		    goto bad;
-		}
 		my $osinfo = OSinfo->Lookup($ospid, $os);
 		if (!defined($osinfo)) {
 		    $response =
@@ -931,9 +920,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		#
+		# The OS must be in the current project, or it must
+		# be global (okay, shared).
+		#
+		if (! ($osinfo->shared() ||
+		       $osinfo->pid() eq $slice_experiment->pid())) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				 "Insufficient permission to use $osinfo");
+		    goto bad;
+		}
+		
+		#
 		# This is only going to be used in raw mode. 
 		#
-		$osname = $os;
+		$osname = "$ospid/$os";
 	    }
 	}
 

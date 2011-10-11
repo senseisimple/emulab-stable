@@ -1,0 +1,31 @@
+#
+# Allow pid/osname in virt_nodes.
+#
+use strict;
+use libdb;
+
+my $impotent = 0;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    my $type = DBSlotType("virt_nodes", "osname");
+    if (! ($type =~ /128/)) {
+	DBQueryFatal("alter table virt_nodes modify ".
+		     " `osname` varchar(128) default NULL");
+    }
+    $type = DBSlotType("virt_nodes", "parent_osname");
+    if (! ($type =~ /128/)) {
+	DBQueryFatal("alter table virt_nodes modify ".
+		     " `parent_osname` varchar(128) default NULL");
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "  ('virt_nodes','osname','text','regex',".
+		 "   '^([-\\\\w]+\\\\/{0,1})[-\\\\w\\\\.+]+\$',2,128,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "  ('virt_nodes','parent_osname','text','regex',".
+		 "   '^([-\\\\w]+\\\\/{0,1})[-\\\\w\\\\.+]+\$',2,128,NULL)");
+
+    return 0;
+}

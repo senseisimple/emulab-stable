@@ -844,7 +844,6 @@ REPLACE INTO table_regex VALUES ('virt_node_desires','weight','int','redirect','
 REPLACE INTO table_regex VALUES ('virt_nodes','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','ips','text','regex','^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*$',0,2048,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','cmd_line','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','rpms','text','regex','^([-\\w\\.\\/\\+:~]+;{0,1})*$',0,4096,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','deltas','text','regex','^([-\\w\\.\\/\\+]+:{0,1})*$',0,1024,NULL);
@@ -856,7 +855,8 @@ REPLACE INTO table_regex VALUES ('virt_nodes','failureaction','text','regex','^(
 REPLACE INTO table_regex VALUES ('virt_nodes','routertype','text','regex','^(none|ospf|static|manual|static-ddijk|static-old)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','redirect','default:tinytext',0,128,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','sharing_mode','text','regex','^[-\\w]+$',1,32,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','parent_osname','text','redirect','os_info:osname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','osname','text','regex','^([-\\w]+\\/{0,1})[-\\w\\.+]+$',2,128,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','parent_osname','text','regex','^([-\\w]+\\/{0,1})[-\\w\\.+]+$',2,128,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','vnode','text','redirect','virt_nodes:vname',0,0,NULL);

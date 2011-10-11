@@ -644,14 +644,35 @@ sub GenDefsFile($)
     if (defined($pid)) {
 	print TCL "# OSIDs\n";
 	$query_result =
-	    DBQueryFatal("select osname from os_info ".
+	    DBQueryFatal("select pid,osname from os_info ".
 			 "where shared=1 or pid='$pid'");
 		     
-	while (my ($osname) = $query_result->fetchrow_array()) {
+	while (my ($pid,$osname) = $query_result->fetchrow_array()) {
 	    print TCL "set osids($osname) 1\n";
+	    print TCL "set osids($pid/$osname) 1\n";
 	}
 	print TCL "\n";
+	print TCL "# External OSIDs\n";
 
+	if (defined($this_user)) {
+	    my $uid_idx = $this_user->uid_idx();
+	    $query_result =
+		DBQueryFatal("select distinct o.pid,o.osname from os_info as o ".
+			 "left join image_permissions as p1 on ".
+			 "     p1.imageid=o.osid and p1.permission_type='group' ".
+			 "left join image_permissions as p2 on ".
+			 "     p2.imageid=o.osid and p2.permission_type='user' ".
+			 "left join group_membership as g on ".
+			 "     g.gid_idx=p1.permission_idx ".
+			 "where o.ezid!=0 and ".
+			 "      (g.uid_idx='$uid_idx' or ".
+			 "       p2.permission_idx='$uid_idx')");
+
+	    while (my ($pid,$osname) = $query_result->fetchrow_array()) {
+		print TCL "set osids($pid/$osname) 1\n";
+	    }
+	    print TCL "\n";
+	}
 	print TCL "# subOSIDs and parent OSIDs (default parent first element)\n";
 	$query_result =
 	    DBQueryFatal("select oi.osname,oi3.osname," . 
