@@ -160,9 +160,6 @@ struct slicemap fsmap[] = {
 #endif
 #ifdef WITH_EXTFS
 	{ DOSPTYP_LINUX,	"Linux EXT",	read_linuxslice },
-#if 0
-	{ DOSPTYP_EXT4,		"Linux EXT4",	read_ext4slice },
-#endif
 	{ DOSPTYP_LINSWP,	"Linux SWP",	read_linuxswap },
 #endif
 #ifdef WITH_NTFS

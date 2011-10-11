@@ -135,13 +135,6 @@ SUBDIRS		+= extfs
 ZIPLIBS		+= extfs/libextfs.a
 endif
 
-# EXT4
-ifeq ($(WITH_EXT4FS),1)
-CFLAGS		+= -DWITH_EXT4FS
-SUBDIRS		+= ext4fs
-ZIPLIBS		+= ext4fs/libext4fs.a
-endif
-
 # with NTFS
 ifeq ($(WITH_NTFS),1)
 ifndef HAVE_GCC3

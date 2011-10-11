@@ -13,8 +13,8 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#ifndef _LINUX_EXT2_FS_H
-#define _LINUX_EXT2_FS_H
+#ifndef _LINUX_EXT4_FS_H
+#define _LINUX_EXT4_FS_H
 
 #include "linux_types.h"
 
@@ -23,181 +23,177 @@
  */
 
 /*
- * Define EXT2FS_DEBUG to produce debug messages
+ * Define EXT4FS_DEBUG to produce debug messages
  */
-#undef EXT2FS_DEBUG
+#undef EXT4FS_DEBUG
 
 /*
- * Define EXT2_PREALLOCATE to preallocate data blocks for expanding files
+ * Define EXT4_PREALLOCATE to preallocate data blocks for expanding files
  */
-#define EXT2_PREALLOCATE
-#define EXT2_DEFAULT_PREALLOC_BLOCKS	8
+#define EXT4_PREALLOCATE
+#define EXT4_DEFAULT_PREALLOC_BLOCKS	8
 
 /*
  * The second extended file system version
  */
-#define EXT2FS_DATE		"95/08/09"
-#define EXT2FS_VERSION		"0.5b"
+#define EXT4FS_DATE		"95/08/09"
+#define EXT4FS_VERSION		"0.5b"
 
 /*
  * Special inodes numbers
  */
-#define	EXT2_BAD_INO		 1	/* Bad blocks inode */
-#define EXT2_ROOT_INO		 2	/* Root inode */
-#define EXT2_ACL_IDX_INO	 3	/* ACL inode */
-#define EXT2_ACL_DATA_INO	 4	/* ACL inode */
-#define EXT2_BOOT_LOADER_INO	 5	/* Boot loader inode */
-#define EXT2_UNDEL_DIR_INO	 6	/* Undelete directory inode */
+#define	EXT4_BAD_INO		 1	/* Bad blocks inode */
+#define EXT4_ROOT_INO		 2	/* Root inode */
+#define EXT4_ACL_IDX_INO	 3	/* ACL inode */
+#define EXT4_ACL_DATA_INO	 4	/* ACL inode */
+#define EXT4_BOOT_LOADER_INO	 5	/* Boot loader inode */
+#define EXT4_UNDEL_DIR_INO	 6	/* Undelete directory inode */
 
 /* First non-reserved inode for old ext2 filesystems */
-#define EXT2_GOOD_OLD_FIRST_INO	11
+#define EXT4_GOOD_OLD_FIRST_INO	11
 
 /*
  * The second extended file system magic number
  */
-#define EXT2_SUPER_MAGIC	0xEF53
+#define EXT4_SUPER_MAGIC	0xEF53
+#define EXT4_SUPER_MAGIC	0xEF53
 
 /*
  * Maximal count of links to a file
  */
-#define EXT2_LINK_MAX		32000
+#define EXT4_LINK_MAX		32000
 
 /*
  * Macro-instructions used to manage several block sizes
  */
-#define EXT2_MIN_BLOCK_SIZE		1024
-#define	EXT2_MAX_BLOCK_SIZE		4096
-#define EXT2_MIN_BLOCK_LOG_SIZE		  10
+#define EXT4_MIN_BLOCK_SIZE             1024
+#define EXT4_MAX_BLOCK_SIZE             65536
+#define EXT4_MIN_BLOCK_LOG_SIZE         10
 #ifdef __KERNEL__
-# define EXT2_BLOCK_SIZE(s)		((s)->s_blocksize)
+# define EXT4_BLOCK_SIZE(s)             ((s)->s_blocksize)
 #else
-# define EXT2_BLOCK_SIZE(s)		(EXT2_MIN_BLOCK_SIZE << (s)->s_log_block_size)
+# define EXT4_BLOCK_SIZE(s)             (EXT4_MIN_BLOCK_SIZE << (s)->s_log_block_size)
 #endif
-#define EXT2_ACLE_PER_BLOCK(s)		(EXT2_BLOCK_SIZE(s) / sizeof (struct ext2_acl_entry))
-#define	EXT2_ADDR_PER_BLOCK(s)		(EXT2_BLOCK_SIZE(s) / sizeof (__u32))
+#define EXT4_ADDR_PER_BLOCK(s)          (EXT4_BLOCK_SIZE(s) / sizeof(__u32))
 #ifdef __KERNEL__
-# define EXT2_BLOCK_SIZE_BITS(s)	((s)->s_blocksize_bits)
+# define EXT4_BLOCK_SIZE_BITS(s)        ((s)->s_blocksize_bits)
 #else
-# define EXT2_BLOCK_SIZE_BITS(s)	((s)->s_log_block_size + 10)
+# define EXT4_BLOCK_SIZE_BITS(s)        ((s)->s_log_block_size + 10)
 #endif
 #ifdef __KERNEL__
-#define	EXT2_ADDR_PER_BLOCK_BITS(s)	((s)->u.ext2_sb.s_addr_per_block_bits)
-#define EXT2_INODE_SIZE(s)		((s)->u.ext2_sb.s_inode_size)
-#define EXT2_FIRST_INO(s)		((s)->u.ext2_sb.s_first_ino)
+#define EXT4_ADDR_PER_BLOCK_BITS(s)     (EXT4_SB(s)->s_addr_per_block_bits)
+#define EXT4_INODE_SIZE(s)              (EXT4_SB(s)->s_inode_size)
+#define EXT4_FIRST_INO(s)               (EXT4_SB(s)->s_first_ino)
 #else
-#define EXT2_INODE_SIZE(s)	(((s)->s_rev_level == EXT2_GOOD_OLD_REV) ? \
-				 EXT2_GOOD_OLD_INODE_SIZE : \
-				 (s)->s_inode_size)
-#define EXT2_FIRST_INO(s)	(((s)->s_rev_level == EXT2_GOOD_OLD_REV) ? \
-				 EXT2_GOOD_OLD_FIRST_INO : \
-				 (s)->s_first_ino)
+#define EXT4_INODE_SIZE(s)      (((s)->s_rev_level == EXT4_GOOD_OLD_REV) ? \
+                                 EXT4_GOOD_OLD_INODE_SIZE : \
+                                 (s)->s_inode_size)
+#define EXT4_FIRST_INO(s)       (((s)->s_rev_level == EXT4_GOOD_OLD_REV) ? \
+                                 EXT4_GOOD_OLD_FIRST_INO : \
+                                 (s)->s_first_ino)
 #endif
+#define EXT4_BLOCK_ALIGN(size, blkbits)         ALIGN((size), (1 << (blkbits)))
 
 /*
  * Macro-instructions used to manage fragments
  */
-#define EXT2_MIN_FRAG_SIZE		1024
-#define	EXT2_MAX_FRAG_SIZE		4096
-#define EXT2_MIN_FRAG_LOG_SIZE		  10
+#define EXT4_MIN_FRAG_SIZE		1024
+#define	EXT4_MAX_FRAG_SIZE		4096
+#define EXT4_MIN_FRAG_LOG_SIZE		  10
 #ifdef __KERNEL__
-# define EXT2_FRAG_SIZE(s)		((s)->u.ext2_sb.s_frag_size)
-# define EXT2_FRAGS_PER_BLOCK(s)	((s)->u.ext2_sb.s_frags_per_block)
+# define EXT4_FRAG_SIZE(s)		((s)->u.ext2_sb.s_frag_size)
+# define EXT4_FRAGS_PER_BLOCK(s)	((s)->u.ext2_sb.s_frags_per_block)
 #else
-# define EXT2_FRAG_SIZE(s)		(EXT2_MIN_FRAG_SIZE << (s)->s_log_frag_size)
-# define EXT2_FRAGS_PER_BLOCK(s)	(EXT2_BLOCK_SIZE(s) / EXT2_FRAG_SIZE(s))
+# define EXT4_FRAG_SIZE(s)		(EXT4_MIN_FRAG_SIZE << (s)->s_log_frag_size)
+# define EXT4_FRAGS_PER_BLOCK(s)	(EXT4_BLOCK_SIZE(s) / EXT4_FRAG_SIZE(s))
 #endif
 
-/*
- * ACL structures
- */
-struct ext2_acl_header	/* Header of Access Control Lists */
+/* EXT4 group desc */
+
+struct ext4_group_desc
 {
-	__u32	aclh_size;
-	__u32	aclh_file_count;
-	__u32	aclh_acle_count;
-	__u32	aclh_first_acle;
+        __u32  bg_block_bitmap_lo;     /* Blocks bitmap block */
+        __u32  bg_inode_bitmap_lo;     /* Inodes bitmap block */
+        __u32  bg_inode_table_lo;      /* Inodes table block */
+        __u16  bg_free_blocks_count_lo;/* Free blocks count */
+        __u16  bg_free_inodes_count_lo;/* Free inodes count */
+        __u16  bg_used_dirs_count_lo;  /* Directories count */
+        __u16  bg_flags;               /* EXT4_BG_flags (INODE_UNINIT, etc) */
+        __u32  bg_reserved[2];         /* Likely block/inode bitmap checksum */
+        __u16  bg_itable_unused_lo;    /* Unused inodes count */
+        __u16  bg_checksum;            /* crc16(sb_uuid+group+desc) */
+        __u32  bg_block_bitmap_hi;     /* Blocks bitmap block MSB */
+        __u32  bg_inode_bitmap_hi;     /* Inodes bitmap block MSB */
+        __u32  bg_inode_table_hi;      /* Inodes table block MSB */
+        __u16  bg_free_blocks_count_hi;/* Free blocks count MSB */
+        __u16  bg_free_inodes_count_hi;/* Free inodes count MSB */
+        __u16  bg_used_dirs_count_hi;  /* Directories count MSB */
+        __u16  bg_itable_unused_hi;    /* Unused inodes count MSB */
+        __u32   bg_reserved2[3];
 };
 
-struct ext2_acl_entry	/* Access Control List Entry */
-{
-	__u32	acle_size;
-	__u16	acle_perms;	/* Access permissions */
-	__u16	acle_type;	/* Type of entry */
-	__u16	acle_tag;	/* User or group identity */
-	__u16	acle_pad1;
-	__u32	acle_next;	/* Pointer on next entry for the */
-					/* same inode or on next free entry */
-};
-
-/*
- * Structure of a blocks group descriptor
- */
-struct ext2_group_desc
-{
-	__u32	bg_block_bitmap;		/* Blocks bitmap block */
-	__u32	bg_inode_bitmap;		/* Inodes bitmap block */
-	__u32	bg_inode_table;		/* Inodes table block */
-	__u16	bg_free_blocks_count;	/* Free blocks count */
-	__u16	bg_free_inodes_count;	/* Free inodes count */
-	__u16	bg_used_dirs_count;	/* Directories count */
-	__u16	bg_pad;
-	__u32	bg_reserved[3];
-};
+#define EXT4_BG_INODE_UNINIT    0x0001 /* Inode table/bitmap not in use */
+#define EXT4_BG_BLOCK_UNINIT    0x0002 /* Block bitmap not in use */
+#define EXT4_BG_INODE_ZEROED    0x0004 /* On-disk itable initialized to zero */
 
 /*
  * Macro-instructions used to manage group descriptors
  */
+#define EXT4_MIN_DESC_SIZE              32
+#define EXT4_MIN_DESC_SIZE_64BIT        64
+#define EXT4_MAX_DESC_SIZE              EXT4_MIN_BLOCK_SIZE
+#define EXT4_DESC_SIZE(s)               (EXT4_SB(s)->s_desc_size)
 #ifdef __KERNEL__
-# define EXT2_BLOCKS_PER_GROUP(s)	((s)->u.ext2_sb.s_blocks_per_group)
-# define EXT2_DESC_PER_BLOCK(s)		((s)->u.ext2_sb.s_desc_per_block)
-# define EXT2_INODES_PER_GROUP(s)	((s)->u.ext2_sb.s_inodes_per_group)
-# define EXT2_DESC_PER_BLOCK_BITS(s)	((s)->u.ext2_sb.s_desc_per_block_bits)
+# define EXT4_BLOCKS_PER_GROUP(s)       (EXT4_SB(s)->s_blocks_per_group)
+# define EXT4_DESC_PER_BLOCK(s)         (EXT4_SB(s)->s_desc_per_block)
+# define EXT4_INODES_PER_GROUP(s)       (EXT4_SB(s)->s_inodes_per_group)
+# define EXT4_DESC_PER_BLOCK_BITS(s)    (EXT4_SB(s)->s_desc_per_block_bits)
 #else
-# define EXT2_BLOCKS_PER_GROUP(s)	((s)->s_blocks_per_group)
-# define EXT2_DESC_PER_BLOCK(s)		(EXT2_BLOCK_SIZE(s) / sizeof (struct ext2_group_desc))
-# define EXT2_INODES_PER_GROUP(s)	((s)->s_inodes_per_group)
+# define EXT4_BLOCKS_PER_GROUP(s)       ((s)->s_blocks_per_group)
+# define EXT4_DESC_PER_BLOCK(s)         (EXT4_BLOCK_SIZE(s) / EXT4_DESC_SIZE(s))
+# define EXT4_INODES_PER_GROUP(s)       ((s)->s_inodes_per_group)
 #endif
 
 /*
  * Constants relative to the data blocks
  */
-#define	EXT2_NDIR_BLOCKS		12
-#define	EXT2_IND_BLOCK			EXT2_NDIR_BLOCKS
-#define	EXT2_DIND_BLOCK			(EXT2_IND_BLOCK + 1)
-#define	EXT2_TIND_BLOCK			(EXT2_DIND_BLOCK + 1)
-#define	EXT2_N_BLOCKS			(EXT2_TIND_BLOCK + 1)
+#define	EXT4_NDIR_BLOCKS		12
+#define	EXT4_IND_BLOCK			EXT4_NDIR_BLOCKS
+#define	EXT4_DIND_BLOCK			(EXT4_IND_BLOCK + 1)
+#define	EXT4_TIND_BLOCK			(EXT4_DIND_BLOCK + 1)
+#define	EXT4_N_BLOCKS			(EXT4_TIND_BLOCK + 1)
 
 /*
  * Inode flags
  */
-#define	EXT2_SECRM_FL			0x00000001 /* Secure deletion */
-#define	EXT2_UNRM_FL			0x00000002 /* Undelete */
-#define	EXT2_COMPR_FL			0x00000004 /* Compress file */
-#define EXT2_SYNC_FL			0x00000008 /* Synchronous updates */
-#define EXT2_IMMUTABLE_FL		0x00000010 /* Immutable file */
-#define EXT2_APPEND_FL			0x00000020 /* writes to file may only append */
-#define EXT2_NODUMP_FL			0x00000040 /* do not dump file */
-#define EXT2_NOATIME_FL			0x00000080 /* do not update atime */
+#define	EXT4_SECRM_FL			0x00000001 /* Secure deletion */
+#define	EXT4_UNRM_FL			0x00000002 /* Undelete */
+#define	EXT4_COMPR_FL			0x00000004 /* Compress file */
+#define EXT4_SYNC_FL			0x00000008 /* Synchronous updates */
+#define EXT4_IMMUTABLE_FL		0x00000010 /* Immutable file */
+#define EXT4_APPEND_FL			0x00000020 /* writes to file may only append */
+#define EXT4_NODUMP_FL			0x00000040 /* do not dump file */
+#define EXT4_NOATIME_FL			0x00000080 /* do not update atime */
 /* Reserved for compression usage... */
-#define EXT2_DIRTY_FL			0x00000100
-#define EXT2_COMPRBLK_FL		0x00000200 /* One or more compressed clusters */
-#define EXT2_NOCOMPR_FL 		0x00000400 /* Access raw compressed data */
-#define EXT2_ECOMPR_FL			0x00000800 /* Compression error */
+#define EXT4_DIRTY_FL			0x00000100
+#define EXT4_COMPRBLK_FL		0x00000200 /* One or more compressed clusters */
+#define EXT4_NOCOMPR_FL 		0x00000400 /* Access raw compressed data */
+#define EXT4_ECOMPR_FL			0x00000800 /* Compression error */
 /* End compression flags --- maybe not all used */	
-#define EXT2_BTREE_FL			0x00001000 /* btree format dir */
-#define EXT2_IMAGIC_FL			0x00002000
-#define EXT2_RESERVED_FL		0x80000000 /* reserved for ext2 lib */
+#define EXT4_BTREE_FL			0x00001000 /* btree format dir */
+#define EXT4_IMAGIC_FL			0x00002000
+#define EXT4_RESERVED_FL		0x80000000 /* reserved for ext2 lib */
 
-#define EXT2_FL_USER_VISIBLE		0x00001FFF /* User visible flags */
-#define EXT2_FL_USER_MODIFIABLE		0x000000FF /* User modifiable flags */
+#define EXT4_FL_USER_VISIBLE		0x00001FFF /* User visible flags */
+#define EXT4_FL_USER_MODIFIABLE		0x000000FF /* User modifiable flags */
 
 /*
  * ioctl commands
  */
-#define	EXT2_IOC_GETFLAGS		_IOR('f', 1, long)
-#define	EXT2_IOC_SETFLAGS		_IOW('f', 2, long)
-#define	EXT2_IOC_GETVERSION		_IOR('v', 1, long)
-#define	EXT2_IOC_SETVERSION		_IOW('v', 2, long)
+#define	EXT4_IOC_GETFLAGS		_IOR('f', 1, long)
+#define	EXT4_IOC_SETFLAGS		_IOW('f', 2, long)
+#define	EXT4_IOC_GETVERSION		_IOR('v', 1, long)
+#define	EXT4_IOC_SETVERSION		_IOW('v', 2, long)
 
 /*
  * Structure of an inode on the disk
@@ -225,7 +221,7 @@ struct ext2_inode {
 			__u32  m_i_reserved1;
 		} masix1;
 	} osd1;				/* OS dependent 1 */
-	__u32	i_block[EXT2_N_BLOCKS];/* Pointers to blocks */
+	__u32	i_block[EXT4_N_BLOCKS];/* Pointers to blocks */
 	__u32	i_generation;	/* File version (for NFS) */
 	__u32	i_file_acl;	/* File ACL */
 	__u32	i_dir_acl;	/* Directory ACL */
@@ -289,187 +285,213 @@ struct ext2_inode {
 /*
  * File system states
  */
-#define	EXT2_VALID_FS			0x0001	/* Unmounted cleanly */
-#define	EXT2_ERROR_FS			0x0002	/* Errors detected */
+#define	EXT4_VALID_FS			0x0001	/* Unmounted cleanly */
+#define	EXT4_ERROR_FS			0x0002	/* Errors detected */
 
 /*
  * Mount flags
  */
-#define EXT2_MOUNT_CHECK		0x0001	/* Do mount-time checks */
-#define EXT2_MOUNT_GRPID		0x0004	/* Create files with directory's group */
-#define EXT2_MOUNT_DEBUG		0x0008	/* Some debugging messages */
-#define EXT2_MOUNT_ERRORS_CONT		0x0010	/* Continue on errors */
-#define EXT2_MOUNT_ERRORS_RO		0x0020	/* Remount fs ro on errors */
-#define EXT2_MOUNT_ERRORS_PANIC		0x0040	/* Panic on errors */
-#define EXT2_MOUNT_MINIX_DF		0x0080	/* Mimics the Minix statfs */
-#define EXT2_MOUNT_NO_UID32		0x0200  /* Disable 32-bit UIDs */
+#define EXT4_MOUNT_CHECK		0x0001	/* Do mount-time checks */
+#define EXT4_MOUNT_GRPID		0x0004	/* Create files with directory's group */
+#define EXT4_MOUNT_DEBUG		0x0008	/* Some debugging messages */
+#define EXT4_MOUNT_ERRORS_CONT		0x0010	/* Continue on errors */
+#define EXT4_MOUNT_ERRORS_RO		0x0020	/* Remount fs ro on errors */
+#define EXT4_MOUNT_ERRORS_PANIC		0x0040	/* Panic on errors */
+#define EXT4_MOUNT_MINIX_DF		0x0080	/* Mimics the Minix statfs */
+#define EXT4_MOUNT_NO_UID32		0x0200  /* Disable 32-bit UIDs */
 
-#define clear_opt(o, opt)		o &= ~EXT2_MOUNT_##opt
-#define set_opt(o, opt)			o |= EXT2_MOUNT_##opt
+#define clear_opt(o, opt)		o &= ~EXT4_MOUNT_##opt
+#define set_opt(o, opt)			o |= EXT4_MOUNT_##opt
 #define test_opt(sb, opt)		((sb)->u.ext2_sb.s_mount_opt & \
-					 EXT2_MOUNT_##opt)
+					 EXT4_MOUNT_##opt)
 /*
  * Maximal mount counts between two filesystem checks
  */
-#define EXT2_DFL_MAX_MNT_COUNT		20	/* Allow 20 mounts */
-#define EXT2_DFL_CHECKINTERVAL		0	/* Don't use interval check */
+#define EXT4_DFL_MAX_MNT_COUNT		20	/* Allow 20 mounts */
+#define EXT4_DFL_CHECKINTERVAL		0	/* Don't use interval check */
 
 /*
  * Behaviour when detecting errors
  */
-#define EXT2_ERRORS_CONTINUE		1	/* Continue execution */
-#define EXT2_ERRORS_RO			2	/* Remount fs read-only */
-#define EXT2_ERRORS_PANIC		3	/* Panic */
-#define EXT2_ERRORS_DEFAULT		EXT2_ERRORS_CONTINUE
+#define EXT4_ERRORS_CONTINUE		1	/* Continue execution */
+#define EXT4_ERRORS_RO			2	/* Remount fs read-only */
+#define EXT4_ERRORS_PANIC		3	/* Panic */
+#define EXT4_ERRORS_DEFAULT		EXT4_ERRORS_CONTINUE
 
-/*
- * Structure of the super block
- */
-struct ext2_super_block {
-	__u32	s_inodes_count;		/* Inodes count */
-	__u32	s_blocks_count;		/* Blocks count */
-	__u32	s_r_blocks_count;	/* Reserved blocks count */
-	__u32	s_free_blocks_count;	/* Free blocks count */
-	__u32	s_free_inodes_count;	/* Free inodes count */
-	__u32	s_first_data_block;	/* First Data Block */
-	__u32	s_log_block_size;	/* Block size */
-	__s32	s_log_frag_size;	/* Fragment size */
-	__u32	s_blocks_per_group;	/* # Blocks per group */
-	__u32	s_frags_per_group;	/* # Fragments per group */
-	__u32	s_inodes_per_group;	/* # Inodes per group */
-	__u32	s_mtime;		/* Mount time */
-	__u32	s_wtime;		/* Write time */
-	__u16	s_mnt_count;		/* Mount count */
-	__s16	s_max_mnt_count;	/* Maximal mount count */
-	__u16	s_magic;		/* Magic signature */
-	__u16	s_state;		/* File system state */
-	__u16	s_errors;		/* Behaviour when detecting errors */
-	__u16	s_minor_rev_level; 	/* minor revision level */
-	__u32	s_lastcheck;		/* time of last check */
-	__u32	s_checkinterval;	/* max. time between checks */
-	__u32	s_creator_os;		/* OS */
-	__u32	s_rev_level;		/* Revision level */
-	__u16	s_def_resuid;		/* Default uid for reserved blocks */
-	__u16	s_def_resgid;		/* Default gid for reserved blocks */
-	/*
-	 * These fields are for EXT2_DYNAMIC_REV superblocks only.
+/* EXT4 super block */
+
+struct ext4_super_block {
+/*00*/  __u32  s_inodes_count;         /* Inodes count */
+        __u32  s_blocks_count_lo;      /* Blocks count */
+        __u32  s_r_blocks_count_lo;    /* Reserved blocks count */
+        __u32  s_free_blocks_count_lo; /* Free blocks count */
+/*10*/  __u32  s_free_inodes_count;    /* Free inodes count */
+        __u32  s_first_data_block;     /* First Data Block */
+        __u32  s_log_block_size;       /* Block size */
+        __u32  s_obso_log_frag_size;   /* Obsoleted fragment size */
+/*20*/  __u32  s_blocks_per_group;     /* # Blocks per group */
+        __u32  s_obso_frags_per_group; /* Obsoleted fragments per group */
+        __u32  s_inodes_per_group;     /* # Inodes per group */
+        __u32  s_mtime;                /* Mount time */
+/*30*/  __u32  s_wtime;                /* Write time */
+        __u16  s_mnt_count;            /* Mount count */
+        __u16  s_max_mnt_count;        /* Maximal mount count */
+        __u16  s_magic;                /* Magic signature */
+        __u16  s_state;                /* File system state */
+        __u16  s_errors;               /* Behaviour when detecting errors */
+        __u16  s_minor_rev_level;      /* minor revision level */
+/*40*/  __u32  s_lastcheck;            /* time of last check */
+        __u32  s_checkinterval;        /* max. time between checks */
+        __u32  s_creator_os;           /* OS */
+        __u32  s_rev_level;            /* Revision level */
+/*50*/  __u16  s_def_resuid;           /* Default uid for reserved blocks */
+        __u16  s_def_resgid;           /* Default gid for reserved blocks */
+        /*
+	 * These fields are for EXT4_DYNAMIC_REV superblocks only.
 	 *
 	 * Note: the difference between the compatible feature set and
 	 * the incompatible feature set is that if there is a bit set
 	 * in the incompatible feature set that the kernel doesn't
 	 * know about, it should refuse to mount the filesystem.
-	 * 
+	 *
 	 * e2fsck's requirements are more strict; if it doesn't know
 	 * about a feature in either the compatible or incompatible
 	 * feature set, it must abort and not try to meddle with
 	 * things it doesn't understand...
 	 */
-	__u32	s_first_ino; 		/* First non-reserved inode */
-	__u16   s_inode_size; 		/* size of inode structure */
-	__u16	s_block_group_nr; 	/* block group # of this superblock */
-	__u32	s_feature_compat; 	/* compatible feature set */
-	__u32	s_feature_incompat; 	/* incompatible feature set */
-	__u32	s_feature_ro_compat; 	/* readonly-compatible feature set */
-	__u8	s_uuid[16];		/* 128-bit uuid for volume */
-	char	s_volume_name[16]; 	/* volume name */
-	char	s_last_mounted[64]; 	/* directory where last mounted */
-	__u32	s_algorithm_usage_bitmap; /* For compression */
-	/*
-	 * Performance hints.  Directory preallocation should only
-	 * happen if the EXT2_FEATURE_COMPAT_DIR_PREALLOC flag is on.
-	 */
-	__u8	s_prealloc_blocks;	/* Nr of blocks to try to preallocate*/
-	__u8	s_prealloc_dir_blocks;	/* Nr to preallocate for dirs */
-	__u16	s_padding1;
-	/* 
-	 * Journaling support.
-	 */
-	__u8	s_journal_uuid[16];	/* uuid of journal superblock */
-	__u32	s_journal_inum;		/* inode number of journal file */
-	__u32	s_journal_dev;		/* device number of journal file */
-	__u32	s_last_orphan;		/* start of list of inodes to delete */
-	
-	__u32	s_reserved[197];	/* Padding to the end of the block */
+
+        __u32  s_first_ino;            /* First non-reserved inode */
+        __u16  s_inode_size;           /* size of inode structure */
+        __u16  s_block_group_nr;       /* block group # of this superblock */
+        __u32  s_feature_compat;       /* compatible feature set */
+/*60*/  __u32  s_feature_incompat;     /* incompatible feature set */
+        __u32  s_feature_ro_compat;    /* readonly-compatible feature set */
+/*68*/  __u8    s_uuid[16];             /* 128-bit uuid for volume */
+/*78*/  char    s_volume_name[16];      /* volume name */
+/*88*/  char    s_last_mounted[64];     /* directory where last mounted */
+/*C8*/  __u32  s_algorithm_usage_bitmap; /* For compression */
+        /*
+ *          * Performance hints.  Directory preallocation should only
+ *                   * happen if the EXT4_FEATURE_COMPAT_DIR_PREALLOC flag is on.
+ *                            */
+        __u8    s_prealloc_blocks;      /* Nr of blocks to try to preallocate*/
+__u8    s_prealloc_dir_blocks;  /* Nr to preallocate for dirs */
+        __u16  s_reserved_gdt_blocks;  /* Per group desc for online growth */
+        /*
+ *          * Journaling support valid if EXT4_FEATURE_COMPAT_HAS_JOURNAL set.
+ *                   */
+/*D0*/  __u8    s_journal_uuid[16];     /* uuid of journal superblock */
+/*E0*/  __u32  s_journal_inum;         /* inode number of journal file */
+        __u32  s_journal_dev;          /* device number of journal file */
+        __u32  s_last_orphan;          /* start of list of inodes to delete */
+        __u32  s_hash_seed[4];         /* HTREE hash seed */
+        __u8    s_def_hash_version;     /* Default hash version to use */
+        __u8    s_reserved_char_pad;
+        __u16  s_desc_size;            /* size of group descriptor */
+/*100*/ __u32  s_default_mount_opts;
+        __u32  s_first_meta_bg;        /* First metablock block group */
+        __u32  s_mkfs_time;            /* When the filesystem was created */
+        __u32  s_jnl_blocks[17];       /* Backup of the journal inode */
+        /* 64bit support valid if EXT4_FEATURE_COMPAT_64BIT */
+/*150*/ __u32  s_blocks_count_hi;      /* Blocks count */
+        __u32  s_r_blocks_count_hi;    /* Reserved blocks count */
+        __u32  s_free_blocks_count_hi; /* Free blocks count */
+        __u16  s_min_extra_isize;      /* All inodes have at least # bytes */
+        __u16  s_want_extra_isize;     /* New inodes should reserve # bytes */
+        __u32  s_flags;                /* Miscellaneous flags */
+        __u16  s_raid_stride;          /* RAID stride */
+        __u16  s_mmp_interval;         /* # seconds to wait in MMP checking */
+        __u64  s_mmp_block;            /* Block for multi-mount protection */
+        __u32  s_raid_stripe_width;    /* blocks on all data disks (N*stride)*/
+        __u8    s_log_groups_per_flex;  /* FLEX_BG group size */
+        __u8    s_reserved_char_pad2;
+        __u16  s_reserved_pad;
+        __u64  s_kbytes_written;       /* nr of lifetime kilobytes written */
+        __u32   s_reserved[160];        /* Padding to the end of the block */
 };
 
+
 #ifdef __KERNEL__
-#define EXT2_SB(sb)	(&((sb)->u.ext2_sb))
+#define EXT4_SB(sb)	(&((sb)->u.ext2_sb))
 #else
 /* Assume that user mode programs are passing in an ext2fs superblock, not
  * a kernel struct super_block.  This will allow us to call the feature-test
  * macros from user land. */
-#define EXT2_SB(sb)	(sb)
+#define EXT4_SB(sb)	(sb)
 #endif
 
 /*
  * Codes for operating systems
  */
-#define EXT2_OS_LINUX		0
-#define EXT2_OS_HURD		1
-#define EXT2_OS_MASIX		2
-#define EXT2_OS_FREEBSD		3
-#define EXT2_OS_LITES		4
+#define EXT4_OS_LINUX		0
+#define EXT4_OS_HURD		1
+#define EXT4_OS_MASIX		2
+#define EXT4_OS_FREEBSD		3
+#define EXT4_OS_LITES		4
 
 /*
  * Revision levels
  */
-#define EXT2_GOOD_OLD_REV	0	/* The good old (original) format */
-#define EXT2_DYNAMIC_REV	1 	/* V2 format w/ dynamic inode sizes */
+#define EXT4_GOOD_OLD_REV	0	/* The good old (original) format */
+#define EXT4_DYNAMIC_REV	1 	/* V2 format w/ dynamic inode sizes */
 
-#define EXT2_CURRENT_REV	EXT2_GOOD_OLD_REV
-#define EXT2_MAX_SUPP_REV	EXT2_DYNAMIC_REV
+#define EXT4_CURRENT_REV	EXT4_GOOD_OLD_REV
+#define EXT4_MAX_SUPP_REV	EXT4_DYNAMIC_REV
 
-#define EXT2_GOOD_OLD_INODE_SIZE 128
+#define EXT4_GOOD_OLD_INODE_SIZE 128
 
 /*
  * Feature set definitions
  */
 
-#define EXT2_HAS_COMPAT_FEATURE(sb,mask)			\
-	( EXT2_SB(sb)->s_feature_compat & (mask) )
-#define EXT2_HAS_RO_COMPAT_FEATURE(sb,mask)			\
-	( EXT2_SB(sb)->s_feature_ro_compat & (mask) )
-#define EXT2_HAS_INCOMPAT_FEATURE(sb,mask)			\
-	( EXT2_SB(sb)->s_feature_incompat & (mask) )
+#define EXT4_HAS_COMPAT_FEATURE(sb,mask)			\
+	( EXT4_SB(sb)->s_feature_compat & (mask) )
+#define EXT4_HAS_RO_COMPAT_FEATURE(sb,mask)			\
+	( EXT4_SB(sb)->s_feature_ro_compat & (mask) )
+#define EXT4_HAS_INCOMPAT_FEATURE(sb,mask)			\
+	( EXT4_SB(sb)->s_feature_incompat & (mask) )
 
-#define EXT2_FEATURE_COMPAT_DIR_PREALLOC	0x0001
-#define EXT2_FEATURE_COMPAT_IMAGIC_INODES	0x0002
-#define EXT3_FEATURE_COMPAT_HAS_JOURNAL		0x0004
+#define EXT4_FEATURE_COMPAT_DIR_PREALLOC	0x0001
+#define EXT4_FEATURE_COMPAT_IMAGIC_INODES	0x0002
+#define EXT4_FEATURE_COMPAT_HAS_JOURNAL		0x0004
 
-#define EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER	0x0001
-#define EXT2_FEATURE_RO_COMPAT_LARGE_FILE	0x0002
-#define EXT2_FEATURE_RO_COMPAT_BTREE_DIR	0x0004
+#define EXT4_FEATURE_RO_COMPAT_SPARSE_SUPER	0x0001
+#define EXT4_FEATURE_RO_COMPAT_LARGE_FILE	0x0002
+#define EXT4_FEATURE_RO_COMPAT_BTREE_DIR	0x0004
 
-#define EXT2_FEATURE_INCOMPAT_COMPRESSION	0x0001
-#define EXT2_FEATURE_INCOMPAT_FILETYPE		0x0002
-#define EXT3_FEATURE_INCOMPAT_RECOVER		0x0004 /* Needs recovery */
+#define EXT4_FEATURE_INCOMPAT_COMPRESSION	0x0001
+#define EXT4_FEATURE_INCOMPAT_FILETYPE		0x0002
+#define EXT4_FEATURE_INCOMPAT_RECOVER		0x0004 /* Needs recovery */
 
-#define EXT2_FEATURE_COMPAT_SUPP	0
-#define EXT2_FEATURE_INCOMPAT_SUPP	EXT2_FEATURE_INCOMPAT_FILETYPE
-#define EXT2_FEATURE_RO_COMPAT_SUPP	(EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER| \
-					 EXT2_FEATURE_RO_COMPAT_LARGE_FILE| \
-					 EXT2_FEATURE_RO_COMPAT_BTREE_DIR)
+#define EXT4_FEATURE_INCOMPAT_64BIT             0x0080
+#define EXT4_FEATURE_INCOMPAT_FLEX_BG           0x0200
+
+#define EXT4_FEATURE_COMPAT_SUPP	0
+#define EXT4_FEATURE_INCOMPAT_SUPP	EXT4_FEATURE_INCOMPAT_FILETYPE
+#define EXT4_FEATURE_RO_COMPAT_SUPP	(EXT4_FEATURE_RO_COMPAT_SPARSE_SUPER| \
+					 EXT4_FEATURE_RO_COMPAT_LARGE_FILE| \
+					 EXT4_FEATURE_RO_COMPAT_BTREE_DIR)
 
 /*
  * Default values for user and/or group using reserved blocks
  */
-#define	EXT2_DEF_RESUID		0
-#define	EXT2_DEF_RESGID		0
+#define	EXT4_DEF_RESUID		0
+#define	EXT4_DEF_RESGID		0
 
 /*
  * Structure of a directory entry
  */
-#define EXT2_NAME_LEN 255
+#define EXT4_NAME_LEN 255
 
 struct ext2_dir_entry {
 	__u32	inode;			/* Inode number */
 	__u16	rec_len;		/* Directory entry length */
 	__u16	name_len;		/* Name length */
-	char	name[EXT2_NAME_LEN];	/* File name */
+	char	name[EXT4_NAME_LEN];	/* File name */
 };
 
 /*
- * The new version of the directory entry.  Since EXT2 structures are
+ * The new version of the directory entry.  Since EXT4 structures are
  * stored in intel byte order, and the name_len field could never be
  * bigger than 255 chars, it's safe to reclaim the extra byte for the
  * file_type field.
@@ -479,33 +501,33 @@ struct ext2_dir_entry_2 {
 	__u16	rec_len;		/* Directory entry length */
 	__u8	name_len;		/* Name length */
 	__u8	file_type;
-	char	name[EXT2_NAME_LEN];	/* File name */
+	char	name[EXT4_NAME_LEN];	/* File name */
 };
 
 /*
  * Ext2 directory file types.  Only the low 3 bits are used.  The
  * other bits are reserved for now.
  */
-#define EXT2_FT_UNKNOWN		0
-#define EXT2_FT_REG_FILE	1
-#define EXT2_FT_DIR		2
-#define EXT2_FT_CHRDEV		3
-#define EXT2_FT_BLKDEV 		4
-#define EXT2_FT_FIFO		5
-#define EXT2_FT_SOCK		6
-#define EXT2_FT_SYMLINK		7
+#define EXT4_FT_UNKNOWN		0
+#define EXT4_FT_REG_FILE	1
+#define EXT4_FT_DIR		2
+#define EXT4_FT_CHRDEV		3
+#define EXT4_FT_BLKDEV 		4
+#define EXT4_FT_FIFO		5
+#define EXT4_FT_SOCK		6
+#define EXT4_FT_SYMLINK		7
 
-#define EXT2_FT_MAX		8
+#define EXT4_FT_MAX		8
 
 /*
- * EXT2_DIR_PAD defines the directory entries boundaries
+ * EXT4_DIR_PAD defines the directory entries boundaries
  *
  * NOTE: It must be a multiple of 4
  */
-#define EXT2_DIR_PAD		 	4
-#define EXT2_DIR_ROUND 			(EXT2_DIR_PAD - 1)
-#define EXT2_DIR_REC_LEN(name_len)	(((name_len) + 8 + EXT2_DIR_ROUND) & \
-					 ~EXT2_DIR_ROUND)
+#define EXT4_DIR_PAD		 	4
+#define EXT4_DIR_ROUND 			(EXT4_DIR_PAD - 1)
+#define EXT4_DIR_REC_LEN(name_len)	(((name_len) + 8 + EXT4_DIR_ROUND) & \
+					 ~EXT4_DIR_ROUND)
 
 #ifdef __KERNEL__
 /*
@@ -622,4 +644,4 @@ extern struct inode_operations ext2_fast_symlink_inode_operations;
 
 #endif	/* __KERNEL__ */
 
-#endif	/* _LINUX_EXT2_FS_H */
+#endif	/* _LINUX_EXT4_FS_H */

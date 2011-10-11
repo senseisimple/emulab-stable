@@ -19,9 +19,8 @@ WITH_CRYPTO	= 1
 WITH_EXTFS	= 1
 WITH_FFS	= 1
 WITH_FAT	= 1
-WITH_NTFS	= 1
+WITH_NTFS	= 0
 WITH_HASH	= 0
-WITH_EXT4FS	= 0
 
 WITH_V3COMPAT   = 1
 
@@ -46,11 +45,6 @@ endif
 ifeq ($(WITH_EXTFS),1)
 FSOBJS		+= extfs/extfs.o extfs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXTFS -Iextfs
-endif
-
-ifeq ($(WITH_EXT4FS),1)
-FSOBJS		+= ext4fs/ext4fs.o ext4fs/reloc_lilo.o
-CFLAGS		+= -DWITH_EXT4FS -Iext4fs
 endif
 
 ifeq ($(WITH_FFS),1)

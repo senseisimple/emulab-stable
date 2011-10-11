@@ -13,8 +13,8 @@
 #include "sliceinfo.h"
 #include "global.h"
 
-static int read_linuxgroup(struct ext2_super_block *super,
-			   struct ext2_group_desc *group, int index,
+static int read_ext4group(struct ext4_super_block *super,
+			   struct ext4_group_desc *group, int index,
 			   u_int32_t sliceoffset, int infd);
 
 extern int fixup_lilo(int slice, int stype, u_int32_t start, u_int32_t size,
@@ -37,12 +37,10 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 {
 #define LINUX_SUPERBLOCK_OFFSET	1024
 #define LINUX_SUPERBLOCK_SIZE 	1024
-#define LINUX_MAXGRPSPERBLK	\
-	(EXT2_MAX_BLOCK_SIZE/sizeof(struct ext2_group_desc))
 
 	int			cc, i, numgroups, rval = 0;
-	struct ext2_super_block	fs;
-	struct ext2_group_desc	groups[LINUX_MAXGRPSPERBLK];
+	struct ext4_super_block	fs;
+	unsigned char   	groups[EXT4_MAX_BLOCK_SIZE];
 	int			dosslice = slice + 1; /* DOS Numbering */
 	off_t			soff;
 
@@ -55,7 +53,6 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 		return 1;
 
 	assert((sizeof(fs) & ~LINUX_SUPERBLOCK_SIZE) == 0);
-	assert((sizeof(groups) & ~EXT2_MAX_BLOCK_SIZE) == 0);
 
 	if (debug)
 		fprintf(stderr, "  P%d %s Linux Slice)\n",
@@ -79,29 +76,40 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 		warnx("Linux Slice %d: Truncated superblock", dosslice);
 		return 1;
 	}
- 	if (fs.s_magic != EXT2_SUPER_MAGIC) {
+ 	if (fs.s_magic != EXT4_SUPER_MAGIC) {
 		warnx("Linux Slice %d: Bad magic number in superblock",
 		      dosslice);
  		return (1);
  	}
-	if (EXT2_BLOCK_SIZE(&fs) < EXT2_MIN_BLOCK_SIZE ||
-	    EXT2_BLOCK_SIZE(&fs) > EXT2_MAX_BLOCK_SIZE) {
+	if (EXT4_BLOCK_SIZE(&fs) < EXT4_MIN_BLOCK_SIZE ||
+	    EXT4_BLOCK_SIZE(&fs) > EXT4_MAX_BLOCK_SIZE) {
 	    warnx("Linux Slice %d: Block size not what I expect it to be: %d!",
-		  dosslice, EXT2_BLOCK_SIZE(&fs));
+		  dosslice, EXT4_BLOCK_SIZE(&fs));
 	    return 1;
 	}
 
-	numgroups = ((fs.s_blocks_count - fs.s_first_data_block)
+	if (EXT4_HAS_INCOMPAT_FEATURE(&fs,EXT4_FEATURE_INCOMPAT_64BIT)) {
+		warnx("Linux Slice %d: 64-bit block numbers not supported",
+			dosslice);
+		return 1;
+	} else {
+		fs.s_desc_size = EXT4_MIN_DESC_SIZE;
+	}
+
+	numgroups = ((fs.s_blocks_count_lo - fs.s_first_data_block)
 		     + (fs.s_blocks_per_group - 1))
 		/ fs.s_blocks_per_group;
 	if (debug) {
 		fprintf(stderr, "        %s\n",
-			(fs.s_feature_compat & 4) ? "EXT3" : "EXT2");
+			(fs.s_feature_compat & 4) ?
+			(fs.s_feature_ro_compat > 0x07 ||
+			 fs.s_feature_incompat > 0x3f) ? "EXT4" :
+			"EXT3" : "EXT2");
 		fprintf(stderr, "        count %9u, size %9d, pergroup %9d\n",
-			fs.s_blocks_count, EXT2_BLOCK_SIZE(&fs),
+			fs.s_blocks_count_lo, EXT4_BLOCK_SIZE(&fs),
 			fs.s_blocks_per_group);
 		fprintf(stderr, "        bfree %9u, first %9u, groups %9d\n",
-			fs.s_free_blocks_count, fs.s_first_data_block,
+			fs.s_free_blocks_count_lo, fs.s_first_data_block,
 			numgroups);
 	}
 
@@ -114,13 +122,13 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 	 *
 	 * Group descriptors are in the blocks right after the superblock.
 	 */
-	assert(LINUX_SUPERBLOCK_SIZE <= EXT2_BLOCK_SIZE(&fs));
-	assert(EXT2_DESC_PER_BLOCK(&fs) * sizeof(struct ext2_group_desc)
-	       == EXT2_BLOCK_SIZE(&fs)); 
+	assert(LINUX_SUPERBLOCK_SIZE <= EXT4_BLOCK_SIZE(&fs));
+
 	soff = sectobytes(start) +
-		(fs.s_first_data_block + 1) * EXT2_BLOCK_SIZE(&fs);
+		(fs.s_first_data_block + 1) * EXT4_BLOCK_SIZE(&fs);
 	rval = 0;
 	for (i = 0; i < numgroups; i++) {
+		struct ext4_group_desc *group;
 		int gix;
 
 		/*
@@ -128,7 +136,7 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 		 * smaller than a sector size, packed into EXT2_BLOCK_SIZE
 		 * blocks right after the superblock. 
 		 */
-		gix = (i % EXT2_DESC_PER_BLOCK(&fs));
+		gix = (i % EXT4_DESC_PER_BLOCK(&fs));
 		if (gix == 0) {
 			if (devlseek(infd, soff, SEEK_SET) < 0) {
 				warnx("Linux Slice %d: "
@@ -137,28 +145,30 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 				return 1;
 			}
 
-			if ((cc = devread(infd, groups, sizeof(groups))) < 0) {
+			if ((cc = devread(infd, groups, EXT4_BLOCK_SIZE(&fs))) < 0) {
 				warn("Linux Slice %d: "
 				     "Could not read Group %d",
 				     dosslice, i);
 				return 1;
 			}
-			if (cc != sizeof(groups)) {
+			if (cc != EXT4_BLOCK_SIZE(&fs)) {
 				warnx("Linux Slice %d: "
 				      "Truncated Group %d", dosslice, i);
 				return 1;
 			}
-			soff += EXT2_BLOCK_SIZE(&fs);
+			soff += EXT4_BLOCK_SIZE(&fs);
 		}
+
+		group = (struct ext4_group_desc *)&groups[gix * EXT4_DESC_SIZE(&fs)];
 
 		if (debug) {
 			fprintf(stderr,
 				"        Group:%-2d\tBitmap %9u, bfree %9d\n",
-				i, groups[gix].bg_block_bitmap,
-				groups[gix].bg_free_blocks_count);
+				i, group->bg_block_bitmap_lo,
+				group->bg_free_blocks_count_lo);
 		}
 
-		if ((rval = read_linuxgroup(&fs, &groups[gix], i, start, infd)))
+		if ((rval = read_ext4group(&fs, group, i, start, infd)))
 			return rval;
 	}
 	
@@ -172,17 +182,20 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
  * of the slice, need to adjust the numbers using the slice offset.
  */
 static int
-read_linuxgroup(struct ext2_super_block *super,
-		struct ext2_group_desc	*group,
+read_ext4group(struct ext4_super_block *super,
+		struct ext4_group_desc	*group,
 		int index,
 		u_int32_t sliceoffset /* Sector offset of slice */,
 		int infd)
 {
-	char	*p, bitmap[EXT2_MAX_BLOCK_SIZE];
+	char	*p, bitmap[EXT4_MAX_BLOCK_SIZE];
 	int	i, cc, max;
 	int	count, j, freecount;
 	off_t	offset;
 	unsigned long block;
+
+#define LINUX_FSBTODB(count) \
+	((EXT4_BLOCK_SIZE(super) / secsize) * (count))
 
 	block = super->s_first_data_block +
 		(index * super->s_blocks_per_group);
@@ -190,21 +203,34 @@ read_linuxgroup(struct ext2_super_block *super,
 	/*
 	 * Sanity check the bitmap block numbers
 	 */
-	if (group->bg_block_bitmap < block ||
-	    group->bg_block_bitmap >= block + super->s_blocks_per_group) {
-		warnx("Linux Group %d: "
-		      "Group bitmap block (%d) out of range [%lu-%lu]",
-		      index, group->bg_block_bitmap,
-		      block, block + super->s_blocks_per_group - 1);
-		return 1;
+	if (!EXT4_HAS_INCOMPAT_FEATURE(super,EXT4_FEATURE_INCOMPAT_FLEX_BG)) {
+		if (group->bg_block_bitmap_lo < block ||
+		    group->bg_block_bitmap_lo >= block + super->s_blocks_per_group) {
+			warnx("Linux Group %d: "
+			      "Group bitmap block (%d) out of range [%lu-%lu]",
+			      index, group->bg_block_bitmap_lo,
+			      block, block + super->s_blocks_per_group - 1);
+			return 1;
+		}
+	}
+
+	if (group->bg_flags & EXT4_BG_BLOCK_UNINIT) {
+		/* Block group bitmap hasn't been initialized yet, so all
+		   blocks are free. */
+		unsigned long dboff;
+		dboff = sliceoffset +
+			LINUX_FSBTODB(index*super->s_blocks_per_group) +
+			LINUX_FSBTODB(super->s_first_data_block);
+		addskip(dboff, LINUX_FSBTODB(group->bg_free_blocks_count_lo));
+		return 0;
 	}
 
 	offset  = sectobytes(sliceoffset);
-	offset += (off_t)EXT2_BLOCK_SIZE(super) * group->bg_block_bitmap;
+	offset += (off_t)EXT4_BLOCK_SIZE(super) * group->bg_block_bitmap_lo;
 	if (devlseek(infd, offset, SEEK_SET) < 0) {
 		warn("Linux Group %d: "
 		     "Could not seek to Group bitmap block %d",
-		     index, group->bg_block_bitmap);
+		     index, group->bg_block_bitmap_lo);
 		return 1;
 	}
 
@@ -212,19 +238,19 @@ read_linuxgroup(struct ext2_super_block *super,
 	 * Sanity check this number since it the number of blocks in
 	 * the group (bitmap size) is dependent on the block size. 
 	 */
-	if (super->s_blocks_per_group > (EXT2_BLOCK_SIZE(super) * 8)) {
+	if (super->s_blocks_per_group > (EXT4_BLOCK_SIZE(super) * 8)) {
 	    warnx("Linux Group %d: "
 		  "Block count not what I expect it to be: %d!",
 		  index, super->s_blocks_per_group);
 	    return 1;
 	}
 
-	if ((cc = devread(infd, bitmap, EXT2_BLOCK_SIZE(super))) < 0) {
+	if ((cc = devread(infd, bitmap, EXT4_BLOCK_SIZE(super))) < 0) {
 		warn("Linux Group %d: "
 		     "Could not read Group bitmap", index);
 		return 1;
 	}
-	if (cc != EXT2_BLOCK_SIZE(super)) {
+	if (cc != EXT4_BLOCK_SIZE(super)) {
 		warnx("Linux Group %d: Truncated Group bitmap", index);
 		return 1;
 	}
@@ -232,7 +258,7 @@ read_linuxgroup(struct ext2_super_block *super,
 	/*
 	 * The final group may have fewer than s_blocks_per_group
 	 */
-	max = super->s_blocks_count - block;
+	max = super->s_blocks_count_lo - block;
 	if (max > super->s_blocks_per_group)
 		max = super->s_blocks_per_group;
 	else if (debug && max != super->s_blocks_per_group)
@@ -246,8 +272,6 @@ read_linuxgroup(struct ext2_super_block *super,
 	 * XXX The bitmap is FS blocks.
 	 *     The bitmap is an "inuse" map, not a free map.
 	 */
-#define LINUX_FSBTODB(count) \
-	((EXT2_BLOCK_SIZE(super) / secsize) * (count))
 
 	if (debug > 2)
 		fprintf(stderr, "                 ");
@@ -290,10 +314,10 @@ read_linuxgroup(struct ext2_super_block *super,
 	if (debug > 2)
 		fprintf(stderr, "\n");
 
-	if (freecount != LINUX_FSBTODB(group->bg_free_blocks_count)) {
+	if (freecount != LINUX_FSBTODB(group->bg_free_blocks_count_lo)) {
 		warnx("Linux Group %d: "
 		      "computed free count (%d) != expected free count (%d)",
-		      index, freecount, group->bg_free_blocks_count);
+		      index, freecount, group->bg_free_blocks_count_lo);
 	}
 
 	return 0;
