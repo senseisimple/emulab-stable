@@ -65,6 +65,7 @@ int	level	  = 4;
 long	dev_bsize = 1;
 uint32_t compat   = 0;
 int	frangesize= 64;	/* 32k */
+int	zerofrange= 0;
 int	forcereads= 0;
 int	badsectors= 0;
 int	retrywrites= 1;
@@ -403,7 +404,7 @@ main(int argc, char *argv[])
 	memset(imageid, UUID_LENGTH, '\0');
 
 	gettimeofday(&sstamp, 0);
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:ofI:13F:DR:S:XH:Me:k:u:a:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:ofI:13F:DR:S:XH:Me:k:u:a:Z")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -470,6 +471,9 @@ main(int argc, char *argv[])
 			frangesize = atoi(optarg);
 			if (frangesize < 0)
 				usage();
+			break;
+		case 'Z':
+			zerofrange = 1;
 			break;
 		case 'X':
 			forcereads++;
@@ -1177,6 +1181,20 @@ dumpskips(int verbose)
 #undef DOHISTO
 
 /*
+ * Zero the data associated with a free range that is being included
+ * in the image because its size is less than frangesize.
+ */
+static void
+zerofixup(void *bstart, off_t bsize, void *fdata)
+{
+	if (debug > 1)
+		fprintf(stderr, "zerofixup: zeroing %llu@%p\n",
+			(unsigned long long)bsize, bstart);
+
+	memset(bstart, 0, bsize);
+}
+
+/*
  * Sort and merge the list of skip blocks.
  * This code also winnows out the free ranges smaller than frangesize.
  * Returns the number of entries freed, useful so that it can be called
@@ -1209,6 +1227,12 @@ mergeskips(int verbose)
 						"dropping range [%u-%u]\n",
 						prange->start,
 						prange->start+prange->size-1);
+				if (zerofrange)
+					addfixupfunc(zerofixup,
+						     sectobytes(prange->start),
+						     0,
+						     sectobytes(prange->size),
+						     NULL, 0, RELOC_NONE);
 				total += prange->size;
 #ifdef DOHISTO
 				if (prange->size < 64)
