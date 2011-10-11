@@ -49,9 +49,13 @@ struct emulab_ii_extra_info {
 /* Extra info associated with a host authentication entry */
 struct emulab_ha_extra_info {
 	char *pid;	/* project */
+	int pidix;	/* project table index */
 	char *gid;	/* group */
+	int gidix;	/* group table index */
 	char *eid;	/* experiment */
+	int eidix;	/* experiment table index */
 	char *sname;	/* swapper user name */
+	int suidix;	/* swapper user table index */
 	int suid;	/* swapper's unix uid */
 	gid_t sgids[MAXGIDS];	/* swapper's unix gids */
 	int ngids;	/* number of gids */
@@ -758,6 +762,139 @@ emulab_nodeid(struct in_addr *cnetip)
 }
 
 /*
+ * Get the Emulab internal imageid for the image identified by ipid/iname.
+ * Return a non-zero index on success, zero otherwise.
+ */
+static int
+emulab_imageid(char *ipid, char *iname)
+{
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+	int id;
+
+	res = mydb_query("SELECT imageid FROM images"
+			 " WHERE pid='%s' AND imagename='%s'",
+			 1, ipid, iname);
+	if (res == NULL)
+		return 0;
+
+	/* No such image */
+	if (mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/* NULL imageid!? */
+	row = mysql_fetch_row(res);
+	if (!row[0]) {
+		error("config_host_authinfo: null imageid!?");
+		mysql_free_result(res);
+		return 0;
+	}
+	id = atoi(row[0]);
+	mysql_free_result(res);
+
+	return id;
+}
+
+/*
+ * Get the list of unix gids needed to access an image.
+ * Returns the count of IDs put in igids, or zero on error.
+ */
+static int
+emulab_imagegids(int imageidx, int *igids)
+{
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+	int nrows;
+
+	igids[0] = igids[1] = -1;
+
+	res = mydb_query("SELECT unix_gid FROM groups AS g, images AS i"
+			 " WHERE g.pid_idx=i.pid_idx"
+			 " AND (g.gid_idx=g.pid_idx OR g.gid_idx=i.gid_idx)"
+			 " AND imageid=%d", 1, imageidx);
+	if (res == NULL) {
+		error("config_host_authinfo: image gid query failed!?");
+		return 0;
+	}
+
+	nrows = mysql_num_rows(res);
+	if (nrows > 2) {
+		error("config_host_authinfo: image gid query returned too many rows!?");
+		mysql_free_result(res);
+		return 0;
+	}
+
+	if (nrows > 0) {
+		row = mysql_fetch_row(res);
+		if (row[0] && row[0][0])
+			igids[0] = atoi(row[0]);
+		if (nrows > 1) {
+			row = mysql_fetch_row(res);
+			if (row[0] && row[0][0])
+				igids[1] = atoi(row[0]);
+		}
+	}
+	mysql_free_result(res);
+
+	return nrows;
+}
+
+/*
+ * Based on the image_permissions table, see if the user or group of the
+ * experiment identified by ei can access the image with the given Emulab
+ * imagid for either upload or download.
+ *
+ * Returns 1 if explicitly yes, 0 otherwise.
+ */
+static int
+can_access(int imageidx, struct emulab_ha_extra_info *ei, int upload)
+{
+	MYSQL_RES *res;
+	char *clause = "";
+
+	if (upload)
+		clause = "AND ip.allow_write=1";
+
+	/*
+	 * Check user permissions first.
+	 */
+	res = mydb_query("SELECT allow_write FROM image_permissions AS ip"
+			 " WHERE ip.imageid=%d"
+			 " AND ip.permission_type='user'"
+			 " AND ip.permission_idx=%d %s",
+			 1, imageidx, ei->suidix, clause);
+	if (res) {
+		if (mysql_num_rows(res) > 0) {
+			mysql_free_result(res);
+			return 1;
+		}
+		mysql_free_result(res);
+	}
+
+	/*
+	 * No go? Try group permissions instead.
+	 */
+        res = mydb_query("SELECT allow_write FROM group_membership AS g"
+			 " LEFT JOIN image_permissions AS ip ON"
+			 "   ip.permission_type='group'"
+			 "   AND ip.permission_idx=g.gid_idx"
+			 " WHERE ip.imageid=%d"
+			 " AND g.uid_idx=%d AND g.trust!='none' %s",
+			 1, imageidx, ei->suidix, clause);
+	if (res) {
+		if (mysql_num_rows(res) > 0) {
+			mysql_free_result(res);
+			return 1;
+		}
+		mysql_free_result(res);
+	}
+
+	return 0;
+}
+
+/*
  * Find all images (imageid==NULL) or a specific image (imageid!=NULL)
  * that a particular node can access for GET/PUT.  At any time, a node is
  * associated with a specific project and group.  These determine the
@@ -767,6 +904,12 @@ emulab_nodeid(struct in_addr *cnetip)
  * - all "global" images (GET only)
  * - all "shared" images in the project and any group (GET only)
  * - all images in the project and group of the node (GET and PUT)
+ *
+ * We later added a more fine-grained mechanism for accessing "real"
+ * (imageid[0]!='/') images. If the standard checks fail, we look for
+ * specific images in the image_permissions table which allows per-group
+ * and per-user access at individual image granularity. Right now we are
+ * only checking this table if called for a specific image (imageid!=NULL).
  *
  * For a single image this will either return a single image or no image.
  * The desired image must be one of the images that would be returned in
@@ -804,6 +947,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	char		*wantpid = NULL, *wantname = NULL;
 	struct config_host_authinfo *get = NULL, *put = NULL;
 	struct emulab_ha_extra_info *ei = NULL;
+	int		imageidx = 0, ngids, igids[2];
 
 	if (getp == NULL && putp == NULL)
 		return 0;
@@ -950,11 +1094,12 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	 * and also the unix uid of the swapper of the experiment and
 	 * their gids in case we need to run a server process.
 	 */
-	res = mydb_query("SELECT e.pid,e.gid,r.eid,u.uid,u.unix_uid"
+	res = mydb_query("SELECT e.pid,e.gid,r.eid,u.uid,u.unix_uid,"
+			 "       e.pid_idx,e.gid_idx,e.idx,u.uid_idx"
 			 " FROM reserved AS r,experiments AS e,users AS u"
 			 " WHERE r.pid=e.pid AND r.eid=e.eid"
 			 "  AND e.swapper_idx=u.uid_idx"
-			 "  AND r.node_id='%s'", 5, node);
+			 "  AND r.node_id='%s'", 9, node);
 	assert(res != NULL);
 
 	/* Node is free */
@@ -967,7 +1112,8 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	}
 
 	row = mysql_fetch_row(res);
-	if (!row[0] || !row[1] || !row[2] || !row[3] || !row[4]) {
+	if (!row[0] || !row[1] || !row[2] || !row[3] || !row[4] ||
+	    !row[5] || !row[6] || !row[7] || !row[8]) {
 		error("config_host_authinfo: null pid/gid/eid/uname/uid!?");
 		mysql_free_result(res);
 		emulab_free_host_authinfo(get);
@@ -983,6 +1129,10 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		ei->eid = mystrdup(row[2]);
 		ei->sname = mystrdup(row[3]);
 		ei->suid = atoi(row[4]);
+		ei->pidix = atoi(row[5]);
+		ei->gidix = atoi(row[6]);
+		ei->eidix = atoi(row[7]);
+		ei->suidix = atoi(row[8]);
 		ei->ngids = 0;
 		get->extra = ei;
 	}
@@ -993,6 +1143,10 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		ei->eid = mystrdup(row[2]);
 		ei->sname = mystrdup(row[3]);
 		ei->suid = atoi(row[4]);
+		ei->pidix = atoi(row[5]);
+		ei->gidix = atoi(row[6]);
+		ei->eidix = atoi(row[7]);
+		ei->suidix = atoi(row[8]);
 		ei->ngids = 0;
 		put->extra = ei;
 	}
@@ -1052,6 +1206,8 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			*wantname = '\0';
 			wantname = mystrdup(wantname+1);
 		}
+		imageidx = emulab_imageid(wantpid, wantname);
+		assert(imageidx > 0);
 	}
 
 	if (put != NULL) {
@@ -1059,16 +1215,32 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 
 		if (imageid != NULL) {
 			/* Interested in a specific image */
-			res = mydb_query("SELECT pid,gid,imagename,path,imageid"
-					 " FROM images"
-					 " WHERE pid='%s'"
-					 " AND (gid='%s' OR"
-					 "     (gid=pid AND shared=1))"
-					 " AND imagename='%s'",
-					 5, ei->pid, ei->gid, wantname);
+			if (can_access(imageidx, ei, 1)) {
+				res = mydb_query("SELECT pid,gid,imagename,"
+						 " path,imageid"
+						 " FROM images WHERE"
+						 " pid='%s'"
+						 " AND imagename='%s'",
+						 5, wantpid, wantname);
+			} else {
+				/*
+				 * Pid of expt must be same as pid of image
+				 * and gid the same or image "shared".
+				 */
+				res = mydb_query("SELECT pid,gid,imagename,"
+						 "path,imageid"
+						 " FROM images WHERE"
+						 " pid='%s' AND imagename='%s'"
+						 " AND pid='%s'"
+						 " AND (gid='%s' OR"
+						 "    (gid=pid AND shared=1))",
+						 5, wantpid, wantname,
+						 ei->pid, ei->gid);
+			}
 		} else {
 			/* Find all images that this pid/gid can PUT */
-			res = mydb_query("SELECT pid,gid,imagename,path,imageid"
+			res = mydb_query("SELECT pid,gid,imagename,"
+					 "path,imageid"
 					 " FROM images"
 					 " WHERE pid='%s'"
 					 " AND (gid='%s' OR"
@@ -1090,6 +1262,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			struct config_imageinfo *ci;
 			struct stat sb;
 			char *iid;
+			int iidx;
 
 			row = mysql_fetch_row(res);
 			/* XXX ignore rows with null or empty info */
@@ -1135,17 +1308,30 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			} else
 				ci->sig = NULL;
 			ci->uid = ei->suid;
+			iidx = atoi(row[4]);
+
 			/*
-			 * XXX note that we don't really need all of the
-			 * swapper's GIDs here, we could just include the
-			 * project and any group GID for the image.
+			 * Find the unix gids to use for any server process.
+			 * This includes the gid of the image's project and
+			 * any subgroup gid if the image is associated with
+			 * one. If for any reason we don't come up with
+			 * these gids, we use the gids for the swapper of
+			 * the experiment.
 			 */
-			for (j = 0; j < ei->ngids; j++)
-				ci->gids[j] = ei->sgids[j];
-			ci->ngids = ei->ngids;
+			ngids = emulab_imagegids(iidx, igids);
+			if (ngids > 0) {
+				for (j = 0; j < ngids; j++)
+					ci->gids[j] = igids[j];
+				ci->ngids = ngids;
+			} else {
+				for (j = 0; j < ei->ngids; j++)
+					ci->gids[j] = ei->sgids[j];
+				ci->ngids = ei->ngids;
+			}
+
 			set_put_values(put, put->numimages);
 			ii = mymalloc(sizeof *ii);
-			ii->DB_imageid = atoi(row[4]);
+			ii->DB_imageid = iidx;
 			ci->extra = ii;
 			put->numimages++;
 		}
@@ -1157,22 +1343,36 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 
 		if (imageid != NULL) {
 			/* Interested in a specific image */
-			res = mydb_query("SELECT pid,gid,imagename,path,imageid,pid_idx,gid_idx"
-					 " FROM images"
-					 " WHERE (global=1"
-					 "  OR (pid='%s' AND (gid='%s' OR shared=1)))"
-					 "  AND pid='%s' AND imagename='%s'"
-					 " ORDER BY pid,gid,imagename",
-					 7, ei->pid, ei->gid,
-					 wantpid, wantname);
+			if (can_access(imageidx, ei, 0)) {
+				res = mydb_query("SELECT pid,gid,imagename,"
+						 "path,imageid"
+						 " FROM images WHERE"
+						 " pid='%s'"
+						 " AND imagename='%s'",
+						 5, wantpid, wantname);
+			} else {
+				res = mydb_query("SELECT pid,gid,imagename,"
+						 "path,imageid"
+						 " FROM images WHERE"
+						 " pid='%s' AND imagename='%s'"
+						 " AND (global=1"
+						 "     OR (pid='%s'"
+						 "        AND (gid='%s'"
+						 "            OR shared=1)))"
+						 " ORDER BY pid,gid,imagename",
+						 5, wantpid, wantname,
+						 ei->pid, ei->gid);
+			}
 		} else {
 			/* Find all images that this pid/gid can GET */
-			res = mydb_query("SELECT pid,gid,imagename,path,imageid,pid_idx,gid_idx"
-					 " FROM images"
-					 " WHERE (global=1"
-					 "  OR (pid='%s' AND (gid='%s' OR shared=1)))"
+			res = mydb_query("SELECT pid,gid,imagename,"
+					 "path,imageid"
+					 " FROM images WHERE"
+					 "  (global=1"
+					 "  OR (pid='%s'"
+					 "     AND (gid='%s' OR shared=1)))"
 					 " ORDER BY pid,gid,imagename",
-					 7, ei->pid, ei->gid);
+					 5, ei->pid, ei->gid);
 		}
 		assert(res != NULL);
 
@@ -1188,7 +1388,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			struct config_imageinfo *ci;
 			struct stat sb;
 			char *iid;
-			int igids[2];
+			int iidx;
 
 			row = mysql_fetch_row(res);
 			/* XXX ignore rows with null or empty info */
@@ -1196,9 +1396,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			    !row[1] || !row[1][0] ||
 			    !row[2] || !row[2][0] ||
 			    !row[3] || !row[3][0] ||
-			    !row[4] || !row[4][0] ||
-			    !row[5] || !row[5][0] ||
-			    !row[6] || !row[6][0])
+			    !row[4] || !row[4][0])
 				continue;
 			iid = mymalloc(strlen(row[0]) + strlen(row[2]) + 2);
 			strcpy(iid, row[0]);
@@ -1217,6 +1415,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			} else
 				ci->sig = NULL;
 			ci->uid = ei->suid;
+			iidx = atoi(row[4]);
 
 			/*
 			 * Find the unix gids to use for any server process.
@@ -1225,47 +1424,12 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			 * one. If for any reason we don't come up with
 			 * these gids, we use the gids for the swapper of
 			 * the experiment.
-			 *
-			 * XXX we could probably combine the lookup of these
-			 * gids with the query above, but it doesn't really
-			 * seem worth it.
 			 */
-			igids[0] = igids[1] = -1;
-			{
-				MYSQL_RES *res2;
-				MYSQL_ROW row2;
-				int nrows2, pidx, gidx;
-
-				pidx = atoi(row[5]);
-				gidx = atoi(row[6]);
-				res2 = mydb_query("SELECT unix_gid"
-						  " FROM groups"
-						  " WHERE pid_idx=%d AND"
-						  "       (gid_idx=pid_idx OR"
-						  "        gid_idx=%d)",
-						  1, pidx, gidx);
-				assert(res2 != NULL);
-				nrows2 = mysql_num_rows(res2);
-				if (nrows2 > 0) {
-					row2 = mysql_fetch_row(res2);
-					if (row2[0] && row2[0][0])
-						igids[0] = atoi(row2[0]);
-					if (nrows2 > 1) {
-						row2 = mysql_fetch_row(res2);
-						if (row2[0] && row2[0][0])
-							igids[1] =
-								atoi(row2[0]);
-					}
-				}
-				mysql_free_result(res2);
-			}
-			if (igids[0] > 0) {
-				ci->gids[0] = igids[0];
-				ci->ngids = 1;
-				if (igids[1] > 0) {
-					ci->gids[1] = igids[1];
-					ci->ngids++;
-				}
+			ngids = emulab_imagegids(iidx, igids);
+			if (ngids > 0) {
+				for (j = 0; j < ngids; j++)
+					ci->gids[j] = igids[j];
+				ci->ngids = ngids;
 			} else {
 				for (j = 0; j < ei->ngids; j++)
 					ci->gids[j] = ei->sgids[j];
@@ -1274,7 +1438,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 
 			set_get_values(get, get->numimages);
 			ii = mymalloc(sizeof *ii);
-			ii->DB_imageid = atoi(row[4]);
+			ii->DB_imageid = iidx;
 			ci->extra = ii;
 			get->numimages++;
 		}
