@@ -972,6 +972,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 			# Lets force to shared node.
 			GeniXML::SetExclusive($ref, 0);
 			$exclusive = 0;
+			$virtexperiment->multiplex_factor(5);
 			$virtexperiment->encap_style("vlan");
 		    }
 		    elsif ($virtualization_subtype eq "raw"
