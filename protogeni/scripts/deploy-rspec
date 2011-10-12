@@ -32,6 +32,8 @@ for path in $1/ext/delay/1/; do
     done
 done
 
+sudo scp $1/rspeclint ops.emulab.net:/usr/local/www.geni/data/trac/resources/
+
 #cd ../security
 
 #for path in ext/policy/1; do
