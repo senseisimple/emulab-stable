@@ -355,6 +355,8 @@ sub Resolve($)
 #
 sub Register($)
 {
+    require Experiment;
+    
     # FIXME once migration to URNs is complete, $type should be removed
     # (it's deduced automatically from the URN).
     my ($argref) = @_;
@@ -434,6 +436,11 @@ sub Register($)
 	
     if ( lc( $type ) eq "slice") {
 	my $expires = $argref->{'expiration'};
+
+	if (! Experiment->ValidEID($hrn)) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				"$hrn is not a valid slice name");
+	}
 
 	#
 	# Figure out new expiration time; this is the time at which we can
