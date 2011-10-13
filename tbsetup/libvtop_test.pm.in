@@ -1239,7 +1239,7 @@ sub LoadVirtNodes($)
 		if (!defined($osinfo)) {
 		    tberror({cause => 'user', type => 'primary',
 			     severity => SEV_ERROR,
-			     error => ['invalid_os', undef, $osname, $pid]},
+			     error => ['invalid_os', undef, $osname, $ospid]},
 			    "Invalid OS $osname in project $ospid!");
 		    return -1;
 		}
@@ -1267,7 +1267,7 @@ sub LoadVirtNodes($)
 	    
 	    if ($parent_osname =~ /^(.*)\/(.*)$/) {
 		$ospid  = $1;
-		$osname = $2;
+		$parent_osname = $2;
 	    }
 	    my $osinfo = OSinfo->Lookup("$ospid,$parent_osname");
 	    if (!defined($osinfo)) {
