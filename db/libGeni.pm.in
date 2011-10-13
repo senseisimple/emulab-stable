@@ -31,7 +31,7 @@ use Interface;
 use Experiment;
 use OSinfo;
 use Lan;
-use GeniEmulab;
+use GeniEmulabUtil;
 use GeniResource;
 use GeniResponse;
 use GeniAuthority;
@@ -50,14 +50,14 @@ sub Register($$)
 {
     my ($experiment, $user) = @_;
 
-    return GeniEmulab::RegisterExperiment($experiment, $user);
+    return GeniEmulabUtil::RegisterExperiment($experiment, $user);
 }
 
 sub UnRegister($)
 {
     my ($experiment) = @_;
 
-    return GeniEmulab::UnRegisterExperiment($experiment);
+    return GeniEmulabUtil::UnRegisterExperiment($experiment);
 }
 
 sub RenewSlivers($;$)
@@ -874,7 +874,7 @@ sub MapResourcesNew($$$$$)
 
 	my $proxy = LookupProxyNode($node_urn);
 	if (!defined($proxy)) {
-	    $proxy = GeniEmulab::CreatePhysNode($cm_urn, $node_urn);
+	    $proxy = GeniEmulabUtil::CreatePhysNode($cm_urn, $node_urn);
 	    if (!defined($proxy)) {
 		#
 		# It would be nice at this point to drop the node from
