@@ -320,6 +320,7 @@ class Image
 	global $TB_IMAGEID_MODIFYINFO;
 	global $TB_IMAGEID_DESTROY;
 	global $TB_IMAGEID_ACCESS;
+	global $TB_IMAGEID_EXPORT;
 	global $TB_IMAGEID_MIN;
 	global $TB_IMAGEID_MAX;
 	global $TBDB_TRUST_USER;
