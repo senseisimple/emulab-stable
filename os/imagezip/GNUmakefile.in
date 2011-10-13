@@ -11,7 +11,7 @@ SUBDIR		= os/imagezip
 DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
 		  imageunzip.c crc.c checksum.c disksize.c imageunzip.8 \
-		  extfs/*.[hc] ext4fs/*.[hc] fat/*.[hc] ffs/*.[hc] \
+		  extfs/*.[hc] fat/*.[hc] ffs/*.[hc] \
 		  ntfs/*.[hc] hashmap/*.[hc]
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
@@ -142,11 +142,11 @@ CC		= gcc30
 endif
 
 #
-# Default to the old libntfs for now.
-# Once proven, switch to 2.0.0.
+# Default to the "lastest" libntfs (2.0.0).
+# If there are problems, switch back to:
+# NTFSVER		= 1.7.1
 #
 ifndef NTFSVER
-#NTFSVER		= 1.7.1
 NTFSVER		= 2.0.0
 endif
 export		NTFSVER
