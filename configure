@@ -7253,7 +7253,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/libdb.py db/elabinelab_bossinit \
 	ipod/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
-	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
+	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile \
 	os/imagezip/hashmap/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
         os/zapdisk/GNUmakefile \
