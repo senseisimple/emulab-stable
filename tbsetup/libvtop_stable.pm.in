@@ -1229,15 +1229,21 @@ sub LoadVirtNodes($)
 	# use the default for the type of phys node that assign picks.
 	#
 	if (defined($osname) && $osname ne "") {
-	    my $osinfo = OSinfo->Lookup("$pid,$osname");
+	    my $ospid = $pid;
+	    
+	    if ($osname =~ /^(.*)\/(.*)$/) {
+		$ospid  = $1;
+		$osname = $2;
+	    }
+	    my $osinfo = OSinfo->Lookup("$ospid,$osname");
 	    if (!defined($osinfo)) {
 		$osinfo = OSinfo->LookupByName($osname);
 
 		if (!defined($osinfo)) {
 		    tberror({cause => 'user', type => 'primary',
 			     severity => SEV_ERROR,
-			     error => ['invalid_os', undef, $osname, $pid]},
-			    "Invalid OS $osname in project $pid!");
+			     error => ['invalid_os', undef, $osname, $ospid]},
+			    "Invalid OS $osname in project $ospid!");
 		    return -1;
 		}
 	    }
@@ -1260,15 +1266,22 @@ sub LoadVirtNodes($)
 	# Map the parent_osname to an OSID now.
 	#
 	if (defined($parent_osname) && $parent_osname ne "") {
-	    my $osinfo = OSinfo->Lookup("$pid,$parent_osname");
+	    my $ospid = $pid;
+	    
+	    if ($parent_osname =~ /^(.*)\/(.*)$/) {
+		$ospid  = $1;
+		$parent_osname = $2;
+	    }
+	    my $osinfo = OSinfo->Lookup("$ospid,$parent_osname");
 	    if (!defined($osinfo)) {
 		$osinfo = OSinfo->LookupByName($parent_osname);
 
 		if (!defined($osinfo)) {
 		    tberror({cause => 'user', type => 'primary',
 			     severity => SEV_ERROR,
-			     error => ['invalid_os', undef, $parent_osname, $pid]},
-			    "Invalid parent OS $parent_osname in project $pid!");
+			     error => ['invalid_os',
+				       undef, $parent_osname, $ospid]},
+		    "Invalid parent OS $parent_osname in project $ospid!");
 		    return -1;
 		}
 	    }
