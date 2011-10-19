@@ -3480,12 +3480,29 @@ sub GetExperiment($) { return $_[0]->{'EXPT'}; }
 sub Create($$$$$;$$)
 {
     my ($class, $experiment, $vname, $secretkey, $style, $mask, $port) = @_;
+    my $exptidx = $experiment->idx();
 
     # The new lan has the 'ready' bit set to zero.
     my $lan = Lan->Create($experiment, $vname, "tunnel");
     return undef
 	if (!defined($lan));
 
+    #
+    # We need an index to use for a unit number. Just look to see
+    # how many tunnels 
+    #
+    my $query_result =
+	DBQueryWarn("select count(*) from lans ".
+		    "where exptidx='$exptidx' and type='tunnel'");
+    if (!$query_result || !$query_result->numrows) {
+	$lan->Destroy();
+	return undef;
+    }
+    my ($tunnel_number) = $query_result->fetchrow_array();
+    if ($lan->SetAttribute("tunnel_number", $tunnel_number) != 0) {
+	$lan->Destroy();
+	return undef;
+    }
     # Set the secret key for the tunnel.
     if ($lan->SetAttribute("secretkey", $secretkey) != 0) {
 	$lan->Destroy();

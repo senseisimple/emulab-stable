@@ -1625,6 +1625,13 @@ sub Create($$$$$$)
     my $manager1;
     my $manager2;
     my $testing = 0;
+    my $tunnel_number;
+
+    # The tunnel number is how we generate the unit number.
+    if ($tunnel->GetAttribute("tunnel_number", \$tunnel_number) != 0) {
+	print STDERR "Could not get tunnel_number for $tunnel\n";
+	goto bad;
+    }
 
     # We need the control network addresses, but it is possible that
     # one of the nodes is not on this testbed.
@@ -1761,7 +1768,7 @@ sub Create($$$$$$)
 	    if (defined($manager2));
 	$member1->SetAttribute("tunnel_ipmask", "255.255.255.0");
 	$member1->SetAttribute("tunnel_lan", $linkname);
-	$member1->SetAttribute("tunnel_unit", $member1->memberid() + 1);
+	$member1->SetAttribute("tunnel_unit", $tunnel_number + 1);
 	$member1->SetAttribute("tunnel_style", "gre");
 	$member1->SetAttribute("tunnel_peerid", $virtid2);
 
@@ -1790,7 +1797,7 @@ sub Create($$$$$$)
 	    if (defined($manager1));
 	$member2->SetAttribute("tunnel_ipmask", "255.255.255.0");
 	$member2->SetAttribute("tunnel_lan", $linkname);
-	$member2->SetAttribute("tunnel_unit", $member2->memberid() + 1);
+	$member2->SetAttribute("tunnel_unit", $tunnel_number + 1);
 	$member2->SetAttribute("tunnel_style", "gre");
 	$member2->SetAttribute("tunnel_peerid", $virtid1);
 
