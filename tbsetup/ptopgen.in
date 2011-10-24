@@ -779,10 +779,15 @@ if (defined($pid)) {
 # 
 my $osidquery = "select distinct o.osid, oi.type, o.osname, o.pid, o.OS, o.version, o.description,o.protogeni_export from os_info as o " .
 	"left join osidtoimageid as oi on o.osid = oi.osid " .
-	"left join images as i on oi.imageid = i.imageid ".
-	"where i.global = 1";
+        "left join images as i on oi.imageid = i.imageid ";
 if ($pid) {
-    $osidquery .= " or i.pid='$pid'";
+    $osidquery .= "left join image_permissions as p1 on p1.imageid=i.imageid and p1.permission_type='group' ".
+	"left join groups as g on p1.permission_idx=g.gid_idx ";
+}
+$osidquery .= "where i.global = 1 ";
+if ($pid) {
+    $osidquery .= " or i.pid='$pid' ".
+	" or (g.pid is not null and g.pid='$pid')";
 }
 
 my $defaultosidquery = 'select distinct o.osid, t.type, o.osname, o.pid, o.OS, o.version, o.description, o.protogeni_export '.
