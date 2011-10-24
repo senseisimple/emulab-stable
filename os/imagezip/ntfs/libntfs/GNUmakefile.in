@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 # EMULAB-COPYRIGHT
 #
@@ -102,14 +102,14 @@ else
 		$(MV) freebsd_io.c* ntfsprogs-$(NTFSVER)/libntfs/; \
 	fi
 	$(MV) ntfsprogs-$(NTFSVER) $(NTFSDIR)
-	(cd $(NTFSDIR); configure)
+	(cd $(NTFSDIR); ./configure)
 	cp -p $(NTFSDIR)/config.h $(NTFSDIR)/include
 endif
 	touch $(LIBSRCDIR)/patched
 
 clean:
 	-rm -f *.o *~ *.a config.* Makefile libtool *.spec stamp-h
-	-rm -rf $(NTFSDIR) doc include libntfs
+	-rm -rf ntfsprogs-$(NTFSVER) $(NTFSDIR) doc include libntfs
 
 distclean:
 	-rm -rf *.gz *.spec *-h doc libtool include libntfs
