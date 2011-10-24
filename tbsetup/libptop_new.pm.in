@@ -53,6 +53,14 @@ my $default_longitude = undef;
 my $default_latitude = undef;
 my $default_country = undef;
 
+my %wireless_protocols = ("80211" => 1,
+			  "80211a" => 1,
+			  "80211b" => 1,
+			  "80211g" => 1,
+			  "flex900" => 1,
+			  "xcvr2450" => 1);
+
+
 our %nodeList = ();
 our %nodeTypeList = ();
 our %linkList = ();
@@ -86,6 +94,9 @@ our %osid_subosid = ();
 # interface_capabilities table. 'base' is the capkey prefix to one of
 # the defspeed keys.
 our %itype_bw = ();
+# Mapping between interface_type and a list of protocols supported.
+# Only includes wireless protocols (those listed in %wireless_protocols).
+our %itype_protos = ();
 
 # Mapping between interfaces and columns
 our %iface_type = ();
@@ -457,6 +468,24 @@ sub LookupInterfaces()
 {
     my $dbresult;
     my $row;
+    $dbresult =
+	DBQueryFatal("SELECT type,capkey,capval from interface_capabilities ".
+		     "where capkey='protocols' or capkey like '%_defspeed'");
+    while (my ($type,$capkey,$capval) = $dbresult->fetchrow_array()) {
+	if ($capkey eq "protocols") {
+	    my @protos = split(",", $capval);
+	    foreach my $proto (@protos) {
+		if (exists($wireless_protocols{$proto})) {
+		    hashpush(\%itype_protos, $type, $proto);
+		}
+	    }
+	} elsif ($capkey =~ /^([-\w]+)_defspeed$/) {
+	    $itype_bw{$type.":".$1} = $capval;
+	} else {
+	    die("Improper defspeed $capval for $type!\n");
+	}
+    }
+
     $dbresult = DBQueryFatal("select i.node_id, i.iface, i.IP, i.role, ".
 			     "i.interface_type, s.remaining_bandwidth ".
 			     "from interfaces as i ".
@@ -477,19 +506,6 @@ sub LookupInterfaces()
 	    $node->addInterface($ifaceName);
 	} elsif ($debug) {
 	    print STDERR "Node $nodeName is in interfaces but not nodes\n";
-	}
-    }
-
-    $dbresult =
-	DBQueryFatal("SELECT type,capkey,capval from interface_capabilities ".
-		     "where capkey='protocols' or capkey like '%_defspeed'");
-    while (my ($type,$capkey,$capval) = $dbresult->fetchrow_array()) {
-	if ($capkey eq "protocols") {
-#	    $interfaceprotocols{$type} = [ split(",", $capval) ];
-	} elsif ($capkey =~ /^([-\w]+)_defspeed$/) {
-	    $itype_bw{$type.":".$1} = $capval;
-	} else {
-	    die("Improper defspeed $capval for $type!\n");
 	}
     }
 
@@ -540,10 +556,6 @@ sub AddSharedBandwidth()
 	next
 	    if (! exists($iface_type{"$node:$iface"}));
 
-#	if (! exists($sharedbw{"$node:$iface"})) {
-#	    my $bw = $interfaceList{"$node:$iface"}->remaining_bandwidth();
-#	    $sharedbw{"$node:$iface"} = $bw;
-#	}
 	$sharedbw{"$node:$iface"} += $bandwidth;
     }
 }
@@ -559,7 +571,7 @@ sub LookupLinks()
     my $row;
     $dbresult =
 	DBQueryFatal("select w.type, w.node_id1, w.card1, w.port1, i1.iface, ".
-		     "w.node_id2, w.card2, w.port2, i2.iface ".
+		     "w.node_id2, w.card2, w.port2, i2.iface, w.trunkid ".
 		     "from wires as w ".
 		     "left join interfaces as i1 ".
 		     "on w.node_id1=i1.node_id and w.card1=i1.card ".
@@ -568,8 +580,8 @@ sub LookupLinks()
 		     "on w.node_id2=i2.node_id and w.card2=i2.card ".
 		     "and w.port2=i2.port ".
 		     "where w.logical=0");
-    while (my ($type, $node_id1, $card1, $port1, $iface1,
-	       $node_id2, $card2, $port2, $iface2) = $dbresult->fetchrow()) {
+    while (my ($type, $node_id1, $card1, $port1, $iface1, $node_id2, 
+	       $card2, $port2, $iface2, $trunkid) = $dbresult->fetchrow()) {
 	# Add connections between nodes for features later.
 	if ($type ne 'Unused') {
 	    my $node1 = $nodeList{$node_id1};
@@ -596,25 +608,33 @@ sub LookupLinks()
 		print STDERR "Undefined interface for ".
 		    "$node_id2:$card2:$port2\n";
 	    }
-	    my ($source, $dest, $sourcebw, $destbw);
-#	    if ($node_id1 le $node_id2) {
-		$source = $node_id1;
-		$dest = $node_id2;
-		$sourcebw = SwitchBandwidth($node_id1, $iface1);
-		$destbw = SwitchBandwidth($node_id2, $iface2);
-#	    } else {
-#		$source = $node_id2;
-#		$dest = $node_id1;
-#		$sourcebw = SwitchBandwidth($node_id2, $iface2);
-#		$destbw = SwitchBandwidth($node_id1, $iface1);
-#	    }
-	    my $name = "link-$source:$dest";
+	    my $source = $node_id1;
+	    my $dest = $node_id2;
+	    my $sourcebw = SwitchBandwidth($node_id1, $iface1);
+	    my $destbw = SwitchBandwidth($node_id2, $iface2);
+	    if (! defined($trunkid) || $trunkid == 0) {
+		die("DATABASE ERROR: Wire from $node_id1:$card1.$port1 to ".
+		    "$node_id2:$card2.$port2 is of type trunk ".
+		    "but does not have a valid trunkid.");
+	    }
+	    my $name = "link-trunk:$trunkid";
 	    if (! exists($linkList{$name})) {
 		$linkList{$name} = libptop::plink->CreateTrunk($name,
 							       $source,
 							       $dest);
 	    }
-	    $linkList{$name}->addTrunk($sourcebw, $destbw);
+	    my $link = $linkList{$name};
+	    my $same_ends = (($source eq $link->source()
+			      && $dest eq $link->dest()) ||
+			     ($source eq $link->dest()
+			      && $dest eq $link->source()));
+	    if (! $same_ends) {
+		die("DATABASE ERROR: Wire from $node_id1:$card1.$port1 to ".
+		    "$node_id2:$card2.$port2 shares a trunkid ".
+		    "with links from ".$link->source()." to ".
+		    $link->dest());
+	    }
+	    $link->addTrunk($sourcebw, $destbw);
 	} elsif ($type eq 'Node') {
 	    # Add a switch/node or node/node link.
 	    my $node1 = $nodeList{$node_id1};
@@ -642,6 +662,19 @@ sub LookupLinks()
 	    }
 	}
     }
+}
+
+sub AddFakeNodes()
+{
+    my $node;
+    if ($print_widearea || $genimode) {
+	$node = libptop::pnode->CreateCloud("internet", "border", ["ipv4"]);
+	$nodeList{$node->name()} = $node;
+    }
+    my @protos = keys(%wireless_protocols);
+    $node = libptop::pnode->CreateCloud("airswitch", "air",
+					\@protos);
+    $nodeList{$node->name()} = $node;
 }
 
 # Accessors
@@ -784,34 +817,65 @@ sub Create($$)
 
     $self->{'NODE'} = Node->LookupRow($row);
     $self->{'TYPE'} = $nodeTypeList{$typename};
+    $self->{'NAME'} = $self->{'NODE'}->node_id();
     $self->{'PTYPES'} = [];
     $self->{'FEATURES'} = [];
     $self->{'FLAGS'} = {};
-#    $self->{'GLOBALCOUNT'} = undef;
     $self->{'AUXTYPES'} = {};
     $self->{'CONNECTIONS'} = {};
     $self->{'INTERFACES'} = [];
+    $self->{'SHARED'} = 0;
+    $self->{'CLOUD'} = 0;
+#    $self->{'GLOBALCOUNT'} = undef;
 #    $self->{'STATUS'} = undef;
 #    $self->{'WIDEAREA'} = undef;
-    $self->{'SHARED'} = 0;
 #    $self->{'EID'} = undef;
 #    $self->{'PID'} = undef;
 #    $self->{'EROLE'} = undef;
 #    $self->{'EVENTSTATE'} = undef;
 #    $self->{'WILL_PRINT'} = undef;
+#    $self->{'AVAILABLE'} = undef;
 
     bless($self, $class);
     $self->node()->SetNodeTypeInfo($self->type());
     return $self;
 }
 
+sub CreateCloud($$$$)
+{
+    my ($class, $name, $interface, $types) = @_;
+    my $self = {};
+
+    $self->{'NAME'} = $name;
+    $self->{'PTYPES'} = [];
+    $self->{'FEATURES'} = [];
+    $self->{'FLAGS'} = {};
+    $self->{'AUXTYPES'} = {};
+    $self->{'CONNECTIONS'} = {};
+    $self->{'INTERFACES'} = [];
+    $self->{'SHARED'} = 0;
+    $self->{'CLOUD'} = 1;
+    $self->{'WILL_PRINT'} = ! defined($single_node);
+    $self->{'AVAILABLE'} = 1;
+
+    bless($self, $class);
+
+    foreach my $type (@{ $types }) {
+	$self->addPType($type, undef, 1);
+    }
+    $self->addInterface($interface);
+
+    return $self;
+}
+
 # Accessors
-sub name($)        { return $_[0]->{'NODE'}->node_id(); }
+sub name($)        { return $_[0]->{'NAME'}; }
 sub node($)        { return $_[0]->{'NODE'}; }
 sub type($)        { return $_[0]->{'TYPE'}; }
 sub globalcount($) { return $_[0]->{'GLOBALCOUNT'}; }
 sub status($)      { return $_[0]->{'STATUS'}; }
 sub is_shared($)   { return $_[0]->{'SHARED'}; }
+sub is_cloud($)    { return $_[0]->{'CLOUD'}; }
 sub eid($)         { return $_[0]->{'EID'}; }
 sub pid($)         { return $_[0]->{'PID'}; }
 sub erole($)       { return $_[0]->{'EROLE'}; }
@@ -881,7 +945,16 @@ sub isreserved($)
     return $pre_reserved || $exp_reserved;
 }
 
-sub available($;$)
+sub available($)
+{
+    my ($self) = @_;
+    if (! defined($self->{'AVAILABLE'})) {
+	$self->{'AVAILABLE'} = $self->calculateAvailable();
+    }
+    return $self->{'AVAILABLE'};
+}
+
+sub calculateAvailable($;$)
 {
     my ($self, $tagRef) = @_;
     my $node = $self->node();
@@ -912,7 +985,8 @@ sub available($;$)
 	$tags{$self->name()} = 1;
 	my $parent = $node->phys_nodeid();
 	if (! exists($tags{$parent})) {
-	    $isfree = $isfree && $nodeList{$parent}->available(\%tags);
+	    $isfree = $isfree
+		&& $nodeList{$parent}->calculateAvailable(\%tags);
 	}
     }
     return $isfree;
@@ -934,15 +1008,15 @@ sub calculateSwitch($)
 	    || ($role eq 'testnodefoo' && $self->node()->isswitch()));
 }
 
-sub islocal($)
-{
-    if (! defined($_[0]->{'IS_LOCAL'})) {
-	$_[0]->{'IS_LOCAL'} = $_[0]->calculateLocal();
-    }
-    return $_[0]->{'IS_LOCAL'};
-}
+#sub islocal($)
+#{
+#    if (! defined($_[0]->{'IS_LOCAL'})) {
+#	$_[0]->{'IS_LOCAL'} = $_[0]->calculateLocal();
+#    }
+#    return $_[0]->{'IS_LOCAL'};
+#}
 
-sub calculateLocal($)
+sub islocal($)
 {
     my ($self) = @_;
     my $node = $self->node();
@@ -1016,13 +1090,16 @@ sub willPrint($)
     return $self->{'WILL_PRINT'};
 }
 
-sub calculateWillPrint($;$)
+sub calculatePrint($;$)
 {
     my ($self, $tagRef) = @_;
     my $node = $self->node();
+    if (! defined($node)) { 
+	return 1;
+    }
 
     if (defined($single_node)) {
-	return ($single_node eq $node->node_id());
+	return ($single_node eq $self->name());
     }
 
     # In geni mode, disallow nodes tagged protogeni_exclude from being printed.
@@ -1048,7 +1125,7 @@ sub calculateWillPrint($;$)
 	$tags{$self->name()} = 1;
 	my $parent = $node->phys_nodeid();
 	if (! exists($tags{$parent})) {
-	    $result = $result && $nodeList{$parent}->calculateWillPrint(\%tags);
+	    $result = $result && $nodeList{$parent}->calculatePrint(\%tags);
 	}
     }
     return $result;
@@ -1257,7 +1334,7 @@ sub processAuxtypes($)
 	if (! defined($realtype)) {
 	    if ($debug) {
 		print STDERR "NodeType->Lookup failed for $realtypename ".
-		    "on node " . $node->node_id() . "\n";
+		    "on node " . $self->name() . "\n";
 	    }
 	    next;
 	}
@@ -1323,7 +1400,7 @@ sub processVirtGoo($)
     # Put this silly feature in so that we can try to keep vnodes
     # on the same pnode they were before - but only if updating
     if (defined($exempt_eid)) {
-	$self->addFeature($self->node()->node_id(), 0.0);
+	$self->addFeature($self->name(), 0.0);
     }
 }
 
@@ -1460,14 +1537,14 @@ sub processWidearea($)
     if (! defined($self->status())) {
 	if ($debug) {
 	    print STDERR "Widearea node does not have a status: ".
-		$node->node_id()."\n";
+		$self->name()."\n";
 	}
 	return;
     }
     if (! defined($self->eid()) || ! defined($self->pid())) {
 	if ($debug) {
 	    print STDERR "Widearea node is not reserved to an eid or pid".
-		$node->node_id()."\n";
+		$self->name()."\n";
 	}
 	return;
     }
@@ -1586,6 +1663,9 @@ sub toXML($$)
 	GeniXML::SetText("now", $availablexml, $available);
     }
     GeniXML::SetText("component_name", $xml, $self->name());
+    if ($self->is_cloud()) {
+	my $cloud = GeniXML::AddElement("cloud", $parent);
+    }
 
     # Location
     my $lat = $self->widearea("latitude");
@@ -1644,20 +1724,24 @@ sub toXML($$)
 sub interfaceToXML($$$)
 {
     my ($self, $parent, $name) = @_;
-    my $key = $self->node()->node_id() . ":" . $name;
+    my $key = $self->name() . ":" . $name;
     my $role = $iface_role{$key};
-    my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $self->node()->node_id(),
+    my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $self->name(),
 					 $name);
     my $xml = GeniXML::AddElement("interface", $parent);
     GeniXML::SetText("component_id", $xml, $urn);
-    if ($role eq "ctrl") {
-	GeniXML::SetText("role", $xml, "control");
-    } elsif ($role eq "expt") {
-	GeniXML::SetText("role", $xml, "experimental");
+    if (defined($role)) {
+	if ($role eq "ctrl") {
+	    GeniXML::SetText("role", $xml, "control");
+	} elsif ($role eq "expt") {
+	    GeniXML::SetText("role", $xml, "experimental");
+	}
     }
     if (libptop_new::is_public_interface($key)) {
 	my $ip = $iface_ip{$key};
-	GeniXML::SetText("public_ipv4", $xml, $ip);
+	if (defined($ip)) {
+	    GeniXML::SetText("public_ipv4", $xml, $ip);
+	}
    }
     if (! GeniXML::IsVersion0($xml)) {
 	my $child = GeniXML::AddElement("interface", $xml,
@@ -1711,6 +1795,7 @@ sub toString($)
     return $result;
 }
 
+# If this is on a fake node, then mainType will be undefined.
 sub toXML($$)
 {
     my ($self, $parent, $mainType) = @_;
@@ -1729,7 +1814,8 @@ sub toXML($$)
 	# Add OSIDs for version 0.2. These are global to the node
 	# rather than inside a particular type tag.
 	if (GeniXML::GetXmlVersion($parent) eq $GeniXML::RSPEC_0_2
-	    && $mainType eq $self->name()) {
+	    && defined($mainType)
+	    && $mainType->type() eq $self->name()) {
 	    $self->osidToXML($parent, $mainType);
 	}
     } else {
@@ -1737,7 +1823,9 @@ sub toXML($$)
 	if ($self->name() eq "pc") {
 	    $sliverxml = GeniXML::AddElement("sliver_type", $parent);
 	    GeniXML::SetText("name", $sliverxml, "raw-pc");
-	    $self->osidToXML($sliverxml, $mainType);
+	    if (defined($mainType)) {
+		$self->osidToXML($sliverxml, $mainType);
+	    }
 	}
 	if ($self->name() eq "pcvm") {
 	    $sliverxml = GeniXML::AddElement("sliver_type", $parent);
@@ -1773,7 +1861,7 @@ sub osidToXML($$$)
 	    GeniXML::SetText("os", $disk, $os->OS());
 	    GeniXML::SetText("version", $disk, $os->version());
 	    GeniXML::SetText("description", $disk, $os->description());
-	    if (defined($default) && $default eq $type->type()) {
+	    if (defined($default) && $default eq $osid) {
 		GeniXML::SetText("default", $disk, "true");
 	    }
 	}
@@ -2030,7 +2118,7 @@ sub processSwitchNode($$$$)
     $self->set_bw(libptop_new::NodeBandwidth($node, $nodeif));
     my $basetype = $nodeRef->get_basetype();
     $self->add_type($basetype);
-    $self->add_type($basetype."-".$switchRef->node()->node_id());
+    $self->add_type($basetype."-".$switchRef->name());
     $self->add_type($basetype."-".$self->bw());
     my $ifaceType = $iface_type{"$node:$nodeif"};
     $self->add_type($basetype."-".$ifaceType);
