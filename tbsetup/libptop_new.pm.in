@@ -1008,15 +1008,15 @@ sub calculateSwitch($)
 	    || ($role eq 'testnodefoo' && $self->node()->isswitch()));
 }
 
-#sub islocal($)
-#{
-#    if (! defined($_[0]->{'IS_LOCAL'})) {
-#	$_[0]->{'IS_LOCAL'} = $_[0]->calculateLocal();
-#    }
-#    return $_[0]->{'IS_LOCAL'};
-#}
-
 sub islocal($)
+{
+    if (! defined($_[0]->{'IS_LOCAL'})) {
+	$_[0]->{'IS_LOCAL'} = $_[0]->calculateLocal();
+    }
+    return $_[0]->{'IS_LOCAL'};
+}
+
+sub calculateLocal($)
 {
     my ($self) = @_;
     my $node = $self->node();
@@ -1090,7 +1090,7 @@ sub willPrint($)
     return $self->{'WILL_PRINT'};
 }
 
-sub calculatePrint($;$)
+sub calculateWillPrint($;$)
 {
     my ($self, $tagRef) = @_;
     my $node = $self->node();
@@ -1125,7 +1125,7 @@ sub calculatePrint($;$)
 	$tags{$self->name()} = 1;
 	my $parent = $node->phys_nodeid();
 	if (! exists($tags{$parent})) {
-	    $result = $result && $nodeList{$parent}->calculatePrint(\%tags);
+	    $result = $result && $nodeList{$parent}->calculateWillPrint(\%tags);
 	}
     }
     return $result;
