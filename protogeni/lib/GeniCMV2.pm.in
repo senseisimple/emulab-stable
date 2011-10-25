@@ -207,7 +207,8 @@ sub Resolve($)
 	#
 	if (! ($isauth || $admin ||
 	       $slice->urn() eq $credential->target_urn())) {
-	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
+	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
+					"No permission to resolve $slice\n");
 	}
 	# Return a blob.
 	my $blob = { "urn"          => $urn };
@@ -228,14 +229,21 @@ sub Resolve($)
     }
     if ($type eq "sliver") {
 	my $sliver = $object;
+	my $slice  = $sliver->GetSlice();
+	return GeniResponse->Create(GENIRESPONSE_ERROR)
+	    if (!defined($slice));
 
 	#
 	# In this implementation, the caller must hold a valid slice
 	# or sliver credential for the slice being looked up. 
 	#
-	if (! ($admin ||
+	if (! ($admin || $isauth ||
 	       $sliver->urn() eq $credential->target_urn() ||
-	       $sliver->slice_uuid() eq $credential->target_uuid())) {
+	       $slice->urn() eq $credential->target_urn())) {
+	    print STDERR $sliver->urn() . "\n";
+	    print STDERR $slice->urn() . "\n";
+	    print STDERR $credential->target_urn() . "\n";
+	    print STDERR $ENV{'MYURN'} . "\n";
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN);
 	}
 	my $manifest = $sliver->GetManifest(1);
