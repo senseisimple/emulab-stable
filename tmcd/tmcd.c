@@ -4555,7 +4555,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 				  " where i.node_id=s.subboss_id and "
 				  " i.role='ctrl' and "
 				  " s.node_id='%s' and s.service='frisbee'",
-				  1, reqp->nodeid);
+				  1, reqp->isvnode ? reqp->pnodeid : reqp->nodeid);
 		if (!res2) {
 			error("doloadinfo: %s: DB Error getting subboss info!\n",
 			       reqp->nodeid);
