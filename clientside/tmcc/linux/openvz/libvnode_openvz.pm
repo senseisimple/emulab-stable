@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Implements the libvnode API for OpenVZ support in Emulab.
@@ -1283,13 +1283,11 @@ sub vz_vnodePreConfigExpNetwork {
 	    print STDERR "Could not start /sbin/ip\n";
 	    return -1;
 	}
-	my %gre2ip = ();
-	my %ip2gre = ();
+	my %key2gre = ();
 
 	while (<IP>) {
-	    if ($_ =~ /^(gre\d*):.*remote\s*([\d\.]*)\s*local\s*([\d\.]*)/) {
-		$gre2ip{$1} = "$2:$3";
-		$ip2gre{"$2:$3"} = $1;
+	    if ($_ =~ /^(gre\d*):.*key\s*([\d\.]*)/) {
+		$key2gre{$2} = $1;
 	    }
 	}
 	if (!close(IP)) {
@@ -1309,22 +1307,22 @@ sub vz_vnodePreConfigExpNetwork {
 	    my $mask     = $tunnel->{"tunnel_ipmask"};
 	    my $unit     = $tunnel->{"tunnel_unit"};
 	    my $gre;
+	    my $grekey   = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
 
-	    if (exists($ip2gre{"$dsthost:$srchost"})) {
-		$gre = $ip2gre{"$dsthost:$srchost"};
+	    if (exists($key2gre{$grekey})) {
+		$gre = $key2gre{$grekey};
 	    }
 	    else {
-		$gre = "gre" . (scalar(keys(%ip2gre)) + 1);
+		$gre = "gre" . (scalar(keys(%key2gre)) + 1);
 		mysystem2("/sbin/ip tunnel add $gre mode gre ".
-			 "local $srchost remote $dsthost ttl 64");
+			 "local $srchost remote $dsthost ttl 64 key $grekey");
 		return -1
 		    if ($?);
 		mysystem2("/sbin/ifconfig $gre 0 up");
 		return -1
 		    if ($?);
 
-		$ip2gre{"$dsthost:$srchost"} = $gre;
-		$gre2ip{$gre} = "$dsthost:$srchost";
+		$key2gre{$grekey} = $gre;
 	    }
 	    my $net = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
 	    mysystem2("/sbin/ip route replace $net/24 dev $gre");

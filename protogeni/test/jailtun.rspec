@@ -2,14 +2,18 @@
  <node virtual_id="geni1"
        virtualization_type="emulab-vnode"
        virtualization_subtype="emulab-openvz"
-       exclusive="0">
+       exclusive="1">
    <interface virtual_id="virt0"/>
+   <interface virtual_id="virt1"/>
+   <interface virtual_id="virt2"/>
  </node>
  <node virtual_id="geni2"
        virtualization_type="emulab-vnode"
        virtualization_subtype="emulab-openvz"
-       exclusive="0">
+       exclusive="1">
    <interface virtual_id="virt0"/>
+   <interface virtual_id="virt1"/>
+   <interface virtual_id="virt2"/>
  </node>
  <link virtual_id="link0">
   <interface_ref
@@ -29,6 +33,16 @@
   <interface_ref virtual_node_id="geni2"
                  virtual_interface_id="virt1"
                  tunnel_ip="192.168.1.2"
+                 />
+ </link>
+ <link virtual_id="link2" link_type="tunnel">
+  <interface_ref virtual_node_id="geni1"
+                 virtual_interface_id="virt2"
+                 tunnel_ip="192.168.3.1"
+                  />
+  <interface_ref virtual_node_id="geni2"
+                 virtual_interface_id="virt2"
+                 tunnel_ip="192.168.3.2"
                  />
  </link>
 </rspec>
