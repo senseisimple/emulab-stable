@@ -1284,10 +1284,14 @@ sub vz_vnodePreConfigExpNetwork {
 	    return -1;
 	}
 	my %key2gre = ();
+	my $grecount = 0;
 
 	while (<IP>) {
 	    if ($_ =~ /^(gre\d*):.*key\s*([\d\.]*)/) {
 		$key2gre{$2} = $1;
+	    }
+	    if ($_ =~ /^(gre\d*):.*remote\s*([\d\.]*)\s*local\s*([\d\.]*)/) {
+		++$grecount;
 	    }
 	}
 	if (!close(IP)) {
@@ -1313,7 +1317,7 @@ sub vz_vnodePreConfigExpNetwork {
 		$gre = $key2gre{$grekey};
 	    }
 	    else {
-		$gre = "gre" . (scalar(keys(%key2gre)) + 1);
+		$gre = "gre" . ($grecount + 1);
 		mysystem2("/sbin/ip tunnel add $gre mode gre ".
 			 "local $srchost remote $dsthost ttl 64 key $grekey");
 		return -1
