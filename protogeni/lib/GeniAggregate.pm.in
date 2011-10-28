@@ -1627,6 +1627,17 @@ sub Create($$$$$$)
     my $testing = 0;
     my $tunnel_number;
 
+    # Form a gre key that is unique but the same same on both sides.
+    my $cktag = $slice->urn() . ":$linkname";
+    my $cksum = `echo '$cktag' | /usr/bin/cksum`;
+    if ($cksum =~ /^(\d+)/) {
+	$cksum = $1;
+    }
+    else {
+	print STDERR "Could not form a gre key for $linkname\n";
+	goto bad;
+    }
+    
     # The tunnel number is how we generate the unit number.
     if ($tunnel->GetAttribute("tunnel_number", \$tunnel_number) != 0) {
 	print STDERR "Could not get tunnel_number for $tunnel\n";
@@ -1771,6 +1782,7 @@ sub Create($$$$$$)
 	$member1->SetAttribute("tunnel_unit", $tunnel_number + 1);
 	$member1->SetAttribute("tunnel_style", "gre");
 	$member1->SetAttribute("tunnel_peerid", $virtid2);
+	$member1->SetAttribute("tunnel_tag", $cksum);
 
 	my $sliver = GeniSliver::Interface->Create($slice,
 						   $owner,
@@ -1800,6 +1812,7 @@ sub Create($$$$$$)
 	$member2->SetAttribute("tunnel_unit", $tunnel_number + 1);
 	$member2->SetAttribute("tunnel_style", "gre");
 	$member2->SetAttribute("tunnel_peerid", $virtid1);
+	$member2->SetAttribute("tunnel_tag", $cksum);
 
 	my $sliver = GeniSliver::Interface->Create($slice,
 						   $owner,

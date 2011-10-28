@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2008-2011 University of Utah and the Flux Group.
@@ -1277,18 +1277,44 @@ sub vz_vnodePreConfigExpNetwork {
 
     if (values(%{ $tunnels })) {
 	#
+	# gres are a global resource.
+	#
+	if (TBScriptLock($GLOBAL_CONF_LOCK, 0, 900) != TBSCRIPTLOCK_OKAY()) {
+	    print STDERR "Could not get the tunne lock after a long time!\n";
+	    return -1;
+	}
+
+	#
 	# Get current list.
 	#
 	if (! open(IP, "/sbin/ip tunnel show|")) {
 	    print STDERR "Could not start /sbin/ip\n";
+	    TBScriptUnlock();
 	    return -1;
 	}
 	my %key2gre = ();
-	my $grecount = 0;
+	my $maxgre  = 0;
 
 	while (<IP>) {
 	    if ($_ =~ /^(gre\d*):.*key\s*([\d\.]*)/) {
 		$key2gre{$2} = $1;
+		if ($1 =~ /^gre(\d*)$/) {
+		    $maxgre = $1
+			if ($1 > $maxgre);
+		}
+	    }
+	    elsif ($_ =~ /^(gre\d*):.*remote\s*([\d\.]*)\s*local\s*([\d\.]*)/) {
+		#
+		# This is just a temp fixup; delete tunnels with no key
+		# since we no longer use non-keyed tunnels, and cause it
+		# will cause the kernel to throw an error in the tunnel add
+		# below. 
+		#
+		mysystem2("/sbin/ip tunnel del $1");
+		if ($?) {
+		    TBScriptUnlock();
+		    return -1;
+		}
 	    }
 	    if ($_ =~ /^(gre\d*):.*remote\s*([\d\.]*)\s*local\s*([\d\.]*)/) {
 		++$grecount;
@@ -1296,6 +1322,7 @@ sub vz_vnodePreConfigExpNetwork {
 	}
 	if (!close(IP)) {
 	    print STDERR "Could not get tunnel list\n";
+	    TBScriptUnlock();
 	    return -1;
 	}
 
@@ -1310,29 +1337,33 @@ sub vz_vnodePreConfigExpNetwork {
 	    my $peerip   = $tunnel->{"tunnel_peerip"};
 	    my $mask     = $tunnel->{"tunnel_ipmask"};
 	    my $unit     = $tunnel->{"tunnel_unit"};
+	    my $grekey   = $tunnel->{"tunnel_tag"};
 	    my $gre;
-	    my $grekey   = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
 
 	    if (exists($key2gre{$grekey})) {
 		$gre = $key2gre{$grekey};
 	    }
 	    else {
-		$gre = "gre" . ($grecount + 1);
+		$gre = "gre" . ++$maxgre;
 		mysystem2("/sbin/ip tunnel add $gre mode gre ".
 			 "local $srchost remote $dsthost ttl 64 key $grekey");
-		return -1
-		    if ($?);
+		if ($?) {
+		    TBScriptUnlock();
+		    return -1;
+		}
 		mysystem2("/sbin/ifconfig $gre 0 up");
-		return -1
-		    if ($?);
-
+		if ($?) {
+		    TBScriptUnlock();
+		    return -1;
+		}
 		$key2gre{$grekey} = $gre;
 	    }
 	    my $net = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
 	    mysystem2("/sbin/ip route replace $net/24 dev $gre");
-	    return -1
-		if ($?);
-
+	    if ($?) {
+		TBScriptUnlock();
+		return -1;
+	    }
 	    my $veth = "veth$vmid.tun$unit";
 	    my $eth  = "gre$unit";
 	    
@@ -1349,6 +1380,7 @@ sub vz_vnodePreConfigExpNetwork {
 	    }
 	    $elabroutes .= "$veth,$inetip";
 	}
+	TBScriptUnlock();
     }
 
     #
