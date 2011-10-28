@@ -472,7 +472,7 @@ fi
 $BINDIR/get_edd_map > $BOOTDIR/edd_map 2>/dev/null
 
 
-FRISBEE_OPTS="-S $BOSSIP"
+FRISBEE_OPTS="-f -S $BOSSIP"
 
 if [ -e $BOOTDIR/myip ]; then
 	FRISBEE_OPTS="-i `cat $BOOTDIR/myip`"
