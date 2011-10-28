@@ -1316,9 +1316,6 @@ sub vz_vnodePreConfigExpNetwork {
 		    return -1;
 		}
 	    }
-	    if ($_ =~ /^(gre\d*):.*remote\s*([\d\.]*)\s*local\s*([\d\.]*)/) {
-		++$grecount;
-	    }
 	}
 	if (!close(IP)) {
 	    print STDERR "Could not get tunnel list\n";
