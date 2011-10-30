@@ -25,6 +25,7 @@ fi
 
 IFCONFIG=/sbin/ifconfig
 ROUTE=/sbin/route
+IP=/sbin/ip
 BRCTL=/usr/sbin/brctl
 
 # ELABIFS="veth100.1,br0;veth100.2,brp3"
@@ -89,12 +90,13 @@ echo "$ELABIFS" | sed -e 's/;/\n/g' | \
 echo "$ELABROUTES" | sed -e 's/;/\n/g' | \
     while read route; \
     do \
-        _if=`echo "$route" | sed -r -e 's/([^,]*),[^,]*/\1/'`
-        _rt=`echo "$route" | sed -r -e 's/[^,]*,([^,]*)/\1/'`
+        _if=`echo "$route" | sed -r -e 's/([^,]*),[^,]*,[^,]*/\1/'`
+        _rt=`echo "$route" | sed -r -e 's/[^,]*,([^,]*),[^,]*/\1/'`
 
 	if [ $_if = $DEV ]; then
 	    echo "Emulab configuring route for CT$VEID: exp net ($_if)"
-	    $ROUTE add -host $_rt dev $_if
+	    $IP rule add unicast iif $_if table $VEID
+	    $IP route replace $_rt dev $_if table $VEID
 	fi
     done
 

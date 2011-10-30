@@ -874,8 +874,36 @@ sub vz_vnodeBoot {
 sub vz_vnodeHalt {
     my ($vnode_id,$vmid) = @_;
 
+    my @ifs = ();
+    open(CF,"/etc/vz/conf/$vmid.conf") or
+	 die "could not open etc/vz/conf/$vmid.conf for read: $!";
+    my @lines = grep { $_ =~ /^ELABROUTES/ } <CF>;
+    close(CF);
+    if (@lines) {
+	# Should only be one line.
+	my $elabroutes = $lines[0];
+	if ($elabroutes =~ /ELABROUTES="(.*)"/) {
+	    $elabroutes = $1;
+	}
+	else {
+	    print STDERR "Could not parse ELABROUTES in config file.\n";
+	    return -1;
+	}
+	my @routes = split(/;/, $elabroutes);
+	foreach my $route (@routes) {
+	    my @tokens = split(/,/, $route);
+	    # old format, skip to avoid errors.
+	    next
+		if (scalar(@tokens) == 2);
+	    # The first and third tokens are the ones we have to delete.
+	    push(@ifs, $tokens[0]);
+	    push(@ifs, $tokens[2]);
+	}
+    }
+    foreach my $if (@ifs) {
+	mysystem2("/sbin/ip rule del iif $if");
+    }
     mysystem("$VZCTL stop $vnode_id");
-
     return 0;
 }
 
@@ -1334,7 +1362,7 @@ sub vz_vnodePreConfigExpNetwork {
 	    my $peerip   = $tunnel->{"tunnel_peerip"};
 	    my $mask     = $tunnel->{"tunnel_ipmask"};
 	    my $unit     = $tunnel->{"tunnel_unit"};
-	    my $grekey   = $tunnel->{"tunnel_tag"};
+	    my $grekey   = inet_ntoa(pack("N", $tunnel->{"tunnel_tag"}));
 	    my $gre;
 
 	    if (exists($key2gre{$grekey})) {
@@ -1355,8 +1383,13 @@ sub vz_vnodePreConfigExpNetwork {
 		}
 		$key2gre{$grekey} = $gre;
 	    }
+	    mysystem2("/sbin/ip rule add unicast iif $gre table $vmid");
+	    if ($?) {
+		TBScriptUnlock();
+		return -1;
+	    }
 	    my $net = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
-	    mysystem2("/sbin/ip route replace $net/24 dev $gre");
+	    mysystem2("/sbin/ip route replace $net/24 dev $gre table $vmid");
 	    if ($?) {
 		TBScriptUnlock();
 		return -1;
@@ -1375,7 +1408,7 @@ sub vz_vnodePreConfigExpNetwork {
 	    if ($elabroutes ne '') {
 		$elabroutes .= ';';
 	    }
-	    $elabroutes .= "$veth,$inetip";
+	    $elabroutes .= "$veth,$inetip,$gre";
 	}
 	TBScriptUnlock();
     }
