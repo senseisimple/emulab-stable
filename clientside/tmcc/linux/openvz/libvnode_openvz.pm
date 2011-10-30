@@ -874,7 +874,7 @@ sub vz_vnodeBoot {
 sub vz_vnodeHalt {
     my ($vnode_id,$vmid) = @_;
 
-    my @ifs = ();
+    my @ifs  = ();
     open(CF,"/etc/vz/conf/$vmid.conf") or
 	 die "could not open etc/vz/conf/$vmid.conf for read: $!";
     my @lines = grep { $_ =~ /^ELABROUTES/ } <CF>;
@@ -902,6 +902,9 @@ sub vz_vnodeHalt {
     }
     foreach my $if (@ifs) {
 	mysystem2("/sbin/ip rule del iif $if");
+	if ($if =~ /^gre/) {
+	    mysystem2("/sbin/ip tunnel del $if");
+	}
     }
     mysystem("$VZCTL stop $vnode_id");
     return 0;
