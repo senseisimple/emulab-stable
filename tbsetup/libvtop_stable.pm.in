@@ -5983,8 +5983,8 @@ sub InterpLinksAux($)
 			    if (!$protovlan->IsMember($nodeA, $portA));
 
 			if (defined($pathA)) {
-			    my $path = $protolan->GetAttribute("switchpath");
-			    $protolan->SetAttribute("switchpath",
+			    my $path = $protovlan->GetAttribute("switchpath");
+			    $protovlan->SetAttribute("switchpath",
 						AddToSwitchPath($path, $pathA));
 			}
 		    }
