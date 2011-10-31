@@ -1150,7 +1150,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 	}
 	elsif (my @services = GeniXML::GetServices($ref)) {
 	    my $count = 0;
-	    my $startfile = $slice_experiment->UserDir() . "/geni_startup";
+	    my $startfile = $slice_experiment->UserDir() .
+		"/geni_startup." . $node_nickname;
 	    $nodeblob->{'startupcmd'} = $startfile;
 	    
 	    if (!open(STARTUP, ">$startfile")) {
