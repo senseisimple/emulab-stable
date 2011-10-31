@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 LIB_SCRIPTS     = GeniDB.pm GeniUser.pm  \
 		  GeniSlice.pm GeniSA.pm GeniCM.pm GeniCMV2.pm \
 		  GeniTicket.pm GeniSliver.pm GeniCredential.pm \
-		  GeniComponent.pm GeniCH.pm GeniEmulab.pm \
+		  GeniComponent.pm GeniCH.pm GeniEmulabUtil.pm \
 		  GeniAuthority.pm GeniCertificate.pm GeniAggregate.pm \
 		  GeniUtil.pm GeniRegistry.pm GeniUsage.pm GeniHRN.pm \
 		  GeniSES.pm GeniResource.pm GeniXML.pm GeniAM.pm
