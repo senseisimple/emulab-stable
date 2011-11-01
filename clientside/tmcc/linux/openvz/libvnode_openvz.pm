@@ -1325,6 +1325,7 @@ sub vz_vnodePreConfigExpNetwork {
 	}
 	my %key2gre = ();
 	my $maxgre  = 0;
+	my $table   = $vmid + 100;
 
 	while (<IP>) {
 	    if ($_ =~ /^(gre\d*):.*key\s*([\d\.]*)/) {
@@ -1392,7 +1393,7 @@ sub vz_vnodePreConfigExpNetwork {
 		return -1;
 	    }
 	    my $net = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
-	    mysystem2("/sbin/ip route replace $net/24 dev $gre table $vmid");
+	    mysystem2("/sbin/ip route replace default dev $gre table $table");
 	    if ($?) {
 		TBScriptUnlock();
 		return -1;
