@@ -490,6 +490,11 @@ sub vnodeCreate($$$)
 	if (defined($ramdisk));
     addConfig($vmid, "disk = ['phy:$vndisk,$vdisk,w']", 2);
 
+    # XXX memory of over 768MB causes panic as of 8.2
+    if ($os eq "FreeBSD" && memoryPerVnode > 768) {
+	addConfig($vmid, "memory = 768", 1);
+    }
+
     if ($os eq "FreeBSD") {
 	addConfig($vmid, "extra = 'boot_verbose=1'", 2);
 	addConfig($vmid, "extra += ',vfs.root.mountfrom=ufs:/dev/da0a'", 2);
@@ -1031,6 +1036,9 @@ sub disk_hacks($)
 
     # don't start dhcpd in the VM
     unlink("$path/etc/dhcpd.conf");
+
+    # fixup fstab: change UUID=blah to LABEL=/
+    system("sed -i.bak -e 's/UUID=[0-9a-f-]*/LABEL=\\//' $path/etc/fstab");
 
     # enable the correct device for console
     system("sed -i.bak -e 's/xvc0/console/' $path/etc/inittab");
