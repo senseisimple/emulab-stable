@@ -1,0 +1,43 @@
+#!/usr/bin/perl
+
+# WARNING: This script is still in prototype form. Do not use this
+# unless you really know what you are doing. It will only work on the
+# Utah Emulab. Do not use it on any other Emulabs.
+
+use strict;
+
+# Cleanup all state for a particular container number.
+
+if (scalar(@ARGV) != 2) {
+	die("Usage: vzcleanup.sh <pc> <container #>\n");
+}
+
+sub mysystem($)
+{
+    my $command = shift(@_);
+    print "RUNNING: $command\n";
+    return system($command);
+}
+
+my $pc = shift(@ARGV);
+my $container = shift(@ARGV);
+
+
+mysystem("umount /proj /groups /users");
+
+mysystem("vzctl destroy $container");
+
+mysystem("rm -rf /vz/private/$pc");
+mysystem("rm -rf /vz/private/$container");
+mysystem("rm -rf /vz/root/$container");
+mysystem("rm -rf /var/emulab/boot/tmcc.$pc");
+mysystem("rm -rf /var/emulab/jails/$pc");
+mysystem("rm -rf /var/emulab/vms/vnode.$container");
+mysystem("rm -rf /var/emulab/vms/$pc");
+mysystem("rm -rf /var/emulab/logs/tbvnode-$pc.log");
+mysystem("rm -rf /var/emulab/logs/tmccproxy-$pc.log");
+
+mysystem("mount fs.emulab.net:/q/proj /proj");
+mysystem("mount fs.emulab.net:/groups /groups");
+mysystem("mount fs.emulab.net:/users /users");
+
