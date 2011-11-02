@@ -3188,7 +3188,7 @@ sub doMakeVlan($$@) {
 	    VLan->RecordVlanInsertion($source_vlan, $stack->{STACKID});
 	}
 	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
-	    setSwitchTrunkPath($source_vlan);
+	    setSwitchTrunkPath($target_vlan);
 	    VLan->RecordVlanInsertion($target_vlan, $stack->{STACKID});
 	}
     }
