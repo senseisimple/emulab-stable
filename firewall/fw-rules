@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -27,6 +27,9 @@
 #	EMULAB_CNET	Node control network in CIDR notation
 #	EMULAB_MCADDR	Multicast address range used by frisbee
 #	EMULAB_MCPORT	Port range used by frisbee
+#	EMULAB_BOSSES	Comma separated list of subbosses (including "boss"),
+#			used for services that subbosses provide
+#			(dhcp/tftp/frisbee).
 #
 # Currently these are sufficient for rules we use.  Note that you can
 # safely use symbolic hostnames "boss", "ops", "fs", "users", "ntp1"
@@ -37,7 +40,7 @@
 # For an Emulab in Emulab setup, the names "myboss", "myops" and "myfs"
 # are also valid for naming the respective inner servers.
 #
-# There are a few idiom that can be used in rules.  These are dependent
+# There are a few idioms that can be used in rules.  These are dependent
 # on the exact configuration of the bridge and firewall, so be careful
 # (see NOTES for details on the implementation and implications):
 #
@@ -296,6 +299,11 @@ allow tcp from any to myboss 80,443 in not recv vlan0 setup keep-state # 60043: 
 allow tcp from any to myboss 3069 in not recv vlan0 setup keep-state   # 60044: ELABINELAB
 
 #
+# Frisbee master server from boss
+#
+allow tcp from any to EMULAB_BOSSES 64494 in via vlan0 setup keep-state	# 60045: BASIC,CLOSED
+
+#
 # Frisbee multicast from boss
 #  * nodes mcast everything (joins, leaves and requests)
 #  * boss mcasts blocks, unicasts join replies, both from/to same port
@@ -304,11 +312,11 @@ allow tcp from any to myboss 3069 in not recv vlan0 setup keep-state   # 60044: 
 # Elabinelab should only do this to download an image from real boss to
 # the inner boss.  Re-imaging anything else from outside would be a disaster.
 #
-allow udp from any to EMULAB_MCADDR EMULAB_MCPORT in via vlan0	# 60046: BASIC,CLOSED
-allow udp from boss EMULAB_MCPORT to any EMULAB_MCPORT		# 60047: BASIC,CLOSED
-allow udp from myboss to EMULAB_MCADDR EMULAB_MCPORT in via vlan0 # 60046: ELABINELAB
-allow udp from boss EMULAB_MCPORT to myboss EMULAB_MCPORT	  # 60047: ELABINELAB
-allow igmp from any to any					# 60048: BASIC,CLOSED,ELABINELAB
+allow udp from any to EMULAB_MCADDR EMULAB_MCPORT in via vlan0	   # 60046: BASIC,CLOSED
+allow udp from EMULAB_BOSSES EMULAB_MCPORT to any EMULAB_MCPORT    # 60047: BASIC,CLOSED
+allow udp from myboss to EMULAB_MCADDR EMULAB_MCPORT in via vlan0  # 60046: ELABINELAB
+allow udp from EMULAB_BOSSES EMULAB_MCPORT to myboss EMULAB_MCPORT # 60047: ELABINELAB
+allow igmp from any to any					   # 60048: BASIC,CLOSED,ELABINELAB
 
 # Ping, IPoD from boss
 # should we allow all ICMP in general?
@@ -343,8 +351,8 @@ allow udp from any 67 to any 68 in not recv vlan0	# 60065: BASIC,CLOSED,ELABINEL
 # TFTP with boss or ops
 # XXX tftpd can pick any port it wants in response to a request from any port
 # so we have to open wide
-allow udp from any to boss,ops 69 keep-state			# 60066: BASIC,CLOSED,ELABINELAB
-allow udp from boss,ops not 0-1023 to any not 0-1023 keep-state # 60067: BASIC,CLOSED,ELABINELAB
+allow udp from any to EMULAB_BOSSES,ops 69 keep-state			 # 60066: BASIC,CLOSED,ELABINELAB
+allow udp from EMULAB_BOSSES,ops not 0-1023 to any not 0-1023 keep-state # 60067: BASIC,CLOSED,ELABINELAB
 
 # bootinfo with boss (nodes request/receive info or boss does PXEWAKEUP)
 allow udp from any 9696 to boss 6969 keep-state		# 60068: BASIC,CLOSED,ELABINELAB

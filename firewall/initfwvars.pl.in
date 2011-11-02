@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -55,6 +55,13 @@ for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
 }
 
 my $str;
+
+# By default there is only "boss"
+$str = "replace into default_firewall_vars values ('EMULAB_BOSSES', 'boss')";
+print "$str\n"
+    if (!$doit);
+DBQueryFatal($str)
+    if ($doit);
 
 # Use boss IP as "ns" since that is what we assume everywhere else
 $str = "replace into default_firewall_vars values ('EMULAB_NS', '$BOSSNODE_IP')";

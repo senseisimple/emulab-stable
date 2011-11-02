@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -31,20 +31,21 @@ my %fwvars;
 
 sub getfwvars()
 {
-    # XXX
+    # XXX for Utah Emulab as of 11/11
     $fwvars{EMULAB_GWIP} = "155.98.36.1";
-    $fwvars{EMULAB_GWMAC} = "00:b0:8e:84:69:34";
+    $fwvars{EMULAB_GWMAC} = "00:d0:bc:f4:14:f8";
     $fwvars{EMULAB_NS} = "155.98.32.70";
     $fwvars{EMULAB_CNET} = "155.98.36.0/22";
-    $fwvars{EMULAB_MCADDR} = "234.5.0.0/16";
-    $fwvars{EMULAB_MCPORT} = "3564-65535";
+    $fwvars{EMULAB_BOSSES} = "boss,subboss";
+    $fwvars{EMULAB_MCADDR} = "234.0.0.0/8";
+    $fwvars{EMULAB_MCPORT} = "1025-65535";
 }
 
 sub expandfwvars($)
 {
     my ($rule) = @_;
 
-    getfwvars() if (!defined(%fwvars));
+    getfwvars() if (!%fwvars);
 
     if ($rule =~ /EMULAB_\w+/) {
 	foreach my $key (keys %fwvars) {
@@ -76,7 +77,7 @@ sub doconfig($)
 	$style = "emulab" if ($style eq "elabinelab");
 	$enabled = 1;
 
-	print "DELETE FROM default_firewall_rules WHERE ".
+	print "DELETE FROM `default_firewall_rules` WHERE ".
 	    "type='$type' AND style='$style';\n";
     }
 
@@ -95,7 +96,7 @@ sub doconfig($)
 	    print "ipfw add $ruleno $rule\n";
 	}
 	if ($domysql) {
-	    print "INSERT INTO default_firewall_rules VALUES (".
+	    print "INSERT INTO `default_firewall_rules` VALUES (".
 		"'$type','$style',$enabled,$ruleno,'$rule');\n";
 	}
     }
