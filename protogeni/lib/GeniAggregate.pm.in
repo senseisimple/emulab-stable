@@ -1998,7 +1998,20 @@ sub Start($$)
 		# Okay, got the node. Now we need to resolve it at the CM.
 		#
 		my $component_id = GeniXML::GetNodeId($ref);
-		my $nodeblob     = $authority->Resolve($component_id);
+		my $nodeblob;
+		$count    = 1000;
+		$interval = 30;
+		while ($count >= 0) {
+		    $nodeblob = $authority->Resolve($component_id);
+		    last
+			if (defined($nodeblob));
+		    
+		    print STDERR
+			"Could not resolve $component_id at $authority\n";
+		    print STDERR "Will try again in $interval seconds\n";
+		    $count -= $interval;
+		    sleep($interval);
+		}
 		if (!defined($nodeblob)) {
 		    $msg = "Could not resolve $component_id at $authority";
 		    goto bad;
