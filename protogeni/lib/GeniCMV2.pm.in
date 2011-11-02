@@ -134,7 +134,8 @@ sub Resolve($)
 	    $admin = 1;
 	}
     }
-    elsif ($callertype eq "authority" && $callerid eq "cm") {
+    elsif ($callertype eq "authority" &&
+	   ($callerid eq "cm" || $callerid eq "sa")) {
 	$isauth = 1;
     }
     
