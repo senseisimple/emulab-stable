@@ -143,16 +143,16 @@ allow udp from me 514 to ops 514		# 26: BASIC,CLOSED,ELABINELAB
 #
 # NFS
 # DANGER WILL ROBINSON!!!
-# Portmapper (tcp or udp), mountd and NFS with fs
+# Portmapper (tcp or udp), mountd and NFS (tcp or udp) with fs
 #
 # Note that we have to allow IP fragments through due to the default
 # 8k read/write size.  Perhaps we should dial down the read/write size for
 # firewalled experiments.
 #
 allow ip from me to fs 111 keep-state		# 30: BASIC,CLOSED,ELABINELAB
-allow udp from me not 0-700 to fs keep-state	# 31: BASIC,CLOSED,ELABINELAB
-allow udp from me to fs 900 keep-state		# 32: BASIC,CLOSED,ELABINELAB
-allow udp from me to fs 2049 keep-state		# 33: BASIC,CLOSED,ELABINELAB
+allow ip from me not 0-700 to fs keep-state	# 31: BASIC,CLOSED,ELABINELAB
+allow ip from me to fs 900 keep-state		# 32: BASIC,CLOSED,ELABINELAB
+allow ip from me to fs 2049 keep-state		# 33: BASIC,CLOSED,ELABINELAB
 allow ip from me to fs frag			# 34: BASIC,CLOSED,ELABINELAB
 allow ip from fs to me frag			# 35: BASIC,CLOSED,ELABINELAB
 
@@ -205,7 +205,7 @@ deny not mac-type ip				# 80: BASIC,CLOSED,ELABINELAB
 # No one on the inside can talk to other experiments' nodes and visa-versa.
 #
 # XXX currently we only do this for the heavier weight firewalls because
-# the user cannot over ride this.
+# the user cannot override this.
 #
 # Note that this does not apply to nodes within this experiment because
 # those packets never come to the firewall.
@@ -264,16 +264,16 @@ allow udp from any 514 to ops 514		# 60026: BASIC,CLOSED
 #
 # NFS
 # DANGER WILL ROBINSON!!!
-# Portmapper (tcp or udp), mountd and NFS with fs
+# Portmapper (tcp or udp), mountd and NFS (tcp or udp) with fs
 #
 # Note that we have to allow IP fragments through due to the default
 # 8k read/write size.  Perhaps we should dial down the read/write size for
 # firewalled experiments.
 #
 allow ip from any to fs 111 keep-state		# 60030: BASIC,CLOSED
-allow udp from any not 0-700 to fs keep-state	# 60031: BASIC,CLOSED
-allow udp from any to fs 900 keep-state		# 60032: BASIC,CLOSED
-allow udp from any to fs 2049 keep-state	# 60033: BASIC,CLOSED
+allow ip from any not 0-700 to fs keep-state	# 60031: BASIC,CLOSED
+allow ip from any to fs 900 keep-state		# 60032: BASIC,CLOSED
+allow ip from any to fs 2049 keep-state		# 60033: BASIC,CLOSED
 allow ip from any to fs frag			# 60034: BASIC,CLOSED
 allow ip from fs to any frag			# 60035: BASIC,CLOSED
 
@@ -304,19 +304,32 @@ allow tcp from any to myboss 3069 in not recv vlan0 setup keep-state   # 60044: 
 allow tcp from any to EMULAB_BOSSES 64494 in via vlan0 setup keep-state	# 60045: BASIC,CLOSED
 
 #
-# Frisbee multicast from boss
-#  * nodes mcast everything (joins, leaves and requests)
-#  * boss mcasts blocks, unicasts join replies, both from/to same port
-#  * node and switch need to IGMP
+# Frisbee multicast with boss
+#  * nodes mcast everything to boss (joins, leaves and requests): 60046
+#  * boss mcasts blocks to same mcaddr/port: 60047
+#  * boss unicasts join replies to same port: 60048
+#  * node and switch need to IGMP: 60049
 #
 # Elabinelab should only do this to download an image from real boss to
 # the inner boss.  Re-imaging anything else from outside would be a disaster.
+# But note that the image is still mcast, so we cannot really differentiate
+# in 60047.
 #
-allow udp from any to EMULAB_MCADDR EMULAB_MCPORT in via vlan0	   # 60046: BASIC,CLOSED
-allow udp from EMULAB_BOSSES EMULAB_MCPORT to any EMULAB_MCPORT    # 60047: BASIC,CLOSED
-allow udp from myboss to EMULAB_MCADDR EMULAB_MCPORT in via vlan0  # 60046: ELABINELAB
-allow udp from EMULAB_BOSSES EMULAB_MCPORT to myboss EMULAB_MCPORT # 60047: ELABINELAB
-allow igmp from any to any					   # 60048: BASIC,CLOSED,ELABINELAB
+# NOTE: the unicast join replies (60048) make our life miserable. We cannot
+# use a keep-state rule because the request was multicast and not directed to
+# boss. Thus we have to open up a wide range of ports from boss for the reply.
+# To make matters worse, this wide range potentially overlaps with rule 60067
+# which allows TFTP traffic. Since the latter requires bi-directional traffic,
+# we DO need to specify keep-state on this rule. If we ever start mcasting
+# join replies, we could get rid of rule 60048 (which is why it is split out
+# from 60047).
+#
+allow udp from any to EMULAB_MCADDR EMULAB_MCPORT in via vlan0		   # 60046: BASIC,CLOSED
+allow udp from EMULAB_BOSSES EMULAB_MCPORT to EMULAB_MCADDR EMULAB_MCPORT  # 60047: BASIC,CLOSED,ELABINELAB
+allow udp from EMULAB_BOSSES EMULAB_MCPORT to any EMULAB_MCPORT keep-state # 60048: BASIC,CLOSED
+allow udp from myboss to EMULAB_MCADDR EMULAB_MCPORT in via vlan0	   # 60046: ELABINELAB
+allow udp from EMULAB_BOSSES EMULAB_MCPORT to myboss EMULAB_MCPORT keep-state # 60048: ELABINELAB
+allow igmp from any to any						   # 60049: BASIC,CLOSED,ELABINELAB
 
 # Ping, IPoD from boss
 # should we allow all ICMP in general?
