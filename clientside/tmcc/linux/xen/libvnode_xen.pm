@@ -491,7 +491,7 @@ sub vnodeCreate($$$)
     addConfig($vmid, "disk = ['phy:$vndisk,$vdisk,w']", 2);
 
     # XXX memory of over 768MB causes panic as of 8.2
-    if ($os eq "FreeBSD" && memoryPerVnode > 768) {
+    if ($os eq "FreeBSD" && memoryPerVnode() > 768) {
 	addConfig($vmid, "memory = 768", 1);
     }
 
