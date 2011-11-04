@@ -248,6 +248,23 @@ my $pid = $experiment->pid();
 my $eid = $experiment->eid();
 
 #
+# To avoid blowing a cavernous hole ("allow all TCP ports to boss")
+# in the per-experiment firewall, we don't use the frisbee uploader if
+# the node is firewalled.
+# 
+if ($usefup && $experiment->IsFirewalled()) {
+    print "*** WARNING: $node_id is firewalled, not using Frisbee uploader\n";
+    $usefup = 0;
+    if ($NONFS) {
+	$usenfs = 0;
+	$usessh = 1;
+    } else {
+	$usenfs = 1;
+	$usessh = 0;
+    }
+}
+
+#
 # Grab the imageid description from the DB. We do a permission check, but
 # mostly to avoid hard to track errors that would result if the user picked
 # the wrong one (which is likely to happen no matter what I do).
