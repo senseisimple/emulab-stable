@@ -8,7 +8,7 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= protogeni/scripts
-ISMAINSITE	= @TBMAINSITE@
+ISCLEARINGHOUSE = @PROTOGENI_ISCLEARINGHOUSE@
 
 include $(OBJDIR)/Makeconf
 
@@ -22,7 +22,7 @@ PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  reservevlans delgeniuser delegatecredential \
 		  updatecert fixcerts
 
-ifeq ($(ISMAINSITE),1)
+ifeq ($(ISCLEARINGHOUSE),1)
 PSBIN_STUFF     += ch_daemon gencabundle
 endif
 
