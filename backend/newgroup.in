@@ -15,11 +15,12 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print("Usage: newgroup [-v] <xmlfile>\n");
+    print("Usage: newgroup [-v] [-s] <xmlfile>\n");
     exit(-1);
 }
-my $optlist = "dv";
+my $optlist = "dvs";
 my $debug   = 0;
+my $silent  = 0;
 my $verify  = 0;	# Check data and return status only. 
 
 #
@@ -65,6 +66,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"s"})) {
+    $silent = 1;
 }
 if (defined($options{"v"})) {
     $verify = 1;
@@ -355,7 +359,8 @@ my $group_idx = $new_group->gid_idx();
 #
 # Run the script to make the group directory, set the perms, etc.
 #
-my $cmd = "mkgroup $group_idx";
+my $opt = ($silent ? "-s" : "");
+my $cmd = "mkgroup $opt $group_idx";
 print($cmd . "\n")
     if ($debug);
 system($cmd);
@@ -366,7 +371,7 @@ fatal("Failed: '$cmd'")
 # Now add the group leader to the group.
 # 
 my $safe_id = escapeshellarg($group_id);
-$cmd = "modgroups -a $group_pid:$safe_id:group_root $group_leader";
+$cmd = "modgroups $opt -a $group_pid:$safe_id:group_root $group_leader";
 print($cmd . "\n")
     if ($debug);
 system($cmd);
