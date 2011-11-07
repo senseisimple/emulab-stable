@@ -80,8 +80,7 @@ if (!defined($context)) {
 #
 my $credential = GeniRegistry::ClearingHouse->GetCredential($context);
 if (!defined($credential)) {
-    print STDERR "Could not create clearinghouse credential\n";
-    return undef;
+    fatal("Could not create clearinghouse credential\n");
 }
 $credential->Delete();
 
