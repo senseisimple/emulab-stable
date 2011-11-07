@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -15,12 +15,15 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print("Usage: moduserinfo [-d] [-v] <xmlfile>\n");
+    print("Usage: moduserinfo [-d] [-v] [-u <uid>] <xmlfile>\n");
     exit(-1);
 }
-my $optlist = "dv";
+my $optlist = "dvu:s";
 my $debug   = 0;
-my $verify  = 0;	# Check data and return status only. 
+my $verify  = 0;	# Check data and return status only.
+my $silent  = 0;	# No email.
+my $uidopt;		# Use -u to override uid in the xml. 
+my @keyfiles = ();
 
 #
 # Configure variables
@@ -29,6 +32,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $checkpass   = "$TB/libexec/checkpass";
+my $addpubkey   = "$TB/sbin/addpubkey";
 
 #
 # Untaint the path
@@ -68,6 +72,12 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"v"})) {
     $verify = 1;
+}
+if (defined($options{"s"})) {
+    $silent = 1;
+}
+if (defined($options{"u"})) {
+    $uidopt = $options{"u"};
 }
 if (@ARGV != 1) {
     usage();
@@ -124,6 +134,8 @@ else {
 my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
 my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
 my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+my $SLOT_SKIP		= 0x8;  # Handled specially so skip
+
 #
 # XXX We should encode all of this in the DB so that we can generate the
 # forms on the fly, as well as this checking code.
@@ -152,12 +164,30 @@ my %xmlfields =
      "w_password1"	=> ["w_password1",	$SLOT_OPTIONAL],
      "w_password2"	=> ["w_password2",	$SLOT_OPTIONAL],
      "user_interface"	=> ["user_interface",	$SLOT_OPTIONAL],
-     "notes"		=> ["notes",		$SLOT_OPTIONAL]);
+     "pubkeys"		=> ["pubkeys",		$SLOT_SKIP],
+     "wikiname"		=> ["pubkeys",		$SLOT_SKIP],
+     # These are alternates.
+     "name"		=> ["usr_name",		$SLOT_OPTIONAL],
+     "title"	        => ["usr_title",	$SLOT_OPTIONAL],
+     "affiliation"	=> ["usr_affil",	$SLOT_OPTIONAL],
+     "affiliation_abbreviation"	=> ["usr_affil_abbrev",	$SLOT_OPTIONAL],
+     "shell"		=> ["usr_shell",	$SLOT_OPTIONAL],
+     "URL"		=> ["usr_URL",		$SLOT_OPTIONAL],
+     "email"		=> ["usr_email",	$SLOT_OPTIONAL],
+     "address"		=> ["usr_addr",		$SLOT_OPTIONAL],
+     "address2"		=> ["usr_addr2",	$SLOT_OPTIONAL],
+     "city"		=> ["usr_city",		$SLOT_OPTIONAL],
+     "state"		=> ["usr_state",	$SLOT_OPTIONAL],
+     "zip"		=> ["usr_zip",		$SLOT_OPTIONAL],
+     "country"		=> ["usr_country",	$SLOT_OPTIONAL],
+     "phone"		=> ["usr_phone",	$SLOT_OPTIONAL],
+    );
 
 #
 # Must wrap the parser in eval since it exits on error.
 #
 my $xmlparse = eval { XMLin($xmlfile,
+			    ForceArray => ["pubkeys"],
 			    VarAttr => 'name',
 			    ContentKey => '-content',
 			    SuppressEmpty => undef); };
@@ -170,6 +200,12 @@ fatal($@)
 # to go there yet.
 #
 my %errors = ();
+
+# Insert the user override.
+if (defined($uidopt)) {
+    $xmlparse->{'attribute'}->{"uid"} = {};
+    $xmlparse->{'attribute'}->{"uid"}->{"value"} = $uidopt;
+}
 
 #
 # Make sure all the required arguments were provided.
@@ -267,6 +303,8 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
 	$errors{$key} = "Administrators only"
 	    if (! $this_user->IsAdmin());
     }
+    next
+	if ($required & $SLOT_SKIP);
 	
     # Now check that the value is legal.
     if (! TBcheck_dbslot($value, "users",
@@ -291,8 +329,10 @@ if (!defined($target_user)) {
 if (!$target_user->AccessCheck($this_user, TB_USERINFO_MODIFYINFO())) {
     UserError("UserInfo: Not enough permission");
 }
-my $target_name = $target_user->name();
+my $target_name  = $target_user->name();
 my $target_email = $target_user->email();
+my $target_idx   = $target_user->uid_idx();
+$target_uid = $target_user->uid();
 
 # Make sure the user name has at least two tokens!
 if (exists($moduserinfo_args{"usr_name"}) &&
@@ -361,6 +401,34 @@ if (exists($moduserinfo_args{"user_interface"})) {
     }
 }
 
+#
+# Do a check on the pubkeys if supplied. The safest thing to do is generate
+# a temporary file and pass that to addpubkey to check.
+#
+if (exists($xmlparse->{'pubkeys'})) {
+    my @keys = @{ $xmlparse->{'pubkeys'} };
+
+    foreach my $key (@keys) {
+	my $keyfile = TBMakeTempFile("addpubkey");
+	fatal("Could not create tempfile")
+	    if ($?);
+
+	open(KEY, ">> $keyfile") or
+	    fatal("Could not open $keyfile");
+	print KEY $key; 
+	close($keyfile);
+
+	if ($debug) {
+	    print STDERR "Checking key in $keyfile ...\n";
+	}
+	my $result = `$addpubkey -n -f $keyfile`;
+	chomp($result);
+	UserError("Could not parse public key")
+	    if ($?);
+	push(@keyfiles, $keyfile);
+    }
+}
+
 exit(0)
     if ($verify);
 
@@ -374,6 +442,28 @@ UserError($usrerr)
     if (defined($usrerr));
 fatal("Could not modify user profile!")
     if (!defined($mod_val));
+
+#
+# Do we have a keyfile? If so, rerun addpubkey for real now that the
+# user is created and email is sent.
+#
+if (@keyfiles) {
+    $target_user->DeleteSSHKeys();
+    my $opt = ($silent ? "-s" : "");
+    
+    # Set the implied user for addpubkey.
+    $ENV{'HTTP_INVOKING_USER'} = $target_idx;
+
+    foreach my $keyfile (@keyfiles) {
+	my $result = `$addpubkey $opt -u $target_uid -f $keyfile`;
+	chomp($result);
+	fatal("Could not parse public key: $result")
+	    if ($?);
+	
+	unlink($keyfile)
+	    if (! $debug);
+    }
+}
 
 exit(0);
 
