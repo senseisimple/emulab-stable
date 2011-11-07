@@ -439,7 +439,7 @@ sub AddUser()
     $UID = $SAVEUID;
 
     goto skipstuff
-	if ($isnonlocal || $nocollabtools);
+	if ($isnonlocal);
     
     #
     # Do the ssh thing. Invoke as real user for auditing.
@@ -448,6 +448,14 @@ sub AddUser()
     if ($user ne $PROTOUSER && system("$ADDKEY -i $user")) {
 	fatal("Could not generate initial ssh key for $user");
     }
+    # Generate the SSL cert for the user.
+    system("$MKUSERCERT $user");
+    
+    if ($nocollabtools) {
+	$EUID = 0;
+	goto skipstuff;
+    }
+    
     # Add to elists.
     system("$GENELISTS -u $user")
 	if (! $batch);
@@ -476,9 +484,6 @@ sub AddUser()
     system("$ADDTRACUSER $user")
 	if ($TRACSUPPORT && $user ne $PROTOUSER);
 
-    # Generate the SSL cert for the user.
-    system("$MKUSERCERT $user");
-    
     #
     # Must update the exports file or else nodes will complain.  There
     # is a bit of race in here since this update happens after the
