@@ -371,7 +371,7 @@ foreach my $dir (@DIRLIST) {
 #
 # Create a tftp directory for oskit kernels.
 #
-if (! -e "$TFTPDIR/$pid" && !$isnonlocal) {
+if (-e "$TFTPDIR" && ! -e "$TFTPDIR/$pid" && !$isnonlocal) {
     if (! mkdir("$TFTPDIR/$pid", 0770)) {
 	fatal("Could not make directory $TFTPDIR/$pid: $!");
     }
