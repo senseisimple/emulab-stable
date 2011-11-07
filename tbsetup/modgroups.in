@@ -23,8 +23,9 @@ sub usage()
 	                 "[-r pid:gid[,pid:gid]...] user\n";
     exit(-1);
 }
-my $optlist = "dr:a:m:";
+my $optlist = "dr:a:m:s";
 my $debug   = 0;
+my $silent  = 0;
 my $user;
 my @addlist = ();
 my @modlist = ();	# Just changing the trust value ...
@@ -94,6 +95,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug  = 1;
     $optarg = "-d";
+}
+if (defined($options{"s"})) {
+    $silent  = 1;
 }
 if (defined($options{"a"})) {
     my @tokens = split(",", $options{"a"});
@@ -183,7 +187,7 @@ if (AuditStart(0)) {
 #
 foreach my $token (@addlist) {
     my ($pid,$gid,$trust) = split(":", $token);
-    my $sendemail = 1;
+    my $sendemail = !$silent;
 
     my $group = Group->LookupByPidGid($pid, $gid);
     if (! defined($group)) {
@@ -215,8 +219,9 @@ foreach my $token (@addlist) {
 	    or fatal("Could not modify $membership to $trust");
 
 	$sendemail = 0
-	    if ($ELABINELAB &&
-		$group->IsProjectGroup() && $group->IsLeader($target_user));
+	    if ($silent ||
+		($ELABINELAB &&
+		 $group->IsProjectGroup() && $group->IsLeader($target_user)));
     }
     else {
 	$group->AddMemberShip($target_user, $trust) == 0
@@ -261,8 +266,10 @@ foreach my $token (@modlist) {
     $membership->ModifyTrust($trust) == 0
 	    or fatal("Could not modify $membership to '$trust'");
 
-    $group->SendTrustChangeEmail($this_user, $target_user) == 0
-	or fatal("Could not send trust change email to $target_user");
+    if (!$silent) {
+	$group->SendTrustChangeEmail($this_user, $target_user) == 0
+	    or fatal("Could not send trust change email to $target_user");
+    }
 }
 
 #
