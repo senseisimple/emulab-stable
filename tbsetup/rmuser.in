@@ -34,10 +34,12 @@ my $TBOPS   = "@TBOPSEMAIL@";
 my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
-my $OURDOMAIN    = "@OURDOMAIN@";
-my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
-my $MODGROUPS	= "$TB/sbin/modgroups";
-my $DELACCT	= "$TB/sbin/tbacct del";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENISUPPORT   = @PROTOGENI_SUPPORT@;
+my $PORTAL_ENABLE  = @PORTAL_ENABLE@;
+my $PORTAL_PRIMARY = @PORTAL_ISPRIMARY@;
+my $MODGROUPS	   = "$TB/sbin/modgroups";
+my $DELACCT	   = "$TB/sbin/tbacct del";
 
 # Locals
 my $user;
@@ -162,6 +164,18 @@ if ($PGENISUPPORT) {
     my $geniuser = GeniUser->Lookup($urn, 1);
     if (defined($geniuser) && GeniSlice->LookupByCreator($geniuser)) {
 	fatal("$target_user is still heading up ProtoGENI Slices");
+    }
+}
+#
+# Cannot delete from Portal if exported.
+#
+if ($PORTAL_ENABLE && $PORTAL_PRIMARY) {
+    my $exports;
+    if ($target_user->PeerExports(\$exports) != 0) {
+	fatal("Could not get peer exports list for $target_user");
+    }
+    if (keys(%{ $exports })) {
+	fatal("Cannot delete user; still exported to peers");
     }
 }
 
