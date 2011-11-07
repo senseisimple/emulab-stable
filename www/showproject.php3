@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -98,6 +98,46 @@ if ($isadmin) {
     ob_end_clean();
 }
 
+#
+# Portal support; show exports.
+#
+$exports_html = null;
+if ($PORTAL_ENABLE && $PORTAL_ISPRIMARY) {
+    $pid_idx = $project->pid_idx();
+    
+    $query_result =
+	DBQueryFatal("select * from group_exports ".
+		     "where pid_idx='$pid_idx' and pid_idx=gid_idx");
+    if (mysql_num_rows($query_result)) {
+	$exports_html =
+	    "<center>
+               <h3>Peer Exports</h3>
+             </center>
+             <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+        $exports_html .=
+	    "<tr>
+                <th>Peer</th>
+                <th>Exported</th>
+  	        <th>Updated</th>
+             </tr>\n";
+
+	while ($exportrow = mysql_fetch_array($query_result)) {
+	    $peer     = $exportrow["peer"];
+	    $updated  = $exportrow["updated"];
+	    $exported = $exportrow["exported"];
+
+	    $exports_html .=
+		"<tr>
+                    <td>$peer</td>
+                    <td>$exported</td>
+                    <td>$updated</td>
+                  </tr>\n";
+	}
+	$exports_html .= "</table>\n";
+    }
+}
+ 
 $papers_html = null;
 if ($PUBSUPPORT) {
     #
@@ -234,6 +274,13 @@ if ($vis_html) {
 	      "id=\"li_vis\" onclick=\"Show('vis');\">".
               "Visualization</a></li>\n";
 }
+if ($exports_html) {
+    echo "<li>
+          <a href=\"#exports\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	      "id=\"li_exports\" onclick=\"Show('exports');\">".
+              "Peers</a></li>\n";
+}
 echo "</ul>\n";
 echo "</div>\n";
 echo "<div align=center id=topnavbarbottom>&nbsp</div>\n";
@@ -259,6 +306,9 @@ if ($papers_html) {
 }
 if ($vis_html) {
      echo "<div class=invisible id=\"div_vis\">$vis_html</div>";
+}
+if ($exports_html) {
+     echo "<div class=invisible id=\"div_exports\">$exports_html</div>";
 }
 SUBPAGEEND();
 

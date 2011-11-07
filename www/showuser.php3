@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -70,6 +70,7 @@ $html_groups    = null;
 $html_stats     = null;
 $html_templates = null;
 $html_pubs      = null;
+$html_exports   = null;
 
 #
 # See if any mailman lists owned by the user. If so we add a menu item.
@@ -81,6 +82,15 @@ $mm_result =
 # Table defs for functions that generate tables.
 #
 $tabledefs = array('#html' => TRUE);
+
+echo "<script type='text/javascript' language='javascript'>
+	function PortalLogin(theform, user) {
+            var namex = theform['selectpeer'].selectedIndex;
+            var name  = theform['selectpeer'].options[namex].value;
+            newurl    = 'gotopeer.php?peer=' + name + '&user=' + user;
+            window.open(newurl, '_self');
+	}
+      </script>\n";
 
 # The user profile.
 # Add all the menu stuff. Ick.
@@ -125,6 +135,31 @@ if (!$archived && !$target_user->wikionly() &&
 	if (mysql_num_rows($mm_result)) {
 	    WRITESUBMENUBUTTON("Show Mailman Lists",
 			       CreateURL("showmmlists", $target_user));
+	}
+    }
+    if ($PORTAL_ENABLE && $PORTAL_ISPRIMARY) {
+	$peer_result =
+	    DBQueryFatal("select peer from user_exports ".
+			 "where uid_idx=$target_idx");
+	if (mysql_num_rows($peer_result) &&
+	    ($this_user->SameUser($target_user) || $isadmin)) {
+	
+	    $portaltext =
+		"<form name=\"portal\" onsubmit=\"return false;\">\n
+                  <select name=\"selectpeer\">
+                    <option value=''>Portal Login</option>\n";
+	    while ($row = mysql_fetch_array($peer_result)) {
+		$peer = $row["peer"];
+
+		$portaltext .= "<option value='$peer'>$peer</option>\n";
+	    }
+	    $portaltext .= "</select> ";
+	    $portaltext .=
+		"<input type=button name='go' value='Go'
+                        onclick='PortalLogin(portal, $target_idx);'>";
+	    $portaltext .= "</form>\n";
+	
+	    WRITESUBMENUBUTTON($portaltext);
 	}
     }
 }
@@ -306,7 +341,7 @@ if ($PUBSUPPORT) {
     #
     # List pubs owned by user if any
     #
-    $query_result = GetPubs("`owner` = $uid_idx");
+    $query_result = GetPubs("`owner` = $target_idx");
     if (mysql_num_rows($query_result)) {
 	$html_pubs = MakeBibList($this_user, $isadmin, $query_result);
 	$html_pubs .= '<p><a href="deleted_pubs.php">Show Deleted Publications</a></p>';
@@ -317,6 +352,45 @@ if ($PUBSUPPORT) {
     }
 }
 
+#
+# Portal support; show exports.
+#
+if ($PORTAL_ENABLE && $PORTAL_ISPRIMARY) {
+    $query_result =
+	DBQueryFatal("select * from user_exports where uid_idx='$target_idx'");
+    if (mysql_num_rows($query_result)) {
+	$html_exports =
+	    "<center>
+               <h3>Peer Exports</h3>
+             </center>
+             <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+        $html_exports .=
+	    "<tr>
+                <th>Peer</th>
+                <th>Exported</th>
+  	        <th>Updated</th>
+             </tr>\n";
+
+	while ($exportrow = mysql_fetch_array($query_result)) {
+	    $peer     = $exportrow["peer"];
+	    $updated  = $exportrow["updated"];
+	    $exported = $exportrow["exported"];
+
+	    $html_exports .=
+		"<tr>
+                    <td>$peer</td>
+                    <td>$exported</td>
+                    <td>$updated</td>
+                  </tr>\n";
+	}
+	$html_exports .= "</table>\n";
+	list ($html_exports, $button_exports) =
+	    TableWrapUp($html_exports, FALSE, FALSE,
+			"exports_table", "exports_button");
+    }
+}
+ 
 #
 # Special banner message.
 #
@@ -429,6 +503,13 @@ if ($html_pubs) {
 	      "id=\"li_pubs\" onclick=\"Show('pubs');\">".
               "Publications</a></li>\n";
 }
+if ($html_exports) {
+    echo "<li>
+          <a href=\"#exports\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	      "id=\"li_exports\" onclick=\"Show('exports');\">".
+              "Peers</a></li>\n";
+}
 echo "</ul>\n";
 echo "</div>\n";
 echo "<div align=center id=topnavbarbottom>&nbsp</div>\n"; 
@@ -448,6 +529,9 @@ if ($isadmin && $html_stats) {
 }
 if ($html_pubs) {
     echo $html_pubs;
+}
+if ($html_exports) {
+    echo $html_exports;
 }
 if ($html_experiments) {
     echo $html_experiments;
