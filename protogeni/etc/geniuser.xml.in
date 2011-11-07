@@ -14,5 +14,5 @@
 <attribute name="affiliation_abbreviation">  <value>AnyU</value></attribute>
 <attribute name="password">  <value>*</value></attribute>
 <attribute name="wikiname">  <value>GeniUser</value></attribute>
-<attribute name="login">  <value>geniuser</value></attribute>
+<attribute name="uid">  <value>geniuser</value></attribute>
 </user>
