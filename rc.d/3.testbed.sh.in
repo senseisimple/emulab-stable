@@ -93,6 +93,11 @@ case "$1" in
 			@prefix@/sbin/checknodes_daemon
 		fi
 
+		if [ -x @prefix@/sbin/portal_daemon  ]; then
+			echo -n " portal_daemon"
+			@prefix@/sbin/portal_daemon
+		fi
+
 		#
 		# Could trigger experiment creation, so make sure everything
 		# else is setup first; i.e., run this last!
