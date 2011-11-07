@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -31,7 +31,7 @@ sub usage()
     print " -r      Force a regenerate of initial key for user\n";
     exit(-1);
 }
-my $optlist   = "dkniwfu:rX:";
+my $optlist   = "dkniwfu:rX:s";
 my $iskey     = 0;
 my $verify    = 0;
 my $initmode  = 0;
@@ -149,6 +149,9 @@ if (defined($options{"i"})) {
 }
 if (defined($options{"r"})) {
     $force = 1;
+}
+if (defined($options{"s"})) {
+    $noemail = 1;
 }
 if (defined($options{"w"})) {
     $genmode = 1;
