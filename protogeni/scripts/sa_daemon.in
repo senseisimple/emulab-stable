@@ -29,7 +29,6 @@ my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
-my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
 my $LOGFILE       = "$TB/log/sa_daemon.log";
 my $EMULAB_PEMFILE = "$TB/etc/genisa.pem";
 my $CLEANUPSLICE  = "$TB/sbin/cleanupslice";
