@@ -14,12 +14,12 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: initpgenisite [-c]\n";
+    print "Usage: initpgenisite\n";
     exit(1);
 }
-my $optlist = "c";
-my $asch    = 0;
-my $cflag   = "";
+my $optlist = "";
+my $asch    = @PROTOGENI_ISCLEARINGHOUSE@;
+my $cflag   = ($asch ? "-c" : "");
 
 #
 # Configure variables
@@ -32,6 +32,7 @@ my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PROTOGENI_RPCNAME = "@PROTOGENI_RPCNAME@";
 my $PROTOGENI_RPCPORT = "@PROTOGENI_RPCPORT@";
+my $PROTOGENI_WEBSITE = "@PROTOGENI_WEBSITE@";
 my $PROTOGENI_URL = "@PROTOGENI_URL@";
 my $geniuserid    = "geniuser";
 my $geniprojid    = "GeniSlices";
@@ -101,10 +102,6 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (defined($options{"c"})) {
-    $asch  = 1;
-    $cflag = "-c";
-}
 
 #
 # People seem to miss this.
@@ -168,14 +165,15 @@ if( $? == -1 ) {
 }
 
 #
-# Have you sent in your certificate to Utah?
+# Have you sent in your certificate to the ClearingHouse?
 #
 if (!$asch && ! -e "$TB/etc/.federated") {
     my $done = 0;
     my $federated = 0;
 
     while (!$done) {
-	print "Have you sent in your root certificate to Utah? [y/n]: ";
+	print
+	    "Have you sent your root certificate to the ClearingHouse? [y/n]: ";
 
 	$_ = <STDIN>;
 	if ($_ =~ /^(y|yes)$/i) {
@@ -191,10 +189,11 @@ if (!$asch && ! -e "$TB/etc/.federated") {
 	system("/usr/bin/touch $TB/etc/.federated");
     }
     else {
-	print "Please email $TB/etc/emulab.pem to testbed-ops\@flux.utah.edu";
+	print "\n";
+	print "Please email $TB/etc/emulab.pem to @PROTOGENI_EMAIL@";
 	print "\n";
 	print "This is a public key, so no harm in sending it in email.\n";
-	print "Once you hear back from Utah, please rerun this script.\n";
+	print "Once you hear back from the ClearingHouse, rerun this script.\n";
 	exit(1);
     }
 }
@@ -254,6 +253,14 @@ if (! -e "$TB/www/protogeni") {
     mkdir("$TB/www/protogeni", 0775)
 	or fatal("Could not mkdir $TB/www/protogeni");
 }
+if (! -e "$TB/www/protogeni/advertisements") {
+    mkdir("$TB/www/protogeni/advertisements", 0775)
+	or fatal("Could not mkdir $TB/www/protogeni/advertisements");
+}
+if (! -e "$TB/www/protogeni/authorities") {
+    mkdir("$TB/www/protogeni/authorities", 0775)
+	or fatal("Could not mkdir $TB/www/protogeni/authorities");
+}
 
 $crosstext = <<'CROSSEND';
 <?xml version="1.0"?>
@@ -279,7 +286,7 @@ if (system("egrep -q -s 'flashpolicy' /etc/services")) {
     $restartinetd++;
 }
 if (system("egrep -q -s 'flashpolicy' /etc/inetd.conf")) {
-    print "Please add \n$FLASH_LINE\n to /etc/services\n";
+    print "Please add \n$FLASH_LINE\n to /etc/inetd.conf\n";
     $restartinetd++;
 }
 if ($restartinetd) {
@@ -342,38 +349,28 @@ if (! -e "$TB/ssl/index.txt.attr" ||
 	or fatal("Could not update $TB/ssl/index.txt.attr");
 }
 
-my $restartapache = 0;
-
 if (system("egrep -q -s 'PGENI' $APACHE_CONF")) {
     print "Please go to the apache subdir of your build tree and do:\n";
     print "    gmake\n";
     print "    sudo gmake install\n";
-    $restartapache++;
 }
 if (system("egrep -q -s 'DPGENI' /etc/rc.conf")) {
     print "Please add '$APACHE_FLAGS=\"-DSSL -DPGENI\"' to /etc/rc.conf\n";
-    $restartapache++;
-}
-if ($restartapache) {
-    print "Then restart apache:\n";
-    print "    sudo $APACHE_START restart\n";
-    print "Then rerun this script\n";
-    exit(1);
 }
 
 #
-# On the clients, we have to get the bundle from Utah website and
+# On the clients, we have to get the bundle from the CH website and
 # then break it up for xmlsec (see above). We use a script for this
 # since the clients need to do this everytime a new client is added.
 # This script restarts apache.
 #
 if (!$asch) {
     system("$GETCACERTS -l -p") == 0
-	or fatal("Could not get CA bundle from Utah");
+	or fatal("Could not get CA bundle from $PROTOGENI_WEBSITE");
 
     #
     # This cron entry will autoupdate the CA/CRL certs by getting them from
-    # Utah.
+    # the CH website.
     #
     if (system("egrep -q -s '$GETCACERTS' /etc/crontab")) {
 	print "Please add this line to /etc/crontab:\n\n";
@@ -446,6 +443,11 @@ if (!defined($sslcert)) {
     fatal("Could not create encrypted certificate for geni user")
 	if ($?);
 }
+
+system("/usr/sbin/chown $geniuserid ".
+       "$TB/www/protogeni/advertisements $TB/www/protogeni/authorities");
+fatal("Could not chown www/protogeni directories")
+    if ($?);
 
 #
 # Need this fake type for now.
@@ -556,16 +558,17 @@ if ($asch) {
     #
     # Add the cert to the DB directly.
     #
-    system("$ADDAUTHORITY -c $CHCERT ma") == 0
+    system("$ADDAUTHORITY -f -c $CHCERT ma") == 0
 	or fatal("Could not add MA certificate");
 }
 else {
     #
-    # Grab the CH certificate from Utah. Only one for now.
+    # Grab the CH certificate.
     #
-    print "Fetching clearinghouse certificate from Utah ...\n";
-    system("$FETCH -q -o $CHCERT http://boss.emulab.net/genich.pem") == 0
-	or fatal("Could not fetch clearinghouse certificate from Utah");
+    print "Fetching clearinghouse certificate from $PROTOGENI_WEBSITE ...\n";
+    system("$FETCH -q -o $CHCERT http://$PROTOGENI_WEBSITE/genich.pem") == 0
+	or fatal("Could not fetch clearinghouse certificate ".
+		 "from $PROTOGENI_WEBSITE");
 }
 
 #
@@ -592,20 +595,13 @@ my $context = Genixmlrpc->Context($certificate);
 if (!defined($context)) {
     fatal("Could not create context to talk to clearinghouse");
 }
-
-#
-# Note that we had to send the clearinghouse $TB/etc/emulab.pem so they
-# know about this new site. That is sent out of band (email).
-#
-print "Getting credential to talk to clearinghouse ...\n";
-my $credential = GeniRegistry::ClearingHouse->GetCredential($context);
-if (!defined($credential)) {
-    fatal("Could not get credential to talk to clearinghouse");
+my $cmcert = GeniCertificate->LoadFromFile($CMCERT);
+if (!defined($cmcert)) {
+    fatal("Could not load certificate from $CMCERT\n");
 }
-my $clearinghouse = GeniRegistry::ClearingHouse->Create($context,
-							$credential);
-if (!defined($clearinghouse)) {
-    fatal("Could not create a clearinghouse client");
+my $sescert = GeniCertificate->LoadFromFile($SESCERT);
+if (!defined($sescert)) {
+    fatal("Could not load certificate from $SESCERT\n");
 }
 
 #
@@ -627,37 +623,59 @@ system("$ADDAUTHORITY -a $CMCERT cm") == 0
     or fatal("Could not add CM certificate to CM DB");
 
 #
-# Register our certs at the clearinghouse.
+# Register our certs at the clearinghouse or locally.
 #
-print "Registering SA cert at the clearinghouse.\n";
-if ($clearinghouse->Register("SA", $certificate->cert())) {
-    fatal("Could not register SA cert at the clearinghouse");
+if ($asch) {
+    system("$ADDAUTHORITY -c $SACERT sa") == 0
+	or fatal("Could not add SA certificate");
+    system("$ADDAUTHORITY -c $CMCERT cm") == 0
+	or fatal("Could not add CM certificate");
+    system("$ADDAUTHORITY -c $SESCERT ses") == 0
+	or fatal("Could not add SES certificate");
 }
-my $cmcert = GeniCertificate->LoadFromFile($CMCERT);
-if (!defined($cmcert)) {
-    fatal("Could not load certificate from $CMCERT\n");
-}
-print "Registering CM cert at the clearinghouse.\n";
-if ($clearinghouse->Register("CM", $cmcert->cert())) {
-    fatal("Could not register CM cert at the clearinghouse");
-}
-my $sescert = GeniCertificate->LoadFromFile($SESCERT);
-if (!defined($sescert)) {
-    fatal("Could not load certificate from $SESCERT\n");
-}
-# Don't treat SES registration failure as a fatal error quite yet, until
-# we're certain that server-side support exists everywhere.
-print "Registering SES cert at the clearinghouse.\n";
-if ($clearinghouse->Register("SES", $sescert->cert())) {
-    print("Warning: could not register SES cert at the clearinghouse\n");
-}
+else {
+    #
+    # Note that we had to send the clearinghouse $TB/etc/emulab.pem so they
+    # know about this new site. That is sent out of band (email).
+    #
+    print "Getting credential to talk to clearinghouse ...\n";
+    my $credential = GeniRegistry::ClearingHouse->GetCredential($context);
+    if (!defined($credential)) {
+	fatal("Could not get credential to talk to clearinghouse");
+    }
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create($context,
+							    $credential);
+    if (!defined($clearinghouse)) {
+	fatal("Could not create a clearinghouse client");
+    }
 
+    print "Registering SA cert at the clearinghouse.\n";
+    if ($clearinghouse->Register("SA", $certificate->cert())) {
+	fatal("Could not register SA cert at the clearinghouse");
+    }
+    print "Registering CM cert at the clearinghouse.\n";
+    if ($clearinghouse->Register("CM", $cmcert->cert())) {
+	fatal("Could not register CM cert at the clearinghouse");
+    }
+    # Don't treat SES registration failure as a fatal error quite yet, until
+    # we're certain that server-side support exists everywhere.
+    print "Registering SES cert at the clearinghouse.\n";
+    if ($clearinghouse->Register("SES", $sescert->cert())) {
+	print("Warning: could not register SES cert at the clearinghouse\n");
+    }
+}
 #
 # Local SiteVars to hold the UUIDs.
 #
 TBSetSiteVar('protogeni/sa_uuid', $certificate->uuid());
 TBSetSiteVar('protogeni/cm_uuid', $cmcert->uuid());
 TBSetSiteVar('protogeni/ses_uuid', $sescert->uuid());
+
+#
+# Do this again.
+#
+system("$GETCACERTS -l -p") == 0
+    or fatal("Could not get (again) CA bundle from $PROTOGENI_WEBSITE");
 
 exit(0);
 
