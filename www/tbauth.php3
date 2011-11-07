@@ -773,7 +773,7 @@ function NODETYPE_ALLOWED($type) {
 #
 # Attempt a login.
 # 
-function DOLOGIN($token, $password, $adminmode = 0) {
+function DOLOGIN($token, $password, $adminmode = 0, $nopassword = 0) {
     global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
@@ -782,7 +782,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     
     # Caller makes these checks too.
     if ((!TBvalid_uid($token) && !TBvalid_email($token)) ||
-	!isset($password) || $password == "") {
+	((!isset($password) || $password == "") && !$nopassword)) {
 	return DOLOGIN_STATUS_ERROR;
     }
     $now = time();
@@ -841,29 +841,31 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	    $user->UpdateWebLoginFail();
 	    return DOLOGIN_STATUS_WEBFREEZE;
 	}
-	
-        $encoding = crypt("$password", $db_encoding);
-        if (strcmp($encoding, $db_encoding)) {
-	    #
-	    # Bump count and check for too many consecutive failures.
-	    #
-	    $failcount++;
-	    if ($failcount > DOLOGIN_MAXUSERATTEMPTS) {
-		$user->SetWebFreeze(1);
+
+	if (!$nopassword) {
+	    $encoding = crypt("$password", $db_encoding);
+	    if (strcmp($encoding, $db_encoding)) {
+		#
+                # Bump count and check for too many consecutive failures.
+	        #
+		$failcount++;
+		if ($failcount > DOLOGIN_MAXUSERATTEMPTS) {
+		    $user->SetWebFreeze(1);
 		
-		TBMAIL("$usr_name '$uid' <$usr_email>",
-		   "Web Login Freeze: '$uid'",
-		   "Your login has been frozen because there were too many\n".
-		   "login failures from " . $_SERVER['REMOTE_ADDR'] . ".\n\n".
-		   "Testbed Operations has been notified.\n",
-		   "From: $TBMAIL_OPS\n".
-		   "Cc: $TBMAIL_OPS\n".
-		   "Bcc: $TBMAIL_AUDIT\n".
-		   "Errors-To: $TBMAIL_WWW");
+		    TBMAIL("$usr_name '$uid' <$usr_email>",
+			   "Web Login Freeze: '$uid'",
+			   "Your login has been frozen because there were too many\n".
+			   "login failures from " . $_SERVER['REMOTE_ADDR'] . ".\n\n".
+			   "Testbed Operations has been notified.\n",
+			   "From: $TBMAIL_OPS\n".
+			   "Cc: $TBMAIL_OPS\n".
+			   "Bcc: $TBMAIL_AUDIT\n".
+			   "Errors-To: $TBMAIL_WWW");
+		}
+		$user->UpdateWebLoginFail();
+		break;
 	    }
-	    $user->UpdateWebLoginFail();
-            break;
-        }
+	}
 	#
 	# Pass!
 	#
@@ -972,6 +974,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     #
     $timeout = $now + $TBAUTHTIMEOUT;
     $hashkey = GENHASH();
+    # See note in CrossLogin() in db/User.pm.in. Do not change this.
     $crc     = bin2hex(mhash(MHASH_CRC32, $hashkey));
     $opskey  = GENHASH();
 
