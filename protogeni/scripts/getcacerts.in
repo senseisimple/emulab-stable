@@ -28,6 +28,7 @@ my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $PROTOGENI_WEBSITE = "@PROTOGENI_WEBSITE@";
 my $FETCH	  = "/usr/bin/fetch";
 my $OPENSSL       = "/usr/bin/openssl";
 my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
@@ -52,10 +53,17 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libaudit;
+use libEmulab;
 
 if ($UID != 0) {
     fatal("Must be root to run this script\n");
 }
+
+#
+# Do not run when the testbed is disabled.
+#
+exit(0)
+    if (NoLogins());
 
 #
 # Check args.
@@ -95,18 +103,18 @@ else {
 }
 
 #
-# Fetch the ca bundle from Utah. These are public keys ...
+# Fetch the ca bundle from the CH. These are public keys ...
 #
 system("$FETCH -q -o /tmp/genica.bundle.$$ ".
-       "     http://boss.emulab.net/genica.bundle") == 0
-    or fatal("Could not fetch genica bundle from Utah");
+       "     http://$PROTOGENI_WEBSITE/genica.bundle") == 0
+    or fatal("Could not fetch genica bundle from $PROTOGENI_WEBSITE");
 
 #
-# Fetch the crl bundle from Utah. These are public keys ...
+# Fetch the crl bundle from the CH. These are public keys ...
 #
 system("$FETCH -q -o /tmp/genicrl.bundle.$$ ".
-       "     http://boss.emulab.net/genicrl.bundle") == 0
-    or fatal("Could not fetch genicrl bundle from Utah");
+       "     http://$PROTOGENI_WEBSITE/genicrl.bundle") == 0
+    or fatal("Could not fetch genicrl bundle from $PROTOGENI_WEBSITE");
 
 system( "/bin/cat $TB/etc/extracerts.bundle >> /tmp/genica.bundle.$$ " .
 	"2> /dev/null" );
