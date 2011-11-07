@@ -946,7 +946,7 @@ if (!$returning) {
 	$args["URL"] = $formfields["usr_URL"];
     }
     if ($USERSELECTUIDS || $FirstInitState) {
-	$args["login"] = $formfields["proj_head_uid"];
+	$args["uid"] = $formfields["proj_head_uid"];
     }
 
     # Backend verifies pubkey and returns error.
