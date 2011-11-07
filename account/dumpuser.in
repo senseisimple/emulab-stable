@@ -1,0 +1,178 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use CGI;
+use Data::Dumper;
+
+#
+# Dump a user in XML format suitable for reading into newuser script.
+#
+sub usage()
+{
+    print("Usage: dumpuser [-d] [-p] <uid>\n");
+    exit(-1);
+}
+my $optlist = "dp";
+my $debug   = 0;
+my $nopswd  = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
+my $OURDOMAIN   = "@OURDOMAIN@";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+if ($PGENISUPPORT) {
+    require GeniHRN;
+}
+
+# Protos
+sub fatal($);
+sub DumpUser($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"p"})) {
+    $nopswd = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $user = $ARGV[0];
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+DumpUser($target_user);
+exit(0);
+
+#
+# Dump the user in XML.
+#
+sub DumpUser($)
+{
+    my ($user) = @_;
+    my @keys   = ();
+
+    # Array of string values to print. 
+    my %xmlnames = (
+	"name"		=> {"tag"       => "name",
+			    "optional"	=> 0 },
+	"email"         => {"tag"       => "email",
+			   "optional"	=> 0 },
+	"pswd"		=> {"tag"       => "password",
+			    "optional"	=> 0 },
+	"uid"		=> {"tag"       => "uid",
+			    "optional"	=> 0 },
+	"URL"		=> {"tag"       => "URL",
+			    "optional"	=> 1 },
+	"addr"		=> {"tag"       => "address",
+			    "optional"	=> 0 },
+	"addr2"		=> {"tag"       => "address2",
+			   "optional"	=> 1 },
+	"city"		=> {"tag"       => "city",
+			   "optional"	=> 0 },
+	"state"		=> {"tag"       => "state",
+			   "optional"	=> 0 },
+	"zip"		=> {"tag"       => "zip",
+			   "optional"	=> 0 },
+	"country"	=> {"tag"       => "country",
+			   "optional"	=> 0 },
+	"phone"		=> {"tag"       => "phone",
+			    "optional"	=> 0 },
+	"title"		=> {"tag"       => "title",
+			    "optional"	=> 0 },
+	"affil"		=> {"tag"       => "affiliation",
+			    "optional"	=> 0 },
+	"shell"		=> {"tag"       => "shell",
+			    "optional"	=> 1 },
+	"wikiname"	=> {"tag"       => "wikiname",
+			    "optional"	=> 1 },
+	"affil_abbrev"  => {"tag"      => "affiliation_abbreviation",
+			    "optional" => 0 },
+    );
+
+    $user->GetSSHKeys(\@keys) == 0
+	or fatal("Could not net ssh keys");
+
+    print "<userinfo>\n";
+    foreach my $key (keys(%xmlnames)) {
+	my $ref = $xmlnames{$key};
+	my $tag = $ref->{'tag'};
+	my $optional = $ref->{'optional'};
+	my $val = $user->$key();
+
+	next
+	    if ($optional && (!defined($val) || $val eq ""));
+
+	$val = "None"
+	    if (!defined($val) && $key eq "affil_abbrev");
+	next
+	    if ($nopswd && $key eq "pswd");
+
+	print " <attribute name=\"$tag\">";
+	print "<value>" . CGI::escapeHTML($val) . "</value>";
+	print "</attribute>\n";
+    }
+    # Pubkeys are special.
+    if (@keys) {
+	foreach my $key (@keys) {
+	    print "<pubkeys>$key</pubkeys>\n";
+	}
+    }
+    print "</userinfo>\n";
+}
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+

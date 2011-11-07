@@ -1,0 +1,150 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use CGI;
+use Data::Dumper;
+
+#
+# Dump a project in XML format suitable for reading into newproj script.
+#
+sub usage()
+{
+    print("Usage: dumpproject [-d] <pid>\n");
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+
+# Protos
+sub fatal($);
+sub DumpProject($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $pid = $ARGV[0];
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+#
+# Figure out who called us. Must have admin status to do this.
+#
+if (!$this_user->IsAdmin()) {
+    fatal("You must be a TB administrator to run this script!");
+}
+
+# Map target user to object.
+my $project = Project->Lookup($pid);
+if (! defined($project)) {
+    fatal("$pid does not exist!");
+}
+DumpProject($project);
+exit(0);
+
+#
+# Dump the project in XML.
+#
+sub DumpProject($)
+{
+    my ($project) = @_;
+
+    # Array of string values to print. 
+    my %xmlnames = (
+	"pid"		=> {"tag"       => "name",
+			    "optional"	=> 0 },
+	"head_uid"	=> {"tag"       => "leader",
+			    "optional"	=> 0 },
+	"description"   => {"tag"       => "short description",
+			   "optional"	=> 0 },
+	"URL"		=> {"tag"       => "URL",
+			    "optional"	=> 0 },
+	"funders"	=> {"tag"       => "funders",
+			    "optional"	=> 0 },
+	"why"		=> {"tag"       => "long description",
+			    "optional"	=> 0 },
+	"public"	=> {"tag"       => "public",
+			    "optional"	=> 0 },
+	"num_pcs"	=> {"tag"       => "num_pcs",
+			   "optional"	=> 0 },
+	"linked_to_us"	=> {"tag"       => "linkedtous",
+			   "optional"	=> 0 },
+    );
+
+    print "<project>\n";
+    foreach my $key (keys(%xmlnames)) {
+	my $ref = $xmlnames{$key};
+	my $tag = $ref->{'tag'};
+	my $optional = $ref->{'optional'};
+	my $val = $project->$key();
+
+	next
+	    if (!defined($val) && $optional);
+
+	$val = "None"
+	    if (!defined($val) &&
+		($key eq "funders" || $key eq "why"));
+
+	print " <attribute name=\"$tag\">";
+	print "<value>" . CGI::escapeHTML($val) . "</value>";
+	print "</attribute>\n";
+    }
+    print "</project>\n";
+    
+}
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+
