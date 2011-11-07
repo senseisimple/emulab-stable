@@ -126,6 +126,7 @@ sub IsLocal($)		{ return (defined($_[0]->nonlocal_id()) ? 0 : 1); };
 sub IsNonLocal($)	{ return (defined($_[0]->nonlocal_id()) ? 1 : 0); };
 sub nonlocal_id($)	{ return field($_[0], "nonlocal_id"); }
 sub nonlocal_type($)	{ return field($_[0], "nonlocal_type"); }
+sub manager_urn($)	{ return field($_[0], "manager_urn"); }
 
 # These come from the group not the project.
 sub unix_gid($)         { return $_[0]->{'GROUP'}->unix_gid(); }
@@ -325,6 +326,26 @@ sub Create($$$$)
     }
 
     return $newproject;
+}
+
+#
+# Delete newly added project, as for errors.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+    my $pid_idx = $self->pid_idx();
+    my $group   = $self->GetProjectGroup();
+
+    $group->Delete()
+	if (!defined($group));
+    
+    DBQueryWarn("delete from project_stats where pid_idx=$pid_idx")
+	or return -1;
+    DBQueryWarn("delete from projects where pid_idx=$pid_idx")
+	or return -1;
+
+    return 0;
 }
 
 #
@@ -762,6 +783,36 @@ sub ValidPID($$)
     return TBcheck_dbslot($pid, "projects", "newpid",
 			  TBDB_CHECKDBSLOT_WARN()|
 			  TBDB_CHECKDBSLOT_ERROR());
+}
+
+#
+# Add a user to the Project
+#
+sub AddMemberShip($$;$)
+{
+    my ($self, $user, $trust) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($user)));
+
+    my $membership = $self->LookupUser($user);
+
+    if (defined($membership)) {
+	print "*** AddMemberShip: $user is already a member of $self!\n";
+	return -1;
+    }
+    return $self->{'GROUP'}->AddMemberShip($user, $trust);    
+}
+
+#
+# Return group_exports info, as a plain hash.
+#
+sub PeerExports($$)
+{
+    my ($self, $pref) = @_;
+
+    return $self->{'GROUP'}->PeerExports($pref);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
