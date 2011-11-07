@@ -187,7 +187,7 @@ $UID = $EUID;
 #
 if (! scalar(@userlist)) {
     $query_result =
-	DBQueryFatal("select uid from group_membership ".
+	DBQueryFatal("select uid_idx from group_membership ".
 		     "where pid='$pid' and pid=gid");
 
     $query_result->numrows ||
@@ -201,16 +201,17 @@ if (! scalar(@userlist)) {
 #
 # Loop through user set, building up the group set and issuing commands.
 #
-foreach my $uid (@userlist) {
+foreach my $token (@userlist) {
     my @groupnames;
     my @grouplist;
     my $groupargument;
     my $project;
 
-    my $user = User->Lookup($uid);
-    fatal("Could not map user $uid to object")
+    my $user = User->Lookup($token);
+    fatal("Could not map user $token to object")
 	if (!defined($user));
     my $uid_idx = $user->uid_idx();
+    my $uid     = $user->uid();
 
     if ($user->webonly()) {
 	print "Skipping $uid; webonly account!\n";
