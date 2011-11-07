@@ -13,11 +13,11 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-c] [-n]\n";
+    print STDERR "Usage: $0 [-n]\n";
     exit(-1);
 }
-my $optlist    = "cn";
-my $asch       = 0;
+my $optlist    = "n";
+my $asch       = @PROTOGENI_ISCLEARINGHOUSE@;
 my $noregister = 0;
 
 # Configure ...
@@ -29,6 +29,7 @@ my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
 my $REREGISTER    = "$TB/sbin/protogeni/reregister";
 my $REGRESOURCES  = "$TB/sbin/protogeni/register_resources";
 my $PROTOGENI_URL = "@PROTOGENI_URL@";
+my $PROTOGENI_WEBSITE = "@PROTOGENI_WEBSITE@";
 my $SUDO	  = "/usr/local/bin/sudo";
 my $FETCH	  = "/usr/bin/fetch";
 my $CMCERT	  = "$TB/etc/genicm.pem";
@@ -58,9 +59,6 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (defined($options{"c"})) {
-    $asch  = 1;
-}
 if (defined($options{"n"})) {
     $noregister  = 1;
 }
@@ -80,9 +78,9 @@ if (!$asch) {
     #
     # Grab the CH certificate from Utah.
     #
-    print "Fetching clearinghouse certificate from Utah ...\n";
-    system("$FETCH -q -o $CHCERT http://boss.emulab.net/genich.pem") == 0
-	or fatal("Could not fetch clearinghouse certificate from Utah");
+    print "Fetching clearinghouse certificate from $PROTOGENI_WEBSITE ...\n";
+    system("$FETCH -q -o $CHCERT http://$PROTOGENI_WEBSITE/genich.pem") == 0
+	or fatal("Could not fetch clearinghouse certificate");
 }
 
 #
