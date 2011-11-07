@@ -215,8 +215,8 @@ sub GetCredential($)
 	my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
 	if (!defined($authority)) {
 	    print STDERR "Could not find local authority object\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Who are you?");
+	    return GeniResponse->Create(GENIRESPONSE_ERROR,
+					undef, "Who am I?");
 	}
 	my $credential = GeniCredential->Create($authority, $caller_authority);
 	if (!defined($credential)) {
