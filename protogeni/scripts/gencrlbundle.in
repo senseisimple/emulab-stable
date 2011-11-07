@@ -54,8 +54,7 @@ $GENI_DBNAME = "geni-ch";
 # Now we can load the libraries after setting the proper DB.
 use lib '@prefix@/lib';
 use libaudit;
-require GeniDB;
-import GeniDB;
+use libEmulab;
 
 # For error log.
 my $errors = 0;
@@ -67,6 +66,16 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
+
+#
+# Do not run when the testbed is disabled.
+#
+exit(0)
+    if (NoLogins());
+
+# Leave this after the NoLogins check, for initial install.
+require GeniDB;
+import GeniDB;
 
 # Record output in case of error.
 LogStart(0);
