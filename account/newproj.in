@@ -19,9 +19,11 @@ sub usage()
     print("       newproj -l -m <pid_idx>\n");
     exit(-1);
 }
-my $optlist = "dm:l";
+my $optlist = "dm:lns";
 my $debug   = 0;
 my $nonlocal= 0;
+my $impotent= 0;
+my $silent  = 0;
 my $resend;
 
 #
@@ -80,6 +82,12 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"s"})) {
+    $silent = 1;
 }
 if (defined($options{"l"})) {
     $nonlocal = 1;
@@ -293,8 +301,11 @@ if (exists($newproj_args{'newuser_xml'})) {
     # determines which args are required or optional in the xml data!  The
     # user type is always "project leader" for new users under newproj.
     #
-    my $opt = ($nonlocal ? "-t nonlocal" : "");
-    my $cmd = "newuser -t leader $newuser_xml";
+    my $opt = ($impotent ? "-n" : "");
+    $opt .= " -d"
+	if ($debug);
+    
+    my $cmd = "newuser $opt -t leader $newuser_xml";
     print $cmd . "\n"
 	if ($debug);
     my $cmd_out = `$cmd`;
@@ -320,6 +331,9 @@ UserError("Project already exists; pick another name!")
 my $leader = User->Lookup($newproj_args{'head_uid'});
 UserError("Project leader does not exist!")
     if (!defined($leader));
+
+exit(0)
+    if ($impotent);
    
 #
 # Now safe to create the project. Move the pid out of the argument array
@@ -346,7 +360,7 @@ TBGetSiteVar("general/firstinit/state", \$firstinitstate);
 # Send the email notification.
 #
 $newproj->SendNewProjectEmail($firstinitstate eq "createproject")
-    if (!$nonlocal);
+    if (! ($nonlocal || $silent));
 
 # Unlink this here, so that the newuser file is left behind in case of error.
 # We can then create the user by hand from the xmlfile, if desired.
