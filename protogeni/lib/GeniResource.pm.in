@@ -39,6 +39,7 @@ use English;
 use XML::Simple;
 use Date::Parse;
 use Data::Dumper;
+use RPC::XML;
 use POSIX qw(strftime);
 use overload ('""' => 'Stringify');
 
@@ -2207,14 +2208,14 @@ sub Discover($$$)
     #
     my $method_name = "DiscoverResources";
     my $method_hash = { "available"     => "true",
-			"rspec_version" => "0.2"};
+			"rspec_version" => RPC::XML::string->new("0.2")};
     my @method_args = ($method_hash);
 
     if ($manager_api eq "AM") {
 	$method_name = "ListResources";
 	@method_args = ([$slice_credential->asString()],
 			{'geni_available' => "true",
-			 'rspec_version'  => "0.2"});
+			 'rspec_version'  => RPC::XML::string->new("0.2")});
     }
     elsif ($manager_version == 1.0) {
 	$method_hash->{'credential'} = $slice_credential->asString();
