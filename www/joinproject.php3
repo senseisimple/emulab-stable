@@ -198,9 +198,11 @@ function SPITFORM($formfields, $returning, $errors)
                   <td colspan=2>*Full Name (first and last):</td>
                   <td class=left>
                       <input type=text
-                             name=\"formfields[usr_name]\"
-                             onchange=\"SetWikiName(myform);\"
-                             value=\"" . $formfields["usr_name"] . "\"
+                             name=\"formfields[usr_name]\" ";
+	if ($WIKISUPPORT) {
+	    echo "           onchange=\"SetWikiName(myform);\" ";
+	}
+	echo "               value=\"" . $formfields["usr_name"] . "\"
 	                     size=30>
                   </td>
               </tr>\n";
@@ -785,7 +787,7 @@ if (! $returning) {
 	$args["URL"] = $formfields["usr_URL"];
     }
     if ($USERSELECTUIDS) {
-	$args["login"] = $formfields["joining_uid"];
+	$args["uid"] = $formfields["joining_uid"];
     }
 
     # Backend verifies pubkey and returns error.
