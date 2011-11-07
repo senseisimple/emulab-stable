@@ -1,7 +1,7 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -15,12 +15,15 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print("Usage: newuser -t <type> <xmlfile>\n");
+    print("Usage: newuser [-s] -t <type> <xmlfile>\n");
     exit(-1);
 }
-my $optlist = "dt:";
+my $optlist = "dt:ns";
 my $debug   = 0;
+my $impotent= 0;
 my $type    = "";
+my $silent  = 0;
+my @keyfiles = ();
 
 #
 # Configure variables
@@ -71,7 +74,6 @@ sub escapeshellarg($);
 
 # Locals
 my $SAVEUID	= $UID;
-my $keyfile;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -83,6 +85,12 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"s"})) {
+    $silent = 1;
 }
 if (defined($options{"t"})) {
     $type = $options{"t"};
@@ -135,14 +143,15 @@ else {
 # This first set is required by all types of users
 #
 my %required = ("name"		=> "usr_name",
-		"email"		=> "usr_email",
-		"password"	=> undef);
+		"email"		=> "usr_email");
 
-my %optional = ("login"		=> "uid",
+my %optional = ("uid"		=> "uid",
 		"address2"	=> "usr_addr2",
 		"URL"		=> "usr_URL",
 		"shell"		=> "usr_shell",
-		"pubkey"        => undef);
+		"password"	=> undef,
+		"pubkey"        => undef,
+		"pubkeys"       => undef);
 
 #
 # These are required for most users, but are optional for wiki-only users
@@ -168,12 +177,15 @@ if ($type eq "wikionly") {
 # Must wrap the parser in eval since it exits on error.
 #
 my $xmlparse = eval { XMLin($xmlfile,
+			    ForceArray => ["pubkeys"],
 			    VarAttr => 'name',
 			    ContentKey => '-content',
 			    SuppressEmpty => undef); };
 fatal($@)
     if ($@);
 
+print STDERR Dumper($xmlparse)
+    if ($debug);
 
 #
 # Make sure all the required arguments were provided.
@@ -275,11 +287,17 @@ UserError("Email address already in use; please pick another!")
 #
 # Check the password.
 #
-my $pswd = $xmlparse->{'attribute'}->{'password'}->{'value'};
+my $pswd = (exists($xmlparse->{'attribute'}->{'password'}) ?
+	    $xmlparse->{'attribute'}->{'password'}->{'value'} : "*");
 
 # Admins can "star" the password entry.
-if (defined($this_user) && $this_user->IsAdmin() && $pswd eq "*") {
-    $newuser_args{'usr_pswd'} = "*";
+if ($pswd eq "*") {
+    if (defined($this_user) && $this_user->IsAdmin()) {
+	$newuser_args{'usr_pswd'} = "*";
+    }
+    else {
+	UserError("Only admins can star the password entry");
+    }
 }
 else {
     my $checkpass_args = escapeshellarg($pswd);
@@ -304,26 +322,41 @@ else {
 # Do a check on the pubkey if supplied. The safest thing to do is generate
 # a temporary file and pass that to addpubkey to check.
 #
-if (exists($xmlparse->{'attribute'}->{'pubkey'})) {
-    $keyfile = TBMakeTempFile("addpubkey");
-    fatal("Could not create tempfile")
-	if ($?);
+if (exists($xmlparse->{'attribute'}->{'pubkey'}) ||
+    exists($xmlparse->{'pubkeys'})) {
 
-    open(KEY, ">> $keyfile") or
-	fatal("Could not open $keyfile");
-    print KEY $xmlparse->{'attribute'}->{'pubkey'}->{'value'};
-    close($keyfile);
+    my @keys = (exists($xmlparse->{'pubkeys'}) ? 
+		@{ $xmlparse->{'pubkeys'} } :
+		($xmlparse->{'attribute'}->{'pubkey'}->{'value'}));
 
-    my $result = `$addpubkey -n -f $keyfile`;
-    chomp($result);
-    UserError("Could not parse public key")
-	if ($?);
+    foreach my $key (@keys) {
+	my $keyfile = TBMakeTempFile("addpubkey");
+	fatal("Could not create tempfile")
+	    if ($?);
+
+	open(KEY, ">> $keyfile") or
+	    fatal("Could not open $keyfile");
+	print KEY $key; 
+	close($keyfile);
+
+	if ($debug) {
+	    print STDERR "Checking key in $keyfile ...\n";
+	}
+	my $result = `$addpubkey -n -f $keyfile`;
+	chomp($result);
+	UserError("Could not parse public key")
+	    if ($?);
+	push(@keyfiles, $keyfile);
+    }
 }
 
 #
 # Now safe to create the user. Move the uid out of the argument array
 # since its actually an argument to the Create() routine.
 #
+exit(0)
+    if ($impotent);
+
 my $new_uid;
 
 if (exists($newuser_args{'uid'})) {
@@ -417,22 +450,27 @@ SENDMAIL("$usr_name '$usr_uid' <$usr_email>",
 	 "Thanks,\n".
 	 "Testbed Operations\n",
 	 "$TBAPPROVAL",
-	 "Bcc: $TBAUDIT");
+	 "Bcc: $TBAUDIT")
+    if (!$silent);
 
 #
 # Do we have a keyfile? If so, rerun addpubkey for real now that the
 # user is created and email is sent.
 #
-if (defined($keyfile)) {
+if (@keyfiles) {
     # Set the implied user for addpubkey.
     $ENV{'HTTP_INVOKING_USER'} = $usr_idx;
-    my $result   = `$addpubkey -u $usr_uid -f $keyfile`;
-    chomp($result);
-    fatal("Could not parse public key: $result")
-	if ($?);
-    unlink($keyfile)
-	if (! $debug);
-    
+    my $opt = ($silent ? "-s" : "");
+
+    foreach my $keyfile (@keyfiles) {
+	my $result = `$addpubkey $opt -u $usr_uid -f $keyfile`;
+	chomp($result);
+	fatal("Could not parse public key: $result")
+	    if ($?);
+	
+	unlink($keyfile)
+	    if (! $debug);
+    }
 }
 
 # The web interface requires this line to be printed!
@@ -442,8 +480,11 @@ exit(0);
 sub fatal($) {
     my($mesg) = $_[0];
 
-    unlink($keyfile)
-	if (defined($keyfile) && !$debug);
+    if (@keyfiles && !$debug) {
+	foreach my $keyfile (@keyfiles) {
+	    unlink($keyfile)
+	}
+    }
 
     print STDERR "*** $0:\n".
 	         "    $mesg\n";
@@ -452,8 +493,11 @@ sub fatal($) {
 sub UserError($) {
     my($mesg) = $_[0];
 
-    unlink($keyfile)
-	if (defined($keyfile) && !$debug);
+    if (@keyfiles && !$debug) {
+	foreach my $keyfile (@keyfiles) {
+	    unlink($keyfile)
+	}
+    }
 
     print $mesg;
     exit(1);
