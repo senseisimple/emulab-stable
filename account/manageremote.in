@@ -1,0 +1,648 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Data::Dumper;
+use CGI;
+
+#
+#
+#
+sub usage()
+{
+    print "Usage: manageremote version <remote>\n";
+    print "       manageremote addpeer <remote> <urn> <url> [is_primary]\n";
+    print "       manageremote adduser <remote> <uid>\n";
+    print "       manageremote deluser <remote> <uid>\n";
+    print "       manageremote moduser <remote> <uid>\n";
+    print "       manageremote setgroups <remote> <uid>\n";
+    print "       manageremote xlogin <remote> <uid>\n";
+    print "       manageremote addproject <remote> <pid>\n";
+    print "       manageremote addgroup <remote> <gid>\n";
+    exit(1);
+}
+my $optlist    = "dnf";
+my $debug      = 0;
+my $force      = 0;
+my $impotent   = 0;
+
+#
+# Function prototypes
+#
+sub Version();
+sub AddUser(;$);
+sub AddPeer();
+sub DeleteUser();
+sub ModifyUser();
+sub SetGroups();
+sub CrossLogin();
+sub AddProject();
+sub AddGroup();
+sub fatal($);
+sub do_method($$;$);
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $PORTAL_ENABLE = @PORTAL_ENABLE@;
+my $PORTAL_PRIMARY= @PORTAL_ISPRIMARY@;
+my $OURDOMAIN     = "@OURDOMAIN@";
+my $DUMPUSER	  = "$TB/sbin/dumpuser";
+my $DUMPPROJ	  = "$TB/sbin/dumpproject";
+my $SACERT	  = "$TB/etc/genisa.pem";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+use lib '@prefix@/lib';
+use emdb;
+use libtestbed;
+use User;
+use Project;
+use Group;
+use emutil;
+use GeniHRN;
+use Genixmlrpc;
+use GeniResponse;
+use GeniCredential;
+use GeniAuthority;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+usage()
+    if (@ARGV < 2 || @ARGV > 4);
+
+my $cmd      = shift(@ARGV);
+my $peername = shift(@ARGV);
+my $peerurn;
+
+if (! $PORTAL_ENABLE) {
+    fatal("Portal mode is not enabled");
+}
+if (! ($PORTAL_PRIMARY || $cmd eq "addpeer")) {
+    fatal("You can only run addpeer on this boss");
+}
+
+#
+# Map invoking user to object. 
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+#
+# Mere users can call only one function.
+#
+if (!$this_user->IsAdmin() && $cmd ne "xlogin") {
+    fatal("You must be a TB administrator to run this script!");
+}
+
+#
+# Load the SA cert to act as caller context.
+#
+my $certificate = GeniCertificate->LoadFromFile($SACERT);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $SACERT\n");
+}
+my $context = Genixmlrpc->Context($certificate);
+if (!defined($context)) {
+    fatal("Could not create context to talk to clearinghouse");
+}
+Genixmlrpc->SetContext($context);
+
+my $me      = GeniAuthority->Lookup($certificate->uuid());
+if (!defined($me)) {
+    fatal("Could not find my own authority object");
+}
+my $credential = GeniCredential->GetSelfCredential($me);
+if (!defined($credential)) {
+    fatal("Could not create self credential for $me");
+}
+
+#
+# All operations other then AddPeer require that the peer be
+# in the DB.
+#
+if ($cmd eq "addpeer") {
+    AddPeer();
+    exit(0);
+}
+else {
+    my $query_result =
+	DBQueryFatal("select name,urn from emulab_peers ".
+		     "where name='$peername' or urn='$peername'");
+    fatal("Unknown peer")
+	if (!$query_result->numrows);
+    ($peername,$peerurn) = $query_result->fetchrow_array();
+}
+my $authority = GeniAuthority->CreateFromRegistry("sa", $peerurn);
+if (!defined($authority)) {
+    fatal("Could not locate authority for $peername");
+}
+
+#
+# Now dispatch operation.
+#
+SWITCH: for ($cmd) {
+    /^version$/ && do {
+	Version();
+	last SWITCH;
+    };
+    /^adduser$/ && do {
+	AddUser();
+	last SWITCH;
+    };
+    /^deluser$/ && do {
+	DeleteUser();
+	last SWITCH;
+    };
+    /^moduser$/ && do {
+	ModifyUser();
+	last SWITCH;
+    };
+    /^setgroups$/ && do {
+	SetGroups();
+	last SWITCH;
+    };
+    /^xlogin$/ && do {
+	CrossLogin();
+	last SWITCH;
+    };
+    /^addproject$/ && do {
+	AddProject();
+	last SWITCH;
+    };
+    /^addgroup$/ && do {
+	AddGroup();
+	last SWITCH;
+    };
+    
+    # Default
+    usage();
+}
+exit(0);
+
+#
+# Get the version. 
+#
+sub Version()
+{
+    my $response = do_method($authority, "GetVersion");
+    fatal("Could not get version from $authority")
+	if (! (defined($response) &&
+	       $response->code() == GENIRESPONSE_SUCCESS));
+
+    my $version = $response->value();
+    print "Version: $version\n";
+    return 0;
+}
+
+#
+# Add a peer to the list
+#
+sub AddPeer()
+{
+    usage()
+	if (@ARGV < 2);
+    
+    my $urn  = shift(@ARGV);
+    my $url  = shift(@ARGV);
+    my $primary  = (@ARGV ? shift(@ARGV) : 0);
+    my $safe_url = DBQuoteSpecial($url);
+    $primary = ($primary ? 1 : 0);
+
+    fatal("Invalid URN")
+	if (!GeniHRN::IsValid($urn));
+    fatal("Invalid peer name")
+	if (! ($peername =~ /^[-\w]*$/));
+
+    my $authority = GeniAuthority->CreateFromRegistry("sa", $urn);
+    if (!defined($authority)) {
+	fatal("Could not locate authority for $peername");
+    }
+    
+    my $query_result =
+	DBQueryFatal("select * from emulab_peers ".
+		     "where name='$peername' or urn='$urn' or ".
+		     "      weburl=$safe_url");
+    fatal("Peer already exists. Please delete first")
+	if ($query_result->numrows);
+
+    fatal("Could not add new peer")
+	if (!DBQueryWarn("insert into emulab_peers set ".
+			 "  name='$peername', urn='$urn', weburl=$safe_url, ".
+			 "  is_primary='$primary'"));
+    return 0;
+}
+
+#
+# Add a user.
+#
+sub AddUser(;$)
+{
+    my ($token) = @_;
+
+    if (! defined($token)) {
+	usage()
+	    if (! @ARGV);
+	$token = $ARGV[0];
+    }
+    my $user = User->Lookup($token);
+    if (!defined($user)) {
+	fatal("No such user");
+    }
+    my $uid_idx = $user->uid_idx();
+    my $uid     = $user->uid();
+
+    # Check for existing export.
+    my $query_result =
+	DBQueryFatal("select * from user_exports ".
+		     "where uid_idx='$uid_idx' and peer='$peername'");
+    if ($query_result->numrows && !$force) {
+	fatal("User already exported to peer. Use -f option");
+    }
+    my $urn = GeniHRN::Generate($OURDOMAIN, "user", $user->uid());
+    
+    my $xmlgoo = emutil::ExecQuiet("$DUMPUSER -p $uid");
+    if ($?) {
+	fatal("$DUMPUSER failed");
+    }
+    my $args = {"xmlstring" => $xmlgoo,
+		"urn"       => $urn};
+    
+    my $response = do_method($authority, "AddUser", $args);
+    fatal("Could not add user to $authority")
+	if (! (defined($response) &&
+	       ($response->code() == GENIRESPONSE_SUCCESS ||
+		$response->code() == GENIRESPONSE_ALREADYEXISTS)));
+
+    DBQueryFatal("replace into user_exports set ".
+		 "  uid='$uid', uid_idx='$uid_idx', peer='$peername', ".
+		 "  exported=now()");
+    
+    return 0;
+}
+
+#
+# Delete a user.
+#
+sub DeleteUser()
+{
+    usage()
+	if (! @ARGV);
+    
+    my $user = User->Lookup($ARGV[0]);
+    if (!defined($user)) {
+	fatal("No such user");
+    }
+    my $uid     = $user->uid(); 
+    my $uid_idx = $user->uid_idx();
+    
+    my $query_result =
+	DBQueryFatal("select * from user_exports ".
+		     "where uid_idx='$uid_idx' and peer='$peername'");
+    if (!$query_result->numrows && !$force) {
+	fatal("User has not been exported to peer. Use -f option");
+    }
+    my $urn = GeniHRN::Generate($OURDOMAIN, "user", $user->uid());
+    my $args = {"urn" => $urn};
+    
+    my $response = do_method($authority, "DeleteUser", $args);
+    fatal("Could not delete user from $authority")
+	if (! (defined($response) &&
+	       ($response->code() == GENIRESPONSE_SUCCESS ||
+		$response->code() == GENIRESPONSE_SEARCHFAILED)));
+
+    DBQueryFatal("delete from user_exports ".
+		 "where uid_idx='$uid_idx' and peer='$peername'");
+    return 0;
+}
+
+#
+# Modify a user.
+#
+sub ModifyUser()
+{
+    usage()
+	if (! @ARGV);
+    
+    my $user = User->Lookup($ARGV[0]);
+    if (!defined($user)) {
+	fatal("No such user");
+    }
+    my $uid     = $user->uid();
+    my $uid_idx = $user->uid_idx();
+    
+    my $query_result =
+	DBQueryFatal("select * from user_exports ".
+		     "where uid_idx='$uid_idx' and peer='$peername'");
+    if (!$query_result->numrows && !$force) {
+	fatal("User has not been exported to peer. Use -f option");
+    }
+    my $urn = GeniHRN::Generate($OURDOMAIN, "user", $user->uid());
+    
+    my $xmlgoo = emutil::ExecQuiet("$DUMPUSER -p $uid");
+    if ($?) {
+	fatal("$DUMPUSER failed");
+    }
+    my $args = {"xmlstring" => $xmlgoo,
+		"urn"       => $urn};
+    
+    my $response = do_method($authority, "ModifyUser", $args);
+    fatal("Could not modify user at $authority")
+	if (! (defined($response) &&
+	       $response->code() == GENIRESPONSE_SUCCESS));
+    return 0;
+}
+
+#
+# Set the groups for a user.
+#
+sub SetGroups(;$)
+{
+    my ($token) = @_;
+
+    if (! defined($token)) {
+	usage()
+	    if (! @ARGV);
+	$token = $ARGV[0];
+    }
+    my $user = User->Lookup($token);
+    if (!defined($user)) {
+	fatal("No such user");
+    }
+    my $uid     = $user->uid();
+    my $uid_idx = $user->uid_idx();
+    
+    my $query_result =
+	DBQueryFatal("select * from user_exports ".
+		     "where uid_idx='$uid_idx' and peer='$peername'");
+    if (!$query_result->numrows && !$force) {
+	fatal("User has not been exported to peer. Use -f option");
+    }
+    my $urn = GeniHRN::Generate($OURDOMAIN, "user", $user->uid());
+
+    my @grouplist = ();
+    if ($user->GroupMembershipList(\@grouplist)) {
+	fatal("Could not get group list for user");
+    }
+    if (! @grouplist) {
+	print STDERR "$user is not a member of any groups";
+	return 0;
+    }
+    my %grouparray = ();
+    foreach my $group (@grouplist) {
+	my $pid_idx = $group->pid_idx();
+	my $gid_idx = $group->gid_idx();
+	#
+	# See if this group has been exported. Skip if not.
+	#
+	$query_result =
+	    DBQueryFatal("select pid_idx,gid_idx from group_exports ".
+			 "where  pid_idx='$pid_idx' and gid_idx='$gid_idx' and ".
+			 "       peer='$peername'");
+	next
+	    if (!$query_result->numrows);
+	
+	my $membership = $group->LookupUser($user);
+	if (!defined($membership)) {
+	    fatal("Could not get membership for $user in $group");
+	}
+	my $pid   = $group->pid();
+	my $gid   = $group->gid();
+	my $trust = $membership->trust();
+	$grouparray{"$pid,$gid"} = $trust;
+    }
+    print STDERR Dumper(\%grouparray) if ($debug);
+    
+    my $args = {"groups" => \%grouparray,
+		"urn"    => $urn};
+
+    my $response = do_method($authority, "SetGroups", $args);
+    fatal("Could not setgroups for user at $authority")
+	if (! (defined($response) &&
+	       $response->code() == GENIRESPONSE_SUCCESS));
+    return 0;
+}
+
+#
+# Cross Login
+#
+sub CrossLogin()
+{
+    usage()
+	if (! @ARGV);
+    
+    my $user = User->Lookup($ARGV[0]);
+    if (!defined($user)) {
+	fatal("No such user");
+    }
+    my $uid     = $user->uid();
+    my $uid_idx = $user->uid_idx();
+    
+    my $query_result =
+	DBQueryFatal("select * from user_exports ".
+		     "where uid_idx='$uid_idx' and peer='$peername'");
+    if (!$query_result->numrows && !$force) {
+	fatal("User has not been exported to peer. Use -f option");
+    }
+    my $urn  = GeniHRN::Generate($OURDOMAIN, "user", $user->uid());
+    my $args = {"urn" => $urn};
+
+    #
+    # Since this is coming from the web interface, want to limit
+    # how long we wait, and return status if timed out.
+    #
+    Genixmlrpc->SetTimeout(20);
+    
+    my $response = do_method($authority, "CrossLogin", $args);
+    fatal("Could not xlogin user at $authority")
+	if (! (defined($response) &&
+	       $response->code() == GENIRESPONSE_SUCCESS));
+    my $key = $response->value();
+    print "$key\n";
+    return 0;
+}
+
+#
+# Add a Project
+#
+sub AddProject()
+{
+    usage()
+	if (! @ARGV);
+    
+    my $project = Project->Lookup($ARGV[0]);
+    if (!defined($project)) {
+	fatal("No such project");
+    }
+    my $pid     = $project->pid();
+    my $pid_idx = $project->pid_idx();
+    my $leader_uid = $project->head_uid();
+    my $leader_idx = $project->head_idx();
+    
+    my $query_result =
+	DBQueryFatal("select * from group_exports ".
+		     "where pid_idx='$pid_idx' and gid_idx='$pid_idx' and ".
+		     "      peer='$peername'");
+    if ($query_result->numrows && !$force) {
+	fatal("Project has already been exported to peer. Use -f option");
+    }
+    #
+    # Check that the leader has been exported, and if not do that first.
+    #
+    my $leader_result =
+	DBQueryFatal("select * from user_exports ".
+		     "where uid_idx='$leader_idx' and peer='$peername'");
+    if (!$leader_result->numrows) {
+	AddUser($leader_idx);
+    }
+    
+    my $xmlgoo = emutil::ExecQuiet("$DUMPPROJ $pid");
+    if ($?) {
+	fatal("$DUMPPROJ failed");
+    }
+    my $args = {"xmlstring" => $xmlgoo};
+    
+    my $response = do_method($authority, "AddProject", $args);
+    fatal("Could not add project to $authority")
+	if (! (defined($response) &&
+	       ($response->code() == GENIRESPONSE_SUCCESS ||
+		$response->code() == GENIRESPONSE_ALREADYEXISTS)));
+
+    DBQueryFatal("replace into group_exports set ".
+		 "  pid='$pid', pid_idx='$pid_idx', ".
+		 "  gid='$pid', gid_idx='$pid_idx', ".
+		 "  exported=now(), updated=now(), ".
+		 "  peer='$peername'");
+    
+    if (!$leader_result->numrows) {
+	SetGroups($leader_idx);
+    }
+    return 0;
+}
+
+#
+# Add a Group
+#
+sub AddGroup()
+{
+    usage()
+	if (! @ARGV);
+    
+    my $group = Group->Lookup($ARGV[0]);
+    if (!defined($group)) {
+	fatal("No such group");
+    }
+    if ($group->IsProjectGroup()) {
+	fatal("Please use addproject instead.");
+    }
+    my $pid_idx = $group->pid_idx();
+    my $gid_idx = $group->gid_idx();
+    my $pid     = $group->pid();
+    my $gid     = $group->gid();
+    
+    my $query_result =
+	DBQueryFatal("select * from group_exports ".
+		     "where pid_idx='$pid_idx' and gid_idx='$pid_idx' and ".
+		     "      peer='$peername'");
+    if (!$query_result->numrows) {
+	fatal("Project has not been exported to peer.\n");
+    }
+    $query_result =
+	DBQueryFatal("select * from group_exports ".
+		     "where pid_idx='$pid_idx' and gid_idx='$gid_idx' and ".
+		     "      peer='$peername'");
+    if ($query_result->numrows && !$force) {
+	fatal("Group has already been exported to peer. Use -f option");
+    }
+    
+    my %tags = (
+	"project"	=> $group->pid(),
+	"group_id"	=> $group->gid(),
+	"group_leader"	=> $group->leader(),
+	"group_description" => $group->description() || "",
+    );
+
+    my $args = {"tags" => \%tags};
+    
+    my $response = do_method($authority, "AddGroup", $args);
+    fatal("Could not add group to $authority")
+	if (! (defined($response) &&
+	       ($response->code() == GENIRESPONSE_SUCCESS ||
+		$response->code() == GENIRESPONSE_ALREADYEXISTS)));
+
+    DBQueryFatal("replace into group_exports set ".
+		 "  pid='$pid', pid_idx='$pid_idx', ".
+		 "  gid='$gid', gid_idx='$gid_idx', ".
+		 "  exported=now(), updated=now(), ".
+		 "  peer='$peername'");
+    
+    return 0;
+}
+
+#
+# Make an rpc call to the Emulab interface on the remote authority.
+#
+sub do_method($$;$)
+{
+    my ($authority, $method, $args) = @_;
+    $args = {} if (!defined($args));
+
+    #
+    # The URL refers to the sa, but we want the emulab interface.
+    #
+    my $url = $authority->url();
+    $url =~ s/\/sa$/\/emulab/;
+
+    $args->{'credentials'} = [$credential->asString()];
+    
+    my $response =
+	Genixmlrpc::CallMethod($url, undef, $method, $args);
+    
+    if (!defined($response)) {
+	print STDERR "*** Internal error at $authority\n";
+	return undef;
+    }
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Error at $authority:";
+	print STDERR " " . $response->output() . "\n";
+    }
+    return $response;
+}
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(-1);
+}

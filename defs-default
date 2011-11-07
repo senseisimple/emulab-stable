@@ -88,7 +88,11 @@ PROTOGENI_SUPPORT=1
 # If you are not the main Emulab site in Utah, change this!
 PROTOGENI_DOMAIN="utahemulab"
 # If you are not the main Emulab site in Utah, DO NOT SET THIS!
-PROTOGENI_CLEARINGHOUSE=1
+PROTOGENI_ISCLEARINGHOUSE=1
+# Set this to the email address for ClearingHouse. 
+PROTOGENI_EMAIL="geni-dev-utah@flux.utah.edu"
+# Set this to the hostname of the clearinghouse web site.
+PROTOGENI_WEBSITE="www.emulab.net"
 
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.

@@ -1,0 +1,32 @@
+#
+# Another change to the testbed startup script.
+#
+use strict;
+use libinstall;
+
+my $TESTBED_STARTUP = "/usr/local/etc/rc.d/3.testbed.sh";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "startupfile", "Updating testbed startup file", sub {
+	    DoneIfIdentical("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    DiffFiles("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    
+    return 0;
+}
+1;

@@ -1,6 +1,6 @@
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ SETUID_LIBX_SCRIPTS  =
 # configure if the .in file is changed.
 # 
 all:	Genixmlrpc.pm GeniResponse.pm \
-	protogeni-ch.pm protogeni-sa.pm protogeni-cm.pm \
+	protogeni-ch.pm protogeni-sa.pm protogeni-cm.pm protogeni-emulab.pm \
 	protogeni-ses.pm geni-am.pm  \
 	protogeni-wrapper.pl
 
@@ -33,6 +33,7 @@ install-libs: $(INSTALL_LIBDIR)/Genixmlrpc.pm \
          $(INSTALL_LIBDIR)/protogeni-sa.pm \
          $(INSTALL_LIBDIR)/protogeni-cm.pm \
          $(INSTALL_LIBDIR)/protogeni-ses.pm \
+         $(INSTALL_LIBDIR)/protogeni-emulab.pm \
          $(INSTALL_LIBDIR)/geni-am.pm \
          $(INSTALL_DIR)/opsdir/lib/Genixmlrpc.pm \
          $(INSTALL_DIR)/opsdir/lib/GeniResponse.pm
@@ -41,7 +42,7 @@ install-scripts: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-wrapper.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-wrapper.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-wrapper.pl
 
-install: install-libs install-scripts
+install: all install-libs install-scripts
 
 control-install:
 

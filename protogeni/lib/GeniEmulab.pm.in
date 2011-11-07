@@ -1,0 +1,825 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniEmulab;
+
+#
+# The interface to some Emulab stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use emdb (); # These symbols overlap with GeniDB. 
+use GeniDB;
+use GeniResponse;
+use GeniHRN;
+use GeniXML;
+use GeniCertificate;
+use GeniCredential;
+use GeniAuthority;
+use emutil;
+use English;
+use User;
+use Project;
+use Data::Dumper;
+use XML::Simple;
+use Date::Parse;
+use POSIX qw(strftime tmpnam);
+use Time::Local;
+use File::Temp qw(tempfile);
+use CGI;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $ELABINELAB     = "@ELABINELAB@";
+my $NEWUSER	   = "$TB/sbin/newuser";
+my $RMUSER	   = "$TB/sbin/rmuser";
+my $ADDUSER	   = "$TB/sbin/tbacct add";
+my $MODUSER	   = "$TB/bin/moduserinfo";
+my $NEWPROJ	   = "$TB/sbin/newproj";
+my $MKPROJ	   = "$TB/sbin/mkproj";
+my $RMPROJ	   = "$TB/sbin/rmproj";
+my $NEWGROUP	   = "$TB/bin/newgroup";
+my $MKGROUP	   = "$TB/sbin/mkgroup";
+my $RMGROUP	   = "$TB/sbin/rmgroup";
+my $SETGROUPS	   = "$TB/sbin/setgroups";
+my $WAP            = "$TB/sbin/withadminprivs";
+my $API_VERSION    = 1;
+
+#
+# Tell the client what API revision we support.  The correspondence
+# between revision numbers and API features is to be specified elsewhere.
+# No credentials are required.
+#
+sub GetVersion()
+{
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $API_VERSION);
+}
+
+#
+# Add a new user.
+#
+sub AddUser($)
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $xmlgoo      = $argref->{'xmlstring'};
+    my $urn         = $argref->{'urn'};
+
+    if (! (defined($credentials) && defined($xmlgoo) && defined($urn))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! GeniHRN::IsValid($urn));
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+    my $authority = CheckCredential($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
+
+    #
+    # Do prelim check to make sure the user is unique and that
+    # there is a urn that matches the domain of the caller.
+    # do this, we have to parse the XML. 
+    #
+    my $xmlparse = eval { XMLin($xmlgoo,
+				ForceArray => ["pubkeys"],
+				VarAttr => 'name',
+				ContentKey => '-content',
+				SuppressEmpty => undef); };
+    
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, "$@")
+	if ($@);
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (!exists($xmlparse->{'attribute'}->{'uid'}));
+
+    my $login = $xmlparse->{'attribute'}->{'uid'}->{'value'};
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! User->ValidUID($login));
+
+    my $user = User->Lookup($login);
+    if (defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_ALREADYEXISTS, undef,
+				    "User already exists");
+    }
+    my ($domain,undef,$id) = GeniHRN::Parse($urn);
+    if ($domain ne $authority->domain()) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "user urn does not match authority");
+    }
+    if ($id ne $login) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "urn id does not match login id");
+    }
+    #
+    # Create and approve the user. Must do this as an admin.
+    #
+    GeniUtil::FlipToElabMan();
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    if (!defined($fh)) {
+	print STDERR "Could not create temp file for newuser xml\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    print $fh $xmlgoo;
+    close($fh);
+    
+    my $output = GeniUtil::ExecQuiet("$WAP $NEWUSER -s $filename");
+    if ($?) {
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error creating newuser");
+    }
+    unlink($filename);
+
+    #
+    # Now have to change the status and activate/add the user.
+    #
+    $user = User->Lookup($login);
+    if (!defined($user)) {
+	print STDERR "Could not lookup newly added user\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error creating newuser");
+    }
+    $user->SetStatus($User::USERSTATUS_ACTIVE);
+    $user->Update({"nocollabtools" => "1",
+		   "manager_urn"   => $credential->owner_urn()});
+    $output = GeniUtil::ExecQuiet("$WAP $ADDUSER $login");
+    if ($?) {
+	$user->Delete();
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error adding newuser");
+    }
+    GeniUtil::FlipToGeniUser();
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Delete a user.
+#
+sub DeleteUser($)
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $user_urn    = $argref->{'urn'};
+
+    if (! (defined($credentials) && defined($user_urn))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+    my $authority = CheckCredential($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! GeniHRN::IsValid($user_urn));
+
+    my ($domain,undef,$login) = GeniHRN::Parse($user_urn);
+    if ($domain ne $authority->domain()) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "user urn does not match authority");
+    }
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! User->ValidUID($login));
+    
+    my $user = User->Lookup($login);
+    if (!defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "User does not exist");
+    }
+    # Make sure our record really says the caller is the creator.
+    if ($user->manager_urn() ne $credential->owner_urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "You are not the user creator");
+    }
+
+    #
+    # Delete the user. Must do this as an admin.
+    #
+    GeniUtil::FlipToElabMan();
+    my $output = GeniUtil::ExecQuiet("$WAP $RMUSER $login");
+    if ($?) {
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error creating newuser");
+    }
+    GeniUtil::FlipToGeniUser();
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Modify a user.
+#
+sub ModifyUser($)
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $xmlgoo      = $argref->{'xmlstring'};
+    my $user_urn    = $argref->{'urn'};
+
+    if (! (defined($credentials) && defined($user_urn))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+    my $authority = CheckCredential($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! GeniHRN::IsValid($user_urn));
+
+    my ($domain,undef,$login) = GeniHRN::Parse($user_urn);
+    if ($domain ne $authority->domain()) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "user urn does not match authority");
+    }
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! User->ValidUID($login));
+    
+    my $user = User->Lookup($login);
+    if (!defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "User does not exist");
+    }
+    # Make sure our record really says the caller is the creator.
+    if ($user->manager_urn() ne $credential->owner_urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "You are not the user creator");
+    }
+    GeniUtil::FlipToElabMan();
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    if (!defined($fh)) {
+	print STDERR "Could not create temp file for moduser xml\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    print $fh $xmlgoo;
+    close($fh);
+    
+    #
+    # Modify the user. Must do this as an admin.
+    #
+    my $uid_idx = $user->uid_idx();
+    my $output = GeniUtil::ExecQuiet("$WAP $MODUSER -s -u $uid_idx $filename");
+    if ($?) {
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error modifying user");
+    }
+    unlink($filename);
+    GeniUtil::FlipToGeniUser();
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Create a new project.
+#
+sub AddProject($)
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $xmlgoo      = $argref->{'xmlstring'};
+
+    if (! (defined($credentials) && defined($xmlgoo))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+    my $authority = CheckCredential($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
+
+    #
+    # Do prelim check to make sure the project is unique and that
+    # there is a urn that matches the domain of the caller.
+    # To do this, we have to parse the XML. 
+    #
+    my $xmlparse = eval { XMLin($xmlgoo,
+				VarAttr => 'name',
+				ContentKey => '-content',
+				SuppressEmpty => undef); };
+    
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, "$@")
+	if ($@);
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (!exists($xmlparse->{'attribute'}->{'name'}));
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (!exists($xmlparse->{'attribute'}->{'leader'}));
+
+    my $pid    = $xmlparse->{'attribute'}->{'name'}->{'value'};
+    my $leader = $xmlparse->{'attribute'}->{'leader'}->{'value'};
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! Project->ValidPID($pid));
+
+    my $project = Project->Lookup($pid);
+    if (defined($project)) {
+	return GeniResponse->Create(GENIRESPONSE_ALREADYEXISTS, undef,
+				    "Project already exists");
+    }
+    #
+    # Leader must exist and be active, and be from calling emulab.
+    #
+    my $user = User->Lookup($leader);
+    if (!defined($user) || $user->status() ne $User::USERSTATUS_ACTIVE) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Project leader does not exist");
+    }
+    # Make sure our record really says the caller is the creator.
+    if ($user->manager_urn() ne $credential->owner_urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "You are not the leader creator");
+    }
+    
+    #
+    # Create and approve the project Must do this as an admin.
+    #
+    GeniUtil::FlipToElabMan();
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    if (!defined($fh)) {
+	print STDERR "Could not create temp file for newproj xml\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    print $fh $xmlgoo;
+    close($fh);
+    
+    my $output = GeniUtil::ExecQuiet("$WAP $NEWPROJ -s $filename");
+    if ($?) {
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error creating project");
+    }
+    unlink($filename);
+
+    #
+    # Now have to activate/add the project.
+    #
+    $project = Project->Lookup($pid);
+    if (!defined($project)) {
+	print STDERR "Could not lookup newly added project\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error creating project");
+    }
+    $output = GeniUtil::ExecQuiet("$WAP $MKPROJ -s $pid");
+    if ($?) {
+	system("WAP $RMPROJ $pid");
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error adding project");
+    }
+    $project->Update({"manager_urn" => $credential->owner_urn()});
+    GeniUtil::FlipToGeniUser();
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Create a new group
+#
+sub AddGroup($)
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $tags        = $argref->{'tags'};
+
+    if (! (defined($credentials) && defined($tags))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+    my $authority = CheckCredential($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
+
+    #
+    # Do prelim check to make sure the project is unique and that
+    # there is a urn that matches the domain of the caller.
+    #
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (!exists($tags->{'project'}));
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (!exists($tags->{'group_id'}));
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (!exists($tags->{'group_leader'}));
+
+    my $pid    = $tags->{'project'};
+    my $gid    = $tags->{'group_id'};
+    my $leader = $tags->{'group_leader'};
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! Project->ValidPID($pid));
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! Group->ValidGID($gid));
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! User->ValidUID($leader));
+
+    my $project = Project->Lookup($pid);
+    if (!defined($project)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "Project does not exist");
+    }
+    # Backend script wants an idx not a name.
+    $tags->{'project'} = $project->pid_idx();
+    
+    my $group = $project->LookupGroup($gid);
+    if (defined($group)) {
+	return GeniResponse->Create(GENIRESPONSE_ALREADYEXISTS, undef,
+				    "Group already exists in project");
+    }
+    
+    #
+    # Leader must exist and be active.
+    #
+    my $user = User->Lookup($leader);
+    if (!defined($user) || $user->status() ne $User::USERSTATUS_ACTIVE) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Project leader does not exist");
+    }
+    # Make sure our record really says the caller is the creator.
+    if ($project->manager_urn() ne $credential->owner_urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "You are not the project creator");
+    }
+    if ($user->manager_urn() ne $credential->owner_urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "You are not the leader creator");
+    }
+    
+    #
+    # Create and approve the group. Must do this as an admin.
+    #
+    GeniUtil::FlipToElabMan();
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    if (!defined($fh)) {
+	GeniUtil::FlipToGeniUser();
+	print STDERR "Could not create temp file for newgroup xml\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    print $fh "<group>\n";
+    foreach my $tag (keys(%{ $tags })) {
+	my $val = $tags->{$tag};
+	
+	print $fh "<attribute name=\"$tag\">";
+	print $fh "<value>" . CGI::escapeHTML($val) . "</value>";
+	print $fh "</attribute>\n";
+    }
+    print $fh "</group>\n";
+    close($fh);
+    
+    my $output = GeniUtil::ExecQuiet("$WAP $NEWGROUP -s $filename");
+    if ($?) {
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error creating group");
+    }
+    unlink($filename);
+    GeniUtil::FlipToGeniUser();
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Set groups for a user.
+#
+sub SetGroups($)
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $user_urn    = $argref->{'urn'};
+    my $groups      = $argref->{'groups'};
+    my $message     = "";
+
+    if (! (defined($credentials) && defined($user_urn) && defined($groups))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+    my $authority = CheckCredential($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! GeniHRN::IsValid($user_urn));
+
+    my ($domain,undef,$login) = GeniHRN::Parse($user_urn);
+    if ($domain ne $authority->domain()) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "user urn does not match authority");
+    }
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! User->ValidUID($login));
+    
+    my $user = User->Lookup($login);
+    if (!defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "User does not exist");
+    }
+    # Make sure our record really says the caller is the creator.
+    if ($user->manager_urn() ne $credential->owner_urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "You are not the user creator");
+    }
+
+    #
+    # Current group membership. Use modgroups instead?
+    #
+    my @grouplist = ();
+    if ($user->GroupMembershipList(\@grouplist)) {
+	fatal("Could not get group list for user");
+    }
+    #
+    # First remove user from groups.
+    #
+    my %curgroups = ();
+    foreach my $group (@grouplist) {
+	my $pid = $group->pid();
+	my $gid = $group->gid();
+	my $project = Project->Lookup($group->pid_idx());
+
+	# We do not touch membership in local/other projects.
+	next
+	    if ($project->manager_urn() ne $credential->owner_urn());
+
+	my $membership = $group->LookupUser($user);
+	if (!defined($membership)) {
+	    $message = "Could not get membership in $group";
+	    goto bad;
+	}
+
+	#
+	# If user is no longer in this project, then remove.
+	#
+	if (!exists($groups->{"$pid,$pid"})) {
+	    print STDERR "Deleting $user from $project\n";
+	    $project->DeleteUser($user);
+	    next;
+	}
+	#
+	# Else check actual group.
+	#
+	if (!exists($groups->{"$pid,$gid"})) {
+	    print STDERR "Deleting $user from $group\n";
+	    $group->DeleteMemberShip($user);
+	    next;
+	}
+	#
+	# Else, check the trust level.
+	#
+	if ($membership->trust() ne $groups->{"$pid,$gid"}) {
+	    my $newtrust = $groups->{"$pid,$gid"};
+	    
+	    print STDERR "Changing trust for $user in $group to $newtrust\n";
+	    $membership->ModifyTrust($newtrust);
+	}
+	$curgroups{"$pid,$gid"} = $group;
+    }
+    #
+    # Now add user to groups. Might be better to do this modgroups?
+    #
+    foreach my $group_id (keys(%{ $groups })) {
+	my $grouptrust = $groups->{$group_id};
+	my $group = Group->Lookup($group_id);
+
+	if (!defined($group)) {
+	    $message = "$group_id does not exist here";
+	    goto bad;
+	}
+	my $pid = $group->pid();
+	my $gid = $group->gid();
+	my $project = Project->Lookup($group->pid_idx());
+
+	# We do not touch membership in local/other projects.
+	next
+	    if ($project->manager_urn() ne $credential->owner_urn());
+
+	# Must have a project trust level in the data.
+	if (!exists($groups->{"$pid,$pid"})) {
+	    $message = "Must provide project membership for $group";
+	    goto bad;
+	}
+	my $membership = $group->LookupUser($user);
+	if (defined($membership)) {
+	    #
+	    # Already a member; check trust level.
+	    #
+	    if ($membership->trust() ne $grouptrust) {
+		print STDERR
+		    "Changing trust for $user in $group to $grouptrust\n";
+		$membership->ModifyTrust($grouptrust);
+	    }
+	}
+	else {
+	    #
+	    # Have to add. 
+	    #
+	    if (!defined($project->LookupUser($user))) {
+		#
+		# Not in the project yet, so add that first.
+		#
+		$project->AddMemberShip($user, $groups->{"$pid,$pid"});
+	    }
+	    elsif ($pid ne $gid) {
+		$group->AddMemberShip($user, $grouptrust);
+	    }
+	}
+    }
+    #
+    # Run setgroups. Must do this as an admin.
+    #
+    GeniUtil::FlipToElabMan();
+    my $uid_idx = $user->uid_idx();
+    my $output = GeniUtil::ExecQuiet("$WAP $SETGROUPS $uid_idx");
+    if ($?) {
+	GeniUtil::FlipToGeniUser();
+	print STDERR $output;
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal error setting groups");
+    }
+    GeniUtil::FlipToGeniUser();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+  bad:
+    print STDERR "$message\n";
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
+}
+
+#
+# Cross login.
+#
+sub CrossLogin($)
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $user_urn    = $argref->{'urn'};
+
+    if (! (defined($credentials) && defined($user_urn))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+    my $authority = CheckCredential($credential);
+    return $authority
+	if (GeniResponse::IsResponse($authority));
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! GeniHRN::IsValid($user_urn));
+
+    my ($domain,undef,$login) = GeniHRN::Parse($user_urn);
+    if ($domain ne $authority->domain()) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "user urn does not match authority");
+    }
+    return GeniResponse->Create(GENIRESPONSE_BADARGS)
+	if (! User->ValidUID($login));
+    
+    my $user = User->Lookup($login);
+    if (!defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "User does not exist");
+    }
+    # Make sure our record really says the caller is the creator.
+    if ($user->manager_urn() ne $credential->owner_urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "You are not the user creator");
+    }
+    # Create a login entry for the user, returning a key.
+    my $key = $user->CrossLogin();
+    if (!defined($key)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $key);
+}
+
+#
+# Initial credential check.
+#
+sub CheckCredentials($)
+{
+    if (ref($_[0]) ne "ARRAY") {
+	return
+	    GeniResponse->MalformedArgsResponse("Credentials should be a ".
+						"array not a singleton");
+    }
+    
+    my @credentials = @{ $_[0] };
+    if (scalar(@credentials) != 1) {
+	return
+	    GeniResponse->MalformedArgsResponse("Wrong number of credentials");
+    }
+    my $credential  = GeniCredential->CreateFromSigned($credentials[0]);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create credential object");
+    }
+    #
+    # Well formed credentials must now have URNs.
+    #
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Malformed credentials; missing URNs")
+	if (! (defined($credential->owner_urn()) &&
+	       defined($credential->target_urn()) &&
+	       GeniHRN::IsValid($credential->owner_urn()) &&
+	       GeniHRN::IsValid($credential->target_urn())));
+	
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_urn() ne $ENV{'GENIURN'}) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "This is not your credential");
+    }
+    return $credential;
+}
+
+#
+# We accept only SA credentials. 
+#
+sub CheckCredential($)
+{
+    my ($credential) = @_;
+    my $urn = $credential->owner_urn();
+    my $certificate = $credential->owner_cert();
+
+    my ($domain,$type,$id) = GeniHRN::Parse($urn);
+    if (! ($type eq "authority" && $id eq "sa")) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Credential owner is not an SA");
+    }
+    my $authority = GeniAuthority->CreateFromRegistry("SA", $urn);
+    if (!defined($authority)) {
+	print STDERR "Could not create authority: $urn\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Could not create authority: $urn");
+    }
+    # Look for a changed certificate and reload.
+    return $authority
+	if ($certificate->SameCert($authority));
+    $authority->Delete();
+    
+    $authority = GeniAuthority->CreateFromRegistry("SA", $urn);
+    if (!defined($authority)) {
+	print STDERR "Could not reload authority: $urn\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Could not reload authority: $urn");
+    }
+    if (! $certificate->SameCert($authority)) {
+	print STDERR "Stale authority: $urn\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Stale authority: $urn");
+    }
+    #
+    # In the current implementation, the urn of the authority
+    # must match the urn of the invoker and that urn must be in
+    # the emulab_peers table and have the is_primary bit set.
+    #
+    if ($authority->urn() ne $ENV{'GENIURN'}) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+			    "You are not who you say you are");
+    }
+    my $safe_urn = DBQuoteSpecial($urn);
+    my $query_result =
+	DBQueryWarn("select name,is_primary from emulab_peers ".
+		    "where urn=$safe_urn and is_primary=1");
+    return GeniResponse->Create(GENIRESPONSE_ERROR)
+	if (!defined($query_result));
+    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				"You are not my primary")
+	if ($query_result->numrows != 1);
+    
+    return $authority;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

@@ -12,3 +12,6 @@ TBSTATEDEMAIL=stoller@fast.cs.utah.edu
 TBTESTSUITEEMAIL=stoller@fast.cs.utah.edu
 WWW=www.emulab.net/dev/stoller
 THISHOMEBASE=Stoller.Emulab.Net
+
+PORTAL_ENABLE=1
+PORTAL_ISPRIMARY=1

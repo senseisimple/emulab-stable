@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,15 +13,21 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 include $(OBJDIR)/Makeconf
 
 SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys \
-		  newuser newproj mksyscert spewcert
+		  newuser newproj mksyscert spewcert dumpuser dumpproject \
+		  manageremote
 LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert \
-		  webnewuser webnewproj webspewcert
+		  webnewuser webnewproj webspewcert webmanageremote
 CTRLSBIN_STUFF  = adduserhook
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
 SETUID_SBIN_SCRIPTS  = tbacct addpubkey mkusercert mksyscert
 SETUID_LIBX_SCRIPTS  =
+
+ifeq ($(PROTOGENI_SUPPORT),1)
+SBIN_STUFF += manageremote
+SETUID_SBIN_SCRIPTS += manageremote
+endif
 
 #
 # Targets

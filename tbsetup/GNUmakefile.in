@@ -12,6 +12,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 PLABSUPPORT     = @PLABSUPPORT@
 ISMAINSITE	= @TBMAINSITE@
 NSVERIFY	= @NSVERIFY@
+PORTAL_ISPRIMARY= @PORTAL_ISPRIMARY@
 SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
@@ -44,10 +45,13 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
 		  rmproj snmpit.proxynew snmpit.proxyv2 pool_daemon \
-		  checknodes_daemon snmpit.proxyv3
+		  checknodes_daemon snmpit.proxyv3 
 
 ifeq ($(ISMAINSITE),1)
 SBIN_STUFF     += repos_daemon
+endif
+ifeq ($(PORTAL_ISPRIMARY),1)
+SBIN_STUFF     += portal_daemon
 endif
 
 CTRLSBIN_STUFF  = console_setup.proxy sfskey_update.proxy \

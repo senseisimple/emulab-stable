@@ -1,0 +1,407 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Attempt to determine if nodes are really messed up.
+#
+sub usage()
+{
+    print "Usage: portal_daemon [-d]\n";
+    exit(1);
+}
+my $optlist   = "dn1";
+my $debug     = 0;
+my $impotent  = 0;
+my $oneshot   = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $LOGFILE       = "$TB/log/portal_daemon.log";
+my $PIDFILE       = "/var/run/portal_daemon.pid";
+my $SUDO          = "/usr/local/bin/sudo";
+my $PROTOUSER     = "elabman";
+my $WAP           = "$TB/sbin/withadminprivs";
+my $MANAGEREMOTE  = "$TB/sbin/manageremote";
+my $PORTAL_ENABLE = @PORTAL_ENABLE@;
+my $PORTAL_PRIMARY= @PORTAL_ISPRIMARY@;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub logit($);
+sub notify($);
+	  
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Exit if not a portal.
+#
+if (! ($PORTAL_ENABLE && $PORTAL_PRIMARY)) {
+    exit(0);
+}
+
+#
+# Check args early so we get the right DB.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"1"})) {
+    $oneshot = 1;
+}
+if ($UID != 0) {
+    die("Must be root to run this script\n");
+}
+
+# Set this to turn off tblog in libraries.
+$ENV{'TBLOG_OFF'} = "yep";
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libEmulab;
+use libdb;
+use libtestbed;
+use Project;
+use Group;
+use User;
+
+#
+# Only one please.
+#
+if (CheckDaemonRunning("portal_daemon")) {
+    fatal("Not starting another portal daemon!");
+}
+
+#
+# We need this user for running below.
+#
+my $elabman = User->Lookup($PROTOUSER);
+if (!defined($elabman)) {
+    fatal("Could not lookup $PROTOUSER user. Exiting ...");
+}
+my $protoproj = Project->Lookup(TBOPSPID());
+if (!defined($protoproj)) {
+    fatal("Could not lookup emulab-ops project. Exiting ...");
+}
+
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($LOGFILE)) {
+	exit(0);
+    }
+}
+if (MarkDaemonRunning("portal_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+logit("Portal Daemon starting ... pid $$");
+
+if ($elabman->FlipTo($protoproj->unix_gid())) {
+    fatal("Could not flipto $elabman");
+}
+
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
+    ReOpenLog($LOGFILE);
+    $EUID = $SAVEEUID;
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
+#
+# Export users from projects.
+#
+my %users_warned = ();
+
+sub ExportUsers()
+{
+    my $trust_none = $Group::MemberShip::TRUSTSTRING_NONE;
+    
+    #
+    # First get a list of projects exports.
+    #
+    my $projects_result =
+	DBQueryWarn("select pid,pid_idx,peer from group_exports ".
+		    "where pid_idx=gid_idx");
+    return
+	if (!$projects_result);
+
+    #
+    # For each project, look for users that have not been exported.
+    #
+    while (my ($pid,$pid_idx,$peer) = $projects_result->fetchrow_array()) {
+	my $users_result =
+	    DBQueryWarn("select g.uid,g.uid_idx from group_membership as g ".
+			"left join user_exports as u on ".
+			"     u.uid_idx=g.uid_idx and peer='$peer' ".
+			"where g.pid_idx='$pid_idx' and ".
+			"      g.gid_idx=g.pid_idx and ".
+			"      g.trust!='$trust_none' and ".
+			"      u.uid_idx is null");
+	return
+	    if (!$users_result);
+
+	while (my ($uid,$uid_idx) = $users_result->fetchrow_array()) {
+	    my $user = User->Lookup($uid_idx);
+	    if (!defined($user)) {
+		# Be careful about an email flood.
+		if (!exists($users_warned{"$uid_idx"})) {
+		    notify("User $uid ($uid_idx) does not exist anymore");
+		    $users_warned{"$uid_idx"} = time();
+		}
+		next;
+	    }
+	    logit("Exporting user $uid ($uid_idx) to $peer");
+	    if (!$impotent) {
+		system("$WAP $MANAGEREMOTE adduser $peer $uid_idx");
+		if ($?) {
+		    # Be careful about an email flood.
+		    if (!exists($users_warned{"$uid_idx"})) {
+			notify("Failed to add user $uid ($uid_idx) to $peer");
+			$users_warned{"$uid_idx"} = time();
+		    }
+		    next;
+		}
+		logit("Done");
+	    }
+	    delete($users_warned{"$uid_idx"});
+	}
+    }
+}
+
+#
+# Update users at Peers.
+#
+sub UpdateUsers()
+{
+    my $query_result =
+	DBQueryWarn("select e.uid,e.uid_idx,p.name from user_exports as e ".
+		    "left join users as u on u.uid_idx=e.uid_idx ".
+		    "left join emulab_peers as p on p.name=e.peer ".
+		    "where e.updated is null or ".
+		    "      u.usr_modified>e.updated");
+    return
+	if (!$query_result);
+
+    while (my ($uid,$uid_idx,$peer) = $query_result->fetchrow_array()) {
+	logit("Updating profile for $uid ($uid_idx) at $peer");
+	if (!$impotent) {
+	    system("$WAP $MANAGEREMOTE moduser $peer $uid_idx");
+	    if ($?) {
+		# Be careful about an email flood.
+		if (!exists($users_warned{"$uid_idx"})) {
+		    notify("Failed to update profile for $uid at $peer");
+		    $users_warned{"$uid_idx"} = time();
+		}
+		next;
+	    }
+	    logit("Done");
+	    delete($users_warned{"$uid_idx"});
+	}
+
+	#
+	# Now do a setgroups.
+	#
+	logit("Updating groups for $uid ($uid_idx) at $peer");
+	if (!$impotent) {
+	    system("$WAP $MANAGEREMOTE setgroups $peer $uid_idx");
+	    if ($?) {
+		# Be careful about an email flood.
+		if (!exists($users_warned{"$uid_idx"})) {
+		    notify("Failed to update groups for $uid at $peer");
+		    $users_warned{"$uid_idx"} = time();
+		}
+		next;
+	    }
+	    logit("Done");
+	    delete($users_warned{"$uid_idx"});
+	}
+	
+	DBQueryWarn("update user_exports set updated=now() ".
+		    "where uid_idx='$uid_idx' and peer='$peer'")
+	    if (!$impotent);
+	
+	sleep(1);
+    }
+}
+
+#
+# Look for groups that need to be exported.
+#
+my %groups_warned = ();
+
+sub ExportGroups()
+{
+    #
+    # First get a list of projects exports.
+    #
+    my $projects_result =
+	DBQueryWarn("select pid,pid_idx,peer from group_exports ".
+		    "where pid_idx=gid_idx");
+    return
+	if (!$projects_result);
+
+    #
+    # For each project, look for groups that have not been exported.
+    #
+    while (my ($pid,$pid_idx,$peer) = $projects_result->fetchrow_array()) {
+	my $groups_result =
+	    DBQueryWarn("select g.gid,g.gid_idx,g.leader_idx from groups as g ".
+			"left join group_exports as e on ".
+			"     e.pid_idx=g.pid_idx and e.gid_idx=g.gid_idx ".
+			"where g.pid_idx='$pid_idx' and e.gid_idx is null");
+	return
+	    if (!$groups_result);
+
+	while (my ($gid,$gid_idx,$leader_idx) =
+	       $groups_result->fetchrow_array()) {
+	    #
+	    # If the leader of the group has not been exported, skip.
+	    #
+	    my $user_result =
+		DBQueryWarn("select * from user_exports ".
+			    "where peer='$peer' and uid_idx='$leader_idx'");
+	    return
+		if (!$user_result);
+
+	    if ($user_result->numrows != 1) {
+		# Be careful about an email flood.
+		if (!exists($groups_warned{"$pid,$gid"})) {
+		    notify("Leader of group $pid/$gid has not been exported. ".
+			   "Not exporting group.");
+		    $groups_warned{"$pid,$gid"} = time();
+		}
+		next;
+	    }
+	    delete($groups_warned{"$pid,$gid"});
+
+	    logit("Creating group $pid,$gid ($pid_idx,$gid_idx) on $peer");
+	    if (!$impotent) {
+		system("$WAP $MANAGEREMOTE addgroup $peer $pid,$gid");
+		if ($?) {
+		    # Be careful about an email flood.
+		    if (!exists($groups_warned{"$pid,$gid"})) {
+			notify("Failed to add group $pid,$gid at $peer");
+			$groups_warned{"$pid,$gid"} = time();
+		    }
+		    next;
+		}
+		logit("Done");
+	    }
+	    delete($groups_warned{"$pid,$gid"});
+
+	    #
+	    # Now for all of the exported members of the group, mark them
+	    # modified so that they get updated up in UpdateUsers(), which
+	    # does a setgroups.
+	    #
+	    my $members_result =
+		DBQueryWarn("select g.uid,g.uid_idx from group_membership as g ".
+			    "left join user_exports as u on ".
+			    "     u.uid_idx=g.uid_idx and peer='$peer' ".
+			    "where g.pid_idx='$pid_idx' and ".
+			    "      g.gid_idx='$gid_idx' and ".
+			    "      u.uid_idx is not null");
+
+	    while (my ($uid,$uid_idx) = $members_result->fetchrow_array()) {
+		logit("Marking $uid ($uid_idx) for group update");
+		my $user = User->Lookup($uid_idx);
+		if (!defined($user)) {
+		    # Be careful about an email flood.
+		    if (!exists($users_warned{"$uid_idx"})) {
+			notify("User $uid ($uid_idx) does not exist anymore");
+			$users_warned{"$uid_idx"} = time();
+		    }
+		    next;
+		}
+		$user->BumpModified()
+		    if (!$impotent);
+	    }
+	}
+    }
+}
+
+#
+# Loop forever.
+#
+while (1)
+{
+    if (NoLogins()) {
+	sleep(5);
+	next;
+    }
+    logit("Running");
+    ExportUsers();
+    ExportGroups();
+    UpdateUsers();
+
+    last
+	if ($oneshot);
+
+    sleep(60);
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "Portal Daemon died",
+	     $msg,
+	     $TBOPS);
+
+    MarkDaemonStopped("portal_daemon");
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+sub logit($)
+{
+    my ($msg) = @_;
+    my $stamp = POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime());
+
+    print "$stamp: $msg\n";
+}
+
+sub notify($)
+{
+    my ($msg) = @_;
+
+    logit("$msg");
+    SENDMAIL($TBOPS, "Portal Daemon Message",
+	     "Portal Daemon Message:\n\n$msg", $TBOPS);
+}
+

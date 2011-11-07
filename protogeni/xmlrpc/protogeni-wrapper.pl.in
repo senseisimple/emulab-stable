@@ -30,8 +30,10 @@ BEGIN {
 }
 
 # Configure variables
-my $MAINSITE 	   = @TBMAINSITE@;
-my $TBOPS          = "@TBOPSEMAIL@";
+my $MAINSITE 	     = @TBMAINSITE@;
+my $TBOPS            = "@TBOPSEMAIL@";
+my $PORTAL_ENABLE    = @PORTAL_ENABLE@;
+my $PORTAL_ISPRIMARY = @PORTAL_ISPRIMARY@;
 my $MODULE;
 my $GENIURN;
 
@@ -45,7 +47,10 @@ my %GENI_MODULES = ( "cm"        => "@prefix@/lib/protogeni-cm.pm",
 		     "ses"       => "@prefix@/lib/protogeni-ses.pm",
 		     # XXX This is temporary! 
 		     "instools"  => "@prefix@/lib/protogeni-instools.pm",
-    );
+);
+if ($PORTAL_ENABLE && !$PORTAL_ISPRIMARY) {
+    $GENI_MODULES{"emulab"} = "@prefix@/lib/protogeni-emulab.pm";
+}
 
 # These variables are shared with the loaded module.
 use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION
@@ -61,10 +66,6 @@ use libaudit;
 use libEmulab;
 use libtestbed;
 use User;
-
-# Geniuser.
-my $user  = "geniuser";
-my $group = "GeniSlices";
 
 # Need a command line option.
 my $debug      = 0;
@@ -138,19 +139,7 @@ if (! (exists($ENV{'SSL_CLIENT_VERIFY'}) &&
 # so that there is an emulab user context, or many of the scripts we
 # invoke will complain and croak. 
 #
-my $unix_uid = getpwnam("$user") or
-    die("*** $0:\n".
-	"    No such user $user\n");
-my $unix_gid = getgrnam("$group") or
-    die("*** $0:\n".
-	"    No such group $group\n");
-
-# Flip to user and never go back
-$GID            = $unix_gid;
-$EGID           = "$unix_gid $unix_gid";
-$EUID = $UID    = $unix_uid;
-$ENV{'USER'}    = $user;
-$ENV{'LOGNAME'} = $user;
+GeniUtil::FlipToGeniUser();
 
 if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
     my $pathinfo = $ENV{'PATH_INFO'};
@@ -261,6 +250,10 @@ if (!(defined($GENI_METHODS) && defined($EMULAB_PEMFILE))) {
 #
 # So we know who/what we are acting as.
 #
+# Must be a require cause of the DB name that is set in the module file
+# which is not loaded until just above.
+require GeniCertificate;
+
 my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
 
 if (!defined($certificate)) {
@@ -373,6 +366,9 @@ if ($MODULE eq "cm" || $MODULE eq $AM_MODULE) {
 	$method eq "GetTicket") {
 	$debug = 2;
     }
+}
+elsif ($MODULE eq "emulab") {
+    $debug = 2;
 }
 
 my $starttime = [gettimeofday()];

@@ -591,6 +591,20 @@ CREATE TABLE `emulab_locks` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `emulab_peers`
+--
+
+DROP TABLE IF EXISTS `emulab_peers`;
+CREATE TABLE `emulab_peers` (
+  `name` varchar(64) NOT NULL default '',
+  `urn` varchar(128) NOT NULL default '',
+  `is_primary` tinyint(1) NOT NULL default '0',
+  `weburl` tinytext,
+  PRIMARY KEY  (`name`),
+  UNIQUE KEY `urn` (`urn`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `emulab_pubs`
 --
 
@@ -1480,6 +1494,23 @@ CREATE TABLE `global_vtypes` (
   `weight` float NOT NULL default '0.5',
   `types` text NOT NULL,
   PRIMARY KEY  (`vtype`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `group_exports`
+--
+
+DROP TABLE IF EXISTS `group_exports`;
+CREATE TABLE `group_exports` (
+  `pid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `gid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `pid` varchar(48) NOT NULL default '',
+  `gid` varchar(32) NOT NULL default '',
+  `peer` varchar(64) NOT NULL default '',
+  `exported` datetime default NULL,
+  `updated` datetime default NULL,
+  PRIMARY KEY  (`pid_idx`,`gid_idx`,`peer`),
+  UNIQUE KEY pidpeer (`pid`,`gid`,`peer`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3332,6 +3363,7 @@ CREATE TABLE `projects` (
   `allow_workbench` tinyint(1) NOT NULL default '0',
   `nonlocal_id` varchar(128) default NULL,
   `nonlocal_type` tinytext,
+  `manager_urn` varchar(128) default NULL,
   PRIMARY KEY  (`pid_idx`),
   UNIQUE KEY `pid` (`pid`),
   KEY `unix_gid` (`unix_gid`),
@@ -3814,6 +3846,21 @@ CREATE TABLE `unixgroup_membership` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `user_exports`
+--
+
+DROP TABLE IF EXISTS `user_exports`;
+CREATE TABLE `user_exports` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `peer` varchar(64) NOT NULL default '',
+  `exported` datetime default NULL,
+  `updated` datetime default NULL,
+  PRIMARY KEY  (`uid_idx`,`peer`),
+  UNIQUE KEY uidpeer (`uid`,`peer`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `user_features`
 --
 
@@ -3981,6 +4028,7 @@ CREATE TABLE `users` (
   `mailman_password` tinytext,
   `nonlocal_id` varchar(128) default NULL,
   `nonlocal_type` tinytext,
+  `manager_urn` varchar(128) default NULL,
   `default_project` mediumint(8) unsigned default NULL,
   `nocollabtools` tinyint(1) default '0',
   PRIMARY KEY  (`uid_idx`),

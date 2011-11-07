@@ -1,0 +1,75 @@
+#
+# 
+#
+use strict;
+use libdb;
+
+my $impotent = 0;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (! DBTableExists("emulab_peers")) {
+	DBQueryFatal("CREATE TABLE `emulab_peers` ( ".
+		     " `name` varchar(64) NOT NULL default '', ".
+		     " `urn` varchar(128) NOT NULL default '', ".
+		     " `is_primary` tinyint(1) NOT NULL default '0', ".
+		     " `weburl` tinytext, ".
+		     " PRIMARY KEY  (`name`), ".
+		     " UNIQUE KEY `urn` (`urn`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (! DBTableExists("group_exports")) {
+	DBQueryFatal("CREATE TABLE `group_exports` ( ".
+		     " `pid_idx` mediumint(8) unsigned NOT NULL default '0', ".
+		     " `gid_idx` mediumint(8) unsigned NOT NULL default '0', ".
+		     " `pid` varchar(48) NOT NULL default '', ".
+		     " `gid` varchar(32) NOT NULL default '', ".
+		     " `peer` varchar(64) NOT NULL default '', ".
+		     " `exported` datetime default NULL, ".
+		     " `updated` datetime default NULL, ".
+		     " PRIMARY KEY  (`pid_idx`,`gid_idx`,`peer`), ".
+		     " UNIQUE KEY pidpeer (`pid`,`gid`,`peer`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (! DBTableExists("user_exports")) {
+	DBQueryFatal("CREATE TABLE `user_exports` ( ".
+		     " `uid` varchar(8) NOT NULL default '', ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0', ".
+		     " `peer` varchar(64) NOT NULL default '', ".
+		     " `exported` datetime default NULL, ".
+		     " `updated` datetime default NULL, ".
+		     " PRIMARY KEY  (`uid_idx`,`peer`), ".
+		     " UNIQUE KEY uidpeer (`uid`,`peer`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (!DBSlotExists("projects", "manager_urn")) {
+	DBQueryFatal("alter table projects add ".
+		     "  `manager_urn` varchar(128) default NULL ".
+		     "  after nonlocal_type");
+    }
+    if (!DBSlotExists("users", "manager_urn")) {
+	DBQueryFatal("alter table users add ".
+		     "  `manager_urn` varchar(128) default NULL ".
+		     "  after nonlocal_type");
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('users','manager_urn','text','regex', ".
+		 "  '^[-_\\\\w\\\\.\\\\/:+]*\$',10,128,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('projects','manager_urn','text','regex', ".
+		 "  '^[-_\\\\w\\\\.\\\\/:+]*\$',10,128,NULL)");
+
+    # These were left out of an earlier update.
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('users','nonlocal_id','text','regex', ".
+		 "  '^[-_\\\\w\\\\.\\\\/:+]*\$',10,128,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('users','nonlocal_type','text','regex', ".
+		 "  '^[-\\\\w]*\$',1,64,NULL)");
+    
+    return 0;
+}

@@ -1,6 +1,6 @@
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,7 +17,7 @@ LIB_SCRIPTS     = GeniDB.pm GeniUser.pm  \
 		  GeniComponent.pm GeniCH.pm GeniEmulabUtil.pm \
 		  GeniAuthority.pm GeniCertificate.pm GeniAggregate.pm \
 		  GeniUtil.pm GeniRegistry.pm GeniUsage.pm GeniHRN.pm \
-		  GeniSES.pm GeniResource.pm GeniXML.pm GeniAM.pm
+		  GeniSES.pm GeniResource.pm GeniXML.pm GeniAM.pm GeniEmulab.pm
 SBIN_SCRIPTS	= plabnodewrapper plabslicewrapper
 
 SCRIPTS		= genischemacheck.pl
