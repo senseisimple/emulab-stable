@@ -7846,7 +7846,7 @@ sub UpLoadIPAddresses($)
 		my $pnodename = $self->solution_v2p()->{$vnodename};
 		my $ip        = $member->ip();
 
-		$self->printdb("IP: $member - $pnodename:$iface $ip\n");
+		$self->printdb("IP(v): $member - $pnodename:$iface $ip\n");
 	    }
 	    else {
 		#
