@@ -168,6 +168,9 @@ case "$1" in
 		if [ -r /var/run/batch_daemon_wrapper.pid ]; then
 			kill `cat /var/run/batch_daemon_wrapper.pid`
 		fi
+		if [ -r /var/run/portal_daemon.pid ]; then
+			kill `cat /var/run/portal_daemon.pid`
+		fi
 
 		;;
 	*)
