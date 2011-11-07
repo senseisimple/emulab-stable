@@ -201,13 +201,13 @@ if ($clear) {
 if ($info) {
     my $current = 0;
     
-    my $query_result =
-	DBQueryFatal("select count(*) from nodes where reserved_pid='$pid'");
+    my $nodes_result =
+	DBQueryFatal("select node_id from nodes where reserved_pid='$pid'");
 
-    ($current) = $query_result->fetchrow_array()
-	if ($query_result && $query_result->numrows);
+    ($current) = $nodes_result->numrows
+	if ($nodes_result && $nodes_result->numrows);
     
-    $query_result =
+    my $query_result =
 	DBQueryFatal("select * from node_reservations ".
 		     "where pid_idx='$pid_idx'");
 
@@ -225,6 +225,23 @@ if ($info) {
 	print "-------------------------------------------------------------\n";
 	printf("%-15s %-10s %-10s %-18s %-3d %s\n",
 	       $pid, "$count ($current)", $creator, $created, $priority, $types);
+    }
+    if ($current) {
+	print "-------------------------------------------------------------\n";
+	printf("%-15s %-10s %-32s\n",
+	       "NodeID", "Type", "Pid/Eid");
+	print "-------------------------------------------------------------\n";
+
+	while (my ($node_id) = $nodes_result->fetchrow_array()) {
+	    my $node   = Node->Lookup($node_id);
+	    my $type   = $node->type();
+	    my $pideid = "--";
+
+	    if ($node->IsReserved()) {
+		$pideid = $node->pid() . "/" . $node->eid();
+	    }
+	    printf("%-15s %-10s %-32s\n", $node_id, $type, $pideid);
+	}
     }
     exit(0);
 }
