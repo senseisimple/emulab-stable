@@ -192,6 +192,7 @@ sub archived($)		{ return ($_[0]->status() eq "archived" ? 1 : 0); };
 sub frozen($)		{ return ($_[0]->status() eq "frozen" ? 1 : 0); };
 sub default_project($)	{ return field($_[0], "default_project"); }
 sub nocollabtools($)	{ return field($_[0], "nocollabtools"); }
+sub manager_urn($)	{ return field($_[0], "manager_urn"); }
 sub nonlocal_id($)	{ return field($_[0], "nonlocal_id"); }
 sub nonlocal_type($)	{ return field($_[0], "nonlocal_type"); }
 sub IsLocal($)		{ return (defined($_[0]->nonlocal_id()) ? 0 : 1); };
@@ -594,6 +595,10 @@ sub Delete($)
 
     my $uid_idx = $self->uid_idx();
 
+    DBQueryWarn("delete from user_pubkeys where uid_idx='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from user_sslcerts where uid_idx='$uid_idx'")
+	or return -1;
     DBQueryWarn("delete from user_stats where uid_idx='$uid_idx'")
 	or return -1;
     DBQueryWarn("delete from users where uid_idx='$uid_idx'")
@@ -900,11 +905,8 @@ sub ModUserInfo($$$$)
     }
 
     if (!keys %mods) {
-	if (!$noreport) {
-	    # Warn the user that the submit button was pressed with no effect.
-	    $$usrerr_ref = "Submit: Nothing changed";
-	    return undef;
-	}
+	# Nothing to do, fine.
+	return 1;
     }
     else {
 	# Send an audit e-mail reporting what is being changed.
@@ -1006,6 +1008,26 @@ sub Update($$)
 	if (! DBQueryWarn($query));
 
     return Refresh($self);
+}
+
+#
+# Bump usr_modified.
+#
+sub BumpModified($)
+{
+    my ($self) = @_;
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    return -1
+	if (!DBQueryWarn("update users set usr_modified=now() ".
+			 "where uid_idx='$uid_idx'"));
+
+    return 0;
 }
 
 #
@@ -1131,6 +1153,30 @@ sub GetSSHKeys($$)
 	push(@result, $key);
     }    
     @$pref = @result;
+    return 0;
+}
+
+#
+# Delete ssh keys, except for emulab created keys.
+#
+sub DeleteSSHKeys($)
+{
+    my ($self) = @_;
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("delete from user_pubkeys ".
+		    "where uid_idx='$uid_idx' and ".
+		    "      comment not like '%${OURDOMAIN}'");
+
+    return -1
+	if (!defined($query_result));
+
     return 0;
 }
 
@@ -1744,6 +1790,74 @@ sub DefaultProject($)
 	if ($self->FirstApprovedProject(\$project) == 0);
     
     return undef;
+}
+
+#
+# Cross loging from an emulab peer. Create a login entry, returning
+# the hash of the hash to use as a key.
+#
+sub CrossLogin($)
+{
+    my ($self) = @_;
+    my $uid     = $self->uid();
+    my $uid_idx = $self->uid_idx();
+    my $timeout = time() + 30;
+    my $opskey  = TBGenSecretKey();
+
+    my $key=`/bin/dd if=/dev/urandom count=256 bs=1 2> /dev/null | /sbin/sha256`;
+    return undef
+	if ($?);
+    if ($key =~ /^(\w*)$/) {
+	$key = $1;
+    }
+    else {
+	return undef;
+    }
+
+    #
+    # Note that this hash (of the key) is purposely a different algorithm
+    # then what is used in the normal web login path (in the php code).
+    # This is to protect against the hash being stolen out of the user
+    # browser and used to do an xlogin.
+    #
+    my $hash = `echo $key | /sbin/md5`;
+    return undef
+	if ($?);
+    if ($hash =~ /^(\w*)$/) {
+	$hash = $1;
+    }
+    else {
+	return undef;
+    }
+
+    return undef
+	if (!DBQueryWarn("replace into login set ".
+			 "  uid='$uid', uid_idx='$uid_idx', ".
+			 "  hashkey='$key', hashhash='$hash', ".
+			 "  timeout='$timeout', adminon=0, opskey='$opskey'"));
+    return $hash;
+}
+
+#
+# Return user_exports info, as a plain hash.
+#
+sub PeerExports($$)
+{
+    my ($self, $pref) = @_;
+    my $uid_idx = $self->uid_idx();
+    my $result  = {};
+
+    my $query_result =
+	DBQueryWarn("select e.*,p.* from user_exports as e ".
+		    "left join emulab_peers as p on p.name=e.peer ".
+		    "where e.uid_idx='$uid_idx'");
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $peer = $row->{'name'};
+	$result->{$peer} = $row;
+    }
+    $$pref = $result;
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
