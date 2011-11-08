@@ -35,6 +35,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $NODEREBOOT  = "$TB/bin/node_reboot";
 my $VNODESETUP  = "$TB/sbin/vnode_setup";
+my $ELABINELAB  = "$TB/sbin/elabinelab";
 
 # Setup Operation Flags
 $NOSTATE    = 0x00;
@@ -101,6 +102,7 @@ sub New($$$@)
     # XXX
     $self->noretry(0);
     $self->canceled(0);
+    $self->aborted(0);
 
     if (EmulabFeatures->FeatureEnabled("NewOsload",$user,
 				       $self->{'GROUP'},$experiment)) {
@@ -1172,6 +1174,52 @@ sub AddNode($$)
 }
 
 #
+# Return the set of nodes ready to go.
+#
+sub Volunteers($)
+{
+    my ($self)     = @_;
+    my @nodelist   = $self->todolist();
+    my $parent     = $self->parent();
+    my $experiment = $parent->experiment();
+    my $firewall;
+    my $firewalled = $experiment->IsFirewalled(\$firewall);
+    my $elabinelab = $experiment->elabinelab();
+
+    #
+    # Setup the firewall first.  Once it is up we can continue with the
+    # remaining nodes.
+    #
+    # There is very little point in setting up the other nodes at the same time
+    # as they will not be able to PXE boot until the firewall is up.  We
+    # could fire them off a little early in hopes of overlapping any BIOS
+    # boot time with the last stages of the firewall setup, but it probably
+    # isn't worth the complexity (and would not work with nodes for which
+    # "reboot" means "fall out of PXEWAIT and boot".
+    #
+    # Note that we formerly did just do them all at once and let the nodes
+    # continually PXE-timeout and reboot until the firewall came up.  But
+    # that can actually take longer than what we do now, if a node happened
+    # to timeout and reboot just as the firewall came up (i.e., we would
+    # have to wait an extra BIOS-reboot cycle, which can be 90 seconds or
+    # more.
+    #
+    if ($firewalled) {
+	my $fwnode = $self->node($firewall);
+	#
+	# If the firewall fails, we abort and never come back.
+	#
+	if ($fwnode->allocstate() ne TBDB_ALLOCSTATE_RES_READY()) {
+	    tbnotice("Setting up the firewall node first ... \n");
+	    return ($fwnode);
+	}
+	# Remove firewall from the node list.
+	@nodelist = grep {$_->node_id() ne $firewall} @nodelist;
+    }
+    return @nodelist;
+}
+
+#
 # Wait function signals some local cluster nodes are done waiting.
 #
 sub WaitDone($@)
@@ -1181,6 +1229,9 @@ sub WaitDone($@)
     my $experiment = $parent->experiment();
     my $pid        = $experiment->pid();
     my $eid        = $experiment->eid();
+    my $firewall;
+    my $firewalled = $experiment->IsFirewalled(\$firewall);
+    my $elabinelab = $experiment->elabinelab();
 
     #
     # Must call the generic WaitDone handler too.
@@ -1203,6 +1254,29 @@ sub WaitDone($@)
 	    # Important for VMs that depend on this node.
 	    $node->_rebooted(1)
 		if ($node->_setupoperation() != $libossetup::NOSTATE);
+
+	    if ($node_id eq $firewall) {
+		#
+		# Firewall has booted, perform any final actions.
+		#
+		# The only case that currently matters is if the experiment is
+		# elabinelab. In this case we want to turn off the firewall
+		# so the nodes can boot/reload normally. Later, after we
+		# set up the inner elab, we turn the firewall back on.
+		#
+		if ($elabinelab) {
+		    #
+		    # We use the elabinelab program to do this, since it
+		    # knows what it might want to do (and helpfully, is
+		    # setuid so it can ssh over).
+		    #
+		    system("$ELABINELAB -f $pid $eid");
+		    if ($?) {
+			tbnotice("Firewall Boot Setup failed!\n");
+			$parent->aborted(1);
+		    }
+		}
+	    }
 	    next;
 	}
 	# Fall through on failure.	
@@ -1215,10 +1289,19 @@ sub WaitDone($@)
 	$node->SetBootStatus(NODEBOOTSTATUS_FAILED);
 
 	#
+	# If the firewall fails to boot, we are hosed. Quit right away.
+	#
+	if ($node_id eq $firewall) {
+	    tbnotice("Firewall failed to boot!\n");
+	    $parent->aborted(1);
+	}
+
+	#
 	# Reload failures are terminal.
 	#
 	if ($node->_canfail() && $setupstatus != $libossetup::RELOAD_FAILED &&
-	    !($experiment->canceled() || $parent->noretry())) {
+	    !($experiment->canceled() || $parent->noretry()
+	      || $parent->aborted())) {
 
 	    $parent->add_failed_node_inform_user($node_id);
 	    $parent->add_failed_node_nonfatal($node_id);

@@ -380,6 +380,11 @@ while (1) {
     $MyStruct->InformTBopsFatal();
     $MyStruct->InformTBopsWarn();
     $MyStruct->InformUser();
+
+    if ($MyStruct->aborted()) {
+	print STDERR "Aborting os_setup cause of fatal errors.\n";
+	last;
+    }
 }
 
 ########################################################################
