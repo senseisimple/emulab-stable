@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -504,7 +504,7 @@ sub freebsd_get_disksize {
 	#
 	# Take the first of ad or da, whichever we find first
 	#
-	if (/^((ad|da|ar|aacd)\d): (\d+)MB/) {
+	if (/^((ad|da|ar|aacd|mfid)\d): (\d+)MB/) {
 	    $diskdev = $1;
 	    $disksize = $3;
 	    last;
