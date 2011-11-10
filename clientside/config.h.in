@@ -5,6 +5,5 @@
 #undef VERSION
 
 #undef ELVIN_COMPAT
-#undef EMULAB_CLIENTSIDE
 #undef LOG_TESTBED
 #undef TPM
