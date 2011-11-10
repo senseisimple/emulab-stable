@@ -92,12 +92,10 @@ echo "$ELABROUTES" | sed -e 's/;/\n/g' | \
     do \
         _if=`echo "$route" | sed -r -e 's/([^,]*),[^,]*,[^,]*/\1/'`
         _rt=`echo "$route" | sed -r -e 's/[^,]*,([^,]*),[^,]*/\1/'`
-	_tb=`expr $VEID + 100`
 
 	if [ $_if = $DEV ]; then
 	    echo "Emulab configuring route for CT$VEID: exp net ($_if)"
-	    $IP rule add unicast iif $_if table $_tb
-	    $IP route replace $_rt dev $_if table $VEID
+	    $IP route replace $_rt dev $_if table $ROUTETABLE
 	fi
     done
 

@@ -92,6 +92,11 @@ my $CONTROL_IFNUM  = 999;
 my $CONTROL_IFDEV  = "eth${CONTROL_IFNUM}";
 my $EXP_BASE_IFNUM = 0;
 
+my $RTDB           = "/var/emulab/db/rtdb";
+my $RTTABLES       = "/etc/iproute2/rt_tables";
+# Temporary; later kernel version increases this.
+my $MAXROUTETTABLE = 255;
+
 my $debug = 0;
 
 # XXX needs lifting up
@@ -107,7 +112,10 @@ sub makeBridgeMaps();
 sub findIface($);
 sub findMac($);
 sub editContainerConfigFile($$);
-
+sub InitializeRouteTable();
+sub AllocateRouteTable($);
+sub LookupRouteTable($);
+sub FreeRouteTable($);
 sub vmexists($);
 sub vmstatus($);
 sub vmrunning($);
@@ -309,6 +317,7 @@ sub vz_rootPreConfig {
     my %MDB;
     if (!dbmopen(%MDB, $IMQDB, 0660)) {
 	print STDERR "*** Could not create $IMQDB\n";
+	TBScriptUnlock();
 	return -1;
     }
     for (my $i = 0; $i < $MAXIMQ; $i++) {
@@ -316,7 +325,12 @@ sub vz_rootPreConfig {
 	    if (!exists($MDB{"$i"}));
     }
     dbmclose(%MDB);
-
+    
+    if (InitializeRouteTables()) {
+	print STDERR "*** Could not initialize routing table DB\n";
+	TBScriptUnlock();
+	return -1;
+    }
     mysystem("touch /var/run/openvz.ready");
     TBScriptUnlock();
     return 0;
@@ -789,6 +803,41 @@ sub vz_vnodeDestroy {
 	mysystem("umount /mnt/$vnode_id");
 	mysystem("lvremove -f /dev/openvz/$vnode_id");
     }
+    my @ifs  = ();
+    open(CF,"/etc/vz/conf/$vmid.conf") or
+	 die "could not open etc/vz/conf/$vmid.conf for read: $!";
+    my @lines = grep { $_ =~ /^ELABROUTES/ } <CF>;
+    close(CF);
+    if (@lines) {
+	# Should only be one line.
+	my $elabroutes = $lines[0];
+	if ($elabroutes =~ /ELABROUTES="(.*)"/) {
+	    $elabroutes = $1;
+	}
+	else {
+	    print STDERR "Could not parse ELABROUTES in config file.\n";
+	    return -1;
+	}
+	my @routes = split(/;/, $elabroutes);
+	foreach my $route (@routes) {
+	    my @tokens = split(/,/, $route);
+	    # old format, skip to avoid errors.
+	    next
+		if (scalar(@tokens) == 2);
+	    # The first and third tokens are the ones we have to delete.
+	    push(@ifs, $tokens[0]);
+	    push(@ifs, $tokens[2]);
+	    FreeRouteTable($tokens[0]);
+	}
+    }
+    foreach my $if (@ifs) {
+	mysystem2("/sbin/ip rule del iif $if");
+	if ($if =~ /^gre/) {
+	    mysystem2("/sbin/ip tunnel del $if");
+	}
+    }
+    FreeRouteTable("VZ$vmid");
+    
     mysystem("$VZCTL destroy $vnode_id");
     return -1
 	if ($?);
@@ -874,38 +923,6 @@ sub vz_vnodeBoot {
 sub vz_vnodeHalt {
     my ($vnode_id,$vmid) = @_;
 
-    my @ifs  = ();
-    open(CF,"/etc/vz/conf/$vmid.conf") or
-	 die "could not open etc/vz/conf/$vmid.conf for read: $!";
-    my @lines = grep { $_ =~ /^ELABROUTES/ } <CF>;
-    close(CF);
-    if (@lines) {
-	# Should only be one line.
-	my $elabroutes = $lines[0];
-	if ($elabroutes =~ /ELABROUTES="(.*)"/) {
-	    $elabroutes = $1;
-	}
-	else {
-	    print STDERR "Could not parse ELABROUTES in config file.\n";
-	    return -1;
-	}
-	my @routes = split(/;/, $elabroutes);
-	foreach my $route (@routes) {
-	    my @tokens = split(/,/, $route);
-	    # old format, skip to avoid errors.
-	    next
-		if (scalar(@tokens) == 2);
-	    # The first and third tokens are the ones we have to delete.
-	    push(@ifs, $tokens[0]);
-	    push(@ifs, $tokens[2]);
-	}
-    }
-    foreach my $if (@ifs) {
-	mysystem2("/sbin/ip rule del iif $if");
-	if ($if =~ /^gre/) {
-	    mysystem2("/sbin/ip tunnel del $if");
-	}
-    }
     mysystem("$VZCTL stop $vnode_id");
     return 0;
 }
@@ -1254,6 +1271,7 @@ sub vz_vnodePreConfigExpNetwork {
 	system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
     }
 
+    my $basetable;
     my $elabifs = "";
     my $elabroutes = "";
     my %netif_strs = ();
@@ -1308,15 +1326,21 @@ sub vz_vnodePreConfigExpNetwork {
 
     if (values(%{ $tunnels })) {
 	#
-	# gres are a global resource.
+	# gres and route tables are a global resource.
 	#
 	if (TBScriptLock($GLOBAL_CONF_LOCK, 0, 900) != TBSCRIPTLOCK_OKAY()) {
 	    print STDERR "Could not get the tunne lock after a long time!\n";
 	    return -1;
 	}
+	$basetable = AllocateRouteTable("VZ$vmid");
+	if (!defined($basetable)) {
+	    print STDERR "Could not allocate a routing table!\n";
+	    TBScriptUnlock();
+	    return -1;
+	}
 
 	#
-	# Get current list.
+	# Get current gre list.
 	#
 	if (! open(IP, "/sbin/ip tunnel show|")) {
 	    print STDERR "Could not start /sbin/ip\n";
@@ -1358,7 +1382,7 @@ sub vz_vnodePreConfigExpNetwork {
 	foreach my $tunnel (values(%{ $tunnels })) {
 	    next
 		if ($tunnel->{"tunnel_style"} ne "gre");
-	
+
 	    my $name     = $tunnel->{"tunnel_lan"};
 	    my $srchost  = $tunnel->{"tunnel_srcip"};
 	    my $dsthost  = $tunnel->{"tunnel_dstip"};
@@ -1387,18 +1411,21 @@ sub vz_vnodePreConfigExpNetwork {
 		}
 		$key2gre{$grekey} = $gre;
 	    }
-	    mysystem2("/sbin/ip rule add unicast iif $gre table $vmid");
+	    #
+	    # All packets arriving from gre devices will use the same table.
+	    # The route will be a network route to the root context device.
+	    # The route cannot be inserted until later, since the root 
+	    # context device does not exists until the VM is running.
+	    # See the route stuff in vznetinit-elab.sh.
+	    #
+	    mysystem2("/sbin/ip rule add unicast iif $gre table $basetable");
 	    if ($?) {
 		TBScriptUnlock();
 		return -1;
 	    }
-	    my $net = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
-	    mysystem2("/sbin/ip route replace default dev $gre table $table");
-	    if ($?) {
-		TBScriptUnlock();
-		return -1;
-	    }
+	    # device name outside the container
 	    my $veth = "veth$vmid.tun$unit";
+	    # device name inside the container
 	    my $eth  = "gre$unit";
 	    
 	    $netif_strs{$eth} = "$eth,,$veth";
@@ -1413,6 +1440,37 @@ sub vz_vnodePreConfigExpNetwork {
 		$elabroutes .= ';';
 	    }
 	    $elabroutes .= "$veth,$inetip,$gre";
+
+	    #
+	    # We need a routing table for each tunnel in the other direction.
+	    # This makes sure that all packets coming out of the root context
+	    # device (leaving the VM) got shoved into the real gre device.
+	    # Need to use a default route so all packets ae matched, which is
+	    # why we need a table per tunnel.
+	    #
+	    my $routetable = AllocateRouteTable($veth);
+	    if (!defined($routetable)) {
+		    print STDERR "No free route tables for $veth\n";
+		    TBScriptUnlock();
+		    return -1;
+	    }
+	    #
+	    # Convenient, is that even though the root context device does
+	    # not exist, we can insert the ip *rule* for it that directs
+	    # the traffic through the iproute inserted below.
+	    #
+	    mysystem2("/sbin/ip rule add unicast iif $veth table $routetable");
+	    if ($?) {
+		TBScriptUnlock();
+		return -1;
+	    }
+	    my $net = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
+	    mysystem2("/sbin/ip route replace ".
+		      "  default dev $gre table $routetable");
+	    if ($?) {
+		TBScriptUnlock();
+		return -1;
+	    }
 	}
 	TBScriptUnlock();
     }
@@ -1423,6 +1481,9 @@ sub vz_vnodePreConfigExpNetwork {
     #
     my %lines = ( 'ELABIFS'    => '"' . $elabifs . '"',
 		  'ELABROUTES' => '"' . $elabroutes . '"');
+    if (defined($basetable)) {
+	$lines{'ROUTETABLE'} = '"' . $basetable . '"';
+    }
     editContainerConfigFile($vmid,\%lines);
 
     #
@@ -1580,6 +1641,117 @@ sub vmstopped($) {
 
     return 1 
 	if (vmstatus($id) eq VZSTAT_STOPPED);
+    return 0;
+}
+
+#
+# See if a route table already exists for the given tag, and if not,
+# allocate it and return the table number.
+#
+sub AllocateRouteTable($)
+{
+    my ($token) = @_;
+    my $rval = undef;
+
+    if (! -e $RTDB && InitializeRouteTables()) {
+	print STDERR "*** Could not initialize routing table DB\n";
+	return undef;
+    }
+    my %RTDB;
+    if (!dbmopen(%RTDB, $RTDB, 0660)) {
+	print STDERR "*** Could not open $RTDB\n";
+	return undef;
+    }
+    # Look for existing.
+    for (my $i = 1; $i < $MAXROUTETTABLE; $i++) {
+	if ($RTDB{"$i"} eq $token) {
+	    $rval = $i;
+	    print STDERR "Found routetable $i ($token)\n";
+	    goto done;
+	}
+    }
+    # Allocate a new one.
+    for (my $i = 1; $i < $MAXROUTETTABLE; $i++) {
+	if ($RTDB{"$i"} eq "") {
+	    $RTDB{"$i"} = $token;
+	    print STDERR "Allocate routetable $i ($token)\n";
+	    $rval = $i;
+	    goto done;
+	}
+    }
+  done:
+    dbmclose(%RTDB);
+    return $rval;
+}
+
+sub LookupRouteTable($)
+{
+    my ($token) = @_;
+    my $rval = undef;
+
+    my %RTDB;
+    if (!dbmopen(%RTDB, $RTDB, 0660)) {
+	print STDERR "*** Could not open $RTDB\n";
+	return undef;
+    }
+    # Look for existing.
+    for (my $i = 1; $i < $MAXROUTETTABLE; $i++) {
+	if ($RTDB{"$i"} eq $token) {
+	    $rval = $i;
+	    goto done;
+	}
+    }
+  done:
+    dbmclose(%RTDB);
+    return $rval;
+}
+
+sub FreeRouteTable($)
+{
+    my ($token) = @_;
+    
+    my %RTDB;
+    if (!dbmopen(%RTDB, $RTDB, 0660)) {
+	print STDERR "*** Could not open $RTDB\n";
+	return -1;
+    }
+    # Look for existing.
+    for (my $i = 1; $i < $MAXROUTETTABLE; $i++) {
+	if ($RTDB{"$i"} eq $token) {
+	    $RTDB{"$i"} = "";
+	    print STDERR "Free routetable $i ($token)\n";
+	    last;
+	}
+    }
+    dbmclose(%RTDB);
+    return 0;
+}
+
+sub InitializeRouteTables()
+{
+    # Create clean route table DB and seed it with defaults.
+    my %RTDB;
+    if (!dbmopen(%RTDB, $RTDB, 0660)) {
+	print STDERR "*** Could not create $RTDB\n";
+	return -1;
+    }
+    # Clear all,
+    for (my $i = 0; $i < $MAXROUTETTABLE; $i++) {
+	$RTDB{"$i"} = ""
+	    if (!exists($RTDB{"$i"}));
+    }
+    # Seed the reserved tables.
+    if (! open(RT, $RTTABLES)) {
+	print STDERR "*** Could not open $RTTABLES\n";
+	return -1;
+    }
+    while (<RT>) {
+	if ($_ =~ /^(\d*)\s*/) {
+	    $RTDB{"$1"} = "$1";
+	}
+    }
+    close(RT);
+    dbmclose(%RTDB);
     return 0;
 }
 
