@@ -1,7 +1,18 @@
-<rspec xmlns="http://www.protogeni.net/resources/rspec/0.1">
- <node virtual_id="geni1" 
-       virtualization_type="emulab-vnode" 
-       exclusive="1"> 
- </node>
- <needsfirewall>1</needsfirewall>
+<?xml version="1.0" encoding="UTF-8"?>
+<rspec xmlns="http://www.protogeni.net/resources/rspec/2"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:firewall="http://www.protogeni.net/resources/rspec/ext/firewall/1"
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/2
+                         http://www.protogeni.net/resources/rspec/2/request.xsd"
+       type="request" >
+  <node client_id="my-node"
+        exclusive="true">
+    <sliver_type name="raw-pc" />
+  </node>
+  <node client_id="fw"
+        exclusive="true">
+    <sliver_type name="firewall">
+    	<firewall:firewall_config style="basic" />
+    </sliver_type>
+  </node>
 </rspec>

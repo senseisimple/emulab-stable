@@ -79,7 +79,7 @@ my $IPASSIGN       = "$TB/libexec/ipassign_wrapper";
 my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
 my $MAPPER         = "$TB/bin/mapper";
 my $VTOPGEN        = "$TB/bin/vtopgen";
-my $SNMPIT         = "$TB/bin/snmpit";
+my $SNMPIT         = "$TB/bin/snmpit_test";
 my $RESERVEVLANS   = "$TB/sbin/protogeni/reservevlans";
 my $NEWGROUP       = "$TB/bin/newgroup";
 my $NEWPROJECT     = "$TB/sbin/newproj";
@@ -91,6 +91,7 @@ my $XMLLINT	   = "/usr/local/bin/xmllint";
 my $ADDAUTHORITY   = "$TB/sbin/protogeni/addauthority";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
 my $TARINSTALL     = "/usr/local/bin/install-tarfile";
+my $FWNAME	   = "fw";
 my $API_VERSION    = 1;
 my $USELOCALPROJ   = 0;
 
@@ -686,17 +687,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
 
     #
-    # Firewall hack; just a flag in the rspec for now.
-    #
-    my $needsfirewall = GeniXML::GetText("needsfirewall", $rspec);
-    if (defined($needsfirewall)) {
-	if ($slice->SetFirewallFlag($needsfirewall) != 0) {
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
-	    goto bad;
-	}
-    }
-
-    #
     # We need this now so we can form a virtual topo.
     #
     my $slice_experiment = GeniExperiment($slice, $user);
@@ -861,11 +851,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $virtualization_subtype
                           = GeniXML::GetVirtualizationSubtype($ref);
 	my $exclusive     = GeniXML::GetExclusive($ref);
+	my $tarfiles      = GeniXML::GetTarball($ref);
 	my $pctype;
 	my $osname;
 	my $node;
-	my $isbridge;
-
+	my $isbridge    = 0;
+	my $isfirewall  = 0;
+	
 	# Always populate iface2node mapping, even if we let the node
 	# pass through.
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
@@ -880,6 +872,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    next;
 	}
 
+	#
 	#
 	# Lan nodes are fake and do not go into the virt topo. Need
 	# to remember them though, for when we do the links below.
@@ -983,6 +976,12 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    elsif ($virtualization_subtype eq "delay") {
 			$isbridge = 1;
 			$pctype   = undef;
+		    }
+		    elsif ($virtualization_subtype eq "firewall") {
+			$isfirewall = 1;
+			$osname     = "FW-IPFW2";
+			$pctype     = "pc";
+			goto raw;
 		    }
 		    else {
 			$response
@@ -1122,12 +1121,25 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if ($isbridge) {
 	    $nodeblob->{'role'} = "bridge";
 	}
-
+	elsif ($isfirewall) {
+	    if ($slice->SetFirewallFlag(1) != 0) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+		goto bad;
+	    }
+	    $nodeblob->{'cmd_line'} = '/kernel.fw';
+	    if (!defined($virtexperiment->NewTableRow("virt_firewalls",
+						  {"fwname" => $node_nickname,
+						   "type"   => "ipfw2-vlan",
+						   "style"  => "basic"}))) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				     "Error creating firewall definition");
+		goto bad;
+	    }
+	}
 	# Tarball and startup command.
-	my $tarfiles = GeniXML::GetTarball($ref);
 	if (defined($tarfiles)) {
 	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarfiles",
-				 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+				 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)){
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					 "Invalid tarfiles");
@@ -1139,7 +1151,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    my $startupcmd = GeniXML::GetStartupCommand($ref);
 	    if (defined($startupcmd)) {
 		if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
-				     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+				TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					     "Invalid startup command");
@@ -1851,6 +1863,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $virtual_id     = GeniXML::GetVirtualId($ref);
 	my $component_id   = GeniXML::GetNodeId($ref);
 	my $vnode_id       = GeniXML::GetVnodeId($ref);
+
 	if (!(exists($nodemap{$virtual_id}) ||
 	      exists($external_nodemap{$virtual_id}))) {
 	    $response =
@@ -3303,12 +3316,23 @@ sub SliverWorkAux($$$$$$$)
     # Do firewall stuff.
     if ($slice->needsfirewall()) {
 	require Firewall;
-	
-	my @nodeids = map { $_->node_id() } values(%newnodes);
 
-	if (@nodeids && doFWlans($experiment,
-				 Firewall::FWADDNODES(), \@nodeids) != 0) {
-	    print STDERR "FireWall setup failed\n";
+	if ($isupdate) {
+	    #
+	    # Add new nodes inside the firewall.
+	    #
+	    if (values(%newnodes)) {
+		my @nodeids = map { $_->node_id() } values(%newnodes);
+
+		if (Firewall::doFWlans($experiment,
+				       Firewall::FWADDNODES(), \@nodeids)) {
+		    print STDERR "FireWall update failed\n";
+		    goto bad;
+		}
+	    }
+	}
+	elsif (Firewall::doFWlans($experiment, Firewall::FWSETUP(), undef)) {
+	    print STDERR "FireWall update failed\n";
 	    goto bad;
 	}
 	$didfwsetup = 1;
@@ -3500,8 +3524,9 @@ sub SliverWorkAux($$$$$$$)
 	my @oldnodeids = map { $_->node_id() } values(%newnodes);
 	
 	if ($slice->needsfirewall() && $didfwsetup) {
-	    if (@oldnodeids && doFWlans($experiment, Firewall::FWDELNODES(),
-					\@oldnodeids)) {
+	    if (@oldnodeids &&
+		Firewall::doFWlans($experiment, Firewall::FWDELNODES(),
+				   \@oldnodeids)) {
 		print STDERR "FireWall cleanup failed\n";
 	    }
 	}
@@ -3933,7 +3958,7 @@ sub DeleteSliverAux($$$)
 	# A firewalled slice gets special treatment.
 	#
 	if ($slice->needsfirewall()) {
-	    if (undoFWNodes($experiment, 1) != 0) {
+	    if (Firewall::undoFWNodes($experiment, 0) != 0) {
 		print STDERR "FireWall cleanup failed\n";
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -5139,7 +5164,7 @@ sub CleanupDeadSlice($;$)
 	if ($slice->needsfirewall()) {
 	    print STDERR "Calling undoFWNodes ...\n";
 	    
-	    if (undoFWNodes($experiment, 1) != 0) {
+	    if (Firewall::undoFWNodes($experiment, 0) != 0) {
 		print STDERR "FireWall cleanup failed\n";
 		return -1;
 	    }
@@ -5279,7 +5304,6 @@ sub GeniExperiment($;$)
     my ($slice, $creator) = @_;
 
     my $uuid = $slice->uuid();
-    my $needsfirewall = $slice->needsfirewall();
     my $urn  = $slice->urn();
     my ($pid, $gid, $eid);
     my ($project, $group);
@@ -5498,29 +5522,12 @@ sub GeniExperiment($;$)
 	GeniUtil::FlipToGeniUser($project->unix_gid());
     }
 
-    #
-    # Need a way to can experiments.
-    #
-    my $nsfile = "";
-    if ($needsfirewall) {
-	$nsfile = "/tmp/$$.ns";
-	if (! open(NS, "> $nsfile")) {
-	    print STDERR "Could not create $nsfile\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
-	print NS "source tb_compat.tcl\n";
-	print NS "set ns [new Simulator]\n";
-	print NS "tb-set-security-level Blue\n";
-	print NS "\$ns run\n";
-	close(NS);
-    }
-
     # Note the -h option; allows experiment with no NS file.
     system("$CREATEEXPT -N -q -i -k -w ".
 	   "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	   "-E '$urn' ".
 	   "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	   "-h '$uuid' -p $pid -g $gid -e $eid $nsfile");
+	   "-h '$uuid' -p $pid -g $gid -e $eid");
     my $saved_exitcode = $?;
 
     # Flip back to geni user. Will reset later.

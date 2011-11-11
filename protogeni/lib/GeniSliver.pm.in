@@ -274,6 +274,20 @@ sub sliver_urn($)
 }
 
 #
+# Equality test. Not strictly necessary in perl, but good form.
+#
+sub SameSliver($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($other)));
+
+    return $self->idx() == $other->idx();
+}
+
+#
 # Delete the sliver. The sliver should not be provisioned when this done.
 #
 sub Delete($$)

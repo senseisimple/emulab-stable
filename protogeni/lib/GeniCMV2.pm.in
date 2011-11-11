@@ -910,7 +910,7 @@ sub SliverAction($$$$$)
     }
   bad:
     $slice->UnLock();
-    return ($isasync ? $response->code() : $response);
+    return ($isasync ? $response->{'code'} : $response);
 }
 
 #

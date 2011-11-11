@@ -52,7 +52,7 @@ my $EVENTSYS	   = "$TB/bin/eventsys_control";
 my $VNODESETUP     = "$TB/sbin/vnode_setup";
 my $POWER          = "$TB/bin/power";
 my $OSLOAD         = "$TB/bin/os_load";
-my $SNMPIT         = "$TB/bin/snmpit";
+my $SNMPIT         = "$TB/bin/snmpit_test";
 my $NAMEDSETUP     = "$TB/sbin/named_setup";
 my $EXPORTS_SETUP  = "$TB/sbin/exports_setup";
 my $GENTOPOFILE    = "$TB/libexec/gentopofile";
@@ -780,6 +780,16 @@ sub Start($$$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
+    #
+    # Look for a firewall that needs to be setup first.
+    #
+    my ($firewall, $firewall_sliver);
+    my $firewalled = $experiment->IsFirewalled(\$firewall);
+    if ($firewalled && !defined($firewall)) {
+	$msg .= "Could not determine firewall for experiment";
+	goto bad;
+    }
+
     my @slivers = ();
     if ($self->SliverList(\@slivers) != 0) {
 	$msg .= "Could not get sliver list for $self";
@@ -789,8 +799,10 @@ sub Start($$$)
     my %vnodes   = ();
     my %poweron  = ();
     my %reloads  = ();
+    # See "bad" label below; want to know what sliver failed (if any).
+    my $sliver;
 
-    foreach my $sliver (@slivers) {
+    foreach $sliver (@slivers) {
 	if (ref($sliver) ne "GeniSliver::Node") {
 	    next
 		if ($sliver->state() eq "started" && !$restart);
@@ -798,6 +810,10 @@ sub Start($$$)
 	    $sliver->Start($version) == 0
 		or return -1;
 	    next;
+	}
+	# Remember which sliver is the firewall. 
+	if ($firewall eq $sliver->resource_id()) {
+	    $firewall_sliver = $sliver;
 	}
 
 	my $node = Node->Lookup($sliver->resource_id());
@@ -883,7 +899,7 @@ sub Start($$$)
 		#
 		my $tmp = $osinfo->ResolveNextOSID($experiment);
 		if (!defined($tmp)) {
-		    print STDERR "No next mapping for $osinfo on $node!\n";
+		    $msg .= "No next mapping for $osinfo on $node!";
 		    goto bad;
 		}
 		print STDERR "  Mapping $osinfo on $node to $tmp\n";
@@ -911,10 +927,12 @@ sub Start($$$)
 		push(@{ $reloads{$image->imageid()} }, $node);
 		
 		# Reload means reboot or power on.
+		# But skip the firewall; that is done specially since
+		# it has to come up before everything else.
 		if (!defined($vnode) && $sliver->state() eq "stopped") {
 		    $poweron{$node->node_id} = $node;
 		}
-		else  {
+		else {
 		    $reboots{$node->node_id} = $node;
 		}
 	    }
@@ -963,6 +981,9 @@ sub Start($$$)
 	    goto bad;
 	}
     }
+    # See "bad" label below.
+    $sliver = undef;
+    
     #
     # Cull out vnodes that are going to get rebooted cause the
     # physnode is getting rebooted. 
@@ -1023,16 +1044,16 @@ sub Start($$$)
 	}
 	
 	if (system("$GENTOPOFILE $pid $eid")) {
-	    print STDERR "$GENTOPOFILE failed\n";
+	    $msg .= "$GENTOPOFILE failed\n";
 	    goto bad;
 	}
 	if (system("$EXPORTS_SETUP")) {
-	    print STDERR "$EXPORTS_SETUP failed\n";
+	    $msg .= "$EXPORTS_SETUP failed\n";
 	    goto bad;
 	}
 	# The nodes will not boot locally unless there is a DNS record.
 	if (system("$NAMEDSETUP")) {
-	    print STDERR "$NAMEDSETUP failed\n";
+	    $msg .= "$NAMEDSETUP failed\n";
 	    goto bad;
 	}
 	my @diff = ();
@@ -1057,7 +1078,82 @@ sub Start($$$)
     }
 
     #
-    # First power on any physical nodes that had been stopped.
+    # Before anything, the firewall has to be turned on or rebooted.
+    # Then we have to wait for it to come up before we can let the
+    # rest of the nodes go. 
+    #
+    if ($firewalled &&
+	(exists($poweron{$firewall}) || exists($reboots{$firewall}))) {
+	my $node_id;
+	require StateWait;
+	require EmulabConstants;
+
+	if (exists($poweron{$firewall})) {
+	    my $node = $poweron{$firewall};
+	    $node_id = $node->node_id();
+	    
+	    print STDERR "Powering on the firewall: $node_id\n";
+	
+	    system("$POWER on $node_id");
+	    if ($?) {
+		$msg .= "Failed to power on firewall: $node_id";
+		$firewall_sliver->SetStatus("failed");
+		goto bad;
+	    }
+	    delete($poweron{$firewall});
+	}
+	else {
+	    my $node = $reboots{$firewall};
+	    $node_id = $node->node_id();
+	    
+	    print STDERR "Rebooting the firewall: $node_id\n";
+	    
+	    system("$NODEREBOOT $node_id");
+	    if ($?) {
+		$msg .= "Failed to reboot firewall: $node_id";
+		$firewall_sliver->SetStatus("failed");
+		goto bad;
+	    }
+	    delete($reboots{$firewall});
+	}
+	$StateWait::debug = 0;
+	my @states = (EmulabConstants::TBDB_NODESTATE_ISUP());
+
+	if (StateWait::initStateWait(\@states, $node_id)) {
+	    $msg .=  "Failed to initialize the statewait library!";
+	    $firewall_sliver->SetStatus("failed");
+	    goto bad;
+	}
+	my @finished = ();
+	my @failed   = ();
+	
+	# Now we can statewait.
+	print STDERR "Waiting for firewall ($node_id) to boot\n";
+	
+	if (StateWait::waitForState(\@finished, \@failed, (15 * 60))) {
+	    $msg .= "Failed in waitForState for firewall: $node_id!";
+	    $firewall_sliver->SetStatus("failed");
+	    goto bad;
+	}
+	StateWait::endStateWait();
+
+	#
+	# Note that waitForState does not view timeout as failure,
+	# so if both @finished and @failure are empty, we timed out.
+	# Timeout is failure in this case.
+	#
+	@failed = ($node_id)
+	    if (! (@finished || @failed));
+
+	if (@failed) {
+	    $msg .= "Firewall failed to boot properly: $node_id!";
+	    $firewall_sliver->SetStatus("failed");
+	    goto bad;
+	}
+    }
+
+    #
+    # Then power on any physical nodes that had been stopped.
     # Then reboot the physical nodes, then any leftover virtual nodes.
     #
     if (keys(%poweron)) {
@@ -1119,6 +1215,10 @@ sub Start($$$)
     if (defined($msg)) {
 	$self->SetErrorLog($msg);
 	print STDERR "$msg\n";
+    }
+    # Mark the offending sliver as failed.
+    if (defined($sliver)) {
+	$sliver->SetStatus("failed");
     }
     return -1;
 }
@@ -1890,7 +1990,7 @@ sub UnProvision($)
 }
 
 #
-# Nothing to do yet.
+# 
 #
 sub Start($$)
 {
@@ -1960,7 +2060,7 @@ sub Start($$)
 	    # user can call StartSliver() again after getting the slice started
 	    # at the other CM. 
 	    #
-	    my $count    = 1000;
+	    my $count    = 600;
 	    my $interval = 30;
 	    my $manifest;
 	    while ($count >= 0) {
@@ -1981,7 +2081,7 @@ sub Start($$)
 		sleep($interval);
 	    }
 	    if (!defined($manifest)) {
-		$msg = "Could not get manifest for $dsturn from $authority";
+		$msg = "Timed out getting manifest for $dsturn from $authority";
 		goto bad;
 	    }
 	    $manifest = GeniXML::Parse($manifest);
@@ -1999,7 +2099,7 @@ sub Start($$)
 		#
 		my $component_id = GeniXML::GetNodeId($ref);
 		my $nodeblob;
-		$count    = 1000;
+		$count    = 300;
 		$interval = 30;
 		while ($count >= 0) {
 		    $nodeblob = $authority->Resolve($component_id);
@@ -2013,7 +2113,7 @@ sub Start($$)
 		    sleep($interval);
 		}
 		if (!defined($nodeblob)) {
-		    $msg = "Could not resolve $component_id at $authority";
+		    $msg = "Timed out resolving $component_id at $authority";
 		    goto bad;
 		}
 		if (!exists($nodeblob->{'physctrl'}) ||
