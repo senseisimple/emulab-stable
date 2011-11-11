@@ -458,7 +458,7 @@ sub TBBootWhat($;$)
 
     if (!$query_result || !$query_result->numrows) {
 	print("*** Warning: No bootwhat info for $node\n");
-	return 0;
+	return undef;
     }
     my ($def_boot_osid, $def_boot_opmode,
 	$temp_boot_osid, $temp_boot_opmode,
@@ -474,8 +474,12 @@ sub TBBootWhat($;$)
     return ($def_boot_osid, $def_boot_opmode)
 	if (defined($def_boot_osid) && $def_boot_osid ne 0);
 
+    #
+    # If all info is clear, the node will boot into PXEWAIT.
+    # This is not an error.
+    #
     print("*** Warning: node '$node': All boot info was null!\n");
-    return undef;
+    return (0, 0);
 }
 
 #

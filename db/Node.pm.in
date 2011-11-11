@@ -2798,10 +2798,19 @@ sub ResetNextOpMode($$)
     # screwed since we will not be able to figure out the opmode.
     #
     my ($bootosid, $bootopmode) = TBBootWhat($nodeid, $debug);
-    if (!$bootosid) {
+    if (!defined($bootosid)) {
 	print STDERR "Bootwhat query failed for $nodeid!\n";
 	return -1;
     }
+    #
+    # If it returned 0 the node is in PXEWAIT.
+    # For the node to do anything useful going forward, someone will
+    # have to first set one of the osids with os_select.
+    #
+    if ($bootosid == 0) {
+	return 0;
+    }
+
     print STDERR "Bootwhat says: $nodeid => $bootosid,$bootopmode\n"
 	if ($debug);
 

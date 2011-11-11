@@ -824,6 +824,13 @@ sub stateTransition($$) {
 		# See if we are in the right mode/osid.
 		#
 		my ($bootosid,$bootopmode) = TBBootWhat($node, $debug);
+		if (!defined($bootosid)) {
+		    info("$node: TBBootWhat say node doesn't exist!?");
+		    next;
+		} elsif ($bootosid == 0) {
+		    info("$node: should be in PXEWAIT, why are we here?!");
+		    next;
+		}
 
 		info("$node: BootWhat says $bootosid (mode $bootopmode).\n");
 		DBQueryFatal("update nodes set osid='$bootosid' ".
