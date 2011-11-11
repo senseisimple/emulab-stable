@@ -178,7 +178,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
               <br>
               <a href=" . $_SERVER["REQUEST_URI"] . "#reserved_nodes>
                 <font size=+1><b>Reserved Nodes</b></font></a>
-              <a NAME=reserved_nodes>
+              <a NAME=reserved_nodes></a>
               <table id='nodetable' align=center border=1>
               <thead class='sort'>
               <tr>
