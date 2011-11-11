@@ -363,7 +363,7 @@ sub undoFWNodes($;$@) {
 	if (!defined($leavefw));
 
     my $fwnode;
-    return
+    return 0
 	if ($experiment->IsFirewalled(\$fwnode) == 0);
 
     if (!@nodes || scalar(@nodes) == 0) {
