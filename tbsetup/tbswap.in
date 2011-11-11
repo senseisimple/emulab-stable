@@ -44,6 +44,7 @@ my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 my $piper          = "$TBROOT/sbin/locpiper";
 my $mapper         = "$TBROOT/bin/mapper";
 my $wrapper        = "$TBROOT/libexec/assign_wrapper";
+my $SNMPIT	   = "$TBROOT/bin/snmpit";
 my $NFSTRACESUPPORT= @NFSTRACESUPPORT@;
 my $PGENISUPPORT   = @PROTOGENI_SUPPORT@;
 
@@ -545,7 +546,7 @@ sub doSwapout($) {
 	    # Kill tag reservations on actual swapout.
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing per-experiment VLANs.\n";
-	    if (system("snmpit -S $perexpstack --redirect-err -r $pid $eid")) {
+	    if (system("$SNMPIT -S $perexpstack --redirect-err -r $pid $eid")) {
 		tbwarn "Failed to remove per-experiment VLANs";
 	    }
 	    TBDebugTimeStamp("snmpit finished");
@@ -568,7 +569,7 @@ sub doSwapout($) {
 	    my $tagopt = ($type != MODIFY ? "-C" : "");
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
-	    if (system("snmpit $stackarg --redirect-err $tagopt -r $pid $eid")) {
+	    if (system("$SNMPIT $stackarg --redirect-err $tagopt -r $pid $eid")) {
 		tberror({type => 'secondary', severity => SEV_SECONDARY,
 			 error => ['vlan_reset_failed']},
 			"Failed to reset VLANs");
@@ -590,7 +591,7 @@ sub doSwapout($) {
 	    }
 	    if (@stale) {
 		print "Removing stale vlans @stale\n";
-		system("snmpit $stackarg --redirect-err -f -C ".
+		system("$SNMPIT $stackarg --redirect-err -f -C ".
                     join(" ", map("-o $_", @stale)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
@@ -1050,7 +1051,7 @@ sub doSwapin($) {
 	if ($ELABINELAB || !$syncvlans) {
 	    if (@diff) {
 		print "Removing obsolete vlans @diff\n";
-		system("snmpit $stackarg --redirect-err -f -C ".
+		system("$SNMPIT $stackarg --redirect-err -f -C ".
 		       join(" ", map("-o $_", @diff)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
@@ -1059,7 +1060,7 @@ sub doSwapin($) {
 		    return 1;
 		}
 		if (defined($perexpstack)) {
-		    system("snmpit -S $perexpstack --redirect-err -f -C ".
+		    system("$SNMPIT -S $perexpstack --redirect-err -f -C ".
 			   join(" ", map("-o $_", @diff)));
 		    if ($?) {
 			tberror({type => 'summary', severity => SEV_SECONDARY,
@@ -1072,7 +1073,7 @@ sub doSwapin($) {
 	}
 	else {
 	    print "Synchronizing VLANs.\n";
-	    system("snmpit $stackarg --redirect-err -X $pid $eid");
+	    system("$SNMPIT $stackarg --redirect-err -X $pid $eid");
 	    if ($?) {
 		tberror({type => 'summary', severity => SEV_SECONDARY,
 			 error => ['vlan_setup_failed']},
@@ -1080,7 +1081,7 @@ sub doSwapin($) {
 		return 1;
 	    }
 	    if (defined($perexpstack)) {
-		system("snmpit -S $perexpstack --redirect-err -X $pid $eid");
+		system("$SNMPIT -S $perexpstack --redirect-err -X $pid $eid");
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_setup_failed']},
@@ -1418,7 +1419,7 @@ sub doSwapin($) {
 	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
-	if (system("snmpit $stackarg --redirect-err -t $pid $eid")) {
+	if (system("$SNMPIT $stackarg --redirect-err -t $pid $eid")) {
 	    tberror({type => 'summary', severity => SEV_SECONDARY,
 		     error => ['vlan_setup_failed']},
 		    "Failed to set up VLANs.");
@@ -1508,7 +1509,7 @@ sub doSwapin($) {
 	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
 	print "Setting up per-experiment VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
-	if (system("snmpit -S $perexpstack --redirect-err -t $pid $eid")) {
+	if (system("$SNMPIT -S $perexpstack --redirect-err -t $pid $eid")) {
 	    tberror({type => 'summary', severity => SEV_SECONDARY,
 		     error => ['vlan_setup_failed']},
 		    "Failed to set up per-experiment VLANs.");
