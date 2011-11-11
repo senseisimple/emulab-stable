@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -891,6 +891,9 @@ sub hackwaitandexit($)
 		if ($mtime >= $now || $ctime >= $now);
 	}
 	if ($cpid) {
+	    #
+	    # Child exit indicates the setup failed, so stop waiting.
+	    #
 	    my $kidpid = waitpid($cpid, &WNOHANG);
 	    if ($kidpid == $cpid) {
 		exit($? >> 8);
