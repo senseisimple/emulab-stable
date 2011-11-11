@@ -67,6 +67,7 @@ my $noderestart	= "$TB/sbin/bootinfosend -R";
 my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $nodewait    = "$TB/sbin/node_statewait";
 my $snmpit      = "$TB/bin/snmpit";
+my $osselect	= "$TB/bin/os_select";
 
 # Protos
 sub TearDownEmulab();
@@ -1208,20 +1209,14 @@ sub TearDownEmulab()
     # have no idea what is loaded on the disk, so they should go into an
     # MFS and wait, but then a bunch of nodes will all try to load the big
     # MFS at once, and that could wreak havoc. So, clear the boot osids
-    # so they go into PXEWAIT. I could use os_select, but clearing all the
-    # OSIDs for a node is apparently a bad thing and generates warnings and
-    # emails. Why is that? So just clear the DB state until I figure out
-    # why that is.
+    # so they go into PXEWAIT.
     #
-    DBQueryFatal("update nodes set ".
-		 "  def_boot_osid=NULL,next_boot_osid=NULL,".
-		 "  temp_boot_osid=NULL ".
-		 "where " .
-		    join(" or ", map("node_id='$_'",
-				     ($bossnode,
-				      defined($opsnode) ? $opsnode : (),
-				      defined($fsnode) ? $fsnode : (),
-				      @expnodes))));
+    system("$osselect -w @expnodes");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not clear bootinfo for inner nodes!\n".
+		     "    Continuing anyway.\n";
+    }
     
     #
     # SSH in and kill the inner DHCPD daemon so that it does not reply
@@ -1425,16 +1420,14 @@ sub RemoveNodes()
     # have no idea what is loaded on the disk, so they should go into an
     # MFS and wait, but then a bunch of nodes will all try to load the big
     # MFS at once, and that could wreak havoc. So, clear the boot osids
-    # so they go into PXEWAIT. I could use os_select, but clearing all the
-    # OSIDs for a node is apparently a bad thing and generates warnings and
-    # emails. Why is that? So just clear the DB state until I figure out
-    # why that is.
+    # so they go into PXEWAIT.
     #
-    DBQueryFatal("update nodes set ".
-		 "  def_boot_osid=NULL,next_boot_osid=NULL,".
-		 "  temp_boot_osid=NULL ".
-		 "where " .
-		   join(" or ", map("node_id='$_'", @nodes)));
+    system("$osselect -w @nodes");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not clear bootinfo for freed nodes!\n".
+		     "    Continuing anyway.\n";
+    }
     
     #
     # SSH in and kill the inner DHCPD daemon so that it does not reply
