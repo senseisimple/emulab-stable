@@ -1255,7 +1255,7 @@ sub WaitDone($@)
 	    $node->_rebooted(1)
 		if ($node->_setupoperation() != $libossetup::NOSTATE);
 
-	    if ($node_id eq $firewall) {
+	    if ($firewalled && $node_id eq $firewall) {
 		#
 		# Firewall has booted, perform any final actions.
 		#
@@ -1291,7 +1291,7 @@ sub WaitDone($@)
 	#
 	# If the firewall fails to boot, we are hosed. Quit right away.
 	#
-	if ($node_id eq $firewall) {
+	if ($firewalled && $node_id eq $firewall) {
 	    tbnotice("Firewall failed to boot!\n");
 	    $parent->aborted(1);
 	}
