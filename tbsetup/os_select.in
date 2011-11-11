@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,12 +19,14 @@ Usage: os_select [-h] [-d] [-c] [-1 | -t] [<osid>] <node> [<node> ...]
  -t    Apply change to temporary boot field
  -b    Reset to default boot osid. Do not provide an osid.
  -l    Show the current settings.
- osid  OS identifier for the selected OS (see web interface for listing)
+ -w    Put the nodes in PXEWAIT mode (clears all osids)
+ osid  OS identifier for the selected OS. Must be either numeric ID or
+       a string in the form <pid>/<osname> (see web interface for listing)
  node  Node identifiers (ie pcXX)
 EOF
     exit(-1);
 }
-my $optlist = "hdc1tbl";
+my $optlist = "hdc1tblw";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -70,6 +72,7 @@ my $tempmode	= 0; # apply change to temp_boot_osid.
 my $clear       = 0; # Clear the selected boot (def,temp,next).
 my $default     = 0; # Reset back to default osid.
 my $list	= 0; # Just list the current settings.
+my $waitmode	= 0; # Send the node into PXEWAIT
 my @nodes       = ();
 my $osid;
 my $osinfo;
@@ -90,15 +93,21 @@ if (defined($options{"t"})) { $tempmode=1; }
 if (defined($options{"c"})) { $clear=1; }
 if (defined($options{"b"})) { $default=1; }
 if (defined($options{"l"})) { $list=1; }
+if (defined($options{"w"})) { $waitmode=1; }
 
-# In clearmode, there is no OSID. Just a list of nodes.
-if (! ($clear || $list || $default)) {
+if ($waitmode + $list + $clear + $default > 1) {
+    print STDERR "Should specify only one of -b, -c, -l, -w\n";
+    usage();
+}
+
+# In certain modes, there is no OSID. Just a list of nodes.
+if (! ($clear || $list || $default || $waitmode)) {
     usage()
 	if (@ARGV < 2);
     $osid = shift();
 
     # Untaint args.
-    if ($osid =~ /^([-\w\+\.]+)$/) {
+    if ($osid =~ /^([-\w\+\.\/]+)$/) {
 	$osid = $1;
     }
     else {
@@ -139,9 +148,9 @@ if ($UID && !TBAdmin($UID)) {
 #
 # Grab the info for the OSID. 
 #
-if (! ($clear || $list || $default)) {
+if (defined($osid)) {
     $osinfo = OSinfo->Lookup($osid);
-    fatal("Improper DB entry for OSID: $osid")
+    fatal("Unknown OSID: $osid")
 	if (!defined($osinfo));
 }
 elsif ($default) {
@@ -172,6 +181,13 @@ foreach my $node (@nodes) {
 	    print "default=$info";
 	}
 	print "\n";
+	next;
+    }
+
+    if ($waitmode) {
+	if ($nodeobject->OSSelect($osinfo, undef, $debug) != 0) {
+	    fatal("OSSelect(): clearing all fields failed on $node");
+	}
 	next;
     }
 

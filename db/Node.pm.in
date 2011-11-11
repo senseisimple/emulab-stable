@@ -2718,19 +2718,38 @@ sub OSSelect($$$$)
 	$osinfo = $nextosinfo;
     }
     
-    print STDERR "Current opmode for $nodeid is $curmode.\n"
-	if ($debug);
-    print STDERR "Setting $field for $nodeid to $osinfo.\n"
-	if ($debug && defined($osinfo));
+    if (defined($osinfo) && !defined($field)) {
+	print STDERR "No field specified for OSSelect on $node_id\n";
+	return -1;
+    }
 
-    # Set/Clear the osid.
-    DBQueryWarn("update nodes set ${field}=".
-		(defined($osinfo) ? "'" . $osinfo->osid() . "' " : "NULL ") .
-		"where node_id='$nodeid'")
-	or return -1;
+    if ($debug) {
+	print STDERR "Current opmode for $nodeid is $curmode.\n";
+	if (defined($osinfo)) {
+	    print STDERR "Setting $field for $nodeid to $osinfo.\n";
+	} elsif (defined($field)) {
+	    print STDERR "Clearing $field for $nodeid.\n";
+	} else {
+	    print STDERR "Clearing all boot_osids for $nodeid.\n";
+	}
+    }
 
-    return -1 
-	if ($self->ResetNextOpMode($debug) < 0);
+    if (!defined($field)) {
+	# Clear all osids.
+	DBQueryWarn("update nodes set ".
+		    "def_boot_osid=NULL,next_boot_osid=NULL,temp_boot_osid=NULL ".
+		    "where node_id='$nodeid'")
+	    or return -1;
+    } else {
+	# Set/Clear the osid.
+	DBQueryWarn("update nodes set ${field}=".
+		    (defined($osinfo) ? "'" . $osinfo->osid() . "' " : "NULL ") .
+		    "where node_id='$nodeid'")
+	    or return -1;
+
+	return -1 
+	    if ($self->ResetNextOpMode($debug) < 0);
+    }
 
     return Refresh($self);
 }
