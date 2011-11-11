@@ -33,8 +33,17 @@ use Frontier::RPC2;
 # Disable UUID checks in GeniCredential.
 $GeniCredential::CHECK_UUID = 0;
 
-my $API_VERSION = 1;
+my $API_VERSION = 2;
 my $MAINSITE    = @TBMAINSITE@;
+
+sub SetGeniVersion($)
+{
+    my ($new_version) = @_;
+    if ($new_version eq "1.0") {
+	$API_VERSION = 1;
+    }
+    print STDERR "Api version: " . $API_VERSION . "\n";
+}
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -43,6 +52,8 @@ my $MAINSITE    = @TBMAINSITE@;
 #
 sub GetVersion()
 {
+    # $options is optional here for all versions
+    my ($options) = @_;
     my $me = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($me)) {
 	print STDERR "Could not find local authority object\n";
@@ -145,6 +156,13 @@ sub GetVersion()
         "extensions" => ["http://www.protogeni.net/resources/rspec/ext/emulab/1"]
     };
 
+    my $request_name = "request_rspec_versions";
+    my $ad_name = "ad_rspec_versions";
+    if ($API_VERSION > 1) {
+	$request_name = "geni_request_rspec_versions";
+	$ad_name = "geni_ad_rspec_versions";
+    }
+
     my $blob = {
 	"geni_api"   => $API_VERSION,
 	"urn"        => $me->urn(),
@@ -154,15 +172,24 @@ sub GetVersion()
 	"code_tag"   => $commithash,
 	# XXX
 	"hostname"   => $hostname,
-	"request_rspec_versions" => [$request_0_1, $request_0_2, $request_2,
-				     $request_3],
-	"ad_rspec_versions" => [$ad_0_1, $ad_0_2, $ad_2, $ad_3],
-	"default_ad_rspec" => $default_ad
+	$request_name => [$request_0_1, $request_0_2, $request_2,
+			   $request_3],
+	$ad_name => [$ad_0_1, $ad_0_2, $ad_2, $ad_3],
+	"geni_api_versions" => {
+	    "1" => "$url/1.0",
+	    "2" => "$url/2.0"
+	}
     };
     $blob->{"peers"} = $peers
 	if ($MAINSITE);
-    
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    $blob->{"default_ad_rspec"} = $default_ad
+	if ($API_VERSION == 1);
+
+    my $response = GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    if ($API_VERSION > 1) {
+	$response->{"geni_api"} = $API_VERSION;
+    }
+    return $response;
 }
 
 # List this aggregates resources. Invokes GeniCMV2::Resolve or
@@ -170,10 +197,18 @@ sub GetVersion()
 sub ListResources()
 {
     my ($credentials, $options) = @_;
+    if (! defined($credentials) || ! defined($options)) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
     my $available = $options->{'geni_available'};
     my $compress = $options->{'geni_compressed'};
     my $slice_urn = $options->{'geni_slice_urn'};
-    my $version    = $options->{'rspec_version'} || undef;
+    my $version;
+    if ($API_VERSION == 1) {
+	$version    = $options->{'rspec_version'} || undef;
+    } else {
+	$version    = $options->{'geni_rspec_version'} || undef;
+    }
 
     my $xml = undef;
     if ($slice_urn) {
@@ -364,7 +399,12 @@ sub auto_add_sa($)
 # Create a sliver by allocating and starting resources.
 sub CreateSliver()
 {
-    my ($slice_urn, $credentials, $rspec, $users) = @_;
+    my ($slice_urn, $credentials, $rspec, $users, $options) = @_;
+    if (! defined($slice_urn) || ! defined($credentials)
+	|| ! defined($rspec) || ! defined($users)
+	|| (! defined($options) && $API_VERSION > 1)) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
 
     foreach my $cred (@$credentials) {
         # If we want to remove the SA(s) after this call, push them
@@ -422,7 +462,11 @@ sub CreateSliver()
 # instead.
 sub DeleteSliver()
 {
-    my ($slice_urn, $credentials) = @_;
+    my ($slice_urn, $credentials, $options) = @_;
+    if (! defined($slice_urn) || ! defined($credentials)
+	|| (! defined($options) && $API_VERSION > 1)) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
 
     my $delete_args = {
         'slice_urn' => $slice_urn,
@@ -470,7 +514,11 @@ sub XmlToJson
 # just passes on to the CM SliverStatus operation.
 sub SliverStatus()
 {
-    my ($slice_urn, $credentials) = @_;
+    my ($slice_urn, $credentials, $options) = @_;
+    if (! defined($slice_urn) || ! defined($credentials)
+	|| (! defined($options) && $API_VERSION > 1)) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
 
     my $status_args = {
         'slice_urn' => $slice_urn,
@@ -548,7 +596,12 @@ sub SliverStatus()
 
 sub RenewSliver()
 {
-    my ($slice_urn, $credentials, $expiration_time) = @_;
+    my ($slice_urn, $credentials, $expiration_time, $options) = @_;
+    if (! defined($slice_urn) || ! defined($credentials)
+	|| ! defined($expiration_time)
+	|| (! defined($options) && $API_VERSION > 1)) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
 
     my $renew_args = {
         'slice_urn' => $slice_urn,
@@ -567,7 +620,11 @@ sub RenewSliver()
 
 sub Shutdown()
 {
-    my ($slice_urn, $credentials) = @_;
+    my ($slice_urn, $credentials, $options) = @_;
+    if (! defined($slice_urn) || ! defined($credentials)
+	|| (! defined($options) && $API_VERSION > 1)) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
 
     my $shutdown_args = {
         'slice_urn' => $slice_urn,

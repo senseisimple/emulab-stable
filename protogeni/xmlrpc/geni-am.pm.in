@@ -11,7 +11,7 @@ use Frontier::RPC2;
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME $GENI_METHODS $EMULAB_PEMFILE
-	    $GENI_RESPONSE_CONVERTER);
+	    $GENI_RESPONSE_CONVERTER $GENI_VERSION);
 BEGIN { $GENI_DBNAME = "geni-cm"; }
 
 # Configure variables
@@ -23,7 +23,13 @@ use lib '@prefix@/lib';
 use GeniAM;
 use GeniResponse;
 
-if (!defined($GENI_VERSION) || $GENI_VERSION eq "1.0") {
+if (!defined($GENI_VERSION)) {
+    $GENI_VERSION = "1.0";
+}
+
+GeniAM::SetGeniVersion($GENI_VERSION);
+
+if ($GENI_VERSION eq "1.0" || $GENI_VERSION eq "2.0") {
     $GENI_METHODS = {
         "GetVersion"    => \&GeniAM::GetVersion,
         "ListResources" => \&GeniAM::ListResources,
@@ -37,14 +43,15 @@ if (!defined($GENI_VERSION) || $GENI_VERSION eq "1.0") {
 
 #----------------------------------------------------------------------
 # Morph the ProtoGENI response (a hash with three keys; a
-# GeniResponse) into a GENI AM response (a single value or a fault if
+# GeniResponse) into a GENI AMv1 response (a single value or a fault if
 # there is an error).
 #
-# $response is an XML RPC response, which is a three element hash. The
+# $geni_response is an XML RPC response, which is a three element hash. The
 # value element is the GeniResponse hash.
 #----------------------------------------------------------------------
-sub ConvertResponse($)
+sub ConvertResponseV1($)
 {
+    print STDERR "Convert Response 1: " . $GENI_VERSION . "\n";
     my ($geni_response) = @_;
 
     my $decoder = Frontier::RPC2->new();
@@ -62,7 +69,53 @@ sub ConvertResponse($)
     }
     return $response;
 }
-$GENI_RESPONSE_CONVERTER = \&ConvertResponse;
+
+#----------------------------------------------------------------------
+# Morph the ProtoGENI response (a hash with three keys; a
+# GeniResponse) into a GENI AMv2 response (same value and output, but
+# more complex code format).
+#
+# $geni_response is an XML RPC response, which is a three element hash. The
+# value element is the GeniResponse hash.
+#----------------------------------------------------------------------
+sub ConvertResponseV2($)
+{
+    print STDERR "Convert Response 2: " . $GENI_VERSION . "\n";
+    my ($geni_response) = @_;
+
+    my $decoder = Frontier::RPC2->new();
+    my $version = $geni_response->{"geni_api"};
+    my $am_code = GeniResponse::code($geni_response);
+    # For standard GENI errors, the geni_code is the same as our am_code
+    my $geni_code = $am_code;
+    if ($am_code < GeniResponse::GENIRESPONSE_SUCCESS() ||
+	$am_code > GeniResponse::GENIRESPONSE_ALREADYEXISTS()) {
+	# If the code is outside of the standard GENI code range, set
+	# the geni_code to ERROR
+	$geni_code = GeniResponse::GENIRESPONSE_ERROR();
+    }
+
+    my $blob = {
+	"value" => GeniResponse::value($geni_response),
+	"output" => GeniResponse::output($geni_response),
+	"code" => {
+	    "geni_code" => $geni_code,
+	    "am_code" => $am_code,
+	    "am_type" => "protogeni"
+	}
+    };
+
+    if (defined($version)) {
+	$blob->{"geni_api"} = $version;
+    }
+
+    return $decoder->encode_response($blob);
+}
+
+if ($GENI_VERSION eq "1.0") {
+    $GENI_RESPONSE_CONVERTER = \&ConvertResponseV1;
+} else {
+    $GENI_RESPONSE_CONVERTER = \&ConvertResponseV2;
+}
 
 1;
-
