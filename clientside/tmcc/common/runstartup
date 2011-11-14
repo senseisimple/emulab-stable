@@ -120,8 +120,8 @@ else {
     my $glist = `id -G $login`;
     chomp($glist);
     
-    $GID  = $gid;
-    $EGID = $glist;
+    $GID  = $gid + 0;
+    $EGID = "$gid $glist";
     $EUID = $UID = $uid;
 
     exec($runcmd);

@@ -457,8 +457,13 @@ dolinux() {
 	rootdev=/dev/${disk}s${part}
 	echo "fixing Linux root partition ${disk}s${part}"
 	mount -t ext2fs $rootdev /mnt || {
-		echo "EXT2FS mount of $rootdev failed"
+	    # might need a journal recovery, try fsck
+	    echo "EXT2FS mount failed, trying recovery..."
+	    e2fsck -yf $rootdev
+	    mount -t ext2fs $rootdev /mnt || {
+		echo "EXT2FS mount failed"
 		return 1
+	    }
 	}
 
 	# hardwire the boss node
