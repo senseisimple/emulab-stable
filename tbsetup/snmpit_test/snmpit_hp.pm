@@ -1526,8 +1526,25 @@ sub setVlansOnTrunk($$$$) {
 	return 0;
     }
 
+    #
+    # If we are in dual mode, remember the current native VLAN so that we
+    # don't accidentally tag it when we update the VLAN below.
+    #
+    my $pvid;
+    if ($tagOnly ne "admitOnlyVlanTagged") {
+	$pvid = $self->get1("dot1qPvid", $ifIndex);
+    }
+    $self->debug("$id: pvid=", $self->get1("dot1qPvid", $ifIndex),
+		 ", value=$value, ifIndex=$ifIndex\n");
+
     foreach my $vlan_number (@vlan_numbers) {
-	$RetVal = $self->updateOneVlan(0, 0, $value, $vlan_number, $modport);
+	my $untag = 0;
+
+	if (defined($pvid) && $pvid == $vlan_number) {
+	    warn "$id: not tagging VLAN $vlan_number on port $modport ($ifIndex)\n";
+	    $untag = 1;
+	}
+	$RetVal = $self->updateOneVlan(0, $untag, $value, $vlan_number, $modport);
 	if ($RetVal) {
 	    $errors++;
 	    warn "$id:couldn't " .  (($value == 1) ? "add" : "remove") .
