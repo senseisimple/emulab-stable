@@ -653,9 +653,11 @@ sub doSwapout($) {
 	# Non-firewalled experiments can now be paniced, and the swapout
 	# action is similar. 
 	#
-	if ($firewalled && undoFWNodes($experiment)) {
-	    tblog_set_cleanup(0);
-	    return 1;
+	if ($firewalled) {
+	    if (undoFWNodes($experiment)) {
+		tblog_set_cleanup(0);
+		return 1;
+	    }
 	}
 	elsif ($experiment->paniced() &&
 	       Firewall::Panic($experiment, 0, Firewall::PANIC_ZAP())) {
