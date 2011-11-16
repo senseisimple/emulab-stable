@@ -2519,7 +2519,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^PRIVATE_NETMASK$/ && do {
-		    print OUTDEFS "PRIVATE_NETMASK=255.255.255.0\n";
+		    print OUTDEFS "PRIVATE_NETMASK=$control_netmask\n";
 		    last SWITCH;
 		};
 		/^PUBLIC_NETWORK$/ && do {
