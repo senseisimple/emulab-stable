@@ -7939,6 +7939,55 @@ COMMAND_PROTOTYPE(dofwinfo)
 			info("FWINFO: %d firewalled hosts\n", nrows);
 	}
 
+	/*
+	 * We also start returning the MAC addresses for boss, ops, fs
+	 * and subboss servers so that we can create ARP entries. This is
+	 * necessary if the servers are in the same subnet as the nodes
+	 * and thus the gateway is not used to contact them.
+	 */
+	if (vers > 33) {
+		res = mydb_query("select node_id,IP,mac from interfaces "
+				 "where role='ctrl' and node_id in "
+				 "('boss','ops','fs',"
+				 "(select distinct subboss_id from subbosses))",
+				 3);
+		if (!res) {
+			error("FWINFO: %s: DB Error getting server info!\n",
+			      reqp->nodeid);
+			return 1;
+		}
+		nrows = (int)mysql_num_rows(res);
+
+		if (nrows > 0) {
+			struct in_addr cnet, cmask, naddr;
+
+			inet_aton(CONTROL_NETWORK, &cnet);
+			inet_aton(CONTROL_NETMASK, &cmask);
+			cnet.s_addr &= cmask.s_addr;
+
+			for (n = nrows; n > 0; n--) {
+				row = mysql_fetch_row(res);
+
+				/*
+				 * Return the ones on the node control net.
+				 */
+				inet_aton(row[1], &naddr);
+				naddr.s_addr &= cmask.s_addr;
+				if (naddr.s_addr != cnet.s_addr)
+					continue;
+
+				OUTPUT(buf, sizeof(buf),
+				       "SERVER=%s CNETIP=%s CNETMAC=%s\n",
+				       row[0], row[1], row[2]);
+				client_writeback(sock, buf, strlen(buf), tcp);
+			}
+		}
+
+		mysql_free_result(res);
+		if (verbose)
+			info("FWINFO: %d server hosts\n", nrows);
+	}
+
 	return 0;
 }
 

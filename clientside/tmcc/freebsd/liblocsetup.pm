@@ -664,6 +664,11 @@ sub os_fwconfig_line($@)
     my ($fwinfo, @fwrules) = @_;
     my ($upline, $downline);
 
+    if ($fwinfo->{TYPE} ne "ipfw" && $fwinfo->{TYPE} ne "ipfw2-vlan") {
+	warn "*** WARNING: unsupported firewall type '", $fwinfo->{TYPE}, "'\n";
+	return ("false", "false");
+    }
+
     # XXX debugging
     my $logaccept = defined($fwinfo->{LOGACCEPT}) ? $fwinfo->{LOGACCEPT} : 0;
     my $logreject = defined($fwinfo->{LOGREJECT}) ? $fwinfo->{LOGREJECT} : 0;
@@ -673,6 +678,17 @@ sub os_fwconfig_line($@)
     # Convert MAC info to a useable form and filter out the firewall itself
     #
     my $href = $fwinfo->{MACS};
+    while (my ($node,$mac) = each(%$href)) {
+	if ($mac eq $fwinfo->{OUT_IF}) {
+	    delete($$href{$node});
+	} elsif ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	    $$href{$node} = "$1:$2:$3:$4:$5:$6";
+	} else {
+	    warn "*** WARNING: Bad MAC returned for $node in fwinfo: $mac\n";
+	    return ("false", "false");
+	}
+    }
+    $href = $fwinfo->{SRVMACS};
     while (my ($node,$mac) = each(%$href)) {
 	if ($mac eq $fwinfo->{OUT_IF}) {
 	    delete($$href{$node});
@@ -732,9 +748,14 @@ sub os_fwconfig_line($@)
 	    $upline .=
 		"    ifconfig $vlandev inet $myip netmask $mymask rtabid 2\n";
 
-	    # provide GW MAC to inside
-	    $upline .= "    arp -r 2 -s " .
-		$fwinfo->{GWIP} . " " . $fwinfo->{GWMAC} . " pub only\n";
+	    # publish servers (including GW) on inside and for us on outside
+	    if (defined($fwinfo->{SRVMACS})) {
+		my $href = $fwinfo->{SRVMACS};
+		while (my ($ip,$mac) = each %$href) {
+		    $upline .= "    arp -r 2 -s $ip $mac pub only\n";
+		    $upline .= "    arp -s $ip $mac\n";
+		}
+	    }
 
 	    # provide node MACs to outside, and unpublished on inside for us
 	    my $href = $fwinfo->{MACS};

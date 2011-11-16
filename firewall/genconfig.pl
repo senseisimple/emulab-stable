@@ -13,6 +13,7 @@ my $optlist = "eMIf:";
 my $domysql = 0;
 my $doipfw = 1;
 my $expand = 0;
+my $qualifiers = 0;
 my @lines;
 
 sub usage()
@@ -20,6 +21,7 @@ sub usage()
     print "Usage: genconfig [-MI] config ...\n".
 	"  -e      expand EMULAB_ variables\n".
 	"  -f file specify the input rules file\n".
+	"  -q      include qualifiers\n".
 	"  -M      generate mysql commands\n".
 	"  -I      generate IPFW commands\n".
 	"\n".
@@ -37,6 +39,7 @@ sub getfwvars()
     $fwvars{EMULAB_NS} = "155.98.32.70";
     $fwvars{EMULAB_CNET} = "155.98.36.0/22";
     $fwvars{EMULAB_BOSSES} = "boss,subboss";
+    $fwvars{EMULAB_SERVERS} = "boss,subboss,ops";
     $fwvars{EMULAB_MCADDR} = "234.0.0.0/8";
     $fwvars{EMULAB_MCPORT} = "1025-65535";
 }
@@ -89,15 +92,28 @@ sub doconfig($)
 	} else {
 	    $ruleno++;
 	}
+	my $qual;
+	if ($line =~ /#.*\+(\w+)/) {
+	    $qual = $1;
+	}
+
 	($rule = $line) =~ s/\s*#.*//;
 	chomp($rule);
 	$rule = expandfwvars($rule) if ($expand);
 	if ($doipfw) {
-	    print "ipfw add $ruleno $rule\n";
+	    print "ipfw add $ruleno $rule # config=$config";
+	    print ", $qual only)"
+		if ($qualifiers && $qual);
+	    print "\n";
 	}
 	if ($domysql) {
-	    print "INSERT INTO `default_firewall_rules` VALUES (".
-		"'$type','$style',$enabled,$ruleno,'$rule');\n";
+	    if ($qualifiers) {
+		print "INSERT INTO `default_firewall_rules` VALUES (".
+		    "'$type','$style',$enabled,$qual,$ruleno,'$rule');\n";
+	    } else {
+		print "INSERT INTO `default_firewall_rules` VALUES (".
+		    "'$type','$style',$enabled,$ruleno,'$rule');\n";
+	    }
 	}
     }
 
@@ -121,6 +137,9 @@ if (defined($options{"e"})) {
 }
 if (defined($options{"f"})) {
     $datafile = $options{"f"};
+}
+if (defined($options{"q"})) {
+    $qualifiers = 1;
 }
 
 if (@ARGV == 0) {

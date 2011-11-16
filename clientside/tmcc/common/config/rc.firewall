@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -141,6 +141,10 @@ sub doboot()
 	    last SWITCH;
 	};
 	/^ipfw2-vlan$/i && do {
+	    $rc = firewaller();
+	    last SWITCH;
+	};
+	/^ipchains$/i && do {
 	    $rc = firewaller();
 	    last SWITCH;
 	};

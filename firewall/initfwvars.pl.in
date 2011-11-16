@@ -21,7 +21,13 @@ use libdb;
 
 my $CONTROL_NETWORK    = "@CONTROL_NETWORK@";
 my $CONTROL_NETMASK    = "@CONTROL_NETMASK@";
+my $PRIVATE_NETWORK    = "@PRIVATE_NETWORK@";
+my $PRIVATE_NETMASK    = "@PRIVATE_NETMASK@";
+my $PUBLIC_NETWORK    = "@PUBLIC_NETWORK@";
+my $PUBLIC_NETMASK    = "@PUBLIC_NETMASK@";
 my $BOSSNODE_IP        = "@BOSSNODE_IP@";
+my $USERNODE_IP        = "@USERNODE_IP@";
+my $FSNODE_IP          = "@FSNODE_IP@";
 my $FRISBEE_MCASTADDR  = "@FRISEBEEMCASTADDR@";
 my $FRISBEE_MCASTPORT  = "@FRISEBEEMCASTPORT@";
 
@@ -55,13 +61,51 @@ for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
 }
 
 my $str;
+my $res;
 
-# By default there is only "boss"
-$str = "replace into default_firewall_vars values ('EMULAB_BOSSES', 'boss')";
+#
+# Create EMULAB_BOSSES variable.
+#
+
+# There is boss...
+my @bosses = "boss";
+# ...and any subbosses
+$res = DBQueryFatal("select distinct subboss_id from subbosses");
+while (my ($sb) = $res->fetchrow_array()) {
+    push(@bosses, $sb)
+	if ($sb);
+}
+
+my $bstr = join(',', @bosses);
+$str = "replace into default_firewall_vars values ('EMULAB_BOSSES', '$bstr')";
 print "$str\n"
     if (!$doit);
 DBQueryFatal($str)
     if ($doit);
+
+#
+# Create EMULAB_SERVERS variable
+#
+
+# Start with bosses...
+my @servers = @bosses;
+# ...add ops...
+push(@servers, "ops");
+# ...and fs if it exists
+if ($FSNODE_IP ne $USERNODE_IP) {
+    push(@servers, "fs");
+}
+
+my $sstr = join(',', @servers);
+$str = "replace into default_firewall_vars values ('EMULAB_SERVERS', '$sstr')";
+print "$str\n"
+    if (!$doit);
+DBQueryFatal($str)
+    if ($doit);
+
+#
+# Create EMULAB_NS variable
+#
 
 # Use boss IP as "ns" since that is what we assume everywhere else
 $str = "replace into default_firewall_vars values ('EMULAB_NS', '$BOSSNODE_IP')";
@@ -69,6 +113,10 @@ print "$str\n"
     if (!$doit);
 DBQueryFatal($str)
     if ($doit);
+
+#
+# Create EMULAB_CNET variable
+#
 
 # Add the control net in CIDR notation
 $str = "replace into default_firewall_vars values ('EMULAB_CNET', '$CONTROL_NETWORK/$CIDRMASK')";
@@ -78,6 +126,10 @@ DBQueryFatal($str)
     if ($doit);
 
 #
+# Create EMULAB_MCADDR and EMULAB_MCPORT variables
+#
+
+#
 # Frisbee multicast info
 # XXX assumptions, assumptions (as of 9/05).  We could allow up to a /8 network
 # but we assign a unique port as well as address and a port is only 16 bits,
@@ -85,9 +137,15 @@ DBQueryFatal($str)
 # XXX assumptions II (as of 2/08).  frisbeelauncher ticks up the MC address
 # all the way to /8 (it wraps the port number as needed), so lets make it
 # so here.
+# XXX assumptions III (as of 11/11).  Frisbee master server running on
+# subboss can open up the port range even wider, by default starting at 1025.
 #
 my @mcaddr = split /\./, $FRISBEE_MCASTADDR, 4;
 $FRISBEE_MCASTADDR = $mcaddr[0] . ".0.0.0/8";
+if ($bstr ne "boss") {
+    $FRISBEE_MCASTPORT = 1025
+	if ($FRISBEE_MCASTPORT > 1025);
+}
 $FRISBEE_MCASTPORT = $FRISBEE_MCASTPORT . "-65535";
 
 $str = "replace into default_firewall_vars values ('EMULAB_MCADDR', '$FRISBEE_MCASTADDR')";
@@ -101,5 +159,35 @@ print "$str\n"
     if (!$doit);
 DBQueryFatal($str)
     if ($doit);
+
+#
+# Check for support of non-segmented control network.
+#
+# For this to work, all servers on the same subnet must have entries
+# in the interfaces table with a valid MAC address.
+#
+my $nodenet = inet_aton($CONTROL_NETWORK) & inet_aton($CONTROL_NETMASK);
+my $privnet = inet_aton($PRIVATE_NETWORK) & inet_aton($PRIVATE_NETMASK);
+my $pubnet = inet_aton($PUBLIC_NETWORK) & inet_aton($PUBLIC_NETMASK);
+
+my $segcnet = 1;
+if ($nodenet eq $privnet && $privnet eq $pubnet) {
+    print "You appear to be using a non-segmented control network.\n";
+    $segcnet = 0;
+}
+
+foreach my $n (@servers) {
+    my $res = DBQueryFatal("select node_id,IP,mac from interfaces ".
+			  "where role='ctrl' and node_id='$n'");
+    if ($res->numrows == 0) {
+	if ($segcnet) {
+	    print STDERR "NOTE: '$n' does not have an interfaces table entry,".
+		" but this doesn't matter in your config.\n";
+	} else {
+	    print STDERR "WARNING: '$n' does not have an interfaces table entry,".
+		" you will need to create one for the control net interface.\n";
+	}
+    }
+}
 
 exit(0);

@@ -24,6 +24,9 @@
  *
  * Note, this is assumed to be an integer. No need for 3.23.479 ...
  * NB: See ron/libsetup.pm. That is version 4! I'll merge that in. 
+ *
+ * IMPORTANT NOTE: if you change CURRENT_VERSION, you must also change
+ * it in clientside/tmcc/common/libsetup.pm!
  */
 #define DEFAULT_VERSION		2
-#define CURRENT_VERSION		33
+#define CURRENT_VERSION		34

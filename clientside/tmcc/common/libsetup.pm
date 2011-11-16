@@ -58,7 +58,10 @@ use librc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 33; };
+# IMPORTANT NOTE: if you change the version here, you must also change it
+# in clientside/lib/tmcd/tmcd.h!
+#
+sub TMCD_VERSION()	{ 34; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -2135,6 +2138,45 @@ sub forcecopy($$)
 my %fwvars = ();
 
 #
+# Not pretty, but...
+#
+sub insubnet($$)
+{
+    my ($netspec,$addr) = @_;
+    my ($net,$mask);
+    my @NETMASKS = (
+	0x10000000,						#  0
+	0x80000000, 0xC0000000, 0xE0000000, 0xF0000000,		#  1 -	4
+	0xF8000000, 0xFC000000, 0xFE000000, 0xFF000000,		#  5 -	8
+	0xFF800000, 0xFFC00000, 0xFFE00000, 0xFFF00000,		#  9 - 12
+	0xFFF80000, 0xFFFC0000, 0xFFFE0000, 0xFFFF0000,		# 13 - 16
+	0xFFFF8000, 0xFFFFC000, 0xFFFFE000, 0xFFFFF000,		# 17 - 20
+	0xFFFFF800, 0xFFFFFC00, 0xFFFFFE00, 0xFFFFFF00,		# 21 - 24
+	0xFFFFFF80, 0xFFFFFFC0, 0xFFFFFFE0, 0xFFFFFFF0,		# 25 - 28
+	0xFFFFFFF8, 0xFFFFFFFC, 0xFFFFFFFE, 0xFFFFFFFF		# 29 - 32
+    );
+
+    if ($netspec =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)\/(\d+)$/) {
+	return 0
+	    if ($1 > 255 || $2 > 255 || $3 > 255 || $4 > 255 || $5 > 32);
+	$mask = $NETMASKS[$5];
+	$net = (($1 << 24) | ($2 << 16) | ($3 << 8) | $4);
+	$net &= $mask;
+    } else {
+	return 0;
+    }
+
+    if ($addr =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+	return 0
+	    if ($1 > 255 || $2 > 255 || $3 > 255 || $4 > 255);
+	$addr = (($1 << 24) | ($2 << 16) | ($3 << 8) | $4);
+	$addr &= $mask;
+    }
+
+    return ($addr == $net);
+}
+
+#
 # Substitute values of variables in a firewall rule.
 #
 sub expandfwvars($)
@@ -2167,6 +2209,7 @@ sub getfwconfig($$;$)
     my @fwrules     = ();
     my @fwhosts	    = ();
     my %fwhostmacs  = ();
+    my %fwsrvmacs   = ();
 
     $$infoptr = undef;
     @$rptr = ();
@@ -2180,6 +2223,7 @@ sub getfwconfig($$;$)
     my $rpat   = q(RULENO=(\d*) RULE="(.*)");
     my $vpat   = q(VAR=(EMULAB_\w+) VALUE="(.*)");
     my $hpat   = q(HOST=([-\w]+) CNETIP=([\d\.]*) CNETMAC=([\da-f]{12}));
+    my $spat   = q(SERVER=([-\w]+) CNETIP=([\d\.]*) CNETMAC=([\da-f]{12}));
     my $lpat   = q(LOG=([\w,]+));
 
     $fwinfo->{"TYPE"} = "none";
@@ -2237,6 +2281,17 @@ sub getfwconfig($$;$)
 
 	    # and save off the MACs
 	    $fwhostmacs{$host} = $mac;
+	} elsif ($line =~ /$spat/) {
+	    my $srv = $1;
+	    my $ip = $2;
+	    my $mac = $3;
+
+	    #
+	    # Save off the MACs. Note that since we hash by IP address
+	    # we get a unique set of nodes. This is desirable for setups
+	    # where, e.g., ops == fs.
+	    #
+	    $fwsrvmacs{$ip} = $mac;
 	} elsif ($line =~ /$lpat/) {
 	    for my $log (split(',', $1)) {
 		if ($log =~ /^allow|accept$/) {
@@ -2248,23 +2303,66 @@ sub getfwconfig($$;$)
 		}
 	    }
 	} else {
+	    #
+	    # This used to be fatal. But having unexpected input lines blow
+	    # up the firewall is probably worse than ignoring the lines.
+	    # And it requires that we bump the tmcd version number and
+	    # conditionalize tmcd when we add new line types (which I had
+	    # to do when I added server lines).
+	    #
 	    warn("*** WARNING: Bad firewall info line: $line\n");
-	    return 1;
 	}
     }
 
-    # XXX inner elab: make sure we have a "myfs" entry
-    if (defined($fwhostmacs{"myboss"}) && !defined($fwhostmacs{"myfs"})) {
-	for my $host (@fwhosts) {
-	    if ($host =~ /NAME=myops/) {
-		$host =~ s/ALIASES=''/ALIASES='myfs'/;
+    #
+    # XXX inner elab: make sure we have "myops" and "myfs" entries.
+    #
+    # If there is no myops we are doing ops-as-a-jail. Here we alias both
+    # myops and myfs to myboss; not right, but good enough.
+    # 
+    # If just myfs is not defined, then ops is the file server and we
+    # alias myfs to myops.
+    #
+    if (defined($fwhostmacs{"myboss"})) {
+	if (!defined($fwhostmacs{"myops"})) {
+	    for my $host (@fwhosts) {
+		if ($host =~ /NAME=myboss/) {
+		    $host =~ s/ALIASES=''/ALIASES='myops,myfs'/;
+		}
+	    }
+	} elsif (!defined($fwhostmacs{"myfs"})) {
+	    for my $host (@fwhosts) {
+		if ($host =~ /NAME=myops/) {
+		    $host =~ s/ALIASES=''/ALIASES='myfs'/;
+		}
 	    }
 	}
     }
 
-    # info for proxy ARP
-    $fwinfo->{"GWIP"} = $fwvars{"EMULAB_GWIP"};
-    $fwinfo->{"GWMAC"} = $fwvars{"EMULAB_GWMAC"};
+    # merge GW info into fwsrvmacs hash
+    $fwsrvmacs{$fwvars{"EMULAB_GWIP"}} = $fwvars{"EMULAB_GWMAC"};
+    $fwsrvmacs{$fwvars{"EMULAB_GWIP"}} =~ s/://g;
+
+    # info for proxy ARP, to publish inside...
+    if (%fwsrvmacs) {
+	#
+	# Prune out any that are not on the EMULAB_CNET.
+	#
+	if (!exists($fwvars{"EMULAB_CNET"})) {
+	    $fwinfo->{"SRVMACS"} = \%fwsrvmacs;
+	} else {
+	    my %lsrv = ();
+	    foreach my $ip (keys %fwsrvmacs) {
+		if (insubnet($fwvars{"EMULAB_CNET"}, $ip)) {
+		    $lsrv{$ip} = $fwsrvmacs{$ip};
+		}
+	    }
+	    if (%lsrv) {
+		$fwinfo->{"SRVMACS"} = \%lsrv;
+	    }
+	}
+    }
+    # ...and outside.
     if (%fwhostmacs) {
 	$fwinfo->{"MACS"} = \%fwhostmacs;
     }

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,6 +9,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= firewall
 TBDB		= @TBDBNAME@
+MDOPTS		= --compact --skip-extended-insert --no-create-info --skip-set-charset
 
 FW_SCRIPTS	= initfwvars.pl
 FW_FILES	= open.sql closed.sql basic.sql elabinelab.sql
@@ -27,7 +28,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 	$(SRCDIR)/genconfig.pl -f $(SRCDIR)/fw-rules -M $* > $@
 
 insertvars: initfwvars.pl
-	@if ! `mysqldump $(TBDB) default_firewall_vars >/dev/null 2>&1`; then \
+	@if ! `mysqldump $(MDOPTS) $(TBDB) default_firewall_vars >vars.old`; then \
 		echo -n '*** default_firewall_vars table does not exist, '; \
 		echo 'see sql/database-migrate.txt'; \
 		exit 1; \
@@ -37,10 +38,11 @@ insertvars: initfwvars.pl
 	fi
 
 insertrules: $(FW_FILES)
-	@if ! `mysqldump $(TBDB) default_firewall_rules >/dev/null 2>&1`; then \
+	@if ! `mysqldump $(MDOPTS) -w "1 order by type,style,ruleno" $(TBDB) default_firewall_rules >rules.old`; then \
 		echo -n '*** default_firewall_rules table does not exist, '; \
 		echo 'see sql/database-migrate.txt'; \
 		exit 1; \
 	else \
 		cat $(FW_FILES) | mysql $(TBDB); \
+		echo 'FW rules updated in DB'; \
 	fi

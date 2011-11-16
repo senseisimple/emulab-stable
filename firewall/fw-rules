@@ -8,8 +8,9 @@
 # Firewall rule template.
 #
 # The bulk of the line is the body of an IPFW rule, a '#' denoted "comment"
-# at the end of the line indicates a rule number to use, and a comma
-# separated list of styles to which the rule applies.
+# at the end of the line indicates a rule number to use, a comma separated
+# list of styles to which the rule applies, and an optional qualifier that
+# indicates the types of firewalled nodes to which the rule should apply.
 #
 # Styles:
 #
@@ -17,8 +18,15 @@
 #	CLOSED   	allows only Emulab infrastructure services
 #	BASIC		CLOSED + ssh from anywhere
 #	ELABINELAB	Elab-in-elab, eliminates many Emulab services
-#	WINDOWS		Rules specific to WinXP, not a real style right now
-#			these are usually incorporated into the BASIC rules.
+#
+# Qualifiers:
+#
+#	WINDOWS		For nodes running some variant of Windows
+#	SAMENET		For nodes that are on the same subnet as any
+#			"control" host (boss, subbosses, ops, fs).
+#
+# Note that currently, we do not support the qualifier. Rules with a
+# qualifier are applied unconditionally to the style which they are a part of.
 #
 # Variables expanded by rc.firewall script that can be used here:
 #
@@ -30,6 +38,8 @@
 #	EMULAB_BOSSES	Comma separated list of subbosses (including "boss"),
 #			used for services that subbosses provide
 #			(dhcp/tftp/frisbee).
+#	EMULAB_SERVERS	Comma separated list of all servers
+#			(EMULAB_BOSSES + "ops" + "fs")
 #
 # Currently these are sufficient for rules we use.  Note that you can
 # safely use symbolic hostnames "boss", "ops", "fs", "users", "ntp1"
@@ -220,7 +230,21 @@ deny not mac-type ip				# 80: BASIC,CLOSED,ELABINELAB
 #    (due to the helper function).
 # so for now we allow any IP traffic from the gateway.
 #
-allow ip from EMULAB_GWIP to any in not via vlan0	# 83: CLOSED,ELABINELAB
+allow ip from EMULAB_GWIP to any in not via vlan0	# 81: CLOSED,ELABINELAB
+
+#
+# XXX yuk 2!  In a non-segmented control network or in a configuration with
+# subbosses, some or all of the server machines will be a part of "the node
+# control net" so we cannot unconditionally block all traffic to/from outside
+# control net addresses. Here we allow through all traffic involving the known
+# servers and let later rules further limit it.
+#
+skipto 90 ip from EMULAB_SERVERS to any in not via vlan0 # 82: CLOSED,ELABINELAB+SAMENET
+skipto 90 ip from any to EMULAB_SERVERS in via vlan0	 # 83: CLOSED,ELABINELAB+SAMENET
+
+#
+# Otherwise, nodes inside/outside of the firewall cannot talk to each other. 
+#
 deny ip from any to EMULAB_CNET in via vlan0		# 84: CLOSED,ELABINELAB
 deny ip from EMULAB_CNET to any in not via vlan0	# 85: CLOSED,ELABINELAB
 
@@ -230,7 +254,7 @@ deny ip from EMULAB_CNET to any in not via vlan0	# 85: CLOSED,ELABINELAB
 # Beyond this rule we no longer have to check to make sure that source
 # hosts like "boss" and "ops" come in the correct interface.
 #
-deny ip from not 0.0.0.0,255.255.255.255,EMULAB_CNET to any in via vlan0 # 88: BASIC,CLOSED,ELABINELAB
+deny ip from not 0.0.0.0,255.255.255.255,EMULAB_CNET to any in via vlan0 # 90: BASIC,CLOSED,ELABINELAB
 
 #
 # By convention, user supplied rules are in the 100-60000 range
@@ -300,8 +324,10 @@ allow tcp from any to myboss 3069 in not recv vlan0 setup keep-state   # 60044: 
 
 #
 # Frisbee master server from boss
+# elabinelab: boss to myboss
 #
 allow tcp from any to EMULAB_BOSSES 64494 in via vlan0 setup keep-state	# 60045: BASIC,CLOSED
+allow tcp from myboss to EMULAB_BOSSES 64494 in via vlan0 setup keep-state # 60045: ELABINELAB
 
 #
 # Frisbee multicast with boss
@@ -343,16 +369,16 @@ allow icmp from any to boss icmptypes 0		# 60051: CLOSED,ELABINELAB
 # SMB (445) with fs
 # rdesktop (3389) to nodes
 #
-allow tcp from any to any 80,443 in via vlan0 setup keep-state # 60056: WINDOWS,BASIC
-allow tcp from any to fs 445 in via vlan0 setup keep-state # 60057: WINDOWS,BASIC
-allow tcp from any not 0-1023 to any 3389 in not recv vlan0 setup keep-state # 60059: WINDOWS,BASIC
+allow tcp from any to any 80,443 in via vlan0 setup keep-state # 60056: BASIC+WINDOWS
+allow tcp from any to fs 445 in via vlan0 setup keep-state # 60057: BASIC+WINDOWS
+allow tcp from any not 0-1023 to any 3389 in not recv vlan0 setup keep-state # 60059: BASIC+WINDOWS
 
 #
 # Windows
 # Explicitly stop blaster (135,4444) and slammer (1434)
 #
-deny tcp from any to any 135,4444			# 60060: WINDOWS
-deny udp from any to any 1434				# 60061: WINDOWS
+deny tcp from any to any 135,4444			# 60060: BASIC,CLOSED,ELABINELAB+WINDOWS
+deny udp from any to any 1434				# 60061: BASIC,CLOSED,ELABINELAB+WINDOWS
 
 # Boot time only services (DHCP, TFTP, bootinfo, TMCC).
 
@@ -361,13 +387,21 @@ deny udp from any to any 1434				# 60061: WINDOWS
 allow udp from any 68 to 255.255.255.255 67 recv vlan0	# 60064: BASIC,CLOSED,ELABINELAB
 allow udp from any 67 to any 68 in not recv vlan0	# 60065: BASIC,CLOSED,ELABINELAB
 
+#
 # TFTP with boss or ops
 # XXX tftpd can pick any port it wants in response to a request from any port
-# so we have to open wide
+# so we have to open wide.
+#
+# Note that for elabinelab, inside nodes still need to be able to talk to
+# real boss for PXE boot.
+#
 allow udp from any to EMULAB_BOSSES,ops 69 keep-state			 # 60066: BASIC,CLOSED,ELABINELAB
 allow udp from EMULAB_BOSSES,ops not 0-1023 to any not 0-1023 keep-state # 60067: BASIC,CLOSED,ELABINELAB
 
-# bootinfo with boss (nodes request/receive info or boss does PXEWAKEUP)
+#
+# Emulab bootinfo with boss (nodes request/receive info or boss does PXEWAKEUP)
+# XXX do we really need this for elabinelab inner nodes?
+#
 allow udp from any 9696 to boss 6969 keep-state		# 60068: BASIC,CLOSED,ELABINELAB
 allow udp from boss 6970 to any 9696			# 60069: BASIC,CLOSED,ELABINELAB
 
