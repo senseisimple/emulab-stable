@@ -139,7 +139,7 @@ sub mergeLink($$)
     $linkparents{$left} = $right;
 }
 
-$query_result =
+my $query_result =
     DBQueryFatal("select vname, vlink, vport from virt_bridges ".
 		 " where pid='$pid' and eid='$eid'");
 while (my ($bridgeid, $linkid, $vport) = $query_result->fetchrow_array) {
@@ -160,6 +160,18 @@ my %ips   = ();
 my %lans  = ();
 
 #
+# Find any firewall(s)
+#
+my %firewalls = ();
+$query_result =
+    DBQueryFatal("select fwname from virt_firewalls " .
+		 "where pid='$pid' and eid='$eid' " .
+		 "      order by fwname");
+while (my ($fwname) = $query_result->fetchrow_array()) {
+    $firewalls{$fwname} = 1;
+}
+
+#
 # Grab the node table and save the ips for each node:port. We are going to use
 # this info to convert the DB representation of:
 #
@@ -169,7 +181,7 @@ my %lans  = ();
 #
 # Since the port numbers are totally pointless outside of assign_wrapper.
 #
-my $query_result =
+$query_result =
     DBQueryFatal("select v.vname from virt_nodes as v " .
 		 "where v.pid='$pid' and v.eid='$eid' " .
 		 "      order by v.vname");
@@ -180,6 +192,10 @@ while (my ($vname) = $query_result->fetchrow_array()) {
     # If this is a bridge node, skip.
     next
 	if (exists($bridges{$vname}));
+
+    # If this is a firewall, skip.
+    next
+	if (exists($firewalls{$vname}));
 
     print $LTOUT "h $vname\n";
 }
