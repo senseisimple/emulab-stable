@@ -28,6 +28,12 @@ my $CONFIGBASE = "hooks.multihook";
 my $whichhook = `basename '$0'`; 
 chomp($whichhook);
 
+#
+# Figure out path to the hook directory
+#
+my $hookpath = `dirname '$0'`;
+chomp $hookpath;
+
 my $configvar = $CONFIGBASE . "." . $whichhook;
 
 #
@@ -53,6 +59,12 @@ my @inputlines = <STDIN>;
 # No real error checking for now.
 #
 foreach my $script (@scripts) {
+
+    if ($script !~ /^\.|\//) {
+        # Relative paths get the hook directory pre-pended
+        $script = "$hookpath/$script";
+    }
+
     open(SCRIPT,"| $script");
     print SCRIPT @inputlines;
     close(SCRIPT);
