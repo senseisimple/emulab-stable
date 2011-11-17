@@ -10,6 +10,17 @@
 # to. Intended for situations where you have people pushing up to a central
 # repository that is also the 'real' copy (eg. of a paper)
 #
+# NOTE: In order to use this script, you need to set:
+#     git config receive.denyCurrentBranch ignore
+#
+
+#
+# TODO:
+#   Support for automatically determining the branch that's currently checked
+#       out, rather than hardcoding a single branch
+#   Support for stashing or merging uncommitted changes, rather than just
+#       failing
+#
 
 #
 # Note: Does not hanle the case where the master branch is being deleted. This
@@ -39,12 +50,15 @@ if ($master_pushed) {
     # Check to see whether there are any changes (staged or not) before doing
     # the checkout, so that we can give a reasonable error message
     #
-    if (system("$GIT diff-files --quiet") ||
-        system("$GIT diff-index --cached --quiet HEAD")) {
-            print "*** ERROR: Repository being pushed to has uncommited ";
-            print "changes, checkout aborted\n";
-            exit(1);
+    if (system("$GIT diff-files --quiet")) {
+        print "*** ERROR: Repository being pushed to has uncommited ";
+        print "changes, checkout aborted\n";
+        exit(1);
     }
 
-    system("$GIT checkout master");
+    #
+    # Note that we use 'reset' rather than 'checkout' - the latter doesn't
+    # work for reasons that appear to be very complicated...
+    #
+    system("$GIT reset --hard $BRANCH");
 }
