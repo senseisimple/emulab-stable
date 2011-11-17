@@ -1,0 +1,50 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Simple script to do a checkout whenever the 'master' branch is pushed
+# to. Intended for situations where you have people pushing up to a central
+# repository that is also the 'real' copy (eg. of a paper)
+#
+
+#
+# Note: Does not hanle the case where the master branch is being deleted. This
+# probably does not matter!
+#
+
+my $BRANCH = "master";
+my $GIT = "git";
+
+#
+# Look through all of the changed references to see if any was for the master
+# branch
+#
+my $master_pushed = 0;
+foreach my $refline (<STDIN>) {
+    chomp $refline;
+    my ($oldrev, $newrev, $refname) = split(/\s+/, $refline);
+    if ($refname eq "refs/heads/$BRANCH") {
+        $master_pushed = 1;
+    }
+}
+
+if ($master_pushed) {
+    print "Checking out new $BRANCH\n";
+
+    #
+    # Check to see whether there are any changes (staged or not) before doing
+    # the checkout, so that we can give a reasonable error message
+    #
+    if (system("$GIT diff-files --quiet") ||
+        system("$GIT diff-index --cached --quiet HEAD")) {
+            print "*** ERROR: Repository being pushed to has uncommited ";
+            print "changes, checkout aborted\n";
+            exit(1);
+    }
+
+    system("$GIT checkout master");
+}
