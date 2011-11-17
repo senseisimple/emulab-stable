@@ -238,16 +238,16 @@ $| = 1; #Turn off line buffering on output
 umask(0002);
 
 # Traditional Emulab defaults that can be overridden but must be set
-our $VARDIR = "/var/emulab";
-our $BINDIR = "/usr/local/etc/emulab";
-our $PROJDIR = "/proj";
+my $VARDIR = "/var/emulab";
+my $BINDIR = "/usr/local/etc/emulab";
+my $PROJDIR = "/proj";
 
-our $LOGRUN = "";
-our $LOGDIR = "";
-our $SHAREDDIR = "";
-our $EVENTSERVER = "";
-our $EVENTID = "";
-our $STANDALONE = 0;
+my $LOGRUN = "";
+my $LOGDIR = "";
+my $SHAREDDIR = "";
+my $EVENTSERVER = "";
+my $EVENTID = "";
+my $STANDALONE = 0;
 
 #
 # Parse command arguments. Since Linktest is run via the event system,
@@ -319,21 +319,21 @@ if ($compat < 1.2) {
 }
 
 # path to applications and files
-our $PATH_NICKNAME = "$VARDIR/boot/nickname";
-our $PATH_CONTROL_IF = "$VARDIR/boot/controlif";
-our $PATH_KEYFILE = "$VARDIR/boot/eventkey";
-our $PATH_RUDE = "$BINDIR/emulab-rude";
-our $PATH_CRUDE = "$BINDIR/emulab-crude";
-our $PATH_IPERF = "$BINDIR/emulab-iperf";
-our $PATH_RCTOPO = "$BINDIR/rc/rc.topomap";
-our $PATH_EMULAB_SYNC = "$BINDIR/emulab-sync";
-our $PATH_LTEVENT = "$BINDIR/ltevent";
-our $PATH_TEVC = "$BINDIR/tevc";
-our $RUN_PATH = "$BINDIR"; # where the linktest-ns runs.
-our $PATH_SCHEDFILE = "$VARDIR/logs/linktest.sched";
-our $PATH_SYNCSERVER = "$VARDIR/boot/syncserver";
-our $PATH_TOPOFILE = "$VARDIR/boot/ltmap";
-our $PATH_PTOPOFILE = "$VARDIR/boot/ltpmap";
+my $PATH_NICKNAME = "$VARDIR/boot/nickname";
+my $PATH_CONTROL_IF = "$VARDIR/boot/controlif";
+my $PATH_KEYFILE = "$VARDIR/boot/eventkey";
+my $PATH_RUDE = "$BINDIR/emulab-rude";
+my $PATH_CRUDE = "$BINDIR/emulab-crude";
+my $PATH_IPERF = "$BINDIR/emulab-iperf";
+my $PATH_RCTOPO = "$BINDIR/rc/rc.topomap";
+my $PATH_EMULAB_SYNC = "$BINDIR/emulab-sync";
+my $PATH_LTEVENT = "$BINDIR/ltevent";
+my $PATH_TEVC = "$BINDIR/tevc";
+my $RUN_PATH = "$BINDIR"; # where the linktest-ns runs.
+my $PATH_SCHEDFILE = "$VARDIR/logs/linktest.sched";
+my $PATH_SYNCSERVER = "$VARDIR/boot/syncserver";
+my $PATH_TOPOFILE = "$VARDIR/boot/ltmap";
+my $PATH_PTOPOFILE = "$VARDIR/boot/ltpmap";
 
 my $schedfile = $PATH_SCHEDFILE;
 if ($printsched) {
@@ -721,8 +721,8 @@ exit(EXIT_OK);
 # Unlink Test Functions
 ##############################################################################
 
-our $control_if = "";
-our %interfaces = ();
+my $control_if = "";
+my %interfaces = ();
 
 sub setup_interfaces {
     $control_if = `cat $PATH_CONTROL_IF`;
