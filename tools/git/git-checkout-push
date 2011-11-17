@@ -29,6 +29,14 @@
 
 my $BRANCH = "master";
 my $GIT = "git";
+my $UNSAFE = 0;
+
+#
+# For reasons not clear to me, one has to tell git where the actual working
+# tree is - this makes some layout assumptions that probably work most of
+# the time
+#
+$ENV{GIT_WORK_TREE} = "$ENV{GIT_DIR}/../";
 
 #
 # Look through all of the changed references to see if any was for the master
@@ -50,7 +58,7 @@ if ($master_pushed) {
     # Check to see whether there are any changes (staged or not) before doing
     # the checkout, so that we can give a reasonable error message
     #
-    if (system("$GIT diff-files --quiet")) {
+    if (!$UNSAFE && system("$GIT diff-files --quiet -q --exit-code")) {
         print "*** ERROR: Repository being pushed to has uncommited ";
         print "changes, checkout aborted\n";
         exit(1);
