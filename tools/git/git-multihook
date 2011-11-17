@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Script to allow more than one hook script to be called from a single git
+# hook.
+#
+# To set up, set the config variables:
+#     git config --add hooks.multihook.<hookname> <script>
+# ... where <hookname> is the name of the hook that is being called (eg.
+# 'post-receive'), and <script> is the other hook script you want to call.
+# It's a good idea to give the full path to this script.
+#
+# You can run this command more than once to cause more than one other script
+# to get called.
+#
+
+my $GIT = "git";
+my $CONFIGBASE = "hooks.multihook";
+
+#
+# Figure out which hook we are being called as
+#
+my $whichhook = `basename '$0'`; 
+chomp($whichhook);
+
+my $configvar = $CONFIGBASE . "." . $whichhook;
+
+#
+# Figure out which other scripts we are supposed to call
+# (Note that, for now, we don't support running them in any order other than
+# the one that 'git config' happens to return.)
+#
+my @scripts = `$GIT config --get-all $configvar`;
+chomp @scripts;
+
+if (!@scripts) {
+    print "*** WARNING: git-multihook in use, but $configvar is empty\n";
+    exit;
+}
+
+#
+# Simply read in the stuff we were passed on STDIN, we'll pass it to the other
+# scripts we call
+#
+my @inputlines = <STDIN>;
+
+#
+# No real error checking for now.
+#
+foreach my $script (@scripts) {
+    open(SCRIPT,"| $script");
+    print SCRIPT @inputlines;
+    close(SCRIPT);
+}
