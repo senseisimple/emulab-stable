@@ -2327,7 +2327,7 @@ sub getfwconfig($$;$)
 	if (!defined($fwhostmacs{"myops"})) {
 	    for my $host (@fwhosts) {
 		if ($host =~ /NAME=myboss/) {
-		    $host =~ s/ALIASES=''/ALIASES='myops,myfs'/;
+		    $host =~ s/ALIASES=''/ALIASES='myops myfs'/;
 		}
 	    }
 	} elsif (!defined($fwhostmacs{"myfs"})) {
