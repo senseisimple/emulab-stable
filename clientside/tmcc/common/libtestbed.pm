@@ -190,7 +190,11 @@ sub TBTimeStamp()
 
 sub TBTimeStampWithDate()
 {
-    return POSIX::strftime("%m/%d/20%y %H:%M:%S", localtime());
+    my ($seconds, $microseconds) = gettimeofday();
+
+    return POSIX::strftime("%m/%d/20%y %H:%M:%S", localtime($seconds))
+	. ":$microseconds";
+
 }
 
 #
