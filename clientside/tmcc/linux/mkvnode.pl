@@ -173,10 +173,10 @@ getgenvnodeconfig(\%vnconfig) == 0
 
 # XXX: need to do this for each type encountered! Only happens once.
 my $vmtype = GENVNODETYPE();
-TBDebugTimeStamp("starting $vmtype rootPreConfig()")
+TBDebugTimeStampWithDate("starting $vmtype rootPreConfig()")
     if ($debug);
 $libops{GENVNODETYPE()}{'rootPreConfig'}->();
-TBDebugTimeStamp("finished $vmtype rootPreConfig()")
+TBDebugTimeStampWithDate("finished $vmtype rootPreConfig()")
     if ($debug);
 
 # Link and linkdelay stuff we need in the root context.
@@ -206,11 +206,11 @@ if ($debug) {
     print "tunconfig:\n" . Dumper(%tunconfig);
 }
 
-TBDebugTimeStamp("starting $vmtype rootPreConfigNetwork")
+TBDebugTimeStampWithDate("starting $vmtype rootPreConfigNetwork")
     if ($debug);
 $libops{GENVNODETYPE()}{'rootPreConfigNetwork'}->(\%ifconfigs,{},\%ldconfigs)
     == 0 or fatal("rootPreConfigNetwork failed!");
-TBDebugTimeStamp("finished $vmtype rootPreConfigNetwork")
+TBDebugTimeStampWithDate("finished $vmtype rootPreConfigNetwork")
     if ($debug);
 
 my ($vmid,$ret,$err);
@@ -428,14 +428,14 @@ if ($childpid) {
 else {
     $SIG{TERM} = 'DEFAULT';
 
-    TBDebugTimeStamp("Starting the container")
+    TBDebugTimeStampWithDate("Starting the container")
 	if ($debug);
 
     if (safeLibOp($vnodeid,'vnodeBoot',1,1,$vnodeid,$vmid)) {
 	print STDERR "*** ERROR: vnodeBoot failed\n";
 	exit(1);
     }
-    TBDebugTimeStamp("Container has been started")
+    TBDebugTimeStampWithDate("Container has been started")
 	if ($debug);
     exit(0);
 }
@@ -443,10 +443,10 @@ if (safeLibOp($vnodeid,'vnodePostConfig',1,1,$vnodeid,$vmid)) {
     MyFatal("vnodePostConfig failed");
 }
 # XXX: need to do this for each type encountered!
-TBDebugTimeStamp("starting $vmtype rootPostConfig()")
+TBDebugTimeStampWithDate("starting $vmtype rootPostConfig()")
     if ($debug);
 $libops{$vmtype}{'rootPostConfig'}->();
-TBDebugTimeStamp("finished $vmtype rootPostConfig()")
+TBDebugTimeStampWithDate("finished $vmtype rootPostConfig()")
     if ($debug);
 
 # This is for vnodesetup
@@ -631,7 +631,7 @@ sub safeLibOp($$$$;@) {
     if (@args > 0) {
 	$sargs = join(',',@args);
     }
-    TBDebugTimeStamp("starting $vmtype $op($sargs)")
+    TBDebugTimeStampWithDate("starting $vmtype $op($sargs)")
 	if ($debug);
     my $ret = eval {
 	$libops{$vmtype}{$op}->(@args);
@@ -642,7 +642,7 @@ sub safeLibOp($$$$;@) {
 	if ($autolog) {
 	    ;
 	}
-	TBDebugTimeStamp("failed $vmtype $op($sargs): $@")
+	TBDebugTimeStampWithDate("failed $vmtype $op($sargs): $@")
 	    if ($debug);
 	return (-1,$err);
     }
@@ -651,12 +651,12 @@ sub safeLibOp($$$$;@) {
 	if ($autolog) {
 	    ;
 	}
-	TBDebugTimeStamp("failed $vmtype $op($sargs): exited with $ret")
+	TBDebugTimeStampWithDate("failed $vmtype $op($sargs): exited with $ret")
 	    if ($debug);
 	return ($ret,$err);
     }
 
-    TBDebugTimeStamp("finished $vmtype $op($sargs)")
+    TBDebugTimeStampWithDate("finished $vmtype $op($sargs)")
 	if ($debug);
 
     return $ret;
