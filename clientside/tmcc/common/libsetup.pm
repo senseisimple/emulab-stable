@@ -26,7 +26,7 @@ use Exporter;
 	 forcecopy
          getmanifest fetchmanifestblobs runbootscript runhooks 
 
-	 TBDebugTimeStamp TBDebugTimeStampsOn
+	 TBDebugTimeStamp TBDebugTimeStampWithDate TBDebugTimeStampsOn
 
 	 MFS REMOTE REMOTEDED CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP
 	 USESFS SHADOW FSRVTYPE PROJDIR EXPDIR
@@ -3099,6 +3099,26 @@ sub TBTimeStamp()
     return POSIX::strftime("%H:%M:%S", localtime($seconds)) . ":$microseconds";
 }
 
+sub TBTimeStampWithDate()
+{
+    # To avoid problems with images not having the module installed yet.
+    if (! $imported_hires) {
+	require Time::HiRes;
+	import Time::HiRes;
+	$imported_hires = 1;
+    }
+    my ($seconds, $microseconds) = Time::HiRes::gettimeofday();
+
+    if (! $imported_POSIX) {
+	require POSIX;
+	import POSIX qw(strftime);
+	$imported_POSIX = 1;
+    }
+
+    return POSIX::strftime("%m/%d/20%y %H:%M:%S", localtime($seconds))
+	. ":$microseconds";
+}
+
 #
 # Print out a timestamp if the TIMESTAMPS configure variable was set.
 #
@@ -3109,6 +3129,14 @@ sub TBDebugTimeStamp(@)
     my @strings = @_;
     if ($TIMESTAMPS) {
 	print "TIMESTAMP: ", TBTimeStamp(), " ", join("",@strings), "\n";
+    }
+}
+
+sub TBDebugTimeStampWithDate(@)
+{
+    my @strings = @_;
+    if ($TIMESTAMPS) {
+	print "TIMESTAMP: ", TBTimeStampWithDate(), " ", join("",@strings), "\n";
     }
 }
 
