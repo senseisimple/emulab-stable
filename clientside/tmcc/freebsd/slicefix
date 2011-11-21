@@ -132,8 +132,11 @@ dofreebsd() {
 	rootdev=/dev/${disk}s${part}a
 	echo "fixing FreeBSD root partition ${disk}s${part}a"
 	fsck -p $rootdev || {
-		echo "Fsck of $rootdev failed"
-		return 1
+		# 8.x fsck fails to determine the FS type, try again with ufs
+		fsck -t ufs -p $rootdev || {
+		    echo "Fsck of $rootdev failed"
+		    return 1
+		}
 	}
 	mount -o ro $rootdev /mnt || {
 		echo "RO-mount of $rootdev failed"
