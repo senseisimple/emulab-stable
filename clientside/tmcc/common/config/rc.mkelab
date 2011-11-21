@@ -172,6 +172,14 @@ my $NEEDMROUTED= -1;
 my $OPSVM = 0;
 
 #
+# Node to use as ntp server for inner nodes and other inner servers.
+# This node will use the outside "ntp1" server as its server.
+#
+# XXX this has never been tested with anything but "boss".
+#
+my $NTPSERVER = "boss";
+
+#
 # Defaults for configuration attributes (options).
 # These can be overridden if values are passed in via the emulabconfig command.
 #
@@ -831,12 +839,17 @@ sub SetupFsNode()
     print RC "sshd_enable=\"YES\"\n";
 
     print RC "ntpdate_enable=\"YES\"\n";
-    print RC "ntpdate_flags=\"boss\"\n";
+    if ($NTPSERVER eq "fs") {
+	print RC "ntpdate_flags=\"ntp1.${outer_domain}\"\n";
+    } else {
+	print RC "ntpdate_flags=\"$NTPSERVER\"\n";
+    }
     if ($FBSD_VERSION >= 5) {
 	print RC "ntpd_enable=\"YES\"\n";
     } else {
 	print RC "xntpd_enable=\"YES\"\n";
     }
+
     print RC "linux_enable=\"YES\"\n";
 
     print RC "rpcbind_enable=\"YES\"\n";
@@ -882,6 +895,13 @@ sub SetupFsNode()
     mysystem("cat /etc/syslog.conf | grep -v '\@users' > /tmp/syslog.conf");
     mysystem("cp -pf /etc/syslog.conf /etc/syslog.conf.old ; ".
 	     "cp /tmp/syslog.conf /etc/syslog.conf");
+
+    #
+    # If not us, fixup our ntp.conf file to talk to the inner ntp server.
+    #
+    if ($NTPSERVER ne "fs") {
+	mysystem("sed -i '.orig' -E -e 's/^server .*/server $NTPSERVER/' /etc/ntp.conf");
+    }
 
     #
     # Create a defs file. Note that this will move to boss at some point.
@@ -1244,12 +1264,17 @@ sub SetupOpsNode($)
     print RC "sshd_enable=\"YES\"\n";
 
     print RC "ntpdate_enable=\"YES\"\n";
-    print RC "ntpdate_flags=\"boss\"\n";
+    if ($NTPSERVER eq "ops") {
+	print RC "ntpdate_flags=\"ntp1.${outer_domain}\"\n";
+    } else {
+	print RC "ntpdate_flags=\"$NTPSERVER\"\n";
+    }
     if ($FBSD_VERSION >= 5) {
 	print RC "ntpd_enable=\"YES\"\n";
     } else {
 	print RC "xntpd_enable=\"YES\"\n";
     }
+
     print RC "linux_enable=\"YES\"\n";
     print RC "accounting_enable=\"YES\"\n";
 
@@ -1298,6 +1323,13 @@ sub SetupOpsNode($)
     mysystem("cat /etc/syslog.conf | grep -v '\@users' > /tmp/syslog.conf");
     mysystem("cp -pf /etc/syslog.conf /etc/syslog.conf.old ; ".
 	     "cp /tmp/syslog.conf /etc/syslog.conf");
+
+    #
+    # If not us, fixup our ntp.conf file to talk to the inner ntp server.
+    #
+    if ($NTPSERVER ne "ops") {
+	mysystem("sed -i '.orig' -E -e 's/^server .*/server $NTPSERVER/' /etc/ntp.conf");
+    }
 
     #
     # Create a defs file. Note that this will move to boss at some point.
@@ -1758,8 +1790,17 @@ sub SetupBossNode($)
     print RC "sshd_enable=\"YES\"\n";
 
     print RC "ntpdate_enable=\"YES\"\n";
-    # Points to outer boss
-    print RC "ntpdate_flags=\"${outer_bossip}\"\n";
+    if ($NTPSERVER eq "boss") {
+	print RC "ntpdate_flags=\"ntp1.${outer_domain}\"\n";
+    } else {
+	print RC "ntpdate_flags=\"$NTPSERVER\"\n";
+    }
+    if ($FBSD_VERSION >= 5) {
+	print RC "ntpd_enable=\"YES\"\n";
+    } else {
+	print RC "xntpd_enable=\"YES\"\n";
+    }
+
     print RC "linux_enable=\"YES\"\n";
     print RC "accounting_enable=\"YES\"\n";
 
@@ -1824,6 +1865,13 @@ sub SetupBossNode($)
     mysystem("cat /etc/syslog.conf | grep -v '\@users' > /tmp/syslog.conf");
     mysystem("cp -pf /etc/syslog.conf /etc/syslog.conf.old ; ".
 	     "cp /tmp/syslog.conf /etc/syslog.conf");
+
+    #
+    # If not us, fixup our ntp.conf file to talk to the inner ntp server.
+    #
+    if ($NTPSERVER ne "boss") {
+	mysystem("sed -i '.orig' -E -e 's/^server .*/server $NTPSERVER/' /etc/ntp.conf");
+    }
 
     #
     # Create a defs file. Note that this will move to boss at some point.
@@ -1925,6 +1973,15 @@ sub SetupBossNode($)
 	system("pkg_delete -r -x bind9")
 	    if (-e "/usr/local/sbin/rndc");
     }
+
+    #
+    # Before we restart named, tweak the config to reflect the correct
+    # NTP server for the inner nodes.
+    #
+    my $ndbfile = "${domain}.db.head";
+    mysystem("sed -i '.orig' -E -e 's/^(ntp[12])[[:space:]]+IN[[:space:]]+CNAME[[:space:]]+ops/\\1 IN CNAME $NTPSERVER/' /etc/namedb/$ndbfile");
+    $ndbfile = "${domain}.internal.db.head";
+    mysystem("sed -i '.orig' -E -e 's/^(ntp[12])[[:space:]]+IN[[:space:]]+CNAME[[:space:]]+ops/\\1 IN CNAME $NTPSERVER/' /etc/namedb/$ndbfile");
 
     #
     # Setup up MFSes in /tftpboot.  Must be done after boss-install as
