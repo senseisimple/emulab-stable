@@ -266,12 +266,16 @@ deny ip from not 0.0.0.0,255.255.255.255,EMULAB_CNET to any in via vlan0 # 90: B
 #
 # Note that for many of these, the ELABINELAB configuration restricts
 # the operations to be with only the inner boss/ops/fs (as appropriate)
-# and NOT with the inner nodes.
+# and NOT with the inner nodes. Note also that the firewall is open while
+# the inner servers are being setup (rc.mkelab) so we don't need to allow
+# as many services to them; only services that are needed while the elab
+# is operational need be allowed.
 #
 
 # DNS to NS
+# Note: elabinelab myops/myfs use myboss for NS
 allow udp from any to EMULAB_NS 53 keep-state			# 60020: BASIC,CLOSED
-allow udp from myboss,myops,myfs to EMULAB_NS 53 keep-state	# 60020: ELABINELAB
+allow udp from myboss to EMULAB_NS 53 keep-state		# 60020: ELABINELAB
 
 # ssh from boss (for reboot, etc.) and others if appropriate
 allow tcp from boss to any 22 setup keep-state			# 60022: CLOSED
@@ -279,8 +283,9 @@ allow tcp from boss to myboss,myops,myfs 22 setup keep-state	# 60022: ELABINELAB
 allow tcp from any to any 22 in not via vlan0 setup keep-state	# 60022: BASIC
 
 # NTP to ntp servers
+# Note: elabinelab myops/myfs use myboss for NTP
 allow ip from any to ntp1,ntp2 123 keep-state			# 60024: BASIC,CLOSED
-allow ip from myboss,myops,myfs to ntp1,ntp2 123 keep-state	# 60024: ELABINELAB
+allow ip from myboss to ntp1,ntp2 123 keep-state		# 60024: ELABINELAB
 
 # syslog with ops
 allow udp from any 514 to ops 514		# 60026: BASIC,CLOSED
