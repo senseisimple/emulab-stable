@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -42,6 +42,11 @@ CFLAGS		+= -DWITH_CRYPTO -DSIGN_CHECKSUM
 LIBS		+= -lcrypto
 endif
 
+# Support generation of V3 images when "secure" features not used
+ifeq ($(WITH_V3COMPAT),1)
+CFLAGS		+= -DWITH_V3COMPAT
+endif
+
 ifeq ($(WITH_EXTFS),1)
 FSOBJS		+= extfs/extfs.o extfs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXTFS -Iextfs
@@ -61,10 +66,6 @@ ifeq ($(WITH_NTFS),1)
 FSOBJS		+= ntfs/ntfs_glue.o
 FSLIBS		+= ntfs/libntfs/libntfs.a
 CFLAGS		+= -DWITH_NTFS -DOLD_LIBNTFS -Intfs/libntfs/ntfsprogs-1.7.1.linux/include
-endif
-
-ifeq ($(WITH_NTFS),1)
-CFLAGS += -DWITH_V3COMPAT
 endif
 
 # with HASH
