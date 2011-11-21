@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -102,6 +102,12 @@ if (!$noumount && -e "/share/freebsd") {
 	      "NOT cleaning up /proj and /users\n";
     }
 }
+
+#
+# Remove any auto generated fstab swap line
+#
+print "Removing auto-generated /etc/fstab swap line ...\n";
+system("sed -i -e '/^# the following added by .*rc.freebsd/,+1d' $FSTAB");
 
 #
 # Generate a dumpdates file. Use fstab to find out what filesystems
