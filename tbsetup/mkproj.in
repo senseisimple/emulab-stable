@@ -512,17 +512,16 @@ if (! ($ELABINELAB || $isnonlocal)) {
 	    }
 	}
     }
-    else {
-	#
-	# Need to update the permissions table.
-	#
-	$EUID = $UID;
 
-	system("$UPDATEPERMS") == 0 or
-	    fatal("Could not update permissions table!");
+    #
+    # Always need to update the permissions table on new projects.
+    #
+    $EUID = $UID;
+
+    system("$UPDATEPERMS") == 0 or
+	fatal("Could not update permissions table!");
 		
-	$EUID = 0;
-    }
+    $EUID = 0;
 }
 
 #
