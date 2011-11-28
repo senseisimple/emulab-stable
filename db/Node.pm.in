@@ -2719,7 +2719,7 @@ sub OSSelect($$$$)
     }
     
     if (defined($osinfo) && !defined($field)) {
-	print STDERR "No field specified for OSSelect on $node_id\n";
+	print STDERR "No field specified for OSSelect on $nodeid\n";
 	return -1;
     }
 
