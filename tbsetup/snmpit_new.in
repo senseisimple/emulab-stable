@@ -698,12 +698,32 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	};
 	( /make/ ) && do {
+	    my ($vlan_name) = @args;
+	    
             if ($supplied_switches && !$skip_supplied) {
                 @devicenames = @supplied_switches;
             } elsif (@ports) {
-                # Have to operate on whole stacks so that trunks work
-                @devicenames =
-                    getSwitchesInStacks(getStacksForSwitches(getDeviceNames(@ports)));
+		my $vlanobj;
+		if ($vlan_name =~ /^\d*$/) {
+		    $vlanobj = VLan->Lookup($vlan_name);
+		}
+		else {
+		    $vlanobj = VLan->Lookup($experiment, $vlan_name);
+		}
+		if (defined($vlanobj)) {
+		    #
+		    # Need to know the entire port set, since -m is also
+		    # used to add ports to existing vlans.
+		    #
+		    # All devices needed includes trunks to transit.
+		    @devicenames = mapPortsToSwitches(
+			uniq(getVlanPorts($vlanobj->lanid()), @ports));
+		}
+		else {
+		    # All devices needed includes trunks to transit.
+		    @devicenames = mapPortsToSwitches(@ports);
+		}
+		debug("make: switch list: " . join(",",@devicenames) . "\n");
             } else {
                 @devicenames = getTestSwitches();
             }

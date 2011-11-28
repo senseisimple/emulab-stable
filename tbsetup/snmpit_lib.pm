@@ -36,6 +36,7 @@ use Exporter;
                 uniq isSwitchPort getPathVlanIfaces
 		reserveVlanTag getReservedVlanTag clearReservedVlanTag
 		mapVlansToSwitches mapStaleVlansToSwitches
+		mapPortsToSwitches
 );
 
 use English;
