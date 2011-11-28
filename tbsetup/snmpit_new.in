@@ -850,6 +850,15 @@ COMMAND: foreach my $command (@commands) {
 	    my @oldvlans;
 	    VLan->StaleVlanList($experiment,\@oldvlans);
 
+	    #
+	    # No old or new vlans, then skip all of this. 
+	    #
+	    if (! (@newvlans || @oldvlans)) {
+                print "snmpit: $pid/$eid has no old or new VLANs ... ".
+		    "skipping\n";
+                next COMMAND;
+	    }
+
             if ($supplied_switches && !$skip_supplied) {
 		die("-X and -i cannot be used together\n");
             }
