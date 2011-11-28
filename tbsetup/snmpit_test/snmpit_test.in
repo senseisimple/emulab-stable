@@ -737,7 +737,7 @@ COMMAND: foreach my $command (@commands) {
 		    # All devices needed includes trunks to transit.
 		    @devicenames = mapPortsToSwitches(@ports);
 		}
-		print("make: switch list: " . join(",",@devicenames) . "\n");
+		debug("make: switch list: " . join(",",@devicenames) . "\n");
             } else {
                 @devicenames = getTestSwitches();
             }
