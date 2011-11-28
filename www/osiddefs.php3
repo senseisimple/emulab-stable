@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Stuff for OSIDs. All this stuff should come from the DB instead!
@@ -28,6 +28,7 @@ $osid_featurelist["veths"]	= 0;
 $osid_featurelist["mlinks"]	= 0;
 $osid_featurelist["linktest"]	= 1;
 $osid_featurelist["linkdelays"]	= 0;
+$osid_featurelist["vlans"]	= 0;
 
 # Default op modes. The value is a user-okay flag.
 $osid_opmodes			= array();
