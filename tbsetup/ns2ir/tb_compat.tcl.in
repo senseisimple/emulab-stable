@@ -797,7 +797,7 @@ proc tb-set-link-loss {srclink args} {
 	set lossrate [lindex $args 0]
     }
     if {([regexp $FLOAT $lossrate] == 0) ||
-	(($lossrate != 0) && ($lossrate > 1.0) || ($lossrate < 0.000005))} {
+	(($lossrate != 0) && (($lossrate > 1.0) || ($lossrate < 0.000005)))} {
 	perror "\[tb-set-link-loss] $lossrate is not a valid loss rate."
     }
     $reallink instvar loss
@@ -879,7 +879,7 @@ proc tb-set-link-simplex-backfill {link src bw} {
     }
     set port [$link get_port $src]
     if {$port == {}} {
-	perror "\[tb-set-link-simplex-params] $src is not in $link."
+	perror "\[tb-set-link-simplex-backfill] $src is not in $link."
 	return
     }
     set np [list $src $port]
@@ -900,7 +900,7 @@ proc tb-set-lan-loss {lan lossrate} {
 	return
     }
     if {([regexp $FLOAT $lossrate] == 0) ||
-	(($lossrate != 0) && ($lossrate > 1.0) || ($lossrate < 0.000005))} {
+	(($lossrate != 0) && (($lossrate > 1.0) || ($lossrate < 0.000005)))} {
 	perror "\[tb-set-lan-loss] $lossrate is not a valid loss rate."
     }
     $lan instvar loss
@@ -1030,7 +1030,7 @@ proc tb-set-node-lan-loss {node lan loss} {
 	return
     }
     if {([regexp $FLOAT $loss] == 0) ||
-	(($loss != 0) && ($loss > 1.0) || ($loss < 0.000005))} {
+	(($loss != 0) && (($loss > 1.0) || ($loss < 0.000005)))} {
 	perror "\[tb-set-link-loss] $loss is not a valid loss rate."
     }
     $lan set loss([list $node $port]) $loss
@@ -1139,7 +1139,7 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
 	return
     }
     if {([regexp $FLOAT $loss] == 0) ||
-	(($loss != 0) && ($loss > 1.0) || ($loss < 0.000005))} {
+	(($loss != 0) && (($loss > 1.0) || ($loss < 0.000005)))} {
 	perror "\[tb-set-link-simplex-params] $loss is not a valid loss rate."
 	return
     }
@@ -1199,11 +1199,11 @@ proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fr
 	return
     }
     if {([regexp $FLOAT $toloss] == 0) ||
-	(($toloss != 0) && ($toloss > 1.0) || ($toloss < 0.000005))} {
+	(($toloss != 0) && (($toloss > 1.0) || ($toloss < 0.000005)))} {
 	perror "\[tb-set-link-loss] $toloss is not a valid loss rate."
     }
     if {([regexp $FLOAT $fromloss] == 0) ||
-	(($fromloss != 0) && ($fromloss > 1.0) || ($fromloss < 0.000005))} {
+	(($fromloss != 0) && (($fromloss > 1.0) || ($fromloss < 0.000005)))} {
 	perror "\[tb-set-link-loss] $fromloss is not a valid loss rate."
     }
 
