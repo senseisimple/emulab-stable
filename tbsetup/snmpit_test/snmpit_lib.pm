@@ -38,7 +38,7 @@ use Exporter;
                 convertPortFromString convertPortsFromStrings
                 mapVlansToSwitches mapStaleVlansToSwitches
 		getTrunksForVlan getExperimentTrunksForVlan
-		setSwitchTrunkPath
+		setSwitchTrunkPath mapPortsToSwitches 
 );
 
 use English;
