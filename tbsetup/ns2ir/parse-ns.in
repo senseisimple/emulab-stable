@@ -10,6 +10,7 @@ use English;
 use Getopt::Std;
 use Socket;
 use File::Basename;
+use POSIX ":sys_wait_h";
 
 #
 # Parse an ns file. Since the parser runs arbitrary NS file for the user,
@@ -291,11 +292,10 @@ my $errs;
 }
 close ERR;
 
-
 if ($?) {
-    my $exit_status = $? >> 8;
+    my $exit_status = $?;
     
-    if ($exit_status > 128) {
+    if (WIFSIGNALED($exit_status)) {
 	# The POSIX module doesn't create constants for valid signals
 	# (including SIGBUS), thus we have to do it the hard way.
 
@@ -306,7 +306,7 @@ if ($?) {
 	@sig_num{@names} = split ' ', $Config{sig_num};
 	foreach (@names) {$sig_name[$sig_num{$_}] ||= $_}
 
-	my $signal = $exit_status - 128;
+	my $signal  = WTERMSIG($exit_status);
 	my $signame = $sig_name[$signal];
 	
 	if (grep {$_ eq $signame} qw(ILL TRAP EMT FPE BUS SEGV SYS)) {
