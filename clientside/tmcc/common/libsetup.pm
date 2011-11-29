@@ -25,6 +25,7 @@ use Exporter;
          getlinkdelayconfig getloadinfo getbootwhat 
 	 forcecopy
          getmanifest fetchmanifestblobs runbootscript runhooks 
+         build_fake_macs
 
 	 TBDebugTimeStamp TBDebugTimeStampWithDate TBDebugTimeStampsOn
 
@@ -1103,6 +1104,48 @@ sub runbootscript($$$$;@)
     return $failed;
 }
 
+sub build_fake_macs {
+    my ($id,$vmac) = @_;
+
+    # accept vnodeids in addition to regular integers
+    if ($id =~ /.+\-(\d+)$/) {
+	$id = $1;
+    }
+
+    my $basemac;
+    if ($vmac =~ /^(0000)(.*)$/) {
+        $basemac = "$2";
+    }
+    else {
+        return undef;
+    }
+
+    #
+    # We have to set the locally administered bit (0x02) in the first
+    # octet, and we can't set the unicast/multicast bit (0x01).  So
+    # we have the first two octets to play with, minus those two bits,
+    # leaving us with 14 total bits.  But then, for veths, we need a
+    # a MAC for the root context, and for the container.  So there goes
+    # another bit.
+    #
+    # So, what we're going to do is, if the vmid fits in 13 bits,
+    # take the 5 MSB and shift them into bits 3-7 of the first octet,
+    # and take the 8 LSB and make them the second octet.  Then, we
+    # always set bit 2, and the container MAC gets bit 8 set.
+    #
+    if ($id > (0x1f << 8 | 0xff)) {
+        return undef;
+    }
+
+    return (sprintf("%02x%02x$basemac",
+                    (($id & (0x1f << 8)) >> 6) | 0x02,
+                    $id & 0xff),
+            sprintf("%02x%02x$basemac",
+                    (($id & (0x1f << 8)) >> 6) | 0x02 | 0x80,
+                    $id & 0xff));
+}
+
+
 #
 # Parse the router config and return a hash. This leaves the ugly pattern
 # matching stuff here, but lets the caller do whatever with it (as is the
@@ -1229,8 +1272,22 @@ sub getifconfig($;$)
 	    #
 	    if (JAILED() || GENVNODE()) {
 		if (! ($iface = findiface($vmac))) {
-		    warn("*** WARNING: Could not map $vmac to a veth!\n");
-		    next;
+		    if (defined($vnodeid) && $vnodeid =~ /.+\-(\d+)$/) {
+			my ($voutmac,$vinmac) = build_fake_macs($vnodeid,
+								$vmac);
+			if (defined($voutmac) && ! ($iface = findiface($voutmac))) {
+			    warn("*** WARNING: Could not map $voutmac to a veth (even with vnodeid hack)!\n");
+			    next;
+			}
+			elsif (!defined($voutmac)) {
+			    warn("*** WARNING: Could not map $vmac to a veth (build_fake_macs failed)!\n");
+			    next;
+			}
+		    }
+		    else {
+			warn("*** WARNING: Could not map $vmac to a veth!\n");
+			next;
+		    }
 		}
 	    } else {
 
