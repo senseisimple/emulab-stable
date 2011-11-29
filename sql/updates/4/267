@@ -1,0 +1,23 @@
+#
+# Fix for bug that was causing reserved_vlantags to be left behind.
+# Delete those stale tags here.
+#
+use strict;
+use libdb;
+use Lan;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    my $query_result =
+	DBQueryFatal("select r.lanid,r.tag from reserved_vlantags as r ".
+		     "left join lans as l on l.lanid=r.lanid ".
+		     "where l.lanid is null");
+
+    while (my ($lanid,$tag) = $query_result->fetchrow_array()) {
+	print "Deleting stale reserved vlan tag ($tag) for lan $lanid ...\n";
+	VLan::ClearReservedVlanTag($lanid);
+    }
+    return 0;
+}
