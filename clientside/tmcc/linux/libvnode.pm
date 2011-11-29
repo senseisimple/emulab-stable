@@ -17,6 +17,7 @@ use Exporter;
 	      findControlNet findIface findMac
 	      existsBridge findBridge findBridgeIfaces
               findVirtControlNet findDNS downloadImage setState
+              getKernelVersion
             );
 
 use Data::Dumper;
@@ -492,6 +493,21 @@ sub mysystem2($)
     if ($?) {
 	print STDERR "Command failed: $? - '$command'\n";
     }
+}
+
+#
+# Get kernel (major,minor,patchlevel) version tuple.
+#
+sub getKernelVersion()
+{
+    my $kernvers = `cat /proc/sys/kernel/osrelease`;
+    chomp $kernvers;
+
+    if ($kernvers =~ /^(\d+)\.(\d+)\.(\d+)/) {
+	return ($1,$2,$3);
+    }
+
+    return undef;
 }
 
 #
