@@ -93,6 +93,8 @@ my $SYSCTL      = "/sbin/sysctl";
 my $RMMOD       = "/sbin/rmmod";
 my $BRCTL       = "/usr/sbin/brctl";
 
+my $DO_NETEM = 0;
+
 # This should never happen!
 if ((REMOTE() && !REMOTEDED()) || MFS()) {
     print "Skipping delay configuration on remote/MFS node!\n";
@@ -125,6 +127,16 @@ if (GENVNODE() && GENVNODETYPE() eq 'openvz') {
     opendir(DIR,'/sys/class/net') or die "could not open /sys/class/net: $!";
     @imqdevs = grep { /^imq\d+$/ } readdir(DIR);
     closedir(DIR);
+}
+
+#
+# If we are using a modern kernel, use netem instead of our own plr/delay 
+# qdiscs (which are no longer maintained as of 11/2011).
+#
+my ($kmaj,$kmin,$kpatch) = getkernelversion();
+if ($kmaj >= 2 && $kmin >= 6 && $kpatch >= 32) {
+    print STDERR "Using Linux netem instead of custom qdiscs.\n";
+    $DO_NETEM = 1;
 }
 
 #
@@ -356,14 +368,27 @@ sub DelaySetup
 	}
 
 	# next, plr on the link
-	push @upcmds,"$TC qdisc add dev $iface1 handle $np1 $nextparent1 plr $plr1";
-	push @upcmds,"$TC qdisc add dev $iface2 handle $np2 $nextparent2 plr $plr2";
+	if (!$DO_NETEM) {
+	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 $nextparent1 plr $plr1";
+	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 $nextparent2 plr $plr2";
+	}
+	else {
+
+	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 $nextparent1 netem drop $plr1";
+	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 $nextparent2 netem drop $plr2";
+	}
 	$lp1 = $np1; $np1 += $pinc;
 	$lp2 = $np2; $np2 += $pinc;
 
 	# next, delay on link
-	push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent $lp1:1 delay usecs $delay1";
-	push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent $lp2:1 delay usecs $delay2";
+	if (!$DO_NETEM) {
+	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent $lp1:1 delay usecs $delay1";
+	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent $lp2:1 delay usecs $delay2";
+	}
+	else {
+	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent $lp1:1 delay ${delay1}us";
+	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent $lp2:1 delay ${delay2}us";
+	}
 	$lp1 = $np1; $np1 += $pinc;
 	$lp2 = $np2; $np2 += $pinc;
 
@@ -615,10 +640,10 @@ sub LinkDelaySetup()
             print DEL "$IFCONFIG $iface txqueuelen $queue\n";
 
             print DEL "$TC qdisc add dev $iface handle $pipeno root ";
-            print DEL "plr $plr\n";
+            print DEL "netem drop $plr\n";
 
             print DEL "$TC qdisc add dev $iface handle ". ($pipeno+10) ." ";
-            print DEL "parent ${pipeno}:1 delay usecs $delay\n";
+            print DEL "parent ${pipeno}:1 netem delay ${delay}us\n";
 
             print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." ";
             print DEL "parent ". ($pipeno+10) .":1 htb default 1\n";
@@ -644,11 +669,11 @@ sub LinkDelaySetup()
 		}
 		
                 print DEL "$TC qdisc add dev $imqdev handle $pipeno ";
-                print DEL "root plr $rplr\n";
+                print DEL "root netem drop $rplr\n";
 
                 print DEL "$TC qdisc add dev $imqdev handle ";
                 print DEL "". ($pipeno+10) ." parent ${pipeno}:1 ";
-                print DEL "delay usecs $rdelay reset_time 1\n";
+                print DEL "netem delay ${rdelay}us\n";
 
                 print DEL "$TC qdisc add dev $imqdev handle "; 
                 print DEL "". ($pipeno+20) ." parent ". ($pipeno+10) .":1 ";
@@ -714,6 +739,21 @@ sub LinkDelaySetup()
 	checkkernel($kernel);
     }
     return 0;
+}
+
+#
+# Get kernel (major,minor,patchlevel) version tuple.
+#
+sub getkernelversion()
+{
+    my $kernvers = `cat /proc/sys/kernel/osrelease`;
+    chomp $kernvers;
+
+    if ($kernvers =~ /^(\d+)\.(\d+)\.(\d+)/) {
+	return ($1,$2,$3);
+    }
+
+    return undef;
 }
 
 #
