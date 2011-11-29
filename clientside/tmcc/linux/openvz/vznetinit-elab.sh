@@ -41,7 +41,7 @@ fi
 # Control net is a special case:
 #
 if [ $ELABCTRLDEV = $DEV ]; then
-    echo "Emulab configuring CT0 network for CT$VEID: control net ($ELABCTRLDEV)"
+    echo "Emulab configuring network for CT$VEID: control net ($ELABCTRLDEV)"
     $IFCONFIG $ELABCTRLDEV 2&>1 > /dev/null
     while [ $? -ne 0 ]; do
 	echo "Waiting for $ELABCTRLDEV to appear"
@@ -67,7 +67,7 @@ echo "$ELABIFS" | sed -e 's/;/\n/g' | \
         _br=`echo "$iface" | sed -r -e 's/[^,]*,([^,]*)/\1/'`
 
 	if [ $_if = $DEV ]; then
-	    echo "Emulab configuring CT0 network for CT$VEID: exp net ($_if)"
+	    echo "Emulab configuring network for CT$VEID: exp net ($_if)"
     	    if [ "x$_br" != "x" ]; then
 	        $BRCTL addif $_br $_if
 	    fi
