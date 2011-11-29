@@ -43,6 +43,8 @@ use Exporter;
 
 use strict;
 use English;
+BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
+use AnyDBM_File;
 use Data::Dumper;
 use Socket;
 
@@ -50,6 +52,7 @@ use Socket;
 require "/etc/emulab/paths.pm"; import emulabpaths;
 use libvnode;
 use libtestbed;
+use libsetup;
 
 #
 # Turn off line buffering on output
@@ -64,6 +67,11 @@ $| = 1;
 my $defaultImage = "emulab-default";
 
 my $DOLVM = 1;
+my $DOLVMDEBUG = 0;
+my $LVMDEBUGOPTS = "-vvv -dddddd";
+
+my $DOVZDEBUG = 0;
+my $VZDEBUGOPTS = "--verbose";
 
 my $GLOBAL_CONF_LOCK = "vzconf";
 
@@ -80,6 +88,7 @@ my $IPTABLES = "/sbin/iptables";
 my $MODPROBE = "/sbin/modprobe";
 my $RMMOD = "/sbin/rmmod";
 my $VLANCONFIG = "/sbin/vconfig";
+my $IP = "/sbin/ip";
 
 my $VZRC   = "/etc/init.d/vz";
 my $MKEXTRAFS = "/usr/local/etc/emulab/mkextrafs.pl";
@@ -102,6 +111,22 @@ my $debug = 0;
 # XXX needs lifting up
 my $JAILCTRLNET = "172.16.0.0";
 my $JAILCTRLNETMASK = "255.240.0.0";
+
+my $USE_NETEM = 0;
+my $USE_MACVLAN = 0;
+
+#
+# If we are using a modern kernel, use netem instead of our own plr/delay
+# qdiscs (which are no longer maintained as of 11/2011).
+#
+my ($kmaj,$kmin,$kpatch) = libvnode::getKernelVersion();
+print STDERR "Got Linux kernel version numbers $kmaj $kmin $kpatch\n";
+if ($kmaj >= 2 && $kmin >= 6 && $kpatch >= 32) {
+    print STDERR "Using Linux netem instead of custom qdiscs.\n";
+    $USE_NETEM = 1;
+    print STDERR "Using Linux macvlan instead of OpenVZ veths.\n";
+    $USE_MACVLAN = 1;
+}
 
 #
 # Helpers.
@@ -137,6 +162,27 @@ sub vz_init {
 	$DOLVM = 0;
 	mysystem("/sbin/dmsetup remove_all");
     }
+
+    #
+    # Enable/disable LVM debug options.
+    #
+    if (-e "/vz/.lvmdebug" || -e "/vz.save/.lvmdebug" || -e "/.lvmdebug") {
+	$DOLVMDEBUG = 1;
+    }
+    if (!$DOLVMDEBUG) {
+	$LVMDEBUGOPTS = "";
+    }
+
+    #
+    # Enable/disable VZ debug options.
+    #
+    if (-e "/vz/.vzdebug" || -e "/vz.save/.vzdebug" || -e "/.vzdebug") {
+	$DOVZDEBUG = 1;
+    }
+    if (!$DOVZDEBUG) {
+	$VZDEBUGOPTS = "";
+    }
+
     return 0;
 }
 
@@ -186,7 +232,7 @@ sub vz_rootPreConfig {
 	    mysystem("$MODPROBE dm-snapshot");
 	}
 
-	if (system('vgs | grep -E -q '."'".'^[ ]+openvz.*$'."'")) {
+	if (system('vgs '.$LVMDEBUGOPTS.' | grep -E -q '."'".'^[ ]+openvz.*$'."'")) {
 	    my $blockdevs = "";
 	    my %devs = libvnode::findSpareDisks();
 	    my $totalSize = 0;
@@ -207,8 +253,8 @@ sub vz_rootPreConfig {
 		die "findSpareDisks found no disks, can't use LVM!\n";
 	    }
 		    
-	    mysystem("pvcreate $blockdevs");
-	    mysystem("vgcreate openvz $blockdevs");
+	    mysystem("pvcreate $LVMDEBUGOPTS $blockdevs");
+	    mysystem("vgcreate $LVMDEBUGOPTS openvz $blockdevs");
 
 	    # XXX eventually could move this into its own logical volume, but
 	    # we don't ever know how many images we'll have to store.
@@ -221,7 +267,7 @@ sub vz_rootPreConfig {
 
 	# make sure our volumes are active -- they seem to become inactive
 	# across reboots
-	mysystem("vgchange -a y openvz");
+	mysystem("vgchange $LVMDEBUGOPTS -a y openvz");
     }
     else {
 	#
@@ -276,8 +322,18 @@ sub vz_rootPreConfig {
 	system("$RMMOD vznetdev");
     }
 
-    # this is what we need for veths
-    mysystem("$MODPROBE vzethdev");
+    if ($USE_MACVLAN) {
+	#
+	# If we build dummy shortbridge nets atop either a physical
+	# device, or atop a dummy device, load these!
+	#
+	mysystem("$MODPROBE macvlan");
+	mysystem("$MODPROBE dummy");
+    }
+    else {
+	# this is what we need for veths
+	mysystem("$MODPROBE vzethdev");
+    }
 
     # For tunnels
     mysystem("$MODPROBE ip_gre");
@@ -287,8 +343,13 @@ sub vz_rootPreConfig {
 
     # we need this stuff for traffic shaping -- only root context can
     # modprobe, for now.
-    mysystem("$MODPROBE sch_plr");
-    mysystem("$MODPROBE sch_delay");
+    if (!$USE_NETEM) {
+	mysystem("$MODPROBE sch_plr");
+	mysystem("$MODPROBE sch_delay");
+    }
+    else {
+	mysystem("$MODPROBE sch_netem");
+    }
     mysystem("$MODPROBE sch_htb");
 
     # make sure our network hooks are called
@@ -325,7 +386,7 @@ sub vz_rootPreConfig {
 	    if (!exists($MDB{"$i"}));
     }
     dbmclose(%MDB);
-    
+
     if (InitializeRouteTables()) {
 	print STDERR "*** Could not initialize routing table DB\n";
 	TBScriptUnlock();
@@ -360,11 +421,17 @@ sub vz_rootPreConfigNetwork {
     # XXX only needed for fake mac hack, which should go away someday
     mysystem("echo 1 > /proc/sys/net/ipv4/conf/$iface/proxy_arp");
 
-    # figure out what bridges we need to make:
+    #
+    # If we're using veths, figure out what bridges we need to make:
     # we need a bridge for each physical iface that is a multiplex pipe,
     # and one for each VTAG given PMAC=none (i.e., host containing both sides
     # of a link, or an entire lan).
+    #
     my %brs = ();
+    my $prefix = "br.";
+    if ($USE_MACVLAN) {
+	$prefix = "mvsw.";
+    }
     foreach my $node (keys(%$node_ifs)) {
 	foreach my $ifc (@{$node_ifs->{$node}}) {
 	    next if (!$ifc->{ISVIRT});
@@ -376,7 +443,7 @@ sub vz_rootPreConfigNetwork {
 		# No physical device. Its a loopback (trivial) link/lan
 		# All we need is a common bridge to put the veth ifaces into.
 		#
-		my $brname = "br$vtag";
+		my $brname = "${prefix}$vtag";
 		$brs{$brname}{ENCAP} = 0;
 		$brs{$brname}{SHORT} = 0;
 	    }
@@ -390,13 +457,13 @@ sub vz_rootPreConfigNetwork {
 		system("$VLANCONFIG set_name_type VLAN_PLUS_VID_NO_PAD");
 		system("$IFCONFIG $vdev up");
 
-		my $brname = "pbr$vdev";
+		my $brname = "${prefix}$vdev";
 		$brs{$brname}{ENCAP} = 1;
 		$brs{$brname}{SHORT} = 0;
 		$brs{$brname}{PHYSDEV} = $vdev;
 	    }
 	    elsif ($ifc->{PMAC} eq "none") {
-		my $brname = "br" . $ifc->{VTAG};
+		my $brname = "${prefix}" . $ifc->{VTAG};
 		# if no PMAC, we don't need encap on the bridge
 		$brs{$brname}{ENCAP} = 0;
 		# count up the members so we can figure out if this is a shorty
@@ -409,7 +476,7 @@ sub vz_rootPreConfigNetwork {
 	    }
 	    else {
 		my $iface = findIface($ifc->{PMAC});
-		my $brname = "pbr$iface";
+		my $brname = "${prefix}$iface";
 		$brs{$brname}{ENCAP} = 1;
 		$brs{$brname}{SHORT} = 0;
 		$brs{$brname}{PHYSDEV} = $iface;
@@ -417,7 +484,12 @@ sub vz_rootPreConfigNetwork {
 	}
     }
 
-    # actually make bridges and add phys ifaces
+    #
+    # Make bridges and add phys ifaces.
+    #
+    # Or, in the macvlan case, create a dummy device if there is no
+    # underlying physdev to "host" the macvlan.
+    #
     foreach my $k (keys(%brs)) {
 	# postpass to setup SHORT if only two members and no PMAC
 	if (exists($brs{$k}{MEMBERS})) {
@@ -430,26 +502,32 @@ sub vz_rootPreConfigNetwork {
 	    $brs{$k}{MEMBERS} = undef;
 	}
 
-	# building bridges is an important activity
-	if (! -d "/sys/class/net/$k/bridge") {
-	    mysystem("$BRCTL addbr $k");
+	if (!$USE_MACVLAN) {
+	    # building bridges is an important activity
+	    if (! -d "/sys/class/net/$k/bridge") {
+		mysystem("$BRCTL addbr $k");
+	    }
+	    # repetitions of this should not hurt anything
+	    mysystem("$IFCONFIG $k 0 up");
 	}
-	# repetitions of this should not hurt anything
-	mysystem("$IFCONFIG $k 0 up");
-
-	# XXX here we would normally config the bridge to encapsulate or
-	# act in short mode
 
 	if (exists($brs{$k}{PHYSDEV})) {
-	    # make sure this iface isn't already part of another bridge; if it
-	    # it is, remove it from there first and add to this bridge.
-	    my $obr = findBridge($brs{$k}{PHYSDEV});
-	    if (defined($obr)) {
-		mysystem("$BRCTL delif " . $obr . " " .$brs{$k}{PHYSDEV});
-		# rebuild hashes
-		makeBridgeMaps();
+	    if (!$USE_MACVLAN) {
+		# make sure this iface isn't already part of another bridge; if it
+		# it is, remove it from there first and add to this bridge.
+		my $obr = findBridge($brs{$k}{PHYSDEV});
+		if (defined($obr)) {
+		    mysystem("$BRCTL delif " . $obr . " " .$brs{$k}{PHYSDEV});
+		    # rebuild hashes
+		    makeBridgeMaps();
+		}
+		mysystem("$BRCTL addif $k $brs{$k}{PHYSDEV}");
 	    }
-	    mysystem("$BRCTL addif $k $brs{$k}{PHYSDEV}");
+	}
+	elsif ($USE_MACVLAN
+	       && ! -d "/sys/class/net/$k") {
+	    # need to create a dummy device to "host" the macvlan ports
+	    mysystem("$IP link add name $k type dummy");
 	}
     }
 
@@ -604,7 +682,7 @@ sub vz_vnodeCreate {
 		    }
 
 		    # rename nicely works even when snapshots exist
-		    mysystem("lvrename /dev/openvz/$image" . 
+		    mysystem("lvrename $LVMDEBUGOPTS /dev/openvz/$image" . 
 			     " /dev/openvz/$image.$rand");
 
 		    # now we can remove the readyfile
@@ -698,7 +776,7 @@ sub vz_vnodeCreate {
 	    print "Creating LVM core logical device for image $image\n";
 
 	    # ok, create the lvm logical volume for this image.
-	    mysystem("lvcreate -L${rootSize}M -n $image openvz");
+	    mysystem("lvcreate $LVMDEBUGOPTS -L${rootSize}M -n $image openvz");
 	    mysystem("mkfs -t ext3 /dev/openvz/$image");
 	    mysystem("mkdir -p /tmp/mnt/$image");
 	    mysystem("mount /dev/openvz/$image /tmp/mnt/$image");
@@ -713,7 +791,7 @@ sub vz_vnodeCreate {
 	}
 
 	# Now take a snapshot of this image's logical device
-	mysystem("lvcreate -s -L${snapSize}M -n $vnode_id /dev/openvz/$image");
+	mysystem("lvcreate $LVMDEBUGOPTS -s -L${snapSize}M -n $vnode_id /dev/openvz/$image");
 	mysystem("mkdir -p /mnt/$vnode_id");
 	mysystem("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
 
@@ -732,10 +810,10 @@ sub vz_vnodeCreate {
     }
 
     # build the container
-    mysystem("$VZCTL create $vmid --ostemplate $image $createArg");
+    mysystem("$VZCTL $VZDEBUGOPTS create $vmid --ostemplate $image $createArg");
 
     # make sure bootvnodes actually starts things up on boot, not openvz
-    mysystem("$VZCTL set $vmid --onboot no --name $vnode_id --save");
+    mysystem("$VZCTL $VZDEBUGOPTS set $vmid --onboot no --name $vnode_id --save");
 
     # set some resource limits:
     my %deflimits = ( "diskinodes" => "unlimited:unlimited",
@@ -769,12 +847,12 @@ sub vz_vnodeCreate {
     foreach my $k (keys(%deflimits)) {
 	$savestr .= " --$k $deflimits{$k}";
     }
-    mysystem("$VZCTL set $vmid $savestr --save");
+    mysystem("$VZCTL $VZDEBUGOPTS set $vmid $savestr --save");
 
     # XXX give them cap_net_admin inside containers... necessary to set
     # txqueuelen on devices inside the container.  This may have other
     # undesireable side effects, but need it for now.
-    mysystem("$VZCTL set $vmid --capability net_admin:on --save");
+    mysystem("$VZCTL $VZDEBUGOPTS set $vmid --capability net_admin:on --save");
 
     #
     # Make some directories in case the guest doesn't have them -- the elab
@@ -801,12 +879,15 @@ sub vz_vnodeDestroy {
 
     if ($DOLVM) {
 	mysystem("umount /mnt/$vnode_id");
-	mysystem("lvremove -f /dev/openvz/$vnode_id");
+	mysystem("lvremove $LVMDEBUGOPTS -f /dev/openvz/$vnode_id");
     }
+
     my @ifs  = ();
     open(CF,"/etc/vz/conf/$vmid.conf") or
 	 die "could not open etc/vz/conf/$vmid.conf for read: $!";
     my @lines = grep { $_ =~ /^ELABROUTES/ } <CF>;
+    seek(CF,0,0);
+    my @ndlines = grep { $_ =~ /^NETDEV/ } <CF>;
     close(CF);
     if (@lines) {
 	# Should only be one line.
@@ -837,8 +918,18 @@ sub vz_vnodeDestroy {
 	}
     }
     FreeRouteTable("VZ$vmid");
-    
-    mysystem("$VZCTL destroy $vnode_id");
+
+    foreach my $ndline (@ndlines) {
+	chomp($ndline);
+	if ($ndline =~ /^NETDEV=\"(.+)\"$/) {
+	    my @devs = split(/\s+/,$1);
+	    foreach my $dev (@devs) {
+		mysystem("$IP link del dev $dev");
+	    }
+	}
+    }
+
+    mysystem("$VZCTL $VZDEBUGOPTS destroy $vnode_id");
     return -1
 	if ($?);
 
@@ -915,7 +1006,7 @@ sub vz_vnodeBoot {
 	system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
     }
 
-    mysystem("$VZCTL start $vnode_id");
+    mysystem("$VZCTL $VZDEBUGOPTS start $vnode_id");
 
     return 0;
 }
@@ -923,14 +1014,14 @@ sub vz_vnodeBoot {
 sub vz_vnodeHalt {
     my ($vnode_id,$vmid) = @_;
 
-    mysystem("$VZCTL stop $vnode_id");
+    mysystem("$VZCTL $VZDEBUGOPTS stop $vnode_id");
     return 0;
 }
 
 sub vz_vnodeUnmount {
     my ($vnode_id,$vmid) = @_;
 
-    mysystem("$VZCTL umount $vnode_id");
+    mysystem("$VZCTL $VZDEBUGOPTS umount $vnode_id");
 
     return 0;
 }
@@ -938,7 +1029,7 @@ sub vz_vnodeUnmount {
 sub vz_vnodeReboot {
     my ($vnode_id,$vmid) = @_;
 
-    mysystem("$VZCTL restart $vnode_id");
+    mysystem("$VZCTL $VZDEBUGOPTS restart $vnode_id");
 
     return 0;
 }
@@ -981,6 +1072,10 @@ sub vz_vnodePreConfig {
     my $existing = `sed -n -r -e 's/NETDEV="(.*)"/\1/p' /etc/vz/conf/$vmid.conf`;
     chomp($existing);
     foreach my $dev (split(/,/,$existing)) {
+	if (!($dev =~ /^imq/)) {
+	    next;
+	}
+
 	if (!exists($devs{$dev})) {
 	    # needs deleting
 	    $devs{$dev} = 0;
@@ -993,10 +1088,10 @@ sub vz_vnodePreConfig {
 
     foreach my $dev (keys(%devs)) {
 	if ($devs{$dev} == 1) {
-	    mysystem("$VZCTL set $vnode_id --netdev_add $dev --save");
+	    mysystem("$VZCTL $VZDEBUGOPTS set $vnode_id --netdev_add $dev --save");
 	}
 	elsif ($devs{$dev} == 0) {
-	    mysystem("$VZCTL set $vnode_id --netdev_del $dev --save");
+	    mysystem("$VZCTL $VZDEBUGOPTS set $vnode_id --netdev_del $dev --save");
 	}
     }
     #
@@ -1005,7 +1100,7 @@ sub vz_vnodePreConfig {
     my $status = vmstatus($vmid);
     my $didmount = 0;
     if ($status ne 'running' && $status ne 'mounted') {
-	mysystem("$VZCTL mount $vnode_id");
+	mysystem("$VZCTL $VZDEBUGOPTS mount $vnode_id");
 	$didmount = 1;
     }
     my $privroot = "/vz/private/$vmid";
@@ -1020,7 +1115,7 @@ sub vz_vnodePreConfig {
     my $ret = &$callback("$privroot");
     TBScriptUnlock();
     if ($didmount) {
-	mysystem("$VZCTL umount $vnode_id");
+	mysystem("$VZCTL $VZDEBUGOPTS umount $vnode_id");
     }
     return $ret;
 }
@@ -1099,7 +1194,7 @@ sub vz_vnodePreConfigControlNetwork {
 
     # note that we don't assign a mac to the CT0 part of the veth pair -- 
     # openvz does that automagically
-    mysystem("$VZCTL set $vnode_id" . 
+    mysystem("$VZCTL $VZDEBUGOPTS set $vnode_id" . 
 	     " --netif_add ${CONTROL_IFDEV},$cnet_mac,$cnet_veth,$ext_vethmac --save");
 
     #
@@ -1111,7 +1206,7 @@ sub vz_vnodePreConfigControlNetwork {
 	if ($DOLVM) {
 	    system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
 	}
-	mysystem("$VZCTL mount $vnode_id");
+	mysystem("$VZCTL $VZDEBUGOPTS mount $vnode_id");
     }
 
     #
@@ -1253,7 +1348,7 @@ sub vz_vnodePreConfigControlNetwork {
     mysystem("cp -R /var/emulab/boot/tmcc.$vnode_id $mybootdir/");
 
     if ($didmount) {
-	mysystem("$VZCTL umount $vnode_id");
+	mysystem("$VZCTL $VZDEBUGOPTS umount $vnode_id");
     }
 
     return 0;
@@ -1278,50 +1373,69 @@ sub vz_vnodePreConfigExpNetwork {
     foreach my $ifc (@$ifs) {
 	next if (!$ifc->{ISVIRT});
 
-	#
-	# Add to ELABIFS for addition to conf file (for runtime config by 
-        # external custom script)
-	#
-	my $veth = "veth$vmid.$ifc->{ID}";
 	my $br;
-	
+	my $prefix = "br.";
+	if ($USE_MACVLAN) {
+	    $prefix = "mvsw.";
+	}
+
+	my $physdev;
 	if ($ifc->{ITYPE} eq "vlan") {
 	    my $iface = $ifc->{IFACE};
 	    my $vtag  = $ifc->{VTAG};
 	    my $vdev  = "${iface}.${vtag}";
-	    $br = "pbr$vdev";
+	    $br = "${prefix}$vdev";
+	    $physdev = $vdev;
 	}
 	elsif ($ifc->{PMAC} eq "none" || $ifc->{ITYPE} eq "loop") {
-	    $br = "br" . $ifc->{VTAG};
+	    $br = "${prefix}" . $ifc->{VTAG};
+	    $physdev = $br;
 	}
 	else {
 	    my $iface = findIface($ifc->{PMAC});
-	    $br = "pbr$iface";
+	    $br = "${prefix}$iface";
+	    $physdev = $iface;
 	}
-	if ($elabifs ne '') {
-	    $elabifs .= ';';
-	}
-	$elabifs .= "$veth,$br";
 
 	#
 	# The ethX naming sucks, but hopefully it ensures unique, *easily 
 	# reconfigurable* (i.e., without a local map file) naming for veths.
 	#
 	my $eth = "eth" . $ifc->{VTAG};
-	my $ethmac = macAddSep($ifc->{VMAC});
-	my $vethmac = $ethmac;
-	if ($vethmac =~ /^(00:00)(.*)$/) {
-	    $vethmac = "00:01$2";
-	}
+	my ($vethmac,$ethmac) = libsetup::build_fake_macs(libsetup::libsetup_getvnodeid(),
+							  $ifc->{VMAC});
 
-	#
-	# Savefor later calling, since we need to hack the 
-	# config file BEFORE calling --netif_add so the custom postconfig 
-	# script does the right thing.
-	# Also store up the current set of netifs so we can delete any that
-	# might have been old!
-	#
-        $netif_strs{$eth} = "$eth,$ethmac,$veth,$vethmac";
+	($ethmac,$vethmac) = (macAddSep($ethmac),macAddSep($vethmac));
+
+	if ($USE_MACVLAN) {
+	    #
+	    # Add the macvlan device atop the dummy devices created earlier,
+	    # or atop the physical or vlan device.
+	    #
+	    my $vname = "mv$vmid.$ifc->{ID}";
+	    mysystem("$IP link add link $physdev name $vname address $vethmac type macvlan mode bridge ");
+	    mysystem("$VZCTL $VZDEBUGOPTS set $vnode_id --netdev_add $vname --save");
+	}
+	else {
+	    #
+	    # Add to ELABIFS for addition to conf file (for runtime config by 
+	    # external custom script)
+	    #
+	    my $veth = "veth$vmid.$ifc->{ID}";
+	    if ($elabifs ne '') {
+		$elabifs .= ';';
+	    }
+	    $elabifs .= "$veth,$br";
+
+	    #
+	    # Save for later calling, since we need to hack the 
+	    # config file BEFORE calling --netif_add so the custom postconfig 
+	    # script does the right thing.
+	    # Also store up the current set of netifs so we can delete any that
+	    # might have been old!
+	    #
+	    $netif_strs{$eth} = "$eth,$ethmac,$veth,$vethmac";
+	}
     }
 
     if (values(%{ $tunnels })) {
@@ -1515,12 +1629,12 @@ sub vz_vnodePreConfigExpNetwork {
     # delete
     foreach my $eth (@current) {
 	if (!exists($netif_strs{$eth})) {
-	    mysystem("$VZCTL set $vnode_id --netif_del $eth --save");
+	    mysystem("$VZCTL $VZDEBUGOPTS set $vnode_id --netif_del $eth --save");
 	}
     }
     # add/modify
     foreach my $eth (keys(%netif_strs)) {
-	mysystem("$VZCTL set $vnode_id --netif_add $netif_strs{$eth} --save");
+	mysystem("$VZCTL $VZDEBUGOPTS set $vnode_id --netif_add $netif_strs{$eth} --save");
     }
 
     return 0;
