@@ -5427,7 +5427,7 @@ sub InterpLinksAux($)
 	    my $portB = $member0->_delayport();
 	    my $nodeD = $member1->_delaynode();
 	    my $portD = $member1->_delayport();
-	    my $pathB = $member0->_delaypath();
+	    my $pathB = $member1->_delaypath();
 
 	    $self->printdb("LINK delay: $virtA,$virtC - ".
 			   "$nodeA:$portA,$nodeB:$portB,".
