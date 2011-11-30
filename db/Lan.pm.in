@@ -2762,7 +2762,10 @@ sub ReserveVlanTag($$;$$)
     return undef;
 }
 
-# Both a class and an instance method.
+#
+# We sometimes need to call this with just a vlanid since the vlan object
+# is no longer in the DB.
+#
 sub ClearReservedVlanTag($;$)
 {
     my ($arg, $tag) = @_;
