@@ -2123,7 +2123,7 @@ sub doReset($@) {
 	next
 	    if (exists($notdeleted{$vlan_id}));
 	
-	clearReservedVlanTag($vlan_id)
+	Vlan::ClearReservedVlanTag($vlan_id)
 	    if ($opt{C});
 	VLan->RecordVLanDeletion($vlan_id);
 
@@ -2237,7 +2237,7 @@ sub syncVlansFromTables($$) {
 		    }
 		    VLan->RecordVLanDeletion($vlanid) == 0
 			or goto bad;
-		    clearReservedVlanTag($vlanid) == 0
+		    VLan::ClearReservedVlanTag($vlanid) == 0
 			or goto bad;
 		}
 	    }
@@ -2756,7 +2756,7 @@ sub doSyncVlansWithDB($) {
 		elsif (VLan->RecordVLanDeletion($vlan_id)) {
 		    $errors++;
 		}
-		elsif (clearReservedVlanTag($vlan_id)) {
+		elsif (VLan::ClearReservedVlanTag($vlan_id)) {
 		    $errors++;
 		}
 	    }
@@ -3227,7 +3227,7 @@ sub doDeleteVlan($@) {
 	VLan->RecordVLanDeletion($vlan_id) == 0
 	    or $errors++;
 
-	clearReservedVlanTag($vlan_id) == 0 or $errors++
+	VLan::ClearReservedVlanTag($vlan_id) == 0 or $errors++
 	    if ($opt{C} || (ref($vlan) && $vlan->IsManual()));
 
 	next
