@@ -2123,7 +2123,7 @@ sub doReset($@) {
 	next
 	    if (exists($notdeleted{$vlan_id}));
 	
-	Vlan::ClearReservedVlanTag($vlan_id)
+	VLan::ClearReservedVlanTag($vlan_id)
 	    if ($opt{C});
 	VLan->RecordVLanDeletion($vlan_id);
 
