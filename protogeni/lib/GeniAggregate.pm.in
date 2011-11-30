@@ -812,7 +812,7 @@ sub Start($$$)
 	    next;
 	}
 	# Remember which sliver is the firewall. 
-	if ($firewall eq $sliver->resource_id()) {
+	if ($firewalled && $firewall eq $sliver->resource_id()) {
 	    $firewall_sliver = $sliver;
 	}
 
