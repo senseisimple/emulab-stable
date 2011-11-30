@@ -113,6 +113,9 @@ FS_WITH_QUOTAS="/q /users"
 # Note that OrganizationalUnit is set in the cnf file.
 # CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
 #
+# The Country *must* be a two letter abbreviation.
+# See: http://sustainablesources.com/resources/country-abbreviations/
+#
 SSLCERT_COUNTRY="US"
 SSLCERT_STATE="Utah"
 SSLCERT_LOCALITY="Salt Lake City"
