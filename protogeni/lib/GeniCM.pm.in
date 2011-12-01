@@ -5812,11 +5812,14 @@ sub AddKeys($$$)
 
 		push(@keylist, $keyref->{'key'});
 	    }
-	    my $urn = $ref->{'urn'} if (exists($ref->{'urn'}));
-	    # Allow user to override urn token.
-	    my $uid = $ref->{'login'} if (exists($ref->{'login'}));
+	    my $urn;
+	    my $uid;
 	    my $name;
 	    my $email;
+
+	    $urn = $ref->{'urn'} if (exists($ref->{'urn'}));
+	    # Allow user to override urn token.
+	    $uid = $ref->{'login'} if (exists($ref->{'login'}));
 	    
 	    # The slice owner is easy.
 	    if (defined($urn) && $urn eq $owner->urn()) {
