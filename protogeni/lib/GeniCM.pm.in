@@ -1718,9 +1718,21 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
   skiplinks:
     $virtexperiment->Dump();
-    if ($virtexperiment->Store()) {
-	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef);
-	goto bad;
+    {
+	#
+	# Want to capture this output and return to user.
+	#
+	my $warnings = "";
+	local $SIG{__WARN__} = sub { $warnings .= $_[0] };
+	
+	if ($virtexperiment->Store()) {
+	    print STDERR $warnings
+		if ($warnings ne "");
+	    
+	    $response = GeniResponse->Create(GENIRESPONSE_ERROR,
+					     undef, $warnings);
+	    goto bad;
+	}
     }
 
     # Must chdir to the work directory for the mapper.
