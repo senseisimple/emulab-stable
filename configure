@@ -7187,6 +7187,20 @@ $as_echo "$as_me: WARNING: protogeni/rspec-geni submodule not intialized yet" >&
 	echo "Then rerun configure in your object tree"
 	exit 1;
    fi
+   module_status=`cd $srcdir; git submodule status protogeni/rspec-geni`
+   if test $? -ne 0; then
+       { $as_echo "$as_me:$LINENO: WARNING: Cannot get submodule status for protogeni/rspec-geni" >&5
+$as_echo "$as_me: WARNING: Cannot get submodule status for protogeni/rspec-geni" >&2;};
+       exit 1;
+   fi
+   if echo '$module_status' | grep -E '^\+'; then
+	{ $as_echo "$as_me:$LINENO: WARNING: protogeni/rspec-geni submodule is out of date" >&5
+$as_echo "$as_me: WARNING: protogeni/rspec-geni submodule is out of date" >&2;};
+	echo "Please cd into your source directory and run:"
+	echo "    git submodule update protogeni/rspec-geni"
+	echo "Then rerun configure in your object tree"
+	exit 1;
+   fi
 fi
 
 #

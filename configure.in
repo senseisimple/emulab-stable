@@ -897,6 +897,18 @@ if test "$PROTOGENI_SUPPORT" = "1"; then
 	echo "Then rerun configure in your object tree"
 	exit 1;
    fi
+   module_status=`cd $srcdir; git submodule status protogeni/rspec-geni`
+   if test $? -ne 0; then
+       AC_MSG_WARN([Cannot get submodule status for protogeni/rspec-geni]);
+       exit 1;
+   fi
+   if echo '$module_status' | grep -E '^\+'; then
+	AC_MSG_WARN([protogeni/rspec-geni submodule is out of date]);
+	echo "Please cd into your source directory and run:"
+	echo "    git submodule update protogeni/rspec-geni"
+	echo "Then rerun configure in your object tree"
+	exit 1;
+   fi
 fi
 
 #
