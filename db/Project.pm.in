@@ -485,7 +485,7 @@ sub SendNewProjectEmail($;$)
 	     "ZIP/Postal Code: $usr_zip\n".
 	     "Country:         $usr_country\n".
 	     "Phone:           $usr_phone\n".
-	     "SSL Cert:        $wanted_sslcert\n";
+	     "SSL Cert:        $wanted_sslcert\n".
 	     "Members:         $proj_members\n".
 	     "PCs:             $proj_pcs\n".
 	     "Planetlab PCs:   $proj_plabpcs\n".
