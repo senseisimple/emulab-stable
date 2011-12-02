@@ -874,6 +874,8 @@ sub SendJoinEmail($$)
     my $usr_affil   = $user->affil();
     my $uid_idx     = $user->uid_idx();
     my $uid         = $user->uid();
+    my $wanted_sslcert = (defined($user->initial_passphrase()) ?
+			  "Yes" : "No");
 
     # And leader info
     my $leader      = $self->GetLeader();
@@ -909,6 +911,7 @@ sub SendJoinEmail($$)
 	 "ZIP/Postal Code: $usr_zip\n".
 	 "Country:         $usr_country\n".
 	 "Phone:           $usr_phone\n".
+	 "SSL Cert:        $wanted_sslcert\n";
 	 "\n".
 	 "Please return to $TBWWW,\n".
 	 "log in, select the 'New User Approval' page, and enter your\n".

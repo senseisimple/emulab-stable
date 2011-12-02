@@ -1,0 +1,28 @@
+#
+# Add initial_passphrase slot to users table.
+#
+use strict;
+use libdb;
+
+my $impotent = 0;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("users", "initial_passphrase")) {
+	DBQueryFatal("alter table users add ".
+		     "  `initial_passphrase` varchar(128) default NULL");
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 " ('users','initial_passphrase','text','redirect', ".
+		 "  'default:tinytext',0,128,NULL)");
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 " ('protogeni/show_sslcertbox','1','1', ".
+		 "  'When set, users see option on join/start project pages ".
+		 "to create SSL certificate.',0)")
+	if (!TBSiteVarExists("protogeni/show_sslcertbox"));
+
+    return 0;
+}

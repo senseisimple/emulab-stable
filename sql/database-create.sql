@@ -4031,6 +4031,7 @@ CREATE TABLE `users` (
   `manager_urn` varchar(128) default NULL,
   `default_project` mediumint(8) unsigned default NULL,
   `nocollabtools` tinyint(1) default '0',
+  `initial_passphrase` varchar(128) default NULL,
   PRIMARY KEY  (`uid_idx`),
   KEY `unix_uid` (`unix_uid`),
   KEY `status` (`status`),

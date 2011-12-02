@@ -450,6 +450,21 @@ sub AddUser()
     }
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
+
+    #
+    # If the user requested an initial encrypted SSL certificate, create
+    # that too. Need to delete the initial_passphrase slot though, so that
+    # we do not try to recreate it at some future time.
+    #
+    if (defined($target_user->initial_passphrase())) {
+	my $pphrase = User::escapeshellarg($target_user->initial_passphrase());
+	
+	system("$MKUSERCERT -p '$pphrase' $user");
+	if ($?) {
+	    fatal("Could not create initial encrypted SSL certificate");
+	}
+	$target_user->Update({'initial_passphrase' => undef});
+    }
     
     if ($nocollabtools) {
 	$EUID = 0;

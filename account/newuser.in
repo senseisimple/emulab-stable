@@ -150,6 +150,7 @@ my %optional = ("uid"		=> "uid",
 		"URL"		=> "usr_URL",
 		"shell"		=> "usr_shell",
 		"password"	=> undef,
+		"passphrase"	=> "initial_passphrase",
 		"pubkey"        => undef,
 		"pubkeys"       => undef);
 
@@ -316,6 +317,36 @@ else {
 	fatal("Checkpass failed with $?");
     }
     $newuser_args{'usr_pswd'} = crypt($pswd, "\$1\$" . substr(time(), 0, 8));
+}
+
+#
+# Check the passphrase if supplied.
+#
+if (exists($xmlparse->{'attribute'}->{'passphrase'}) &&
+    $xmlparse->{'attribute'}->{'passphrase'}->{'value'} != "") {
+    my $passphrase = $xmlparse->{'attribute'}->{'passphrase'}->{'value'};
+    
+    my $checkpass_args = escapeshellarg($passphrase);
+    $checkpass_args   .= " " .
+	(exists($newuser_args{'uid'}) ? $newuser_args{'uid'} : "ignored");
+    $checkpass_args   .= escapeshellarg($newuser_args{'usr_name'} . ":" .
+					$newuser_args{'usr_email'});
+    
+    my $pwokay = `$checkpass $checkpass_args`;
+    if ($?) {
+	chomp($pwokay);
+    
+	if (! ($pwokay =~ /^ok$/)) {
+	    UserError("$pwokay");
+	}
+	fatal("Checkpass failed with $?");
+    }
+    $newuser_args{'initial_passphrase'} = $passphrase;
+
+    if (! (exists($xmlparse->{'attribute'}->{'pubkey'}) ||
+	   exists($xmlparse->{'pubkeys'}))) {
+	UserError("Must provide SSH pubkey when requesting SSL Certificate")
+    }
 }
 
 #

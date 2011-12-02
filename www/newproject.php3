@@ -27,6 +27,9 @@ $optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
 #
 $FirstInitState = (TBGetFirstInitState() == "createproject");
 
+# Need this below;
+$show_sslcertbox = TBGetSiteVar("protogeni/show_sslcertbox");
+
 #
 # If a uid came in, then we check to see if the login is valid.
 # If the login is not valid. We require that the user be logged in
@@ -67,6 +70,7 @@ function SPITFORM($formfields, $returning, $errors)
     global $ACCOUNTWARNING, $EMAILWARNING;
     global $WIKISUPPORT, $WIKIHOME, $USERSELECTUIDS;
     global $WIKIDOCURL, $TBMAINSITE;
+    global $PROTOGENI, $show_sslcertbox;
     
     PAGEHEADER("Start a New Testbed Project");
 
@@ -148,13 +152,11 @@ function SPITFORM($formfields, $returning, $errors)
               }
           </SCRIPT>\n";
 
-    echo "<table align=center border=1> 
-          <tr>
-            <td align=center colspan=3>
-                Fields marked with * are required.
-            </td>
-          </tr>\n
+    echo "<div align=left>
+             <font color=red size=-2>Fields marked with * are required</font>
+          </div>\n";
 
+    echo "<table align=center border=1> 
           <form enctype=multipart/form-data name=myform
                 action=newproject.php3 method=post>\n";
 
@@ -163,8 +165,8 @@ function SPITFORM($formfields, $returning, $errors)
         # Start user information stuff. Presented for new users only.
         #
 	echo "<tr>
-                  <th colspan=3>
-                      Project Head Information:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
+                  <th colspan=3 class=center>
+                      Project Head Information<br>
                       <font size=-2>
                        (Prospective project leaders please read our
                        <a href='$WIKIDOCURL/AdminPolicies' target='_blank'>
@@ -373,12 +375,41 @@ function SPITFORM($formfields, $returning, $errors)
                              value=\"" . $formfields["password2"] . "\"
                              size=8></td>
              </tr>\n";
+
+	#
+	# Geni Passphrase.
+	#
+	if ($PROTOGENI && $show_sslcertbox && !$FirstInitState) {
+	    echo "<tr></tr><tr>
+                   <th class=center colspan=3>Geni Account<br>
+                 <a href='http://users.emulab.net/trac/emulab/wiki/GeniBlurb'
+			target=_blank><font size=-2>what's this?</font></a></th>
+                  </tr>\n";
+
+	    echo "<tr>
+                  <td colspan=2>Geni SSL Pass Phrase[<b>4</b>]:</td>
+                  <td class=left>
+                      <input type=password
+                             name=\"formfields[passphrase1]\"
+                             value=\"" . $formfields["passphrase1"] . "\"
+                             size=32></td>
+              </tr>\n";
+
+	    echo "<tr>
+                  <td colspan=2>Retype Geni Pass Phrase:</td>
+                  <td class=left>
+                      <input type=password
+                             name=\"formfields[passphrase2]\"
+                             value=\"" . $formfields["passphrase2"] . "\"
+                             size=32></td>
+             </tr>\n";
+	}
     }
 
     #
     # Project information
     #
-    echo "<tr><th colspan=3>
+    echo "<tr></tr><tr><th colspan=3 class=center>
                Project Information: 
                <!-- <em>(replace the example entries)</em> -->
               </th>
@@ -577,6 +608,12 @@ function SPITFORM($formfields, $returning, $errors)
                    use one of these commercial vendors, then please
                    upload the public key file and we will convert it
                    for you.\n";
+	if ($PROTOGENI && $show_sslcertbox && !$FirstInitState) {
+	    echo "<li>";
+	    echo "Pick a good pass phrase! They can be (much) longer than
+                  Unix passwords; 10 to 30 character phrases are good,
+                  and may include spaces and punctuation.";
+	}
     }
     echo "</ol>
           </blockquote></blockquote></blockquote>
@@ -631,6 +668,8 @@ if (! isset($submit)) {
     $defaults["usr_phone"]      = "";
     $defaults["password1"]      = "";
     $defaults["password2"]      = "";
+    $defaults["passphrase1"]    = "";
+    $defaults["passphrase2"]    = "";
     
     $defaults["pid"]            = "";
     $defaults["proj_name"]      = "";
@@ -821,6 +860,29 @@ if (! $returning) {
 			    $formfields["usr_email"], $checkerror)) {
 	$errors["Password"] = "$checkerror";
     }
+    if ($PROTOGENI && $show_sslcertbox &&
+	isset($formfields["passphrase1"]) && $formfields["passphrase1"] != "") {
+	if (!isset($formfields["passphrase2"]) ||
+	    $formfields["passphrase2"] == "") {
+	    $errors["Confirm Pass Phrase"] = "Missing Field";
+	}
+	elseif ($formfields["passphrase1"] != $formfields["passphrase2"]) {
+	    $errors["Confirm Pass Phrase"] = "Does not match Pass Phrase";
+	}
+	elseif (! CHECKPASSWORD(($USERSELECTUIDS ?
+				 $formfields["proj_head_uid"] : "ignored"),
+				$formfields["passphrase1"],
+				$formfields["usr_name"],
+				$formfields["usr_email"], $checkerror)) {
+	    $errors["Pass Phrase"] = "$checkerror";
+	}
+	if (! (isset($_FILES['usr_keyfile']) &&
+	       $_FILES['usr_keyfile']['name'] != "" &&
+	       $_FILES['usr_keyfile']['name'] != "none")) {
+	    $errors["SSH Pub Key"] =
+		"You must provide an SSH pubkey to use Geni";
+	}
+    }
 }
 
 if (!isset($formfields["pid"]) ||
@@ -956,6 +1018,10 @@ if (!$returning) {
 
 	$localfile = $_FILES['usr_keyfile']['tmp_name'];
 	$args["pubkey"] = file_get_contents($localfile);
+    }
+    if ($PROTOGENI && $show_sslcertbox &&
+	isset($formfields["passphrase1"]) && $formfields["passphrase1"] != "") {
+	$args["passphrase"] = $formfields["passphrase1"];
     }
 
     # Just collect the user XML args here and pass the file to NewNewProject.

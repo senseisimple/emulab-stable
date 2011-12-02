@@ -186,6 +186,7 @@ sub chpasswd_expires($) { return field($_[0], "chpasswd_expires"); }
 sub wikiname($)		{ return field($_[0], "wikiname"); }
 sub wikionly($)		{ return field($_[0], "wikionly"); }
 sub mailman_password($) { return field($_[0], "mailman_password"); }
+sub initial_passphrase($) { return field($_[0], "initial_passphrase"); }
 sub active($)		{ return ($_[0]->status() eq "active"   ? 1 : 0); };
 sub newuser($)		{ return ($_[0]->status() eq "newuser" ? 1 : 0); };
 sub archived($)		{ return ($_[0]->status() eq "archived" ? 1 : 0); };
@@ -998,11 +999,18 @@ sub Update($$)
 	if (! ref($self));
 
     my $uid_idx = $self->uid_idx();
+    my @sets   = ();
 
-    my $query = "update users set usr_modified=now(), ".
-	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}), keys(%{$argref})));
+    foreach my $key (keys(%{$argref})) {
+	my $val = $argref->{$key};
 
-    $query .= " where uid_idx='$uid_idx'";
+	# Treat NULL special.
+	push (@sets, "${key}=" . ($val eq "NULL" ?
+				  "NULL" : DBQuoteSpecial($val)));
+    }
+
+    my $query = "update users set usr_modified=now(), " . join(",", @sets) .
+	" where uid_idx='$uid_idx'";
 
     return -1
 	if (! DBQueryWarn($query));

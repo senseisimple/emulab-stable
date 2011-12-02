@@ -433,6 +433,8 @@ sub SendNewProjectEmail($;$)
     my $wikiname           = $leader->wikiname();
     my $returning          = $leader->status() ne $User::USERSTATUS_NEWUSER;
     my $usr_returning      = ($returning ? "Yes" : "No");
+    my $wanted_sslcert     = (defined($leader->initial_passphrase()) ?
+			      "Yes" : "No");
     my $proj_desc	   = $self->description();
     my $proj_URL           = $self->URL();
     my $proj_funders       = $self->funders();
@@ -483,6 +485,7 @@ sub SendNewProjectEmail($;$)
 	     "ZIP/Postal Code: $usr_zip\n".
 	     "Country:         $usr_country\n".
 	     "Phone:           $usr_phone\n".
+	     "SSL Cert:        $wanted_sslcert\n";
 	     "Members:         $proj_members\n".
 	     "PCs:             $proj_pcs\n".
 	     "Planetlab PCs:   $proj_plabpcs\n".
