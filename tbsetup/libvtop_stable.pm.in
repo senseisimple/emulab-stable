@@ -6560,8 +6560,7 @@ sub InitializePhysNode($$$)
 
 #
 # This is special. Look at the osid of the virtnodes on this pnode and
-# map to a suitable osid using the nextosid field. This overloads nextosid
-# to some extent ...
+# map to a suitable osid.
 #
 sub nodejailosid($$)
 {
@@ -6573,35 +6572,40 @@ sub nodejailosid($$)
     # features/desires). 
     #
     my $osinfo    = $virtnode->_osinfo();
-    my $posinfo   = $virtnode->_parent_osinfo();
-    my $nextosid;
+    my $nextosinfo;
 
     $self->printdb("nodejailosid: $virtnode, $osinfo\n");
 
-    if (!defined($posinfo)) {
-	return undef
-	    if (!defined($osinfo->nextosid()));
-	my $newosinfo = $osinfo->ResolveNextOSID($self->experiment());
-	return undef
-	    if (!defined($newosinfo));
-	$nextosid = $newosinfo->osid();
-    
-	if (defined($nextosid)) {
-	    $self->printdb("Mapping VM osinfo $osinfo to ".
-			   "$newosinfo on $virtnode\n");
-	}
-	else {
-	    tbwarn("Could not map jail osid to real osid on $virtnode\n");
+    #
+    # The old method was to use nextosid, but the new method uses
+    # the subos stuff.
+    #
+    if (defined($osinfo->def_parentosid())) {
+	$nextosinfo = OSinfo->Lookup($osinfo->def_parentosid());
+	if (!defined($nextosinfo)) {
+	    tbwarn("nodejailosid: could not resolve parent osid for $osinfo\n");
+	    return undef;
 	}
     }
     else {
-	# Don't try resolving nextosid if the vnode is booting a subOS.
-	$nextosid = $osinfo->osid();
-	$self->printdb("Mapping VM osinfo to subOS $osinfo".
-		       " on $virtnode\n");
+	if (!defined($osinfo->nextosid())) {
+	    tbwarn("nodejailosid: no nextosid defined for $osinfo\n");
+	    return undef;
+	}
+	$nextosinfo = $osinfo->ResolveNextOSID($self->experiment());
+	if (!defined($nextosinfo)) {
+	    tbwarn("nodejailosid: could not resolve nextosid for $osinfo\n");
+	    return undef;
+	}
     }
-
-    return $nextosid;
+    if (defined($nextosinfo)) {
+	$self->printdb("Mapping VM osinfo $osinfo to ".
+		       "$nextosinfo on $virtnode\n");
+    }
+    else {
+	tbwarn("nodejailosid: Could not map to real osid on $virtnode\n");
+    }
+    return $nextosinfo->osid();
 }
 
 sub osidbootcmd($$$$)
