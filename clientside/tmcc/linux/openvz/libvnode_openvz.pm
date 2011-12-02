@@ -631,9 +631,8 @@ sub vz_vnodeCreate {
 	if ((my $locked = TBScriptLock($imagelockname,
 				       TBSCRIPTLOCK_GLOBALWAIT(), 1800))
 	    != TBSCRIPTLOCK_OKAY()) {
-#	    return 0
-#		if ($locked == TBSCRIPTLOCK_IGNORE());
-	    print STDERR "Could not get the $imagelockname lock after a long time!\n";
+	    print STDERR
+		"Could not get the $imagelockname lock after a long time!\n";
 	    return -1;
 	}
 
@@ -713,9 +712,8 @@ sub vz_vnodeCreate {
     if ((my $locked = TBScriptLock($imagelockname,
 				   TBSCRIPTLOCK_GLOBALWAIT(), 1800))
 	!= TBSCRIPTLOCK_OKAY()) {
-#	return 0
-#	    if ($locked == TBSCRIPTLOCK_IGNORE());
-	print STDERR "Could not get the $imagelockname lock after a long time!\n";
+	print STDERR
+	    "Could not get the $imagelockname lock after a long time!\n";
 	return -1;
     }
     if ($DOLVM) {
