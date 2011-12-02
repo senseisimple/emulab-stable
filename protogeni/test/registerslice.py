@@ -27,7 +27,7 @@ from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 OtherUser  = None
-Expiration = (60 * 30)
+Expiration = (60 * 300)
 
 execfile( "test-common.py" )
 
