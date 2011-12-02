@@ -1,0 +1,18 @@
+#
+# Allow leading spaces in virt_vtype defns; e.g.:
+#   tb-make-hard-vtype clients { pc3000 pc850 pc600}
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ('virt_vtypes','members',".
+    		 " 'text','regex','^( ?[-\\\\w]+ ?)+\$',0,1024,NULL)");
+
+    return 0;
+}
+
+1;

@@ -893,7 +893,7 @@ REPLACE INTO table_regex VALUES ('virt_vtypes','pid','text','redirect','projects
 REPLACE INTO table_regex VALUES ('virt_vtypes','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','name','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','weight','float','redirect','default:float',0,1,NULL);
-REPLACE INTO table_regex VALUES ('virt_vtypes','members','text','regex','^([-\\w]+ ?)+$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_vtypes','members','text','regex','^( ?[-\\w]+ ?)+$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('default','tinytext','text','regex','^[\\040-\\176]*$',0,256,NULL);
 REPLACE INTO table_regex VALUES ('default','text','text','regex','^[\\040-\\176]*$',0,65535,NULL);
 REPLACE INTO table_regex VALUES ('projects','why','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,4096,NULL);
