@@ -445,7 +445,7 @@ sub LookupOsids()
 	"left join osidtoimageid as oi2 on o.parent_osid = oi2.osid " .
 	"left join images as i1 on oi1.imageid = i1.imageid ".
 	"left join images as i2 on oi2.imageid = i2.imageid ".
-	"where (i1.global = 1";
+	"where (i1.imageid is null or i1.global = 1";
     if (defined($user_project)) {
 	$subosidquery .= " or i1.pid='$user_project'";
     }
