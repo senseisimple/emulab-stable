@@ -1343,14 +1343,14 @@ function ShowNodeHistory($node = null,
 	}
 	if ($node_id == "") {
 	    echo "<br>
-                  <center>
+                  <center><b>
                   $str History for All Nodes.
-                  </center><br>\n";
+                  </b></center><br>\n";
 	} else {
 	    echo "<br>
-                  <center>
+                  <center><b>
                   $str History for Node $node_id.
-                  </center><br>\n";
+                  </b></center><br>\n";
 	}
 
 	echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
@@ -1435,9 +1435,9 @@ function ShowNodeHistory($node = null,
 	$ttime = $atime + $ftime + $rtime + $dtime;
 	if ($ttime) {
 	    echo "<br>
-                  <center>
+                  <center><b>
                   Usage Summary for Node $node_id.
-                  </center><br>\n";
+                  </b></center><br>\n";
 
 	    echo "<table border=1 align=center>\n";
 

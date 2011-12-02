@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -43,7 +43,7 @@ if (!isset($reverse)) {
 $node_id = (isset($node) ? $node->node_id() : "");
 
 $opts="node_id=$node_id&count=$count&reverse=$reverse";
-echo "<b>Show records: ";
+echo "<b>Show records:</b> ";
 if ($showall) {
     echo "<a href='shownodehistory.php3?$opts'>allocated only</a>,
           all";
@@ -53,7 +53,7 @@ if ($showall) {
 }
 
 $opts="node_id=$node_id&count=$count&showall=$showall";
-echo "<br><b>Order by: ";
+echo "<br><b>Order by:</b> ";
 if ($reverse == 0) {
     echo "<a href='shownodehistory.php3?$opts&reverse=1'>lastest first</a>,
           earliest first";
@@ -63,7 +63,7 @@ if ($reverse == 0) {
 }
 
 $opts="node_id=$node_id&showall=$showall&reverse=$reverse";
-echo "<br><b>Show number: ";
+echo "<br><b>Show number:</b> ";
 if ($count != 20) {
     echo "<a href='shownodehistory.php3?$opts&count=20'>first 20</a>, ";
 } else {
