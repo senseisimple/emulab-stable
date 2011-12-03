@@ -2337,6 +2337,7 @@ sub SliverWorkAux($$$$$$$)
 {
     my ($credential, $object, $keys, $isupdate, $impotent, $v2, $level) = @_;
     my $didfwsetup  = 0;
+    my $shouldrollback = 0;
     my $restorephys = 0;	# Flag to restore physical state
     my $response;
     my $ticket;
@@ -2845,6 +2846,7 @@ sub SliverWorkAux($$$$$$$)
 	$experiment->SaveLogFiles();
 	goto bad;
     }
+    $shouldrollback = 1;
     # Dump the output to STDERR for debugging.
     print STDERR $output;
   
@@ -3553,7 +3555,8 @@ sub SliverWorkAux($$$$$$$)
 	# Restore old physical state. 
 	#
 	if ($restorephys) {
-	    if ($experiment->ReserveSharedBandwidth(1, 1) ||
+	    if (($shouldrollback &&
+		 $experiment->ReserveSharedBandwidth(1, 1)) ||
 		$experiment->RemovePhysicalState(1) ||
 		$experiment->RestorePhysicalState()) {
 		print STDERR "Could not restore backup state for $pid,$eid\n";
