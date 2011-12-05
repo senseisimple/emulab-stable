@@ -1411,7 +1411,9 @@ sub vz_vnodePreConfigExpNetwork {
 	    # or atop the physical or vlan device.
 	    #
 	    my $vname = "mv$vmid.$ifc->{ID}";
-	    mysystem("$IP link add link $physdev name $vname address $vethmac type macvlan mode bridge ");
+	    if (! -d "/sys/class/net/$vname") {
+		mysystem("$IP link add link $physdev name $vname address $vethmac type macvlan mode bridge ");
+	    }
 	    mysystem("$VZCTL $VZDEBUGOPTS set $vnode_id --netdev_add $vname --save");
 	}
 	else {
