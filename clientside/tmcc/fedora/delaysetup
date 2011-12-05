@@ -367,38 +367,52 @@ sub DelaySetup
 	    $lp2 = $np2; $np2 += $pinc;
 	}
 
-	# next, plr on the link
 	if (!$DO_NETEM) {
+	    # next, plr on the link
 	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 $nextparent1 plr $plr1";
 	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 $nextparent2 plr $plr2";
-	}
-	else {
+	    $lp1 = $np1; $np1 += $pinc;
+	    $lp2 = $np2; $np2 += $pinc;
 
-	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 $nextparent1 netem drop $plr1";
-	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 $nextparent2 netem drop $plr2";
-	}
-	$lp1 = $np1; $np1 += $pinc;
-	$lp2 = $np2; $np2 += $pinc;
-
-	# next, delay on link
-	if (!$DO_NETEM) {
+	    # next, delay on link
 	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent $lp1:1 delay usecs $delay1";
 	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent $lp2:1 delay usecs $delay2";
+	    $lp1 = $np1; $np1 += $pinc;
+	    $lp2 = $np2; $np2 += $pinc;
+
+	    # finally, do the rate limiting
+	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent $lp1:1 htb default 1";
+	    push @upcmds,"$TC class add dev $iface1 classid $np1:1 parent $np1 htb rate $bandw1 ceil $bandw1";
+	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent $lp2:1 htb default 1";
+	    push @upcmds,"$TC class add dev $iface2 classid $np2:1 parent $np2 htb rate $bandw2 ceil $bandw2";
+	    $lp1 = $np1; $np1 += $pinc;
+	    $lp2 = $np2; $np2 += $pinc;
 	}
 	else {
-	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent $lp1:1 delay ${delay1}us";
-	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent $lp2:1 delay ${delay2}us";
-	}
-	$lp1 = $np1; $np1 += $pinc;
-	$lp2 = $np2; $np2 += $pinc;
+	    #
+	    # netem cannot have non-work-conserving qdiscs inside of itself,
+	    # and it can't have itself inside itself -- because it uses the
+	    # skbuff's control block and would thus overwrite itself.  The 
+	    # Linux maintainers removed its classful support for these and 
+	    # other reasons, so you can't nest anything inside it.
+	    # So, we have to do bandwidth shaping first, and then the loss
+	    # and delay with the same netem qdisc.
+	    #
 
-	# finally, do the rate limiting
-	push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent $lp1:1 htb default 1";
-	push @upcmds,"$TC class add dev $iface1 classid $np1:1 parent $np1 htb rate $bandw1 ceil $bandw1";
-	push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent $lp2:1 htb default 1";
-	push @upcmds,"$TC class add dev $iface2 classid $np2:1 parent $np2 htb rate $bandw2 ceil $bandw2";
-	$lp1 = $np1; $np1 += $pinc;
-	$lp2 = $np2; $np2 += $pinc;
+	    # first do the rate limiting
+	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 $nextparent1 htb default 1";
+	    push @upcmds,"$TC class add dev $iface1 classid $np1:1 parent $np1 htb rate $bandw1 ceil $bandw1";
+	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 $nextparent2 htb default 1";
+	    push @upcmds,"$TC class add dev $iface2 classid $np2:1 parent $np2 htb rate $bandw2 ceil $bandw2";
+	    $lp1 = $np1; $np1 += $pinc;
+	    $lp2 = $np2; $np2 += $pinc;
+
+	    # next, plr and delay on the link
+	    push @upcmds,"$TC qdisc add dev $iface1 handle $np1 parent ${lp1}:1 netem drop $plr1 delay ${delay1}us";
+	    push @upcmds,"$TC qdisc add dev $iface2 handle $np2 parent ${lp2}:1 netem drop $plr2 delay ${delay2}us";
+	    $lp1 = $np1; $np1 += $pinc;
+	    $lp2 = $np2; $np2 += $pinc;
+	}
 
 	# and last, add the down commands:
 	push @downcmds,"$TC qdisc del dev $iface1 root";
@@ -639,19 +653,38 @@ sub LinkDelaySetup()
             
             print DEL "$IFCONFIG $iface txqueuelen $queue\n";
 
-            print DEL "$TC qdisc add dev $iface handle $pipeno root ";
-            print DEL "netem drop $plr\n";
+	    if (!$DO_NETEM) {
+		print DEL "$TC qdisc add dev $iface handle $pipeno root ";
+		print DEL "plr $plr\n";
 
-            print DEL "$TC qdisc add dev $iface handle ". ($pipeno+10) ." ";
-            print DEL "parent ${pipeno}:1 netem delay ${delay}us\n";
+		print DEL "$TC qdisc add dev $iface handle ". ($pipeno+10) ." ";
+		print DEL "parent ${pipeno}:1 delay usecs $delay\n";
 
-            print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." ";
-            print DEL "parent ". ($pipeno+10) .":1 htb default 1\n";
+		print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." ";
+		print DEL "parent ". ($pipeno+10) .":1 htb default 1\n";
 
-	    if ($bandw != 0) {
-		print DEL "$TC class add dev $iface classid ". ($pipeno+20) .":1 ";
-		print DEL "parent ". ($pipeno+20) ." htb rate ${bandw} ";
-		print DEL "ceil ${bandw}\n";
+		if ($bandw != 0) {
+		    print DEL "$TC class add dev $iface classid ". ($pipeno+20) .":1 ";
+		    print DEL "parent ". ($pipeno+20) ." htb rate ${bandw} ";
+		    print DEL "ceil ${bandw}\n";
+		}
+	    }
+	    else {
+		#
+		# See comments in DelaySetup for why we have to reverse
+		# the normal shaping order for netem!
+		#
+		print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." root ";
+		print DEL "htb default 1\n";
+
+		if ($bandw != 0) {
+		    print DEL "$TC class add dev $iface classid ". ($pipeno+20) .":1 ";
+		    print DEL "parent ". ($pipeno+20) ." htb rate ${bandw} ";
+		    print DEL "ceil ${bandw}\n";
+		}
+
+		print DEL "$TC qdisc add dev $iface handle ".($pipeno+10)." parent ".($pipeno+20).":1 ";
+		print DEL "netem drop $plr delay ${delay}us\n";
 	    }
 
             $iface =~ /\D+(\d+)/;
@@ -668,21 +701,37 @@ sub LinkDelaySetup()
 		    die("No such IMQ device: imq${imqnum}");
 		}
 		
-                print DEL "$TC qdisc add dev $imqdev handle $pipeno ";
-                print DEL "root netem drop $rplr\n";
+		if (!$DO_NETEM) {
+		    print DEL "$TC qdisc add dev $imqdev handle $pipeno ";
+		    print DEL "root plr $rplr\n";
 
-                print DEL "$TC qdisc add dev $imqdev handle ";
-                print DEL "". ($pipeno+10) ." parent ${pipeno}:1 ";
-                print DEL "netem delay ${rdelay}us\n";
+		    print DEL "$TC qdisc add dev $imqdev handle ";
+		    print DEL "". ($pipeno+10) ." parent ${pipeno}:1 ";
+		    print DEL "delay ${rdelay}us\n";
 
-                print DEL "$TC qdisc add dev $imqdev handle "; 
-                print DEL "". ($pipeno+20) ." parent ". ($pipeno+10) .":1 ";
-                print DEL "htb default 1\n";
+		    print DEL "$TC qdisc add dev $imqdev handle "; 
+		    print DEL "". ($pipeno+20) ." parent ". ($pipeno+10) .":1 ";
+		    print DEL "htb default 1\n";
 
-		if ($rbandw != 0) {
-		    print DEL "$TC class add dev $imqdev classid ";
-		    print DEL "". ($pipeno+20) .":1 parent ". ($pipeno+20) ." ";
-		    print DEL "htb rate ${rbandw} ceil ${rbandw}\n";
+		    if ($rbandw != 0) {
+			print DEL "$TC class add dev $imqdev classid ";
+			print DEL "". ($pipeno+20) .":1 parent ". ($pipeno+20) ." ";
+			print DEL "htb rate ${rbandw} ceil ${rbandw}\n";
+		    }
+		}
+		else {
+		    print DEL "$TC qdisc add dev $imqdev handle "; 
+		    print DEL "". ($pipeno+20) ." root ";
+		    print DEL "htb default 1\n";
+
+		    if ($rbandw != 0) {
+			print DEL "$TC class add dev $imqdev classid ";
+			print DEL "". ($pipeno+20) .":1 parent ". ($pipeno+20) ." ";
+			print DEL "htb rate ${rbandw} ceil ${rbandw}\n";
+		    }
+
+		    print DEL "$TC qdisc add dev $imqdev handle ".($pipeno+10)." ";
+		    print DEL "parent ".($pipeno+20).":1 netem drop $rplr delay $rdelay\n";
 		}
                 
                 print DEL "$IPTABLES -t mangle -A PREROUTING -i $iface ";
