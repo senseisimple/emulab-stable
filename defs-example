@@ -1,8 +1,7 @@
 #
 # This is an example definitions file for configure.
 #
-# Use the --with-TBDEFS=filename to specify your own file.
-# If you add a variable, be sure to go and update configure.in.
+# ALL VARIABLES MUST BE DEFINED! DO NOT COMMENT OUT VARIABLES!
 #
 
 # The name of this installation
